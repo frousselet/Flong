@@ -75,6 +75,7 @@ The app target uses an Xcode synchronized file group, so a new file placed in `F
 
 - **English in code** : all code is English : variable, constant, function, type names, comments and doc comments. French appears only in translated user-facing strings.
 - **Systematic French translations** : every user-facing string must be localizable (`Text("...")`, `String(localized:)`, `LocalizedStringResource`) and must have a French translation in `Flong/Localizable.xcstrings`. Never leave a string untranslated, and never hardcode a user-visible literal outside the catalog. `Text(verbatim:)` is only for content that must not be translated, such as a URL placeholder.
+- **Every source file carries the MPL notice** : a new Swift file starts with the Xcode header, followed by the Mozilla Public License 2.0 source notice (Exhibit A of `LICENSE`). MPL copyleft is file-based, so a file without the notice leaves its licensing ambiguous.
 - **No em dash character** : never use the em dash character (U+2014) in code, strings or display text. Use ` : ` or ` - ` instead.
 - **UI quality in both appearances** : every screen must render correctly in light and dark mode. Rendered article HTML must follow the system appearance too, through `color-scheme` and `prefers-color-scheme`.
 - **Every platform is a first-class target** : a change must work on iPhone, iPad and Mac. Guard platform-specific API with `#if os(iOS)` / `#if os(macOS)` rather than dropping a platform, and check that the split view still behaves once collapsed on iPhone.

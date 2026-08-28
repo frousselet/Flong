@@ -13,3 +13,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `swift-format` configuration and a shared `Flong` scheme so builds and formatting are reproducible outside Xcode.
 - Issue and pull request templates.
 - Project conventions in `CLAUDE.md` and the FreshRSS API reference in `docs/technical/`.
+- MPL-2.0 license, with the source notice carried by every file.
