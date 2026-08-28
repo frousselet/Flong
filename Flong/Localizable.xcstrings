@@ -101,6 +101,36 @@
         }
       }
     },
+    "Cancel": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler"
+          }
+        }
+      }
+    },
+    "Connect": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se connecter"
+          }
+        }
+      }
+    },
+    "Credentials": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identifiants"
+          }
+        }
+      }
+    },
     "Endpoints": {
       "localizations": {
         "fr": {
@@ -151,12 +181,32 @@
         }
       }
     },
+    "Flong": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flong"
+          }
+        }
+      }
+    },
     "Folders": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Dossiers"
+          }
+        }
+      }
+    },
+    "FreshRSS account": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compte FreshRSS"
           }
         }
       }
@@ -171,12 +221,12 @@
         }
       }
     },
-    "Instance": {
+    "Keychain error %d.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Instance"
+            "value": "Erreur du trousseau %d."
           }
         }
       }
@@ -251,6 +301,16 @@
         }
       }
     },
+    "Read checks never change anything on the account.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les vérifications de lecture ne modifient rien sur le compte."
+          }
+        }
+      }
+    },
     "Read state round trip": {
       "localizations": {
         "fr": {
@@ -301,6 +361,16 @@
         }
       }
     },
+    "Runs one check per endpoint against this account.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lance une vérification par point d'accès sur ce compte."
+          }
+        }
+      }
+    },
     "Second page returns a different article": {
       "localizations": {
         "fr": {
@@ -341,6 +411,16 @@
         }
       }
     },
+    "Shared with your devices": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partagés avec vos appareils"
+          }
+        }
+      }
+    },
     "Sign in": {
       "localizations": {
         "fr": {
@@ -351,12 +431,42 @@
         }
       }
     },
+    "Sign out": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se déconnecter"
+          }
+        }
+      }
+    },
+    "Sign out of this account?": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se déconnecter de ce compte ?"
+          }
+        }
+      }
+    },
     "Skipped": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Ignoré"
+          }
+        }
+      }
+    },
+    "Stored in iCloud Keychain, so your other devices signed in to the same Apple Account can use them.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrés dans le trousseau iCloud, vos autres appareils connectés au même compte Apple peuvent donc les utiliser."
           }
         }
       }
@@ -377,6 +487,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "L'état de l'article n'a pas pu être rétabli, vérifiez-le à la main."
+          }
+        }
+      }
+    },
+    "The credentials stored in the keychain could not be read.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les identifiants enregistrés dans le trousseau n'ont pas pu être lus."
+          }
+        }
+      }
+    },
+    "The credentials will be removed from the keychain, on this device and on the others.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les identifiants seront supprimés du trousseau, sur cet appareil comme sur les autres."
           }
         }
       }
@@ -451,6 +581,16 @@
         }
       }
     },
+    "This device only": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet appareil uniquement"
+          }
+        }
+      }
+    },
     "Toggled and restored one article, left %@": {
       "localizations": {
         "fr": {
@@ -497,6 +637,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Identifiant"
+          }
+        }
+      }
+    },
+    "Your credentials are stored in the keychain and shared with your other devices through iCloud Keychain.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vos identifiants sont enregistrés dans le trousseau et partagés avec vos autres appareils via le trousseau iCloud."
+          }
+        }
+      }
+    },
+    "iCloud Keychain refused the item, so they stay on this device.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le trousseau iCloud a refusé l'élément, ils restent donc sur cet appareil."
           }
         }
       }

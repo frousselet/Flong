@@ -21,36 +21,13 @@ import Foundation
 @MainActor
 @Observable
 final class ProbeModel {
-    private static let serverKey = "flong.probe.server"
-    private static let usernameKey = "flong.probe.username"
-
     /// Articles pulled when looking for one to flip during the write check.
     private static let writeCheckWindow = 50
 
-    var server: String
-    var username: String
-    /// Kept in memory only, never written anywhere.
-    var password = ""
     var includesWriteCheck = false
 
     private(set) var checks: [ProbeCheck] = []
     private(set) var isRunning = false
-    private(set) var addressError: String?
-
-    private let defaults: UserDefaults
-
-    init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
-        self.server = defaults.string(forKey: Self.serverKey) ?? ""
-        self.username = defaults.string(forKey: Self.usernameKey) ?? ""
-    }
-
-    var canRun: Bool {
-        !isRunning
-            && !server.trimmingCharacters(in: .whitespaces).isEmpty
-            && !username.trimmingCharacters(in: .whitespaces).isEmpty
-            && !password.isEmpty
-    }
 
     var failureCount: Int { checks.filter(\.isFailure).count }
 
@@ -58,26 +35,10 @@ final class ProbeModel {
 
     // MARK: - Run
 
-    func run() async {
-        guard let serverURL = ServerAddress.normalized(from: server) else {
-            addressError = String(localized: "This address cannot be read as a server URL.")
-            return
-        }
-
-        addressError = nil
+    func run(with provider: any FeedProvider) async {
         isRunning = true
         checks = Self.makeChecks(includesWrite: includesWriteCheck)
         defer { isRunning = false }
-
-        // The address and the username come back on the next launch. The
-        // password does not, deliberately.
-        defaults.set(server, forKey: Self.serverKey)
-        defaults.set(username, forKey: Self.usernameKey)
-
-        let provider = GReaderProvider(
-            serverURL: serverURL,
-            credentials: GReaderCredentials(username: username, password: password)
-        )
 
         guard await runReadChecks(with: provider) else { return }
         if includesWriteCheck {
@@ -86,7 +47,7 @@ final class ProbeModel {
     }
 
     /// - Returns: false when signing in failed, which makes every later check moot.
-    private func runReadChecks(with provider: GReaderProvider) async -> Bool {
+    private func runReadChecks(with provider: any FeedProvider) async -> Bool {
         let signedIn = await perform("signIn") {
             let token = try await provider.signIn()
             return String(localized: "Session opened, token of \(token.count) characters")
@@ -157,7 +118,7 @@ final class ProbeModel {
 
     /// Flips the read state of one article and puts it back, checking the server
     /// agreed both times.
-    private func runWriteCheck(with provider: GReaderProvider) async {
+    private func runWriteCheck(with provider: any FeedProvider) async {
         await perform("writeRoundTrip") {
             let page = try await provider.articles(
                 in: .all, unreadOnly: false, limit: Self.writeCheckWindow, continuation: nil
@@ -187,7 +148,7 @@ final class ProbeModel {
     }
 
     /// Re-reads one article's state from its own feed.
-    private static func readState(of article: RemoteArticle, from provider: GReaderProvider) async throws -> Bool? {
+    private static func readState(of article: RemoteArticle, from provider: any FeedProvider) async throws -> Bool? {
         let page = try await provider.articles(
             in: .feed(id: article.feedID), unreadOnly: false, limit: writeCheckWindow, continuation: nil
         )

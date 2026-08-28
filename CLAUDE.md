@@ -25,6 +25,17 @@ xcodebuild -list -project Flong.xcodeproj          # Targets, configurations and
 xcrun simctl list devices available                # Pick a simulator for -destination
 ```
 
+### Signing
+
+The app carries a `keychain-access-groups` entitlement (`Config/Flong.entitlements`), which the credential store needs. That entitlement requires a provisioning profile, so a machine building it for the first time has to let Xcode create one and register itself :
+
+```bash
+xcodebuild build -project Flong.xcodeproj -scheme Flong -destination 'platform=macOS' \
+  -allowProvisioningUpdates -allowProvisioningDeviceRegistration
+```
+
+Without `-allowProvisioningDeviceRegistration` the build fails with *Device ... isn't registered in your developer account*. Once the profile exists, ordinary builds work again. Only macOS needs this : iOS gets its application identifier from its own profile, and the simulator needs none.
+
 ### Testing
 
 ```bash
@@ -69,6 +80,7 @@ The app target uses an Xcode synchronized file group, so a new file placed in `F
 - **Concurrency** : the target builds with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` and approachable concurrency, so types are main-actor isolated unless marked `nonisolated`. Networking types, DTOs and SwiftData models are declared `nonisolated`; the HTTP client is an `actor`; background store writes go through a `@ModelActor`.
 - **SwiftData models never use `id` as a stored property**, because `PersistentModel` already provides one. The remote identifier is `remoteID`, and relationships are mirrored by a stored foreign key (for example `Article.feedID`) so `@Query` predicates filter on an indexed column instead of walking a relationship.
 - **Optimistic local writes** : read and star actions update the local store first, then push to the server, and roll the local change back if the server refuses it. The interface must never wait on the network to reflect a tap.
+- **Credentials are shared across the account's devices** : they live in the keychain with `kSecAttrSynchronizable`, which hands the item to iCloud Keychain, and `kSecUseDataProtectionKeychain`, which is what selects the modern keychain on macOS. Without the second, macOS silently uses its legacy file-based keychain, which never syncs. Every `SecItem` call for one item must carry the same flags : a query that omits `kSecAttrSynchronizable` only matches non-synchronizable items. A synchronizable item cannot use a `ThisDeviceOnly` protection class. The session token is deliberately not synced : it is a per-device cache rebuildable from the credentials.
 - **Credentials never leave the keychain** : the FreshRSS API password and the session token are stored through `SecretStore`. Never write them to `UserDefaults`, a log line, or a file.
 
 ## Development Guidelines

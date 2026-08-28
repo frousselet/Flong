@@ -11,114 +11,58 @@
 
 import SwiftUI
 
-/// Bench for the Google Reader layer : credentials in, one row per endpoint out.
+/// Bench for the Google Reader layer : one row per endpoint, run against the
+/// signed-in account.
 struct ProbeView: View {
-    @Environment(ProbeModel.self) private var model
-
-    private enum Field: Hashable {
-        case server, username, password
-    }
-
-    @FocusState private var focused: Field?
+    @Environment(SessionModel.self) private var session
+    @State private var model = ProbeModel()
 
     var body: some View {
         @Bindable var model = model
 
-        NavigationStack {
-            Form {
+        Form {
+            Section {
+                Toggle(isOn: $model.includesWriteCheck) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Also test writing")
+                        Text("Flips one article between read and unread, then puts it back.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .disabled(model.isRunning)
+            } footer: {
+                Text("Read checks never change anything on the account.")
+            }
+
+            Section {
+                Button(action: run) {
+                    HStack {
+                        Text(model.hasRun ? "Run again" : "Run the checks")
+                        if model.isRunning {
+                            Spacer()
+                            ProgressView().controlSize(.small)
+                        }
+                    }
+                }
+                .disabled(model.isRunning || session.provider == nil)
+            }
+
+            if model.hasRun {
                 Section {
-                    LabeledContent("Server") {
-                        TextField("Server", text: $model.server, prompt: Text(verbatim: "rss.example.com"))
-                            .labelsHidden()
-                            .focused($focused, equals: .server)
-                            .textContentType(.URL)
-                            .autocorrectionDisabled()
-                            .multilineTextAlignment(.trailing)
-                            #if os(iOS)
-                                .textInputAutocapitalization(.never)
-                                .keyboardType(.URL)
-                            #endif
-                            .onSubmit { focused = .username }
-                    }
-
-                    LabeledContent("Username") {
-                        TextField("Username", text: $model.username, prompt: Text(verbatim: "alice"))
-                            .labelsHidden()
-                            .focused($focused, equals: .username)
-                            .textContentType(.username)
-                            .autocorrectionDisabled()
-                            .multilineTextAlignment(.trailing)
-                            #if os(iOS)
-                                .textInputAutocapitalization(.never)
-                            #endif
-                            .onSubmit { focused = .password }
-                    }
-
-                    LabeledContent("API password") {
-                        SecureField("API password", text: $model.password, prompt: Text(verbatim: ""))
-                            .labelsHidden()
-                            .focused($focused, equals: .password)
-                            .textContentType(.password)
-                            .multilineTextAlignment(.trailing)
-                            .onSubmit(runIfPossible)
+                    ForEach(model.checks) { check in
+                        ProbeCheckRow(check: check)
                     }
                 } header: {
-                    Text("Instance")
+                    Text("Endpoints")
                 } footer: {
-                    Text(
-                        """
-                        The API password is set in FreshRSS under Profile and differs from the web password. \
-                        Enable the API first under Settings, Authentication.
-                        """
-                    )
-                }
-
-                Section {
-                    Toggle(isOn: $model.includesWriteCheck) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Also test writing")
-                            Text("Flips one article between read and unread, then puts it back.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .disabled(model.isRunning)
-                }
-
-                Section {
-                    Button(action: runIfPossible) {
-                        HStack {
-                            Text(model.hasRun ? "Run again" : "Run the checks")
-                            if model.isRunning {
-                                Spacer()
-                                ProgressView().controlSize(.small)
-                            }
-                        }
-                    }
-                    .disabled(!model.canRun)
-
-                    if let addressError = model.addressError {
-                        Label(addressError, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red)
-                    }
-                }
-
-                if model.hasRun {
-                    Section {
-                        ForEach(model.checks) { check in
-                            ProbeCheckRow(check: check)
-                        }
-                    } header: {
-                        Text("Endpoints")
-                    } footer: {
-                        resultSummary
-                    }
+                    resultSummary
                 }
             }
-            .formStyle(.grouped)
-            .navigationTitle("GReader bench")
-            .textSelection(.enabled)
         }
+        .formStyle(.grouped)
+        .navigationTitle("GReader bench")
+        .textSelection(.enabled)
     }
 
     @ViewBuilder
@@ -132,10 +76,9 @@ struct ProbeView: View {
         }
     }
 
-    private func runIfPossible() {
-        guard model.canRun else { return }
-        focused = nil
-        Task { await model.run() }
+    private func run() {
+        guard let provider = session.provider, !model.isRunning else { return }
+        Task { await model.run(with: provider) }
     }
 }
 
@@ -206,6 +149,8 @@ struct ProbeCheckRow: View {
 }
 
 #Preview {
-    ProbeView()
-        .environment(ProbeModel(defaults: UserDefaults(suiteName: "flong.preview") ?? .standard))
+    NavigationStack {
+        ProbeView()
+            .environment(SessionModel(store: InMemoryCredentialStore()))
+    }
 }

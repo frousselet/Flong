@@ -2,7 +2,7 @@
 
 A native [FreshRSS](https://www.freshrss.org/) client for iOS, iPadOS and macOS, written in Swift with SwiftUI and SwiftData.
 
-> Status : early. The Google Reader API client is in place and covered by tests. The data layer and the interface are next.
+> Status : early. The Google Reader API client and the sign-in flow are in place and covered by tests. The data layer and the reading interface are next.
 
 ## Platforms
 
@@ -39,6 +39,12 @@ Flong uses the Google Reader compatible API that FreshRSS exposes at `/api/gread
 2. **Profile** : set an *API password*. It is distinct from the web password, and it is the one Flong asks for.
 
 The instance URL, the username and the API password are all Flong needs. Credentials are stored in the system keychain and never written anywhere else.
+
+## Credentials
+
+The instance address, the username and the API password are stored in the keychain and marked for iCloud Keychain, so the other devices signed in to the same Apple Account pick them up without being set up again. The session token stays on each device, since it can be rebuilt from the credentials.
+
+If the build lacks the keychain entitlement, the credentials fall back to the local keychain and the account screen says so rather than pretending they are shared.
 
 ## Backends
 

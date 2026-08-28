@@ -16,3 +16,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - MPL-2.0 license, with the source notice carried by every file.
 - Google Reader API client for FreshRSS, behind the backend-neutral `FeedProvider` protocol.
 - Bench screen exercising every read endpoint against a live instance, with an opt-in write round trip.
+- Sign-in flow storing credentials in the keychain, shared across the Apple Account's devices through iCloud Keychain.

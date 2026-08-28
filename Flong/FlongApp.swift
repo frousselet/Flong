@@ -13,12 +13,12 @@ import SwiftUI
 
 @main
 struct FlongApp: App {
-    @State private var probe = ProbeModel()
+    @State private var session = SessionModel()
 
     var body: some Scene {
         WindowGroup {
-            ProbeView()
-                .environment(probe)
+            RootView()
+                .environment(session)
         }
         #if os(macOS)
             .defaultSize(width: 720, height: 800)
