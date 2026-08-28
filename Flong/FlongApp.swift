@@ -5,14 +5,14 @@
 //  Created by François Rousselet on 28/08/2026.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 @main
 struct FlongApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            Item.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

@@ -1,0 +1,36 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Add Item" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter un élément"
+          }
+        }
+      }
+    },
+    "Item at %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Élément du %@"
+          }
+        }
+      }
+    },
+    "Select an item" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sélectionnez un élément"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
