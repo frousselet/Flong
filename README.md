@@ -8,9 +8,9 @@ A native [FreshRSS](https://www.freshrss.org/) client for iOS, iPadOS and macOS,
 
 | Platform | Minimum version |
 | -------- | --------------- |
-| iOS      | 26.5 |
-| iPadOS   | 26.5 |
-| macOS    | 26.5 |
+| iOS      | 26.0 |
+| iPadOS   | 26.0 |
+| macOS    | 26.0 |
 
 A single SwiftUI codebase serves the three platforms.
 
