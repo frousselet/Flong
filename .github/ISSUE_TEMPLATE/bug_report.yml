@@ -1,0 +1,62 @@
+name: Bug report
+description: Report something that does not behave as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Never paste a real instance URL, username, password or API token in an issue.
+        Replace them with `https://rss.example.com` and placeholder credentials.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happens, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The shortest sequence that reproduces the problem.
+      placeholder: |
+        1. Open the app on ...
+        2. Select ...
+        3. The article list shows ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - iPhone
+        - iPad
+        - Mac
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      placeholder: iOS 26.5
+    validations:
+      required: true
+
+  - type: input
+    id: freshrss-version
+    attributes:
+      label: FreshRSS version
+      placeholder: "1.28.0"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant console output, with any credential redacted.
+      render: text
