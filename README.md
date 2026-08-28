@@ -55,3 +55,9 @@ The interface is authored in English and translated to French. All strings live 
 | [`CLAUDE.md`](CLAUDE.md) | Working conventions : architecture, guidelines, git and release workflow |
 | [`CHANGELOG.md`](CHANGELOG.md) | Change history, following [Keep a Changelog](https://keepachangelog.com/) |
 | [`docs/technical/freshrss-api.md`](docs/technical/freshrss-api.md) | The Google Reader API surface Flong relies on |
+
+## License
+
+Flong is released under the [Mozilla Public License 2.0](LICENSE). Modified Flong files must be published under the same license, while the rest of a larger work may carry another one.
+
+Copyright (C) 2026 François Rousselet.
