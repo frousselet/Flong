@@ -1,36 +1,96 @@
 {
-  "sourceLanguage" : "en",
-  "strings" : {
-    "Add Item" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajouter un élément"
+  "sourceLanguage": "en",
+  "strings": {
+    "Add Item": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter un élément"
           }
         }
       }
     },
-    "Item at %@" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Élément du %@"
+    "Item at %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Élément du %@"
           }
         }
       }
     },
-    "Select an item" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sélectionnez un élément"
+    "Select an item": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sélectionnez un élément"
+          }
+        }
+      }
+    },
+    "Session expired, please sign in again.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session expirée, reconnectez-vous."
+          }
+        }
+      }
+    },
+    "The server address is not valid.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'adresse du serveur n'est pas valide."
+          }
+        }
+      }
+    },
+    "The server did not return an authentication token.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le serveur n'a pas renvoyé de jeton d'authentification."
+          }
+        }
+      }
+    },
+    "The server rejected this username or API password.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le serveur a refusé cet identifiant ou ce mot de passe d'API."
+          }
+        }
+      }
+    },
+    "The server replied with error %lld.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le serveur a répondu une erreur %lld."
+          }
+        }
+      }
+    },
+    "Unreadable server response: %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réponse du serveur illisible : %@"
           }
         }
       }
     }
   },
-  "version" : "1.0"
+  "version": "1.0"
 }

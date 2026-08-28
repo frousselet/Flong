@@ -2,7 +2,7 @@
 
 A native [FreshRSS](https://www.freshrss.org/) client for iOS, iPadOS and macOS, written in Swift with SwiftUI and SwiftData.
 
-> Status : early. The repository currently holds the project skeleton, its conventions and its documentation. The application itself is being built.
+> Status : early. The Google Reader API client is in place and covered by tests. The data layer and the interface are next.
 
 ## Platforms
 
