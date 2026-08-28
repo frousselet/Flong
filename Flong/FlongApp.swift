@@ -9,28 +9,19 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //
 
-import SwiftData
 import SwiftUI
 
 @main
 struct FlongApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    @State private var probe = ProbeModel()
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ProbeView()
+                .environment(probe)
         }
-        .modelContainer(sharedModelContainer)
+        #if os(macOS)
+            .defaultSize(width: 720, height: 800)
+        #endif
     }
 }
