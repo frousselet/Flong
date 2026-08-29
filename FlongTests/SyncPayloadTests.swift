@@ -370,4 +370,79 @@ struct SyncPayloadTests {
         try await second.payload.apply(fromFirst)
         #expect(try await second.library.count() == 1)
     }
+
+    // MARK: - What the server said
+
+    @Test("A record to save carries the tag the server gave it")
+    func rebasing() throws {
+        let zone = CKRecordZone.ID(zoneName: "Flong", ownerName: CKCurrentUserDefaultName)
+        let id = CKRecord.ID(recordName: "read-read-2026-08", zoneID: zone)
+
+        // The record as the server handed it back, kept the way the store keeps it.
+        let fromServer = CKRecord(recordType: "ReadState", recordID: id)
+        fromServer["period"] = "2026-08"
+        let coder = NSKeyedArchiver(requiringSecureCoding: true)
+        fromServer.encodeSystemFields(with: coder)
+        coder.finishEncoding()
+
+        // The record as this device builds it, which knows nothing of the server.
+        let built = CKRecord(recordType: "ReadState", recordID: id)
+        built["period"] = "2026-08"
+        built["fingerprints"] = Data([1, 2, 3])
+
+        let rebased = SyncRecords.rebased(built, onto: coder.encodedData)
+
+        #expect(rebased.recordID == id)
+        #expect(rebased["fingerprints"] as? Data == Data([1, 2, 3]))
+        // The system fields came from the server's copy, not from the built one.
+        #expect(rebased !== built)
+    }
+
+    @Test("A record the server has never mentioned is sent as it is")
+    func rebasingWithoutATag() {
+        let zone = CKRecordZone.ID(zoneName: "Flong", ownerName: CKCurrentUserDefaultName)
+        let built = CKRecord(recordType: "Feed", recordID: CKRecord.ID(recordName: "feed-1", zoneID: zone))
+
+        #expect(SyncRecords.rebased(built, onto: nil) === built)
+        #expect(SyncRecords.rebased(built, onto: Data([0, 1, 2])) === built)
+    }
+
+    @Test("An archive for another record is not used for this one")
+    func rebasingOntoTheWrongRecord() throws {
+        let zone = CKRecordZone.ID(zoneName: "Flong", ownerName: CKCurrentUserDefaultName)
+        let other = CKRecord(recordType: "Feed", recordID: CKRecord.ID(recordName: "feed-2", zoneID: zone))
+        let coder = NSKeyedArchiver(requiringSecureCoding: true)
+        other.encodeSystemFields(with: coder)
+        coder.finishEncoding()
+
+        let built = CKRecord(recordType: "Feed", recordID: CKRecord.ID(recordName: "feed-1", zoneID: zone))
+
+        #expect(SyncRecords.rebased(built, onto: coder.encodedData) === built)
+    }
+
+    @Test("What the server said is kept, given back and forgotten")
+    func rememberingTags() async throws {
+        let database = try AppDatabase.inMemory()
+        let state = SyncState(database)
+        let zone = CKRecordZone.ID(zoneName: "Flong", ownerName: CKCurrentUserDefaultName)
+
+        let records = ["feed-1", "read-read-2026-08"].map {
+            CKRecord(recordType: "Feed", recordID: CKRecord.ID(recordName: $0, zoneID: zone))
+        }
+
+        try await state.remember(records)
+        let kept = try await state.systemFields(for: ["feed-1", "read-read-2026-08", "never-seen"])
+
+        #expect(kept.count == 2)
+        #expect(kept["feed-1"] != nil)
+        #expect(kept["never-seen"] == nil)
+
+        try await state.forget(["feed-1"])
+        let remaining = try await state.systemFields(for: ["feed-1", "read-read-2026-08"])
+        #expect(remaining.keys.sorted() == ["read-read-2026-08"])
+
+        try await state.forgetEveryRecord()
+        let none = try await state.systemFields(for: ["read-read-2026-08"])
+        #expect(none.isEmpty)
+    }
 }

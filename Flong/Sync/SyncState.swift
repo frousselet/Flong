@@ -9,6 +9,7 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //
 
+import CloudKit
 import Foundation
 import GRDB
 
@@ -38,6 +39,72 @@ nonisolated struct SyncState: Sendable {
         try await database.writer.read { db in
             try Data.fetchOne(db, sql: "SELECT value FROM sync_state WHERE key = ?", arguments: [key])
         }
+    }
+
+    // MARK: - What the server said about each record
+
+    /// The system fields of the records the server has confirmed, by name.
+    func systemFields(for names: Set<String>) async throws -> [String: Data] {
+        guard !names.isEmpty else { return [:] }
+
+        return try await database.writer.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql:
+                    "SELECT record_name, system_fields FROM sync_record WHERE record_name IN (\(placeholders(names.count)))",
+                arguments: StatementArguments(Array(names))
+            )
+            return Dictionary(
+                uniqueKeysWithValues: rows.map { ($0["record_name"] as String, $0["system_fields"] as Data) }
+            )
+        }
+    }
+
+    /// Keeps what the server said about these records, so the next save of
+    /// each carries the tag the server expects.
+    func remember(_ records: [CKRecord], at date: Date = Date()) async throws {
+        guard !records.isEmpty else { return }
+
+        let fields = records.map { record -> (String, Data) in
+            let coder = NSKeyedArchiver(requiringSecureCoding: true)
+            record.encodeSystemFields(with: coder)
+            coder.finishEncoding()
+            return (record.recordID.recordName, coder.encodedData)
+        }
+
+        try await database.writer.write { db in
+            for (name, data) in fields {
+                try db.execute(
+                    sql: """
+                        INSERT INTO sync_record (record_name, system_fields, updated_at) VALUES (?, ?, ?)
+                        ON CONFLICT (record_name) DO UPDATE
+                        SET system_fields = excluded.system_fields, updated_at = excluded.updated_at
+                        """,
+                    arguments: [name, data, date]
+                )
+            }
+        }
+    }
+
+    /// Forgets records the server no longer holds.
+    func forget(_ names: [String]) async throws {
+        guard !names.isEmpty else { return }
+
+        try await database.writer.write { db in
+            try db.execute(
+                sql: "DELETE FROM sync_record WHERE record_name IN (\(placeholders(names.count)))",
+                arguments: StatementArguments(names)
+            )
+        }
+    }
+
+    /// Forgets every tag, for a zone that has gone.
+    func forgetEveryRecord() async throws {
+        try await database.writer.write { db in try db.execute(sql: "DELETE FROM sync_record") }
+    }
+
+    private func placeholders(_ count: Int) -> String {
+        Array(repeating: "?", count: count).joined(separator: ", ")
     }
 
     func setValue(_ value: Data?, for key: String, at date: Date = Date()) async throws {

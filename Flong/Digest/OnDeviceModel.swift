@@ -45,16 +45,66 @@ nonisolated enum OnDeviceModel {
         refusals.withLock { $0 = 0 }
     }
 
-    /// Records a refusal, and says so once rather than once per story.
+    /// Records a failure, and says so once rather than once per story.
+    ///
+    /// A model that will not write about one story is not a model that has
+    /// stopped working, and only the second is worth giving up on.
     static func refused(_ error: Error) {
+        guard isTheModelItself(error) else {
+            Log.enrich.notice("The model would not write about one story : \(Self.kind(of: error), privacy: .public)")
+            return
+        }
+
         let count = refusals.withLock { count -> Int in
             count += 1
             return count
         }
         guard count == refusalsBeforeGivingUp else { return }
         Log.enrich.notice(
-            "The model refused \(count) times and will not be asked again this run : \(error.localizedDescription, privacy: .public)"
+            "The model failed \(count) times and will not be asked again this run : \(Self.kind(of: error), privacy: .public)"
         )
+    }
+
+    /// Whether an error is the model being unusable, rather than the model
+    /// declining to write about one particular thing.
+    ///
+    /// A page of security advisories trips the guardrail on some of its
+    /// stories and not others. Counting those towards giving up meant three
+    /// awkward headlines in a row silenced the model for the rest of the run,
+    /// and every story after them kept whatever it already said, in whatever
+    /// language it already said it. That is the mixture of French and English
+    /// a reader of the security press was looking at.
+    static func isTheModelItself(_ error: Error) -> Bool {
+        guard let error = error as? LanguageModelSession.GenerationError else { return true }
+
+        switch error {
+        case .guardrailViolation, .refusal, .decodingFailure, .exceededContextWindowSize, .unsupportedGuide:
+            // This story, not the model.
+            return false
+        case .assetsUnavailable, .unsupportedLanguageOrLocale, .rateLimited, .concurrentRequests:
+            return true
+        @unknown default:
+            return true
+        }
+    }
+
+    /// The name of what went wrong, without the article that caused it.
+    private static func kind(of error: Error) -> String {
+        guard let error = error as? LanguageModelSession.GenerationError else {
+            return String(describing: type(of: error))
+        }
+        switch error {
+        case .guardrailViolation: return "guardrailViolation"
+        case .refusal: return "refusal"
+        case .decodingFailure: return "decodingFailure"
+        case .exceededContextWindowSize: return "exceededContextWindowSize"
+        case .unsupportedGuide: return "unsupportedGuide"
+        case .assetsUnavailable: return "assetsUnavailable"
+        case .unsupportedLanguageOrLocale: return "unsupportedLanguageOrLocale"
+        case .rateLimited: return "rateLimited"
+        case .concurrentRequests: return "concurrentRequests"
+        @unknown default: return "unknown"
+        }
     }
 
     /// Forgets the refusals, for the next launch or a deliberate retry.
@@ -84,6 +134,44 @@ nonisolated enum OnDeviceModel {
         let articles = "Answer in the language the articles are written in."
         guard let name = englishName(of: locale), isSupported(locale) else { return articles }
         return "Answer in \(name), whatever language the articles are written in."
+    }
+
+    /// The same demand, written in the language it asks for.
+    ///
+    /// Measured against the model, on English articles with a French reader :
+    ///
+    /// | Where the demand is | What comes back |
+    /// | ------------------- | --------------- |
+    /// | in the instructions, in English | English |
+    /// | there and again after the articles | French, clumsy |
+    /// | there, and `not in English` after them | French, an English word left in |
+    /// | **there, and the demand in French after them** | **French, and the best of the four** |
+    ///
+    /// A model answers in the language of the words nearest its answer, and a
+    /// sentence in that language is worth more than any number of sentences
+    /// about it. So the demand is a translated string like any other.
+    ///
+    /// `nil` for a language the application is not translated into, where the
+    /// catalogue would hand back English and the demand would then ask for
+    /// the wrong language altogether.
+    static func demand(in locale: Locale) -> String? {
+        guard let code = locale.language.languageCode?.identifier,
+            Bundle.main.localizations.contains(where: { $0.hasPrefix(code) })
+        else { return nil }
+
+        return String(
+            localized: "Answer in English. Write every word of your answer in English.",
+            locale: locale,
+            comment: "Sent to the on-device model, in the reader's own language, to make it answer in that language"
+        )
+    }
+
+    /// What to put beside the text the model is given.
+    ///
+    /// The demand in the reader's own language when there is one, and the
+    /// English sentence about it otherwise.
+    static func languageReminder(for locale: Locale) -> String {
+        demand(in: locale) ?? languageInstruction(for: locale)
     }
 
     /// The language named in English, since the instructions are in English.

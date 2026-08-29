@@ -86,7 +86,12 @@ nonisolated struct StorySummarizer: Sendable {
 
         do {
             let session = LanguageModelSession(instructions: instructions)
-            let prompt = Self.prompt(for: articles)
+            // The language is said twice, in the instructions and again beside
+            // the articles. A small model answers in the language of the words
+            // nearest its answer, and three English headlines are nearer than
+            // an instruction at the top : that is how a French reader of the
+            // English security press ended up with English headlines.
+            let prompt = Self.prompt(for: articles, language: OnDeviceModel.languageReminder(for: locale))
 
             // The window is four thousand tokens for the prompt and the answer
             // together, and a prompt that leaves no room for an answer is not
@@ -139,7 +144,7 @@ nonisolated struct StorySummarizer: Sendable {
         )
     }
 
-    private static func prompt(for articles: [(title: String, excerpt: String?)]) -> String {
+    private static func prompt(for articles: [(title: String, excerpt: String?)], language: String) -> String {
         let lines = articles.prefix(articlesShown).map { article in
             let excerpt = article.excerpt.map { String($0.prefix(240)) } ?? ""
             return "- \(article.title)\(excerpt.isEmpty ? "" : " : \(excerpt)")"
@@ -149,6 +154,8 @@ nonisolated struct StorySummarizer: Sendable {
             These articles are about the same event. Name it and say what happened.
 
             \(lines.joined(separator: "\n"))
+
+            \(language)
             """
     }
 }

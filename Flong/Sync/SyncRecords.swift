@@ -48,6 +48,32 @@ nonisolated enum SyncRecords {
         "catchup-" + digest(url.absoluteString) + "-" + day
     }
 
+    /// The same record, carrying the tag the server expects.
+    ///
+    /// A record built from the store alone is a record the server has never
+    /// seen, and CloudKit refuses one under a name it already holds :
+    /// `record to insert already exists`. The tag lives in the system fields
+    /// of the record the server handed back, so a save starts from those and
+    /// copies the values over.
+    ///
+    /// An archive that will not decode is treated as no archive : the save is
+    /// refused once, the server hands the record back, and the tag is learned
+    /// again.
+    static func rebased(_ record: CKRecord, onto systemFields: Data?) -> CKRecord {
+        guard let systemFields,
+            let coder = try? NSKeyedUnarchiver(forReadingFrom: systemFields),
+            let base = CKRecord(coder: coder)
+        else { return record }
+
+        coder.finishDecoding()
+        guard base.recordID == record.recordID, base.recordType == record.recordType else { return record }
+
+        for key in record.allKeys() {
+            base[key] = record[key]
+        }
+        return base
+    }
+
     private static func digest(_ text: String) -> String {
         SHA256.hash(data: Data(text.utf8)).prefix(16).map { String(format: "%02x", $0) }.joined()
     }
