@@ -381,15 +381,19 @@ Not a list of articles : a list of **stories**, each one several articles from s
 - **Today, this week, this month**, chosen by a selector, ranked by weight.
 - **The tail** : what grouped with nothing, still there as the ordinary articles it is.
 
-Each card carries the story's name, one line saying what happened, the rooms talking about it, the number of articles and the shape of their arrival. Opening a card lists its articles ; opening an article reads it.
+Each story carries its name, one line saying what happened, the number of rooms talking about it, the number of articles, the shape of their arrival and how long ago the last one came. Opening a story lists its articles ; opening an article reads it. Not a card : a rule, a headline, a line and the facts underneath.
 
-The model names and summarizes ; without one, a story takes the title and standfirst of its most central article, and the card says which of the two it is. `docs/technical/digest.md` records how stories are grouped, and why it is not by the vectors of section 11.
+The model names and summarizes ; without one, a story takes the title and standfirst of its most central article, and the page says which of the two it is. `docs/technical/digest.md` records how stories are grouped, and why it is not by the vectors of section 11.
 
 ### Common structure
 
-Three levels : sidebar, list, article. On iPhone, navigation stacks ; on iPad and Mac, three columns.
+**Amended.** This section asked for three levels, sidebar, list and article, shown as three columns on iPad and Mac. What is built shows one column at a time on every platform, under the system tab bar : the digest, unread, the library, sources, and search. Two columns of chrome around an article are two columns of not reading, and the sections a sidebar was to hold are the sections the tab bar holds. Each section keeps its own navigation stack.
 
-Sidebar : the digest, unread, today, library, starred, tags, folders, saved queries, feeds.
+On macOS those same sections become a sidebar, drawn by the system for an adaptable tab view, since a Mac window keeps its sections at the side.
+
+Views the sidebar was also to list, today, starred, tags, saved queries and individual feeds, are reached from the sources section rather than from a permanent column.
+
+The digest, a story and an article are set as a page rather than as a control panel : one column held to a readable measure, serif headlines, hairline rules, no cards and no boxes. Liquid Glass appears only in the navigation layer, which is the system's own bar, and never in the content. `docs/technical/interface.md` records the design and what was rejected.
 
 ### List
 
@@ -405,7 +409,7 @@ A single field accepting the query language, live results, a switch between stre
 
 ### macOS
 
-A three-column window, complete keyboard shortcuts, a menu bar, customizable toolbar items, multiple windows, and inbound and outbound drag and drop.
+A window whose sections sit in a sidebar, complete keyboard shortcuts, a menu bar, customizable toolbar items, multiple windows, and inbound and outbound drag and drop.
 
 ### Widgets and extensions
 

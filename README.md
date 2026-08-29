@@ -16,15 +16,27 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **Enrichment happens on the device.** Classification, tagging and summaries come from the system model, and no article content is sent anywhere.
 
+**It is set like a page, not like a control panel.** One column at a time, held to a readable measure, serif headlines, hairline rules, no cards and no boxes. Liquid Glass stays in the navigation layer, where Apple puts it, and never in the content.
+
 ## Screenshots
 
-| Digest | Articles | Reader |
-| ------- | -------- | ------ |
-| ![The digest on iPad](docs/images/digest-ipad.png) | ![The article list on iPhone](docs/images/articles-iphone.png) | ![An article on iPad](docs/images/reader-ipad-light.png) |
+| The digest | A story | An article |
+| ---------- | ------- | ---------- |
+| ![The digest on iPad](docs/images/digest-ipad.png) | ![A story on iPad](docs/images/story-ipad.png) | ![An article on iPad](docs/images/reader-ipad-light.png) |
+
+The same three on iPhone, where the sections sit in the system tab bar and search has its own place in it :
+
+| The digest | A story | Search |
+| ---------- | ------- | ------ |
+| ![The digest on iPhone](docs/images/digest-iphone.png) | ![A story on iPhone](docs/images/story-iphone.png) | ![Search on iPhone](docs/images/search-iphone.png) |
 
 Rendered articles follow the system appearance, light and dark :
 
 ![The same article in dark mode](docs/images/reader-ipad-dark.png)
+
+| Unread | Sources |
+| ------ | ------- |
+| ![The unread articles on iPad](docs/images/unread-ipad.png) | ![The sources on iPad](docs/images/sources-ipad.png) |
 
 The feeds shown are made up, and every address in them points at `example.com`.
 
@@ -36,7 +48,7 @@ The feeds shown are made up, and every address in them points at `example.com`.
 | iPadOS   | 26.0 |
 | macOS    | 26.0 |
 
-A single SwiftUI codebase serves the three platforms, and no feature exists on macOS alone. An iCloud account is needed to synchronize between devices, never to use the application.
+A single SwiftUI codebase serves the three platforms, and no feature exists on macOS alone. The sections sit in the tab bar on iPhone and iPad, and in a sidebar on Mac. An iCloud account is needed to synchronize between devices, never to use the application.
 
 ## Requirements
 
@@ -93,6 +105,7 @@ The interface is authored in English and translated to French. All strings live 
 | [`docs/technical/sync.md`](docs/technical/sync.md) | What travels between devices, what never does, and why the record budget shapes it |
 | [`docs/technical/background.md`](docs/technical/background.md) | How long work survives being interrupted, and how the library is searched by meaning |
 | [`docs/technical/digest.md`](docs/technical/digest.md) | How articles become stories, and why not with the vectors |
+| [`docs/technical/interface.md`](docs/technical/interface.md) | How the interface is set, where Liquid Glass is allowed, and what was rejected |
 | [`docs/technical/freshrss-api.md`](docs/technical/freshrss-api.md) | The Google Reader API surface, kept for the FreshRSS import |
 
 ## License

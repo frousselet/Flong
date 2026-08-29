@@ -123,9 +123,7 @@ struct AppModelTests {
         model.selection = .unread
         await model.load()
 
-        model.selectedArticle = id
-        // The selection loads the article on its own ; the wait is for that task.
-        try await Task.sleep(for: .milliseconds(50))
+        await model.open(article: id)
 
         #expect(model.article?.id == id)
         #expect(model.article?.bodyHTML == "<p>one</p>")
@@ -142,8 +140,7 @@ struct AppModelTests {
         model.selection = .unread
         await model.load()
 
-        model.selectedArticle = id
-        try await Task.sleep(for: .milliseconds(50))
+        await model.open(article: id)
         await model.markCurrentUnread()
 
         #expect(model.selectedArticle == nil)

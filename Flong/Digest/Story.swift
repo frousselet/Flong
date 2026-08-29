@@ -26,6 +26,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         case title
         case summary
         case isGenerated = "is_generated"
+        case briefLocked = "brief_locked"
         case signature
         case articleCount = "article_count"
         case feedCount = "feed_count"
@@ -42,6 +43,8 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
     var summary: String?
     /// Whether a model wrote either of them, which the interface says out loud.
     var isGenerated: Bool
+    /// Whether the reader has settled the matter themselves.
+    var briefLocked: Bool
 
     /// The vocabulary its articles share, which is what a new article is
     /// compared against.
@@ -58,6 +61,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         title: String,
         summary: String? = nil,
         isGenerated: Bool = false,
+        briefLocked: Bool = false,
         signature: TextSignature? = nil,
         articleCount: Int = 0,
         feedCount: Int = 0,
@@ -69,6 +73,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         self.title = title
         self.summary = summary
         self.isGenerated = isGenerated
+        self.briefLocked = briefLocked
         self.signature = signature
         self.articleCount = articleCount
         self.feedCount = feedCount
