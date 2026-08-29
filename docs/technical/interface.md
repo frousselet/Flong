@@ -77,6 +77,16 @@ It is broken by day, in the same kerned uppercase as the front page's sections. 
 
 Unread on its own is still a view, in the sources list, for whoever wants a queue. The count of unread articles rides on the section either way, since it is the one number a reader glances at without opening anything.
 
+## The reader's menu
+
+One button in the digest's toolbar, holding what the reader has decided. Not an account : there is no account, nothing here belongs to anyone but the person holding the device, and a person icon would promise a profile that does not exist. It is called `Réglages` in French for the same reason.
+
+It holds the subjects, and the command to write the digest again, which had been buried at the foot of the sources list where it never belonged : the sources list is for the state of the machinery, and asking the model to write again is the reader's own decision.
+
+**The subjects screen is the other half of the pills.** A pill carries a subject of the day, where an opinion is formed and where saying it costs one press. The screen carries every subject there is, including those that have fallen off the page, so a reader who asked for less of something months ago can find it again and take it back : a preference nobody can find is a preference nobody can undo. Each row is a picker of three, down, nothing, up, rather than the pill's nudge by one : here the reader is choosing a side, and reading back three shades of the same side would be a control that says more than it lets them say.
+
+**`sujet` is a story in French, so a topic is a `thème`.** The story page is titled `Sujet` and the front page's second section is `SUJETS` ; calling the topics `Sujets` as well would have had `Typographie, 1 sujet` mean two different things in one line.
+
 ## The dateline
 
 **The title of the page is the date.** Not the name of the section : the tab bar says that already, and a page that repeats its own label has spent a line saying nothing. A dateline says what the label did not, which is how old what follows is allowed to be, and it is where a newspaper puts it.

@@ -301,6 +301,46 @@
         }
       }
     },
+    "%lld stories": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld story"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld stories"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld sujet"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld sujets"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Add": {
       "localizations": {
         "fr": {
@@ -542,6 +582,16 @@
         }
       }
     },
+    "Forget every preference": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oublier toutes les préférences"
+          }
+        }
+      }
+    },
     "Free up space": {
       "localizations": {
         "fr": {
@@ -693,6 +743,16 @@
         }
       }
     },
+    "No subjects yet": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun thème pour l'instant"
+          }
+        }
+      }
+    },
     "Nothing has come in yet": {
       "localizations": {
         "fr": {
@@ -813,6 +873,16 @@
         }
       }
     },
+    "Settings": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réglages"
+          }
+        }
+      }
+    },
     "Share": {
       "localizations": {
         "fr": {
@@ -883,6 +953,26 @@
         }
       }
     },
+    "Subjects": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thèmes"
+          }
+        }
+      }
+    },
+    "Subjects appear once the model has read a page of stories.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les thèmes apparaissent une fois que le modèle a lu une page."
+          }
+        }
+      }
+    },
     "Synchronized %@": {
       "localizations": {
         "fr": {
@@ -929,6 +1019,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Les abonnements n'ont pas pu être enregistrés."
+          }
+        }
+      }
+    },
+    "The system model reads the page and sorts it into subjects. Saying more or less of one moves it, and everything under it, up or down the front page.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle du système lit la page et la trie en thèmes. En demander plus ou moins déplace le thème, et tout ce qu'il couvre, vers le haut ou le bas de la une."
           }
         }
       }
