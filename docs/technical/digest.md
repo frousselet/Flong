@@ -44,6 +44,10 @@ Without a model the story is named after its most central article and summarized
 
 Without a model the story takes the title of its most central article, so it is in that article's language. Translating without a translator is not something to fake.
 
+**The language a brief was written in is stored with it.** Nothing else about a story changes when a reader changes the language of their device, so nothing else would ever ask for the brief to be written again, and the page would stay in a language its reader no longer reads. A brief whose language is not the reader's current one goes back in the queue, exactly as one written without a model does when a model turns up.
+
+There is also a command, at the foot of the sources list, that throws away everything the model wrote and asks it again. Nothing normally needs it : it is there for the reader who wants a fresh reading of the page, and for the one whose model refused all morning and has since been switched back on, which is why it forgets the refusals on the way. A story whose headline the reader settled themselves is left alone by it, subject included.
+
 The prompt is bounded before it is sent : six articles and two hundred and forty characters each, and where the system can count tokens exactly, a prompt that would leave no room for an answer is not sent at all. The cost of asking anyway is a refusal, and the cost of a refusal is a story with no headline.
 
 ## Subjects

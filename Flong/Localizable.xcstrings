@@ -901,6 +901,16 @@
         }
       }
     },
+    "Write the digest again": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réécrire le digest"
+          }
+        }
+      }
+    },
     "Written by the model": {
       "localizations": {
         "fr": {

@@ -45,7 +45,12 @@ struct StoreTests {
         _ = try AppDatabase(queue)
 
         let applied = try queue.read { db in try AppDatabase.migrator.appliedIdentifiers(db) }
-        #expect(applied == ["v1.model", "v2.search", "v3.readStates", "v4.stories", "v5.covers", "v6.topics"])
+        #expect(
+            applied == [
+                "v1.model", "v2.search", "v3.readStates", "v4.stories", "v5.covers", "v6.topics",
+                "v7.briefLanguage",
+            ]
+        )
     }
 
     @Test("A feed, an article and its body round trip with every column filled")
