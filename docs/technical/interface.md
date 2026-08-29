@@ -53,6 +53,8 @@ A picture occupies nothing until it has something to show, and nothing again if 
 
 A list of feeds is a list of names, and names take reading. A mark is recognized before it is read, which is the whole of what a favicon is for. It stands beside a feed in the sources list, in place of the generic symbol, and beside the name of the room on every article row.
 
+On the digest it stands **in place of the count of rooms**. `4 rédactions` is a number the reader has to turn back into rooms ; four marks are the rooms, and they say which ones, which is the question behind the number : a story every paper is running and a story only the trade press is running are not the same story. Four are shown, and a fifth room becomes a `+1`. The count survives for anyone listening to the page rather than looking at it, since the row of marks carries it as its accessibility label.
+
 Three addresses are tried, in order : **what the feed states**, since the publisher chose it ; **`apple-touch-icon.png`**, a well-known path, square by convention and large enough to stay crisp where a sixteen pixel favicon would not ; and **`favicon.ico`**, the oldest well-known path and still the most widely served, since browsers ask for it whether a page mentions it or not. The well-known ones hang off the root of the site, never off the page the feed happens to point at.
 
 Nothing is asked for until a row is on screen, and what comes back is kept on disk, so a feed costs one request rather than one per appearance. A feed that answers none of the three wears the generic mark : a list of sources must keep its column of marks whether a publisher serves one or not, which is the one place a picture does not simply vanish when it fails.

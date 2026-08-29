@@ -127,8 +127,21 @@ struct StoryScreen: View {
             if story.isLive {
                 LiveDot()
             }
-            Text("\(story.feedCount) rooms")
-            Text(verbatim: "·")
+
+            // The same marks the row carried, so the page a reader tapped
+            // into opens on what they tapped.
+            HStack(spacing: 3) {
+                ForEach(story.feedMarks) { mark in
+                    FeedIconView(stated: mark.iconURL, site: mark.siteURL, side: 15)
+                }
+                if story.feedCount > story.feedMarks.count {
+                    Text(verbatim: "+\(story.feedCount - story.feedMarks.count)")
+                        .padding(.leading, 1)
+                }
+            }
+            .accessibilityElement()
+            .accessibilityLabel(Text("\(story.feedCount) rooms"))
+
             Text("\(story.articleCount) articles")
 
             Sparkline(values: story.arrivals)

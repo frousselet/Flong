@@ -39,6 +39,18 @@ nonisolated enum DigestTopic: Hashable, Sendable, Identifiable {
     }
 }
 
+/// One of the rooms covering a story, as the page shows it.
+///
+/// A mark rather than a name : four names are a line of text nobody reads,
+/// four marks are a glance.
+nonisolated struct FeedMark: Hashable, Sendable, Identifiable {
+    let title: String
+    let iconURL: URL?
+    let siteURL: URL?
+
+    var id: String { title }
+}
+
 /// A story, as the digest shows it.
 nonisolated struct DigestStory: Identifiable, Hashable, Sendable {
     let id: UUID
@@ -48,8 +60,8 @@ nonisolated struct DigestStory: Identifiable, Hashable, Sendable {
     let isGenerated: Bool
 
     let articleCount: Int
-    /// The rooms talking about it, a few of them named.
-    let feedTitles: [String]
+    /// The rooms talking about it, a few of them shown.
+    let feedMarks: [FeedMark]
     let feedCount: Int
 
     let firstAt: Date
@@ -83,6 +95,8 @@ nonisolated struct Digest: Hashable, Sendable {
 private struct StoryArticle {
     let storyID: UUID
     let feedTitle: String
+    let feedIconURL: URL?
+    let feedSiteURL: URL?
     let date: Date
     let imageURL: URL?
 }
@@ -102,8 +116,8 @@ nonisolated struct DigestStore: Sendable {
     /// the library and search. Three days is a story still worth a headline.
     static let window: TimeInterval = 3 * 24 * 60 * 60
 
-    /// How many rooms a card names before it counts the rest.
-    static let namedFeeds = 3
+    /// How many rooms a row shows the mark of before it counts the rest.
+    static let namedFeeds = 4
     /// How many buckets the sparkline has.
     static let sparklineBuckets = 12
 
@@ -127,7 +141,9 @@ nonisolated struct DigestStore: Sendable {
             let members = try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT m.story_id AS story_id, f.title AS feed_title, e.image_url AS image_url,
+                    SELECT m.story_id AS story_id, f.title AS feed_title,
+                           f.icon_url AS icon_url, COALESCE(f.site_url, f.url) AS site_url,
+                           e.image_url AS image_url,
                            COALESCE(e.published_at, e.received_at) AS date
                     FROM story_member m
                     JOIN entry e ON e.id = m.entry_id
@@ -140,6 +156,8 @@ nonisolated struct DigestStore: Sendable {
                 StoryArticle(
                     storyID: row["story_id"],
                     feedTitle: row["feed_title"],
+                    feedIconURL: (row["icon_url"] as String?).flatMap(URL.init(string:)),
+                    feedSiteURL: (row["site_url"] as String?).flatMap(URL.init(string:)),
                     date: row["date"],
                     imageURL: (row["image_url"] as String?).flatMap(URL.init(string:))
                 )
@@ -198,9 +216,14 @@ nonisolated struct DigestStore: Sendable {
         // is a single newsroom having a busy afternoon.
         let isLive = recent.count >= liveArticles && Set(recent.map(\.feedTitle)).count >= liveFeeds
 
-        var titles: [String] = []
-        for member in members.sorted(by: { $0.date < $1.date }) where !titles.contains(member.feedTitle) {
-            titles.append(member.feedTitle)
+        // In the order the rooms picked the story up, which is the order a
+        // reader would tell it in.
+        var marks: [FeedMark] = []
+        for member in members.sorted(by: { $0.date < $1.date })
+        where !marks.contains(where: { $0.title == member.feedTitle }) {
+            marks.append(
+                FeedMark(title: member.feedTitle, iconURL: member.feedIconURL, siteURL: member.feedSiteURL)
+            )
         }
 
         return DigestStory(
@@ -209,8 +232,8 @@ nonisolated struct DigestStore: Sendable {
             summary: story.summary,
             isGenerated: story.isGenerated,
             articleCount: members.count,
-            feedTitles: Array(titles.prefix(namedFeeds)),
-            feedCount: titles.count,
+            feedMarks: Array(marks.prefix(namedFeeds)),
+            feedCount: marks.count,
             firstAt: dates.first ?? story.firstAt,
             lastAt: dates.last ?? story.lastAt,
             arrivals: sparkline(dates),

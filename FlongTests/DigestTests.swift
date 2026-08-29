@@ -514,8 +514,10 @@ struct DigestTests {
         let story = try #require(try await service.digest(now: now).live.first)
 
         #expect(story.feedCount == 4)
-        #expect(story.feedTitles.count == DigestStore.namedFeeds)
-        #expect(Set(story.feedTitles).isSubset(of: Set(Corpus.calendar.map(\.feed))))
+        #expect(story.feedMarks.count == DigestStore.namedFeeds)
+        #expect(Set(story.feedMarks.map(\.title)) == Set(Corpus.calendar.map(\.feed)))
+        // In the order the rooms picked it up.
+        #expect(story.feedMarks.first?.title == "Le Quotidien")
     }
 
     @Test("The articles of a story are there, newest first")
