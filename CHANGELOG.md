@@ -12,7 +12,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - String catalog with English as the source language and French translations.
 - `swift-format` configuration and a shared `Flong` scheme so builds and formatting are reproducible outside Xcode.
 - Issue and pull request templates.
-- Project conventions in `CLAUDE.md` and the FreshRSS API reference in `docs/technical/`.
+- Product and technical specification in `docs/specification.md`, the reference for every design decision.
+- Project conventions in `CLAUDE.md`, and the Google Reader API reference kept in `docs/technical/` for the FreshRSS import.
 - MPL-2.0 license, with the source notice carried by every file.
-- Google Reader API client for FreshRSS, behind the backend-neutral `FeedProvider` protocol.
-- Bench screen exercising every read endpoint against a live instance, with an opt-in write round trip.

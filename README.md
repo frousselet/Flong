@@ -1,8 +1,18 @@
 # Flong
 
-A native [FreshRSS](https://www.freshrss.org/) client for iOS, iPadOS and macOS, written in Swift with SwiftUI and SwiftData.
+A feed reader for iOS, iPadOS and macOS, written in Swift with SwiftUI and SQLite.
 
-> Status : early. The Google Reader API client is in place and covered by tests. The data layer and the interface are next.
+No server, no account, no hosting. Every device collects the feeds itself and keeps them in a local database ; what you choose to keep propagates through your own private CloudKit database.
+
+> Status : early. The repository holds the specification, the project conventions and the storage layer. Collection, parsing and the reading interface are next.
+
+## Ideas
+
+**Stream and library are two different things.** The stream is a disposable cache, rebuildable at any time from the sources, purged by age and volume. The library is what you chose to keep : its content is frozen at that moment, so it survives the article disappearing from its feed, and it is never purged.
+
+**Search is genuinely indexed.** A full-text index over the whole local corpus, a query language with operators, and semantic search over the library through Spotlight.
+
+**Enrichment happens on the device.** Classification, tagging and summaries come from the system model, and no article content is sent anywhere.
 
 ## Platforms
 
@@ -12,12 +22,11 @@ A native [FreshRSS](https://www.freshrss.org/) client for iOS, iPadOS and macOS,
 | iPadOS   | 26.0 |
 | macOS    | 26.0 |
 
-A single SwiftUI codebase serves the three platforms.
+A single SwiftUI codebase serves the three platforms, and no feature exists on macOS alone. An iCloud account is needed to synchronize between devices, never to use the application.
 
 ## Requirements
 
 - Xcode 26.5 or later
-- A FreshRSS instance with its API enabled
 
 ## Building
 
@@ -31,18 +40,21 @@ xcodebuild build -project Flong.xcodeproj -scheme Flong -destination 'platform=m
 
 The `DEVELOPER_DIR` export is only needed when `xcode-select` points at the Command Line Tools rather than at Xcode.
 
-## Connecting to FreshRSS
+## Dependencies
 
-Flong uses the Google Reader compatible API that FreshRSS exposes at `/api/greader.php`. Two settings are needed on the instance :
+| Package | Use |
+| ------- | --- |
+| [GRDB](https://github.com/groue/GRDB.swift) | SQLite access, migrations, and the FTS5 full-text index |
 
-1. **Settings, Authentication** : tick *Allow API access for external clients*.
-2. **Profile** : set an *API password*. It is distinct from the web password, and it is the one Flong asks for.
+Everything else comes from the system frameworks.
 
-The instance URL, the username and the API password are all Flong needs. Credentials are stored in the system keychain and never written anywhere else.
+## Privacy
 
-## Backends
+No data leaves the device, apart from the private CloudKit database and the requests to the feeds themselves. No telemetry, no tracker, no third-party service active by default. Feed credentials and secret feed URLs live in the keychain only, and never appear in the database, in an export, or in a log.
 
-FreshRSS is the only supported service today. Backend access sits behind a provider abstraction, so other services speaking the same Google Reader API can be added without touching the interface.
+## Other services
+
+Flong is not a client for any service. FreshRSS, Miniflux, Feedbin and Feedly are supported as one-shot import sources only : subscriptions, folders, labels, stars and read states are retrieved once, after which Flong runs on its own.
 
 ## Localization
 
@@ -52,9 +64,10 @@ The interface is authored in English and translated to French. All strings live 
 
 | Document | Contents |
 | -------- | -------- |
+| [`docs/specification.md`](docs/specification.md) | The product and technical specification : the reference for every decision |
 | [`CLAUDE.md`](CLAUDE.md) | Working conventions : architecture, guidelines, git and release workflow |
 | [`CHANGELOG.md`](CHANGELOG.md) | Change history, following [Keep a Changelog](https://keepachangelog.com/) |
-| [`docs/technical/freshrss-api.md`](docs/technical/freshrss-api.md) | The Google Reader API surface Flong relies on |
+| [`docs/technical/freshrss-api.md`](docs/technical/freshrss-api.md) | The Google Reader API surface, kept for the FreshRSS import |
 
 ## License
 
