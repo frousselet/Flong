@@ -603,11 +603,6 @@ final class AppModel {
         sidebar.flatMap { [$0] + $0.children }.first { $0.kind == kind }?.title
     }
 
-    /// How many articles are waiting, for the badge on the bar.
-    var unreadCount: Int {
-        sidebar.first { $0.kind == .unread }?.unreadCount ?? 0
-    }
-
     func loadArticles() async {
         do {
             summaries =
