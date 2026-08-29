@@ -103,6 +103,8 @@ The key is the name of the subject, because a subject has nothing else to be kno
 
 A story shows the marks of the rooms covering it, in the order those rooms picked it up, which is the order a reader would tell it in. Four of them, and a count of the rest.
 
+**A room is a host, not a feed.** A paper that publishes a feed per desk is one newsroom, not six : `leparisien.fr/societe/rss` and `leparisien.fr/politique/rss` are the same room, and a story both of them ran is one room covering it, not two. That is what decides whether anything is happening at all, since the live rule asks for several rooms and a paper running its own story in three sections is not several. The host is taken lowercased without its `www`, and not reduced to a registrable domain : that would need the public suffix list and would fold a paper and its unrelated blog into one.
+
 A story shows the picture of its most recent illustrated article, since a story is shown for where it has got to rather than for where it started. The first story on the page runs it across the column ; the others keep it to a square at the side.
 
 Where the picture itself comes from is in `docs/technical/ingestion.md`, and how it is fetched and drawn in `docs/technical/interface.md`.

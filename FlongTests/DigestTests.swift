@@ -599,6 +599,50 @@ struct DigestTests {
         #expect(story.feedMarks.first?.title == "Le Quotidien")
     }
 
+    @Test("A paper running a story in two of its sections is one room")
+    func roomsAreNewsrooms() async throws {
+        // The same paper, two desks, the same story : one room covering it,
+        // one mark on the page.
+        let subscriptions = SubscriptionStore(database)
+        var feeds: [Feed] = []
+        for desk in ["societe", "politique"] {
+            feeds.append(
+                try await subscriptions.subscribe(
+                    to: Subscription(
+                        address: "https://lequotidien.example.com/\(desk)/rss.xml", title: "Le Quotidien - \(desk)")
+                ).feed
+            )
+        }
+
+        for (index, feed) in feeds.enumerated() {
+            var entry = Entry(
+                feedID: feed.id,
+                guid: "urn:example:phones:\(index)",
+                title: "L'interdiction des téléphones portables dans les lycées",
+                excerpt: "Le gouvernement annonce que l'interdiction sera effective dès la rentrée scolaire.",
+                language: "fr",
+                publishedAt: now.addingTimeInterval(-600),
+                receivedAt: now.addingTimeInterval(-600)
+            )
+            entry.hasMedia = false
+            try await database.writer.write { db in
+                try entry.insert(db)
+                try EntryBody(entryID: entry.id, plainText: entry.excerpt ?? "").insert(db)
+            }
+        }
+
+        try await StoryBuilder(database).build(now: now)
+        let page = try await service.digest(now: now)
+        let story = try #require((page.live + page.stories).first { $0.title.contains("téléphones") })
+
+        #expect(story.articleCount == 2)
+        #expect(story.feedCount == 1)
+        #expect(story.feedMarks.map(\.room) == ["lequotidien.example.com"])
+        // And two desks of one paper are not several rooms, so nothing is
+        // happening yet.
+        #expect(!story.isLive)
+    }
+
     @Test("The articles of a story are there, newest first")
     func articlesOfAStory() async throws {
         try await StoryBuilder(database).build(now: now)

@@ -45,10 +45,13 @@ nonisolated enum DigestTopic: Hashable, Sendable, Identifiable {
 /// four marks are a glance.
 nonisolated struct FeedMark: Hashable, Sendable, Identifiable {
     let title: String
+    /// The newsroom it belongs to, which is its host rather than its feed : a
+    /// paper with a feed per desk is one room, however many feeds are followed.
+    let room: String
     let iconURL: URL?
     let siteURL: URL?
 
-    var id: String { title }
+    var id: String { room }
 }
 
 /// A story, as the digest shows it.
@@ -248,16 +251,23 @@ nonisolated struct DigestStore: Sendable {
         let recent = members.filter { $0.date >= liveSince }
 
         // Several rooms in a few hours is an event. Ten articles from one room
-        // is a single newsroom having a busy afternoon.
-        let isLive = recent.count >= liveArticles && Set(recent.map(\.feedTitle)).count >= liveFeeds
+        // is a single newsroom having a busy afternoon, and a paper running a
+        // story in three of its sections is still one paper.
+        let isLive = recent.count >= liveArticles && Set(recent.map(Self.room)).count >= liveFeeds
 
         // In the order the rooms picked the story up, which is the order a
-        // reader would tell it in.
+        // reader would tell it in. One mark per room, not per feed.
         var marks: [FeedMark] = []
-        for member in members.sorted(by: { $0.date < $1.date })
-        where !marks.contains(where: { $0.title == member.feedTitle }) {
+        for member in members.sorted(by: { $0.date < $1.date }) {
+            let room = Self.room(of: member)
+            guard !marks.contains(where: { $0.room == room }) else { continue }
             marks.append(
-                FeedMark(title: member.feedTitle, iconURL: member.feedIconURL, siteURL: member.feedSiteURL)
+                FeedMark(
+                    title: member.feedTitle,
+                    room: room,
+                    iconURL: member.feedIconURL,
+                    siteURL: member.feedSiteURL
+                )
             )
         }
 
@@ -278,6 +288,12 @@ nonisolated struct DigestStore: Sendable {
             imageURL: members.sorted { $0.date > $1.date }.lazy.compactMap(\.imageURL).first,
             topics: topics
         )
+    }
+
+    /// The newsroom an article came from, or its feed when it has no address
+    /// worth reading a host out of.
+    private static func room(of member: StoryArticle) -> String {
+        FeedURL.room(of: member.feedSiteURL) ?? member.feedTitle
     }
 
     /// The subjects on a page : what the reader asked for first, then the one
