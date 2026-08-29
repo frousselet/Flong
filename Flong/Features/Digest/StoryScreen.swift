@@ -36,7 +36,14 @@ struct StoryScreen: View {
                 }
 
                 ForEach(model.storyArticles[storyID] ?? []) { article in
-                    ArticleRow(article: article, zoom: zoom) {
+                    // The picture at the top of the page came from one of these
+                    // articles, and showing it again two hundred points below is
+                    // saying the same thing twice.
+                    ArticleRow(
+                        article: article,
+                        showsImage: article.imageURL != story?.imageURL,
+                        zoom: zoom
+                    ) {
                         open(article.id)
                     }
                 }
@@ -55,6 +62,11 @@ struct StoryScreen: View {
 
     private func header(_ story: DigestStory) -> some View {
         VStack(alignment: .leading, spacing: 12) {
+            if story.imageURL != nil {
+                RemoteImage(url: story.imageURL, aspect: Editorial.bandAspect, corner: 10)
+                    .padding(.bottom, 2)
+            }
+
             Text(verbatim: story.title)
                 .font(Editorial.headline(.largeTitle))
                 .fixedSize(horizontal: false, vertical: true)

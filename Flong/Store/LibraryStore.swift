@@ -197,7 +197,8 @@ nonisolated struct LibraryStore: Sendable {
             publishedAt: entry.publishedAt,
             promotedAt: date,
             contentHTML: body?.sanitizedHTML,
-            plainText: body?.plainText
+            plainText: body?.plainText,
+            imageURL: entry.imageURL
         )
         try item.insert(db)
         return item
@@ -222,7 +223,7 @@ nonisolated struct LibraryStore: Sendable {
         SELECT id, 'library' AS origin, NULL AS feed_id,
                COALESCE(feed_title, '') AS feed_title,
                title, author, url,
-               1 AS is_read, 1 AS is_starred, 0 AS has_media,
+               1 AS is_read, 1 AS is_starred, 0 AS has_media, image_url,
                SUBSTR(COALESCE(plain_text, ''), 1, 300) AS excerpt,
                COALESCE(published_at, promoted_at) AS date
         FROM library_item

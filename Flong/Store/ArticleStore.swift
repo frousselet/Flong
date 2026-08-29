@@ -39,6 +39,8 @@ nonisolated struct ArticleSummary: Identifiable, Hashable, Sendable, FetchableRe
     var isStarred: Bool
     let hasMedia: Bool
     let url: URL?
+    /// The article's picture, when it has one.
+    let imageURL: URL?
 
     init(row: Row) {
         id = row["id"]
@@ -53,6 +55,7 @@ nonisolated struct ArticleSummary: Identifiable, Hashable, Sendable, FetchableRe
         isStarred = row["is_starred"] ?? true
         hasMedia = row["has_media"] ?? false
         url = (row["url"] as String?).flatMap(URL.init(string:))
+        imageURL = (row["image_url"] as String?).flatMap(URL.init(string:))
     }
 }
 
@@ -145,7 +148,7 @@ nonisolated struct ArticleStore: Sendable {
     /// The columns a list needs, whichever way the rows were found.
     static let columns = """
         SELECT e.id, 'stream' AS origin, e.feed_id, e.title, e.excerpt, e.author, e.url,
-               e.is_read, e.is_starred, e.has_media,
+               e.is_read, e.is_starred, e.has_media, e.image_url,
                COALESCE(e.published_at, e.received_at) AS date,
                f.title AS feed_title
         """

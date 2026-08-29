@@ -59,12 +59,43 @@ nonisolated enum HFeedParser {
             }
         }
 
+        item.imageURL = photo(of: element, relativeTo: base)
+
         if let author = first(in: element, withClass: "p-author") {
             item.author = property(of: author, "p-name") ?? author.textContent.trimmed
         }
 
         guard item.identity != nil else { return nil }
         return item
+    }
+
+    /// The picture the entry carries, which is not its author's face.
+    ///
+    /// `u-photo` is also how an `h-card` states an avatar, and an entry that
+    /// names its author carries one inside itself.
+    private static func photo(of element: HTMLElement, relativeTo base: URL) -> URL? {
+        let candidates = element.descendants.filter {
+            $0.classNames.contains("u-photo")
+                && !isInsideAnotherEntry($0, below: element)
+                && !isInside($0, withClass: "h-card", below: element)
+        }
+        let value = candidates.lazy.compactMap { $0.attribute("src") ?? $0.attribute("href") }.first
+        guard let value, let url = URL(string: value, relativeTo: base)?.absoluteURL else { return nil }
+        return url
+    }
+
+    /// Whether an element sits below an ancestor carrying that class.
+    private static func isInside(
+        _ element: HTMLElement,
+        withClass className: String,
+        below root: HTMLElement
+    ) -> Bool {
+        var parent = element.parent
+        while let current = parent, current !== root {
+            if current.classNames.contains(className) { return true }
+            parent = current.parent
+        }
+        return false
     }
 
     /// The first element carrying that class, this one included, nested entries

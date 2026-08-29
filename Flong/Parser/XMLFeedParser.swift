@@ -26,6 +26,7 @@ nonisolated final class XMLFeedParser: NSObject, XMLParserDelegate {
         static let content = "http://purl.org/rss/1.0/modules/content/"
         static let dublinCore = "http://purl.org/dc/elements/1.1/"
         static let media = "http://search.yahoo.com/mrss/"
+        static let itunes = "http://www.itunes.com/dtds/podcast-1.0.dtd"
     }
 
     private var feed: ParsedFeed?
@@ -116,8 +117,20 @@ nonisolated final class XMLFeedParser: NSObject, XMLParserDelegate {
         case ("enclosure", _):
             addEnclosure(address: attributes["url"], type: attributes["type"], length: attributes["length"])
 
-        case ("content", Namespace.media), ("thumbnail", Namespace.media):
+        // A thumbnail is the article's picture, not a file attached to it :
+        // counting it as an enclosure would put a media badge on every article
+        // of a feed that simply illustrates its headlines.
+        case ("thumbnail", Namespace.media):
+            setCover(attributes["url"])
+
+        case ("content", Namespace.media):
             addEnclosure(address: attributes["url"], type: attributes["type"], length: attributes["fileSize"])
+            if attributes["medium"] == "image" || attributes["type"]?.hasPrefix("image/") == true {
+                setCover(attributes["url"])
+            }
+
+        case ("image", Namespace.itunes):
+            setCover(attributes["href"])
 
         case ("content", Namespace.atom) where attributes["type"] == "xhtml":
             capturedDepth = 0
@@ -299,6 +312,14 @@ nonisolated final class XMLFeedParser: NSObject, XMLParserDelegate {
         default:
             break
         }
+    }
+
+    /// The first statement wins : a feed that carries both a thumbnail and a
+    /// full picture states the thumbnail first, and either is better than none.
+    private func setCover(_ address: String?) {
+        guard item != nil, item?.imageURL == nil else { return }
+        guard let address, let url = URL(string: address), url.scheme?.hasPrefix("http") == true else { return }
+        item?.imageURL = url
     }
 
     private func addEnclosure(address: String?, type: String?, length: String?) {

@@ -61,6 +61,64 @@ struct FeedRefreshTests {
 
     // MARK: - Storing
 
+    @Test("An article arrives with the picture that stands for it")
+    func covers() async throws {
+        let feed = try await subscribe()
+        try serve("covers.xml")
+        defer { server.reset() }
+
+        _ = await refresh.refresh(feed)
+
+        let summaries = try await articles.summaries(.all)
+        let covers = Dictionary(uniqueKeysWithValues: summaries.map { ($0.title, $0.imageURL?.absoluteString) })
+
+        #expect(covers["Stated as a thumbnail"] == "https://example.com/covers/1.jpg")
+        #expect(covers["Stated as media content"] == "https://example.com/covers/2.jpg")
+        #expect(covers["Stated the podcast way"] == "https://example.com/covers/3.jpg")
+        #expect(covers["Enclosed rather than stated"] == "https://example.com/media/4.png")
+
+        // A thumbnail is not an attachment : only the podcast and the enclosed
+        // picture are media, and only they wear the badge.
+        let withMedia = summaries.filter(\.hasMedia).map(\.title).sorted()
+        #expect(withMedia == ["Enclosed rather than stated", "Stated as media content", "Stated the podcast way"])
+    }
+
+    @Test("A feed that states no picture lends the first one in the body")
+    func coverFromTheBody() async throws {
+        let feed = try await subscribe()
+        server.install { _ in
+            StubResponse(
+                statusCode: 200,
+                headers: ["Content-Type": "application/rss+xml"],
+                body: Data(
+                    """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <rss version="2.0"><channel>
+                      <title>Plain</title><link>https://example.com/</link><description>d</description>
+                      <item>
+                        <title>Illustrated in its body</title>
+                        <link>https://example.com/posts/1</link>
+                        <guid>urn:example:1</guid>
+                        <description><![CDATA[
+                          <p><img src="/pixel.gif" width="1" height="1"></p>
+                          <p><img src="/badge.png" width="16"></p>
+                          <figure><img src="/photo.jpg" width="1200"></figure>
+                        ]]></description>
+                      </item>
+                    </channel></rss>
+                    """.utf8))
+        }
+        defer { server.reset() }
+
+        _ = await refresh.refresh(feed)
+
+        let summary = try #require(try await articles.summaries(.all).first)
+
+        // The tracking pixel is already gone by then, and the badge is too
+        // small to be what the article is about.
+        #expect(summary.imageURL?.absoluteString == "https://example.com/photo.jpg")
+    }
+
     @Test("A refresh brings the articles in, sanitized")
     func refreshing() async throws {
         let feed = try await subscribe()

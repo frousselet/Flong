@@ -25,6 +25,14 @@ nonisolated enum Editorial {
     static let measure: CGFloat = 680
 
     /// The vertical rhythm between stories.
+    /// The shape of a lead photograph : a band rather than a square.
+    ///
+    /// Sixteen by nine across a column of six hundred and eighty points is a
+    /// picture four hundred points tall, which is one story per screen and a
+    /// front page that says nothing. A band keeps the same picture and gives the
+    /// rest of the page back.
+    static let bandAspect: CGFloat = 2.2
+
     static let rhythm: CGFloat = 28
     static let tightRhythm: CGFloat = 10
 

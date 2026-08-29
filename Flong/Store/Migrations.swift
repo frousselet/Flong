@@ -55,7 +55,26 @@ nonisolated extension AppDatabase {
             try createStories(db)
         }
 
+        migrator.registerMigration("v5.covers") { db in
+            try addCovers(db)
+        }
+
         return migrator
+    }
+
+    /// The picture that stands for an article.
+    ///
+    /// An address, never the file : the bytes belong to the publisher and are
+    /// asked for only when a screen shows them. It travels to the library with
+    /// the rest, so a kept article still has its illustration once the stream
+    /// row it came from has been purged.
+    private static func addCovers(_ db: Database) throws {
+        try db.alter(table: "entry") { table in
+            table.add(column: "image_url", .text)
+        }
+        try db.alter(table: "library_item") { table in
+            table.add(column: "image_url", .text)
+        }
     }
 
     /// The stories of the digest.

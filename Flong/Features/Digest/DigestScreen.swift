@@ -109,7 +109,16 @@ struct DigestScreen: View {
     }
 
     private func row(_ story: DigestStory) -> some View {
-        StoryRow(story: story, zoom: zoom) { open(.story(story.id)) }
+        StoryRow(story: story, isLead: story.id == leadID, zoom: zoom) { open(.story(story.id)) }
+    }
+
+    /// The first story on the page runs its picture across the column.
+    ///
+    /// A page where every story is the same size is a list, and a list makes the
+    /// reader do the ranking the digest exists to do. One lead, and the rest set
+    /// smaller, is how a front page has said what matters for two centuries.
+    private var leadID: UUID? {
+        model.digest.live.first?.id ?? model.digest.stories.first?.id
     }
 
     /// The period sits in the page rather than in the toolbar, and is set in
@@ -169,30 +178,27 @@ struct DigestScreen: View {
 }
 
 /// One story, set as an editor would set it.
+///
+/// The lead runs its picture across the column, above a larger headline. The
+/// others keep theirs to a square at the side, where it says which story this is
+/// without competing with the story above it.
 struct StoryRow: View {
     let story: DigestStory
+    var isLead = false
     let zoom: Namespace.ID
     let open: () -> Void
 
+    /// The side of the picture beside a story that is not the lead.
+    private static let thumbnailSide: CGFloat = 88
+
     var body: some View {
         Button(action: open) {
-            VStack(alignment: .leading, spacing: 7) {
-                Text(verbatim: story.title)
-                    .font(Editorial.headline(.title3))
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if let summary = story.summary, !summary.isEmpty {
-                    Text(verbatim: summary)
-                        .font(Editorial.standfirst)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(3)
-                        .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if isLead {
+                    lead
+                } else {
+                    standard
                 }
-
-                facts
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 14)
@@ -204,18 +210,82 @@ struct StoryRow: View {
         .accessibilityElement(children: .combine)
     }
 
+    private var lead: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if story.imageURL != nil {
+                RemoteImage(url: story.imageURL, aspect: Editorial.bandAspect, corner: 10)
+                    .padding(.bottom, 2)
+            }
+            text(headline: .title2)
+        }
+    }
+
+    private var standard: some View {
+        HStack(alignment: .top, spacing: 14) {
+            text(headline: .title3)
+
+            if story.imageURL != nil {
+                RemoteImage(url: story.imageURL, side: Self.thumbnailSide)
+            }
+        }
+    }
+
+    private func text(headline: Font.TextStyle) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(verbatim: story.title)
+                .font(Editorial.headline(headline))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if let summary = story.summary, !summary.isEmpty {
+                Text(verbatim: summary)
+                    .font(Editorial.standfirst)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            facts
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     /// Why this is here : who is saying it, how many of them, and how fast.
     ///
     /// It is the explanation the 2026 trend towards visible reasoning asks for,
     /// and it happens to be the only interesting thing about a story anyway.
+    ///
+    /// Beside a picture on a phone there is not room for all of it, and a line
+    /// that wraps to hyphenate `rédac-tions` is worse than a line that says less.
+    /// The sparkline goes first, then the article count : what is left is who is
+    /// talking and when they last did, which is the irreducible part.
     private var facts: some View {
+        ViewThatFits(in: .horizontal) {
+            factsLine()
+            factsLine(sparkline: false)
+            factsLine(sparkline: false, articles: false)
+        }
+        .font(Editorial.metadata)
+        .foregroundStyle(.tertiary)
+    }
+
+    private func factsLine(sparkline: Bool = true, articles: Bool = true) -> some View {
         HStack(spacing: 10) {
             Text("\(story.feedCount) rooms")
-            Text(verbatim: "·")
-            Text("\(story.articleCount) articles")
+                .lineLimit(1)
 
-            Sparkline(values: story.arrivals)
-                .frame(width: 36, height: 9)
+            if articles {
+                Text(verbatim: "·")
+                Text("\(story.articleCount) articles")
+                    .lineLimit(1)
+            }
+
+            if sparkline {
+                Sparkline(values: story.arrivals)
+                    .frame(width: 36, height: 9)
+            }
 
             Spacer(minLength: 4)
 
@@ -227,16 +297,18 @@ struct StoryRow: View {
             Text(story.lastAt, format: .relative(presentation: .numeric))
                 .lineLimit(1)
         }
-        .font(Editorial.metadata)
-        .foregroundStyle(.tertiary)
     }
 }
 
 /// One article, in a list of articles.
 struct ArticleRow: View {
     let article: ArticleSummary
+    var showsImage = true
     let zoom: Namespace.ID
     let open: () -> Void
+
+    /// The side of the picture beside an article.
+    private static let thumbnailSide: CGFloat = 64
 
     var body: some View {
         Button(action: open) {
@@ -280,6 +352,11 @@ struct ArticleRow: View {
                     }
                     .font(Editorial.metadata)
                     .foregroundStyle(.tertiary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if showsImage, article.imageURL != nil {
+                    RemoteImage(url: article.imageURL, side: Self.thumbnailSide, corner: 6)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

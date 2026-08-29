@@ -209,6 +209,7 @@ nonisolated struct FeedRefresh: Sendable {
         let sanitized = bodyHTML.map { HTMLSanitizer.sanitize($0, relativeTo: base) }
         let plainText = sanitized.map(HTMLSanitizer.plainText)
         let excerpt = Self.excerpt(of: item)
+        let cover = CoverImage.of(item, sanitizedHTML: sanitized)
 
         // Detected once, at ingestion, since the index and the stemmer both
         // want to know and neither may guess again later.
@@ -237,6 +238,10 @@ nonisolated struct FeedRefresh: Sendable {
                 entry.enclosures = item.enclosures
                 entry.hasMedia = true
             }
+            // A publisher who illustrates an article after publishing it is
+            // improving it ; one who drops the picture has usually just
+            // reworded the feed, and the picture already shown stays.
+            entry.imageURL = cover ?? entry.imageURL
             try entry.update(db)
 
             if let sanitized {
@@ -262,7 +267,8 @@ nonisolated struct FeedRefresh: Sendable {
             updatedAt: item.updatedAt,
             receivedAt: now,
             isRead: read.contains(fingerprint),
-            enclosures: item.enclosures.isEmpty ? nil : item.enclosures
+            enclosures: item.enclosures.isEmpty ? nil : item.enclosures,
+            imageURL: cover
         )
         entry.hasMedia = !item.enclosures.isEmpty
         try entry.insert(db)
