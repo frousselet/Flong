@@ -568,6 +568,24 @@ struct DigestTests {
         #expect(!TopicNamer.isField("   ", of: headline))
     }
 
+    @Test("The stories left to file are counted, and none of them is one already filed")
+    func backlog() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await put(["calendrier": "Éducation"])
+
+        let job = FileStoriesJob(database, now: now)
+        let left = try await job.remaining()
+
+        let stories = try await database.writer.read { db in try Story.fetchCount(db) }
+        let filed = try await database.writer.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT story_id) FROM story_topic") ?? 0
+        }
+
+        // Everything but what is already filed, on a machine with a model ;
+        // nothing at all on one without, since there is nothing it could do.
+        #expect(left == (OnDeviceModel.isAvailable ? stories - filed : 0))
+    }
+
     // MARK: - A vocabulary that stays put
 
     @Test("A story keeps the subjects it was given")

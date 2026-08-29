@@ -17,6 +17,110 @@ import OSLog
 ///
 /// A batch is small on purpose : each one is a call to the model, which takes a
 /// second or two, and this runs while a reader is looking at the screen.
+/// Files stories under the subjects the reader has.
+///
+/// **Only the ones with no subject.** A story keeps the subjects it was given
+/// for as long as it lives : sorting the whole page afresh on every rebuild made
+/// the subjects drift, and a preference the reader attached to a name that no
+/// longer exists is a preference silently thrown away.
+///
+/// One story per call, each against the vocabulary the reader already has. A
+/// story that fits nothing in it gets one new subject, folded against the
+/// vocabulary before it is kept, so a second spelling of something that exists
+/// is not a second subject.
+///
+/// Re-reading what is already filed is what `rewrite` is for, and it is the
+/// reader who asks for it.
+nonisolated struct FileStoriesJob: ResumableJob {
+    let name = "file-stories"
+    static let batchSize = 4
+
+    private let database: AppDatabase
+    private let locale: Locale
+    private let since: Date
+
+    init(_ database: AppDatabase, locale: Locale = .current, now: Date = Date()) {
+        self.database = database
+        self.locale = locale
+        self.since = now.addingTimeInterval(-DigestStore.window)
+    }
+
+    func remaining() async throws -> Int {
+        guard OnDeviceModel.isAvailable else { return 0 }
+        let since = self.since
+
+        return try await database.writer.read { db in
+            try Int.fetchOne(
+                db,
+                sql: """
+                    SELECT COUNT(*) FROM story s
+                    LEFT JOIN story_topic t ON t.story_id = s.id
+                    WHERE s.last_at >= ? AND t.story_id IS NULL
+                    """,
+                arguments: [since]
+            ) ?? 0
+        }
+    }
+
+    func step() async throws -> Int {
+        guard OnDeviceModel.isAvailable else { return 0 }
+        let since = self.since
+
+        let stories = try await database.writer.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT s.id AS id, s.title AS title, s.summary AS summary FROM story s
+                    LEFT JOIN story_topic t ON t.story_id = s.id
+                    WHERE s.last_at >= ? AND t.story_id IS NULL
+                    ORDER BY s.last_at DESC
+                    LIMIT \(Self.batchSize)
+                    """,
+                arguments: [since]
+            )
+            .map { (id: $0["id"] as UUID, title: $0["title"] as String, summary: $0["summary"] as String?) }
+        }
+        guard !stories.isEmpty else { return 0 }
+
+        let preferences = TopicPreferences(database)
+        let namer = TopicNamer(locale: locale)
+        var filedCount = 0
+
+        for story in stories {
+            guard OnDeviceModel.isAvailable else { break }
+
+            let vocabulary = (try? await preferences.vocabulary()) ?? []
+            var filed = await namer.file(story.title, summary: story.summary, into: vocabulary)
+
+            // Nothing the reader has is about this story, so the model names one
+            // thing, once.
+            if filed?.isEmpty == true || (vocabulary.isEmpty && filed == nil) {
+                if let proposed = await namer.newSubject(for: story.title, summary: story.summary),
+                    let settled = try? await preferences.record(proposed)
+                {
+                    filed = [settled]
+                }
+            }
+
+            // No usable answer leaves the story unfiled, to be asked about again
+            // when the model is next available and the vocabulary has grown. An
+            // empty page is better than a wrong one.
+            guard let filed, !filed.isEmpty else { continue }
+
+            try await database.writer.write { db in
+                for name in filed {
+                    try StoryTopic(storyID: story.id, name: name).insert(db, onConflict: .ignore)
+                }
+            }
+            filedCount += 1
+        }
+
+        // Nothing filed means nothing this run can file, and the runner stops
+        // rather than asking the same questions for ever.
+        return filedCount
+    }
+}
+
 nonisolated struct BriefStoriesJob: ResumableJob {
     let name = "brief-stories"
     static let batchSize = 3
@@ -164,73 +268,18 @@ nonisolated struct DigestService: Sendable {
     func rebuild(until deadline: Date? = nil, now: Date = Date()) async -> StoryBuilder.Summary {
         let summary = await buildStories(now: now)
         await brief(until: deadline)
-        await nameTopics(now: now)
+        await nameTopics(until: deadline, now: now)
         return summary
     }
 
-    /// Files the stories nobody has filed yet.
+    /// Files the stories nobody has filed yet, until there are none left.
     ///
-    /// **Only the ones with no subject.** A story keeps the subjects it was
-    /// given for as long as it lives : sorting the whole page afresh on every
-    /// rebuild made the subjects drift, and a preference the reader attached to
-    /// a name that no longer exists is a preference silently thrown away.
-    ///
-    /// One story at a time, each against the vocabulary the reader already has.
-    /// A story that fits nothing in it gets one new subject, folded against the
-    /// vocabulary before it is kept, so a second spelling of something that
-    /// exists is not a second subject.
-    ///
-    /// Re-reading what is already filed is what `rewrite` is for, and it is the
-    /// reader who asks for it.
-    func nameTopics(now: Date = Date()) async {
-        let since = now.addingTimeInterval(-DigestStore.window)
-
-        let stories = try? await database.writer.read { db in
-            try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT s.id AS id, s.title AS title, s.summary AS summary FROM story s
-                    LEFT JOIN story_topic t ON t.story_id = s.id
-                    WHERE s.last_at >= ? AND t.story_id IS NULL
-                    ORDER BY s.last_at DESC
-                    LIMIT \(TopicNamer.storiesPerRun)
-                    """,
-                arguments: [since]
-            )
-            .map { (id: $0["id"] as UUID, title: $0["title"] as String, summary: $0["summary"] as String?) }
-        }
-        guard let stories, !stories.isEmpty else { return }
-
-        let preferences = TopicPreferences(database)
-        let namer = TopicNamer(locale: locale)
-
-        for story in stories {
-            guard OnDeviceModel.isAvailable else { return }
-
-            let vocabulary = (try? await preferences.vocabulary()) ?? []
-            var filed = await namer.file(story.title, summary: story.summary, into: vocabulary)
-
-            // Nothing the reader has is about this story, so the model names one
-            // thing, once.
-            if filed?.isEmpty == true || (vocabulary.isEmpty && filed == nil) {
-                if let proposed = await namer.newSubject(for: story.title, summary: story.summary),
-                    let settled = try? await preferences.record(proposed)
-                {
-                    filed = [settled]
-                }
-            }
-
-            // No answer at all leaves the story unfiled, to be asked about again
-            // when the model is next available. An empty page is better than a
-            // wrong one.
-            guard let filed, !filed.isEmpty else { continue }
-
-            try? await database.writer.write { db in
-                for name in filed {
-                    try StoryTopic(storyID: story.id, name: name).insert(db, onConflict: .ignore)
-                }
-            }
-        }
+    /// A job like the others rather than a fixed handful : filing twelve stories
+    /// a run left a reader with a backlog of them permanently unfiled, since a
+    /// page brings in more than twelve between two openings. It runs until the
+    /// backlog is empty, the time runs out, or the model gives up.
+    func nameTopics(until deadline: Date? = nil, now: Date = Date()) async {
+        await JobRunner(FileStoriesJob(database, locale: locale, now: now)).run(until: deadline)
     }
 
     func digest(_ topic: DigestTopic = .frontPage, now: Date = Date()) async throws -> Digest {
