@@ -89,6 +89,8 @@ A single application, shared code, distinct interface layers per platform.
 
 SQLite is driven directly through GRDB. SwiftData is ruled out : the volume is large, the concurrency needs fine control, and FTS5 virtual tables need direct access.
 
+GRDB is the only external dependency, and it stays that way. A package is added only where writing the equivalent ourselves would be unreasonable ; everything else comes from the system frameworks.
+
 ---
 
 ## 6. Local data model
