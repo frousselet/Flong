@@ -41,6 +41,10 @@ nonisolated struct ArticleSummary: Identifiable, Hashable, Sendable, FetchableRe
     let url: URL?
     /// The article's picture, when it has one.
     let imageURL: URL?
+    /// Where the source keeps its mark, and where the source itself is, for
+    /// the well-known paths a mark also lives at.
+    let feedIconURL: URL?
+    let feedSiteURL: URL?
 
     init(row: Row) {
         id = row["id"]
@@ -56,6 +60,10 @@ nonisolated struct ArticleSummary: Identifiable, Hashable, Sendable, FetchableRe
         hasMedia = row["has_media"] ?? false
         url = (row["url"] as String?).flatMap(URL.init(string:))
         imageURL = (row["image_url"] as String?).flatMap(URL.init(string:))
+        feedIconURL = (row["icon_url"] as String?).flatMap(URL.init(string:))
+        feedSiteURL =
+            (row["site_url"] as String?).flatMap(URL.init(string:))
+            ?? (row["feed_url"] as String?).flatMap(URL.init(string:))
     }
 }
 
@@ -149,6 +157,7 @@ nonisolated struct ArticleStore: Sendable {
     static let columns = """
         SELECT e.id, 'stream' AS origin, e.feed_id, e.title, e.excerpt, e.author, e.url,
                e.is_read, e.is_starred, e.has_media, e.image_url,
+               f.icon_url, f.site_url, f.url AS feed_url,
                COALESCE(e.published_at, e.received_at) AS date,
                f.title AS feed_title
         """

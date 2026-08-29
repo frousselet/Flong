@@ -28,6 +28,9 @@ nonisolated struct SidebarItem: Identifiable, Hashable, Sendable {
     /// in the reader's language.
     let title: String?
     let unreadCount: Int
+    /// Where a feed keeps its mark, when it is a feed and it states one.
+    var iconURL: URL?
+    var siteURL: URL?
     var children: [SidebarItem] = []
 
     var id: Kind { kind }
@@ -526,7 +529,13 @@ final class AppModel {
     }
 
     private func item(for feed: Feed, counts: [UUID: Int]) -> SidebarItem {
-        SidebarItem(kind: .feed(feed.id), title: feed.title, unreadCount: counts[feed.id] ?? 0)
+        SidebarItem(
+            kind: .feed(feed.id),
+            title: feed.title,
+            unreadCount: counts[feed.id] ?? 0,
+            iconURL: feed.iconURL,
+            siteURL: feed.siteURL ?? feed.url
+        )
     }
 
     /// Whether the list is showing the library rather than a view of the stream.
