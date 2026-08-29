@@ -69,7 +69,9 @@ struct AppShell: View {
 
             // Everything, newest first : the wire, not a queue. A queue is a
             // thing to get to the end of, and a reader who is watching a
-            // subject is not trying to finish anything. Unread on its own is
+            // subject is not trying to finish anything. It carries no count
+            // either, for the same reason : a number that only ever grows is a
+            // debt, and nobody owes their feeds anything. Unread on its own is
             // still a view, in the sources list, for whoever does want it.
             Tab("Live", systemImage: "dot.radiowaves.left.and.right", value: AppSection.live) {
                 stack($livePath) {
@@ -78,7 +80,6 @@ struct AppShell: View {
                     }
                 }
             }
-            .badge(model.unreadCount)
 
             Tab("Library", systemImage: "books.vertical", value: AppSection.library) {
                 stack($libraryPath) {
