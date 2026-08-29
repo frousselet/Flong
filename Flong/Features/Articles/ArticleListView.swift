@@ -45,6 +45,15 @@ struct ArticleListView: View {
             }
         }
         .refreshable { await model.refreshAll() }
+        .searchable(
+            text: Binding(get: { model.searchText }, set: { model.searchText = $0 }),
+            placement: .toolbar,
+            prompt: Text("Search")
+        ) {
+            ForEach(model.searchSuggestions, id: \.self) { suggestion in
+                Text(verbatim: suggestion).searchCompletion(suggestion)
+            }
+        }
         .navigationTitle(Text("Articles"))
         .toolbar {
             ToolbarItem {
@@ -66,11 +75,25 @@ struct ArticleListView: View {
         }
         .overlay {
             if model.summaries.isEmpty {
-                ContentUnavailableView {
-                    Label("Nothing to read", systemImage: "checkmark.circle")
-                } description: {
-                    Text("Everything here has been read.")
+                if model.isShowingResults {
+                    ContentUnavailableView.search
+                } else {
+                    ContentUnavailableView {
+                        Label("Nothing to read", systemImage: "checkmark.circle")
+                    } description: {
+                        Text("Everything here has been read.")
+                    }
                 }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if model.isShowingResults, !model.summaries.isEmpty {
+                Text("\(model.summaries.count) results")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(.bar)
             }
         }
     }
