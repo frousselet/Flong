@@ -412,6 +412,16 @@
         }
       }
     },
+    "Articles appear as they arrive.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les articles apparaissent à mesure qu'ils arrivent."
+          }
+        }
+      }
+    },
     "By %@": {
       "localizations": {
         "fr": {
@@ -612,6 +622,17 @@
         }
       }
     },
+    "Live": {
+      "comment": "The section showing every article as it arrives, newest first",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En direct"
+          }
+        }
+      }
+    },
     "Mark all as read": {
       "localizations": {
         "fr": {
@@ -668,6 +689,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rien n'est encore arrivé"
+          }
+        }
+      }
+    },
+    "Nothing here yet": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien pour l'instant"
           }
         }
       }

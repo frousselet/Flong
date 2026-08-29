@@ -26,9 +26,9 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 The pills are the subjects the system model found across the page. Tapping one narrows the page to it ; the others stay, so there is always a way back.
 
-| An article | Unread | Sources |
-| ---------- | ------ | ------- |
-| ![An article on iPad](docs/images/reader-ipad-light.png) | ![The unread articles on iPad](docs/images/unread-ipad.png) | ![The sources on iPad](docs/images/sources-ipad.png) |
+| An article | Live | Sources |
+| ---------- | ---- | ------- |
+| ![An article on iPad](docs/images/reader-ipad-light.png) | ![Everything as it arrives, on iPad](docs/images/live-ipad.png) | ![The sources on iPad](docs/images/sources-ipad.png) |
 
 The same page on iPhone, where the sections sit in the system tab bar and search has its own place in it :
 

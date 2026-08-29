@@ -25,7 +25,7 @@ nonisolated enum Route: Hashable {
 /// has and which every screen here uses.
 nonisolated enum AppSection: Hashable {
     case digest
-    case unread
+    case live
     case library
     case sources
     case search
@@ -44,7 +44,7 @@ struct AppShell: View {
     @State private var model: AppModel
     @State private var section = AppSection.digest
     @State private var digestPath: [Route] = []
-    @State private var unreadPath: [Route] = []
+    @State private var livePath: [Route] = []
     @State private var libraryPath: [Route] = []
     @State private var sourcesPath: [Route] = []
     @State private var searchPath: [Route] = []
@@ -66,9 +66,15 @@ struct AppShell: View {
                 }
             }
 
-            Tab("Unread", systemImage: "circle.inset.filled", value: AppSection.unread) {
-                stack($unreadPath) {
-                    ArticleFeedScreen(model: model, kind: .unread) { unreadPath.append(.article($0)) }
+            // Everything, newest first : the wire, not a queue. A queue is a
+            // thing to get to the end of, and a reader who is watching a
+            // subject is not trying to finish anything. Unread on its own is
+            // still a view, in the sources list, for whoever does want it.
+            Tab("Live", systemImage: "dot.radiowaves.left.and.right", value: AppSection.live) {
+                stack($livePath) {
+                    ArticleFeedScreen(model: model, kind: .all, named: "Live") {
+                        livePath.append(.article($0))
+                    }
                 }
             }
             .badge(model.unreadCount)
