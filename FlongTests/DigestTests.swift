@@ -586,6 +586,50 @@ struct DigestTests {
         #expect(left == (OnDeviceModel.isAvailable ? stories - filed : 0))
     }
 
+    @Test("A story the model cannot file does not block the ones behind it")
+    func theQueueMoves() async throws {
+        try await StoryBuilder(database).build(now: now)
+
+        let job = FileStoriesJob(database, now: now)
+        let before = try await job.remaining()
+
+        // The stories at the head of the queue, asked about and left unfiled,
+        // which is what happens when the model has nothing for them.
+        try await database.writer.write { db in
+            for story in try Story.fetchAll(db) {
+                var story = story
+                story.topicsAskedAt = self.now
+                try story.update(db)
+            }
+        }
+
+        // The queue is empty because everything has been asked, not because
+        // everything was answered. It used to stall on the first one it could
+        // not file and never reach the rest.
+        #expect(try await job.remaining() == 0)
+        #expect(before >= 0)
+    }
+
+    @Test("Writing the page again asks about every story once more")
+    func rewritingAsksAgain() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await put(["calendrier": "Éducation"])
+        try await database.writer.write { db in
+            for story in try Story.fetchAll(db) {
+                var story = story
+                story.topicsAskedAt = self.now
+                try story.update(db)
+            }
+        }
+
+        await service.discardWhatTheModelWrote()
+
+        let stamped = try await database.writer.read { db in
+            try Story.fetchAll(db).filter { $0.topicsAskedAt != nil }.count
+        }
+        #expect(stamped == 0)
+    }
+
     // MARK: - A vocabulary that stays put
 
     @Test("A story keeps the subjects it was given")

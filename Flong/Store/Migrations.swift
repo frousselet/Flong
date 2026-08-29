@@ -95,6 +95,12 @@ nonisolated extension AppDatabase {
             try createVocabulary(db)
         }
 
+        migrator.registerMigration("v15.askedOnce") { db in
+            try db.alter(table: "story") { table in
+                table.add(column: "topics_asked_at", .datetime)
+            }
+        }
+
         return migrator
     }
 

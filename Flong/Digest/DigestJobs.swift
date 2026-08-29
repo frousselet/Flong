@@ -55,7 +55,7 @@ nonisolated struct FileStoriesJob: ResumableJob {
                 sql: """
                     SELECT COUNT(*) FROM story s
                     LEFT JOIN story_topic t ON t.story_id = s.id
-                    WHERE s.last_at >= ? AND t.story_id IS NULL
+                    WHERE s.last_at >= ? AND t.story_id IS NULL AND s.topics_asked_at IS NULL
                     """,
                 arguments: [since]
             ) ?? 0
@@ -72,7 +72,7 @@ nonisolated struct FileStoriesJob: ResumableJob {
                 sql: """
                     SELECT s.id AS id, s.title AS title, s.summary AS summary FROM story s
                     LEFT JOIN story_topic t ON t.story_id = s.id
-                    WHERE s.last_at >= ? AND t.story_id IS NULL
+                    WHERE s.last_at >= ? AND t.story_id IS NULL AND s.topics_asked_at IS NULL
                     ORDER BY s.last_at DESC
                     LIMIT \(Self.batchSize)
                     """,
@@ -84,7 +84,7 @@ nonisolated struct FileStoriesJob: ResumableJob {
 
         let preferences = TopicPreferences(database)
         let namer = TopicNamer(locale: locale)
-        var filedCount = 0
+        var asked = 0
 
         for story in stories {
             guard OnDeviceModel.isAvailable else { break }
@@ -102,22 +102,28 @@ nonisolated struct FileStoriesJob: ResumableJob {
                 }
             }
 
-            // No usable answer leaves the story unfiled, to be asked about again
-            // when the model is next available and the vocabulary has grown. An
-            // empty page is better than a wrong one.
-            guard let filed, !filed.isEmpty else { continue }
-
+            // Asked, whatever came of it. A story the model cannot file would
+            // otherwise sit at the head of the queue for ever, since the
+            // unfiled are taken newest first, and stop everything behind it
+            // from being asked at all. An empty page is better than a wrong
+            // one, and a story asked about once and left is better than a
+            // queue that never moves.
             try await database.writer.write { db in
-                for name in filed {
+                try db.execute(
+                    sql: "UPDATE story SET topics_asked_at = ? WHERE id = ?",
+                    arguments: [Date(), story.id]
+                )
+                for name in filed ?? [] {
                     try StoryTopic(storyID: story.id, name: name).insert(db, onConflict: .ignore)
                 }
             }
-            filedCount += 1
+            asked += 1
         }
 
-        // Nothing filed means nothing this run can file, and the runner stops
-        // rather than asking the same questions for ever.
-        return filedCount
+        // What was asked, not what was filed : the runner stops when there is
+        // nothing left to ask, which is a queue that empties rather than one
+        // that stalls on whatever it cannot answer.
+        return asked
     }
 }
 
@@ -318,6 +324,8 @@ nonisolated struct DigestService: Sendable {
                     WHERE story_id IN (SELECT id FROM story WHERE brief_locked = 0)
                     """
             )
+            // Asked again means asked again : the stamp goes with the filing.
+            try db.execute(sql: "UPDATE story SET topics_asked_at = NULL WHERE brief_locked = 0")
         }
     }
 
