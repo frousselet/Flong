@@ -513,19 +513,28 @@ struct ArticleRow: View {
     /// The side of the picture beside an article.
     private static let thumbnailSide: CGFloat = 64
 
+    /// The headline, with a tick at the end of it when the article has been
+    /// read.
+    ///
+    /// At the end of the words rather than beside them, so it sits where the
+    /// reader stopped reading and costs the row no width. Every headline keeps
+    /// one weight and one colour : a page of half-grey rows is a page that
+    /// looks stale, and a story worth reading is worth reading whether it has
+    /// been opened once already or not.
+    private var headline: Text {
+        let title = Text(verbatim: article.title)
+        guard article.isRead else { return title }
+
+        return title + Text(verbatim: "  ")
+            + Text(Image(systemName: "checkmark")).font(.caption2).foregroundStyle(.tertiary)
+    }
+
     var body: some View {
         Button(action: open) {
             HStack(alignment: .top, spacing: 10) {
-                Circle()
-                    .fill(article.isRead ? Color.clear : Color.accentColor)
-                    .frame(width: 6, height: 6)
-                    .padding(.top, 7)
-                    .accessibilityHidden(true)
-
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(verbatim: article.title)
+                    headline
                         .font(Editorial.headline(.body))
-                        .fontWeight(article.isRead ? .regular : .semibold)
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
