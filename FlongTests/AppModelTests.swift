@@ -178,6 +178,56 @@ struct AppModelTests {
         #expect(model.smartLists.first?.unreadCount == 0)
     }
 
+    // MARK: - Searching
+
+    @Test("Typing a query narrows the list to what answers it")
+    func searching() async throws {
+        let feed = try await subscriptions.subscribe(
+            to: Subscription(address: "https://a.example.com/f.xml", title: "A")
+        ).feed
+        try await seed("Une réforme du calendrier", feed: feed)
+        try await seed("Les macros Swift", feed: feed)
+        await model.load()
+
+        model.searchText = "réforme"
+        await model.loadArticles()
+
+        #expect(model.isShowingResults)
+        #expect(model.summaries.map(\.title) == ["Une réforme du calendrier"])
+
+        model.searchText = ""
+        await model.loadArticles()
+        #expect(!model.isShowingResults)
+        #expect(model.summaries.count == 2)
+    }
+
+    @Test("A query that says nothing is not a query")
+    func emptyQuery() async throws {
+        model.searchText = "   "
+        #expect(model.query == nil)
+        #expect(!model.isShowingResults)
+    }
+
+    @Test("Feed and folder names complete themselves")
+    func suggestions() async throws {
+        try await subscriptions.subscribe(
+            to: Subscription(address: "https://a.example.com/f.xml", title: "Le Quotidien", folder: "Presse")
+        )
+        try await subscriptions.subscribe(
+            to: Subscription(address: "https://b.example.com/f.xml", title: "Swift", folder: "Veille/iOS")
+        )
+        await model.load()
+
+        model.searchText = "feed:quot"
+        #expect(model.searchSuggestions == ["feed:\"Le Quotidien\""])
+
+        model.searchText = "réforme tag:vei"
+        #expect(model.searchSuggestions == ["réforme tag:Veille/iOS"])
+
+        model.searchText = "réforme"
+        #expect(model.searchSuggestions.isEmpty)
+    }
+
     // MARK: - Subscribing
 
     @Test("An address becomes a feed, its articles and a selection")

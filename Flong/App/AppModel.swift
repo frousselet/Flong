@@ -87,6 +87,9 @@ final class AppModel {
     private(set) var isRefreshing = false
     private(set) var feedCount = 0
 
+    /// Whether the list is showing the answer to a query rather than a view.
+    var isShowingResults: Bool { query != nil }
+
     var selection: SidebarItem.Kind? = .unread {
         didSet { Task { await loadArticles() } }
     }
@@ -97,6 +100,79 @@ final class AppModel {
     /// The summary of the last import, until the reader dismisses it.
     var report: OPMLImportReport?
     var failure: AppFailure?
+
+    /// What is in the search field.
+    ///
+    /// Results follow it as it is typed, after a pause short enough not to be
+    /// felt and long enough that a word is not searched for four times while it
+    /// is being written.
+    var searchText = "" {
+        didSet {
+            guard searchText != oldValue else { return }
+            search?.cancel()
+            search = Task {
+                try? await Task.sleep(for: .milliseconds(150))
+                guard !Task.isCancelled else { return }
+                await loadArticles()
+            }
+        }
+    }
+
+    private var search: Task<Void, Never>?
+
+    /// The query as it is understood, or `nil` when the field is empty.
+    var query: QueryNode? {
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let node = QueryParser.parse(trimmed)
+        return node == .all ? nil : node
+    }
+
+    /// What to offer while a query is being typed.
+    ///
+    /// Section 12 asks for completion of feed and tag names, which are the two
+    /// things nobody remembers the exact spelling of.
+    var searchSuggestions: [String] {
+        guard let last = searchText.split(separator: " ").last.map(String.init) else { return [] }
+
+        let names: [String]
+        let prefix = searchText.dropLast(last.count)
+
+        if last.lowercased().hasPrefix("feed:") {
+            names = completions(for: String(last.dropFirst(5)), in: feedTitles)
+        } else if last.lowercased().hasPrefix("tag:") {
+            names = completions(for: String(last.dropFirst(4)), in: folderPaths)
+        } else {
+            return []
+        }
+
+        let field = last.prefix(while: { $0 != ":" })
+        return names.map { name in
+            let value = name.contains(" ") ? "\"\(name)\"" : name
+            return prefix + field + ":" + value
+        }
+    }
+
+    private func completions(for text: String, in names: [String]) -> [String] {
+        let text = text.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+        guard !names.isEmpty else { return [] }
+        guard !text.isEmpty else { return Array(names.prefix(6)) }
+
+        return names.filter { $0.localizedCaseInsensitiveContains(text) }.prefix(6).map { $0 }
+    }
+
+    private var feedTitles: [String] {
+        sidebar.flatMap { [$0] + $0.children }.compactMap { item in
+            if case .feed = item.kind { item.title } else { nil }
+        }
+    }
+
+    private var folderPaths: [String] {
+        sidebar.compactMap { item in
+            if case .folder(let path) = item.kind { path } else { nil }
+        }
+    }
 
     init(database: AppDatabase, fetcher: FeedFetcher = FeedFetcher()) {
         self.database = database
@@ -187,7 +263,7 @@ final class AppModel {
 
     func loadArticles() async {
         do {
-            summaries = try await articles.summaries(filter)
+            summaries = try await articles.summaries(filter, matching: query)
             if let selectedArticle, !summaries.contains(where: { $0.id == selectedArticle }) {
                 self.selectedArticle = nil
             }

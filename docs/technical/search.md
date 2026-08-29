@@ -53,4 +53,20 @@ Two rules, and the tests that hold them :
 1. **Every value travels as a bound parameter.** No value the reader typed reaches a statement as text.
 2. **Every word handed to the index is quoted first**, with internal quotes doubled. A reader typing `NEAR(`, `^` or `"` searches for it rather than instructing the index with it. The only operators in a `MATCH` expression are the ones the grammar put there.
 
+## What it costs
+
+Section 11 sets the targets and section 22 asks for them to be measured against a synthetic corpus of 125 000 articles. `SearchPerformanceTests` builds one and holds the store to them. Measured on an Apple silicon Mac :
+
+| Operation | Target | Measured |
+| --------- | ------ | -------- |
+| a word matching one article in twenty | under 100 ms | 39 ms |
+| a word in titles only | under 100 ms | 7 ms |
+| a phrase | under 100 ms | 3 ms |
+| indexing one article at ingestion | under 10 ms | 0.24 ms |
+| a full rebuild of the index | under 2 min | 5 s |
+
+The corpus has to be shaped like a real one, not merely be large. A vocabulary of thirty words repeated everywhere would put every word in every article, and a query for one of them would match all 125 000 : that measures how fast a full scan ranks, which is not what anybody searches for. Words follow the usual lopsided distribution, and the searched terms are planted at known rates.
+
+The suite is opt in, since building the corpus takes half a minute : tick `FLONG_PERFORMANCE` in the scheme's environment, or set `isEnabled="YES"` on it in `Flong.xcscheme`. Nobody should wait for this to find out that a parser test broke.
+
 The suites feed the parser unterminated quotes, stray brackets, lone operators, control characters, two thousand `OR` branches and `'; DROP TABLE entry; --`, and require an answer and an intact store every time.
