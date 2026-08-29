@@ -392,13 +392,17 @@ The model names and summarizes ; without one, a story takes the title and standf
 
 ### Common structure
 
-**Amended.** This section asked for three levels, sidebar, list and article, shown as three columns on iPad and Mac. What is built shows one column at a time on every platform, under the system tab bar : the digest, unread, the library, sources, and search. Two columns of chrome around an article are two columns of not reading, and the sections a sidebar was to hold are the sections the tab bar holds. Each section keeps its own navigation stack.
+**Amended.** This section asked for three levels, sidebar, list and article, shown as three columns on iPad and Mac. What is built shows one column at a time on every platform, under the system tab bar : the digest, the wire, the library, sources, and search. Two columns of chrome around an article are two columns of not reading, and the sections a sidebar was to hold are the sections the tab bar holds. Each section keeps its own navigation stack.
 
 On macOS those same sections become a sidebar, drawn by the system for an adaptable tab view, since a Mac window keeps its sections at the side.
 
 Views the sidebar was also to list, today, starred, tags, saved queries and individual feeds, are reached from the sources section rather than from a permanent column.
 
 The digest, a story and an article are set as a page rather than as a control panel : one column held to a readable measure, serif headlines, hairline rules, no cards and no boxes. Liquid Glass appears only in the navigation layer, which is the system's own bar, and never in the content. `docs/technical/interface.md` records the design and what was rejected.
+
+### The wire
+
+**Amended.** This section asked for an unread queue as one of the three levels. The section beside the digest shows **everything, newest first, read or not**, broken by day. A queue is a thing to get to the end of, and a reader watching a subject is not trying to finish anything ; what they want is to see what came in and where they left off. Unread on its own remains a view, in the sources list, for whoever does want it, and the count of unread articles still rides on the section.
 
 ### List
 

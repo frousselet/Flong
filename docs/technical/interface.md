@@ -69,6 +69,14 @@ Motion is either information or decoration, and decoration on a screen read ever
 
 Nothing else animates.
 
+## The wire
+
+The section beside the digest shows everything, newest first, read or not. A queue is a thing to get to the end of, and a reader watching a subject is not trying to finish anything : what they want is to see what came in, and where they left off. The read ones stay, greyed by the loss of their dot and of the weight in their headline, which is how a reader finds their place.
+
+It is broken by day, in the same kerned uppercase as the front page's sections. A long scroll with no landmarks is one a reader loses their place in, and the day is the landmark.
+
+Unread on its own is still a view, in the sources list, for whoever wants a queue. The count of unread articles rides on the section either way, since it is the one number a reader glances at without opening anything.
+
 ## The dateline
 
 **The title of the page is the date.** Not the name of the section : the tab bar says that already, and a page that repeats its own label has spent a line saying nothing. A dateline says what the label did not, which is how old what follows is allowed to be, and it is where a newspaper puts it.
