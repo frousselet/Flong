@@ -67,6 +67,7 @@ The app target uses an Xcode synchronized file group, so a new file placed in `F
 | `Flong/Enricher/` | Vectors, classification, rule execution |
 | `Flong/Sync/` | `CKSyncEngine` on the private database |
 | `Flong/Automation/` | App Intents, widgets, local MCP server |
+| `Flong/Import/` | Reading a subscription list or an export back in, and writing one out |
 | `Flong/Features/` | One directory per screen area, each holding its views |
 | `Flong/Support/` | Logging and cross-cutting helpers |
 | `FlongTests/` | Swift Testing unit tests |
@@ -80,6 +81,7 @@ A module directory is created when its first real file lands, not before.
 - **Storage is GRDB, never SwiftData** : the corpus reaches 125,000 articles, concurrency needs fine control, and the FTS5 virtual table needs direct SQL. Schema changes go through a numbered `DatabaseMigrator` registration, never an edit of an existing migration once it has shipped.
 - **Technical keys are UUIDv7**, so identifiers sort by creation time and indexes stay lightly fragmented. Remote identity stays separate : an article is matched by its GUID, or failing that by the pair of link and publication date.
 - **A feed is identified by its canonical URL** : everything that creates a subscription goes through `FeedURL.canonical(_:)`, never through a raw string, otherwise two spellings of one address become two rows and every article shows up twice. The rules, and what a second subscription to the same address may and may not overwrite, are in `docs/technical/feed-identity.md`.
+- **An import tolerates a broken file, never a broken result** : an exported OPML routinely holds a bare ampersand, a control character or a lying encoding declaration, and the reader cannot fix any of it, so the parser repairs and retries. A single unusable line is reported and skipped, never fatal. What cannot be understood is never guessed at.
 - **Stream and library are different things** : the stream is purged by age and volume, the library never is. Promotion freezes and copies the content, which is what lets a library item survive its source disappearing. Never make a library feature read through to a stream row.
 - **The CloudKit record budget is a design constraint**, not a detail : around three thousand records total, read states compacted into one record per feed and per month, and never one record per article. Merging is a union, so it stays commutative and idempotent and needs no conflict resolution.
 - **Concurrency** : the target builds with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` and approachable concurrency, so types are main-actor isolated unless marked `nonisolated`. Store types, records, parsers and networking types are `nonisolated` ; database access goes through GRDB's own `DatabaseQueue` / `DatabasePool` serialization rather than a hand-rolled actor.

@@ -86,6 +86,7 @@ A single application, shared code, distinct interface layers per platform.
 | `Enricher` | vectors, classification, rule execution |
 | `Sync` | `CKSyncEngine` on the private database |
 | `Automation` | App Intents, widgets, local MCP server on macOS |
+| `Import` | OPML and service imports, exports |
 
 SQLite is driven directly through GRDB. SwiftData is ruled out : the volume is large, the concurrency needs fine control, and FTS5 virtual tables need direct access.
 

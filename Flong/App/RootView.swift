@@ -13,18 +13,24 @@ import SwiftUI
 
 /// The window content.
 ///
-/// The reading interface of section 16 of the specification lands with M0. Until
-/// then the window states plainly that nothing is subscribed yet.
+/// Everything hangs off the store, so a window without one has nothing to show
+/// and says so rather than pretending to be empty.
 struct RootView: View {
+    let database: AppDatabase?
+
     var body: some View {
-        ContentUnavailableView {
-            Label("No feed yet", systemImage: "dot.radiowaves.up.forward")
-        } description: {
-            Text("Add a feed to start reading.")
+        if let database {
+            SubscriptionsView(database: database)
+        } else {
+            ContentUnavailableView {
+                Label("Storage unavailable", systemImage: "externaldrive.trianglebadge.exclamationmark")
+            } description: {
+                Text("Flong could not open its database.")
+            }
         }
     }
 }
 
 #Preview {
-    RootView()
+    RootView(database: try? AppDatabase.inMemory())
 }
