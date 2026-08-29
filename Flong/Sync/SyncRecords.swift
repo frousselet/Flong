@@ -1,0 +1,181 @@
+//
+//  SyncRecords.swift
+//  Flong
+//
+//  Created by François Rousselet on 29/08/2026.
+//
+//  This Source Code Form is subject to the terms of the Mozilla Public
+//  License, v. 2.0. If a copy of the MPL was not distributed with this
+//  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+
+import CloudKit
+import CryptoKit
+import Foundation
+
+/// What travels between a reader's devices, and what it is called.
+///
+/// Every record name is **derived from what the record is about**, never from a
+/// local identifier. Two devices that star the same article compute the same
+/// name and write the same record, which is what turns two concurrent writes
+/// into one row rather than two. A name derived from a local UUID would give
+/// every device its own copy of everything.
+nonisolated enum SyncRecords {
+    /// The one zone. A custom zone rather than the default one, since only a
+    /// custom zone can be fetched by change token and deleted whole.
+    static let zoneName = "Flong"
+
+    enum RecordType {
+        static let feed = "Feed"
+        static let libraryItem = "LibraryItem"
+        static let readState = "ReadState"
+        static let catchUp = "CatchUp"
+    }
+
+    // MARK: - Names
+
+    static func name(forFeed url: URL) -> String { "feed-" + digest(url.absoluteString) }
+
+    static func name(forLibraryItemWithGUID guid: String, feedURL: URL?) -> String {
+        "item-" + digest((feedURL?.absoluteString ?? "") + "\n" + guid)
+    }
+
+    static func name(forReadStatePeriod period: String, kind: ReadStateKind) -> String {
+        "read-\(kind.rawValue)-\(period)"
+    }
+
+    static func name(forCatchUpFeed url: URL, day: String) -> String {
+        "catchup-" + digest(url.absoluteString) + "-" + day
+    }
+
+    private static func digest(_ text: String) -> String {
+        SHA256.hash(data: Data(text.utf8)).prefix(16).map { String(format: "%02x", $0) }.joined()
+    }
+
+    // MARK: - Feeds
+
+    /// What a subscription looks like on the wire.
+    ///
+    /// The health of a feed stays at home : the counters, the `ETag`, the
+    /// quarantine and the observed interval are what *this* device knows about
+    /// its own fetching, and telling another device about them would be telling
+    /// it something untrue.
+    static func record(for feed: Feed, in zone: CKRecordZone.ID) -> CKRecord {
+        let record = CKRecord(
+            recordType: RecordType.feed,
+            recordID: CKRecord.ID(recordName: name(forFeed: feed.url), zoneID: zone)
+        )
+        record["url"] = feed.url.absoluteString
+        record["title"] = feed.title
+        record["folder"] = feed.folder
+        record["siteURL"] = feed.siteURL?.absoluteString
+        record["iconURL"] = feed.iconURL?.absoluteString
+        record["createdAt"] = feed.createdAt
+        return record
+    }
+
+    static func subscription(from record: CKRecord) -> Subscription? {
+        guard record.recordType == RecordType.feed, let url = record["url"] as? String else { return nil }
+
+        return try? Subscription(
+            address: url,
+            title: record["title"] as? String ?? "",
+            siteURL: (record["siteURL"] as? String).flatMap(URL.init(string:)),
+            iconURL: (record["iconURL"] as? String).flatMap(URL.init(string:)),
+            folder: record["folder"] as? String
+        )
+    }
+
+    // MARK: - Library items
+
+    /// A kept article, content and all.
+    ///
+    /// The text is compressed. An article is a few tens of kilobytes of markup
+    /// and compresses to a fifth of that, which keeps a record well inside what
+    /// CloudKit accepts and a first synchronization well inside what a phone
+    /// wants to upload.
+    static func record(for item: LibraryItem, in zone: CKRecordZone.ID) -> CKRecord {
+        let record = CKRecord(
+            recordType: RecordType.libraryItem,
+            recordID: CKRecord.ID(
+                recordName: name(forLibraryItemWithGUID: item.guid, feedURL: item.feedURL),
+                zoneID: zone
+            )
+        )
+        record["guid"] = item.guid
+        record["feedURL"] = item.feedURL?.absoluteString
+        record["feedTitle"] = item.feedTitle
+        record["url"] = item.url?.absoluteString
+        record["title"] = item.title
+        record["author"] = item.author
+        record["language"] = item.language
+        record["publishedAt"] = item.publishedAt
+        record["promotedAt"] = item.promotedAt
+        record["annotation"] = item.annotation
+        record["contentHTML"] = compressed(item.contentHTML)
+        record["plainText"] = compressed(item.plainText)
+        return record
+    }
+
+    static func libraryItem(from record: CKRecord) -> LibraryItem? {
+        guard record.recordType == RecordType.libraryItem, let guid = record["guid"] as? String else { return nil }
+
+        return LibraryItem(
+            feedURL: (record["feedURL"] as? String).flatMap(URL.init(string:)),
+            feedTitle: record["feedTitle"] as? String,
+            guid: guid,
+            url: (record["url"] as? String).flatMap(URL.init(string:)),
+            title: record["title"] as? String ?? "",
+            author: record["author"] as? String,
+            language: record["language"] as? String,
+            publishedAt: record["publishedAt"] as? Date,
+            promotedAt: record["promotedAt"] as? Date ?? Date(),
+            contentHTML: expanded(record["contentHTML"] as? Data),
+            plainText: expanded(record["plainText"] as? Data),
+            annotation: record["annotation"] as? String
+        )
+    }
+
+    // MARK: - Read states
+
+    static func record(for block: ReadStateBlock, in zone: CKRecordZone.ID) -> CKRecord {
+        let record = CKRecord(
+            recordType: RecordType.readState,
+            recordID: CKRecord.ID(
+                recordName: name(forReadStatePeriod: block.period, kind: block.kind),
+                zoneID: zone
+            )
+        )
+        record["period"] = block.period
+        record["kind"] = block.kind.rawValue
+        record["fingerprints"] = block.encoded()
+        return record
+    }
+
+    static func readStateBlock(from record: CKRecord) -> ReadStateBlock? {
+        guard record.recordType == RecordType.readState,
+            let period = record["period"] as? String,
+            let kind = (record["kind"] as? String).flatMap(ReadStateKind.init(rawValue:)),
+            let fingerprints = record["fingerprints"] as? Data
+        else { return nil }
+
+        return ReadStateBlock.decode(fingerprints, period: period, kind: kind)
+    }
+
+    // MARK: - Bytes
+
+    private static func compressed(_ text: String?) -> Data? {
+        guard let text, !text.isEmpty else { return nil }
+        let data = Data(text.utf8)
+        guard let compressed = try? (data as NSData).compressed(using: .lzfse) as Data else { return data }
+        return compressed.count < data.count ? compressed : data
+    }
+
+    private static func expanded(_ data: Data?) -> String? {
+        guard let data, !data.isEmpty else { return nil }
+        if let expanded = try? (data as NSData).decompressed(using: .lzfse) as Data {
+            return String(decoding: expanded, as: UTF8.self)
+        }
+        return String(decoding: data, as: UTF8.self)
+    }
+}

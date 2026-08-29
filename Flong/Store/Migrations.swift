@@ -47,7 +47,33 @@ nonisolated extension AppDatabase {
             try createSearchIndex(db)
         }
 
+        migrator.registerMigration("v3.readStates") { db in
+            try createReadStateBlocks(db)
+        }
+
         return migrator
+    }
+
+    /// The read states, as one row per period rather than one per article.
+    ///
+    /// `read_state` of v1 was written for one row per feed and per month, and
+    /// was never used. One row per month, over every feed, is what actually
+    /// meets the record budget of section 7 : three years of reading is a few
+    /// dozen records instead of several thousand. It is replaced rather than
+    /// altered, nothing having ever been stored in it.
+    private static func createReadStateBlocks(_ db: Database) throws {
+        try db.create(table: "read_state_block") { table in
+            // The month the articles were published in, which every device
+            // works out alike, or `undated`.
+            table.column("period", .text).notNull()
+            table.column("kind", .text).notNull()
+            // The compressed set of fingerprints.
+            table.column("fingerprints", .blob).notNull()
+            table.column("updated_at", .datetime).notNull()
+            table.primaryKey(["period", "kind"])
+        }
+
+        try db.drop(table: "read_state")
     }
 
     /// The full-text index of the stream, and the triggers that keep it in step.

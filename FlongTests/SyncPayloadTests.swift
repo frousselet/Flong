@@ -1,0 +1,307 @@
+//
+//  SyncPayloadTests.swift
+//  FlongTests
+//
+//  Created by François Rousselet on 29/08/2026.
+//
+//  This Source Code Form is subject to the terms of the Mozilla Public
+//  License, v. 2.0. If a copy of the MPL was not distributed with this
+//  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+
+import CloudKit
+import Foundation
+import GRDB
+import Testing
+
+@testable import Flong
+
+/// One device, as far as these tests are concerned.
+///
+/// CloudKit itself is not exercised : an account, a container and a network are
+/// none of them things a test can rely on. What is exercised is everything on
+/// either side of it, which is where the behaviour lives, with records carried
+/// between two stores by hand.
+private struct Device {
+    let database: AppDatabase
+    let subscriptions: SubscriptionStore
+    let articles: ArticleStore
+    let library: LibraryStore
+    let readStates: ReadStateStore
+    let payload: SyncPayload
+
+    init(zone: CKRecordZone.ID) throws {
+        database = try AppDatabase.inMemory()
+        subscriptions = SubscriptionStore(database)
+        articles = ArticleStore(database)
+        library = LibraryStore(database)
+        readStates = ReadStateStore(database)
+        payload = SyncPayload(database, zone: zone)
+    }
+
+    @discardableResult
+    func add(_ guid: String, to feed: Feed, title: String, published: Date, body: String = "Un corps.") async throws
+        -> Entry
+    {
+        var entry = Entry(
+            feedID: feed.id,
+            guid: guid,
+            url: URL(string: "https://example.com/\(guid)"),
+            title: title,
+            excerpt: body,
+            publishedAt: published,
+            receivedAt: published
+        )
+        entry.hasMedia = false
+
+        try await database.writer.write { db in
+            try entry.insert(db)
+            try EntryBody(entryID: entry.id, sanitizedHTML: "<p>\(body)</p>", plainText: body).insert(db)
+        }
+        return entry
+    }
+}
+
+@Suite("Synchronization records")
+struct SyncRecordsTests {
+    private let zone = CKRecordZone.ID(zoneName: SyncRecords.zoneName, ownerName: CKCurrentUserDefaultName)
+    private let now = Date(timeIntervalSince1970: 1_787_646_600)
+
+    @Test("A record is named after what it is about, not after where it was made")
+    func namesAreDerived() throws {
+        let url = URL(string: "https://feeds.example.com/f.xml")!
+
+        #expect(SyncRecords.name(forFeed: url) == SyncRecords.name(forFeed: url))
+        #expect(SyncRecords.name(forFeed: url) != SyncRecords.name(forFeed: URL(string: "https://other.example/f")!))
+        #expect(
+            SyncRecords.name(forLibraryItemWithGUID: "urn:1", feedURL: url)
+                == SyncRecords.name(forLibraryItemWithGUID: "urn:1", feedURL: url)
+        )
+        #expect(SyncRecords.name(forReadStatePeriod: "2026-08", kind: .read) == "read-read-2026-08")
+    }
+
+    @Test("A subscription survives the wire")
+    func feedRoundTrip() throws {
+        let feed = Feed(
+            url: URL(string: "https://feeds.example.com/f.xml")!,
+            siteURL: URL(string: "https://example.com"),
+            title: "Le Quotidien",
+            folder: "Presse",
+            createdAt: now
+        )
+
+        let record = SyncRecords.record(for: feed, in: zone)
+        let subscription = try #require(SyncRecords.subscription(from: record))
+
+        #expect(subscription.url == feed.url)
+        #expect(subscription.title == "Le Quotidien")
+        #expect(subscription.folder == "Presse")
+        #expect(subscription.siteURL == feed.siteURL)
+    }
+
+    @Test("What a feed knows about its own fetching stays at home")
+    func healthDoesNotTravel() throws {
+        var feed = Feed(url: URL(string: "https://feeds.example.com/f.xml")!, title: "A")
+        feed.etag = "\"v1\""
+        feed.failureCount = 3
+        feed.quarantinedAt = now
+        feed.observedInterval = 3600
+
+        let record = SyncRecords.record(for: feed, in: zone)
+
+        #expect(record["etag"] == nil)
+        #expect(record["failureCount"] == nil)
+        #expect(record["quarantinedAt"] == nil)
+        #expect(record["observedInterval"] == nil)
+    }
+
+    @Test("A kept article survives the wire, text and all")
+    func libraryItemRoundTrip() throws {
+        let item = LibraryItem(
+            feedURL: URL(string: "https://feeds.example.com/f.xml"),
+            feedTitle: "Le Quotidien",
+            guid: "urn:example:1",
+            url: URL(string: "https://example.com/1"),
+            title: "Une réforme du calendrier",
+            author: "Camille Dupuis",
+            language: "fr",
+            publishedAt: now,
+            promotedAt: now,
+            contentHTML: String(repeating: "<p>Le corps de l'article.</p>", count: 200),
+            plainText: String(repeating: "Le corps de l'article. ", count: 200),
+            annotation: "À relire"
+        )
+
+        let record = SyncRecords.record(for: item, in: zone)
+        let restored = try #require(SyncRecords.libraryItem(from: record))
+
+        #expect(restored.title == item.title)
+        #expect(restored.guid == item.guid)
+        #expect(restored.author == item.author)
+        #expect(restored.annotation == "À relire")
+        #expect(restored.contentHTML == item.contentHTML)
+        #expect(restored.plainText == item.plainText)
+
+        // Compressed, because an article is markup and markup compresses.
+        let content = try #require(record["contentHTML"] as? Data)
+        #expect(content.count < Data(item.contentHTML!.utf8).count / 2)
+    }
+
+    @Test("A block of read states survives the wire")
+    func readStateRoundTrip() throws {
+        let fingerprints = Set((0..<400).map { ArticleFingerprint(value: UInt64($0) &* 2_654_435_761) })
+        let block = ReadStateBlock(period: "2026-08", fingerprints: fingerprints)
+
+        let record = SyncRecords.record(for: block, in: zone)
+        #expect(SyncRecords.readStateBlock(from: record) == block)
+    }
+}
+
+@Suite("Two devices")
+struct SyncPayloadTests {
+    private let zone = CKRecordZone.ID(zoneName: SyncRecords.zoneName, ownerName: CKCurrentUserDefaultName)
+    private let now = Date(timeIntervalSince1970: 1_787_646_600)
+
+    @Test("A second device is set up from records alone, with no bulk transfer")
+    func settingUpASecondDevice() async throws {
+        let first = try Device(zone: zone)
+        let second = try Device(zone: zone)
+
+        let feed = try await first.subscriptions.subscribe(
+            to: Subscription(address: "https://feeds.example.com/f.xml", title: "Le Quotidien", folder: "Presse")
+        ).feed
+        let kept = try await first.add("urn:1", to: feed, title: "Une réforme", published: now)
+        try await first.add("urn:2", to: feed, title: "Autre chose", published: now)
+        try await first.library.setStarred([kept.id], to: true, at: now)
+        try await first.articles.setRead([kept.id], to: true)
+        _ = try await first.readStates.compact(at: now)
+
+        let records = try await first.payload.everything()
+        let applied = try await second.payload.apply(records)
+
+        // A feed, a kept article and one block of read states. Not one record
+        // per article : that is the whole point of the budget.
+        #expect(records.count == 3)
+        #expect(applied.feeds == 1)
+        #expect(applied.libraryItems == 1)
+
+        #expect(try await second.subscriptions.feeds().map(\.title) == ["Le Quotidien"])
+        #expect(try await second.subscriptions.feeds().first?.folder == "Presse")
+        #expect(try await second.library.count() == 1)
+        #expect(try await second.library.allItems().first?.contentHTML == "<p>Un corps.</p>")
+        #expect(try await second.articles.count(.all, now: now) == 0)
+    }
+
+    @Test("The stream is never sent : each device fetches for itself")
+    func theStreamStaysHome() async throws {
+        let first = try Device(zone: zone)
+        let feed = try await first.subscriptions.subscribe(
+            to: Subscription(address: "https://feeds.example.com/f.xml", title: "A")
+        ).feed
+        for index in 0..<50 {
+            try await first.add("urn:\(index)", to: feed, title: "Article \(index)", published: now)
+        }
+
+        let records = try await first.payload.everything()
+
+        #expect(records.count == 1)
+        #expect(records.allSatisfy { $0.recordType == SyncRecords.RecordType.feed })
+    }
+
+    @Test("An article read on one device arrives read on the other, whenever it arrives")
+    func readStatesTravel() async throws {
+        let first = try Device(zone: zone)
+        let second = try Device(zone: zone)
+
+        let feed = try await first.subscriptions.subscribe(
+            to: Subscription(address: "https://feeds.example.com/f.xml", title: "A")
+        ).feed
+        let read = try await first.add("urn:1", to: feed, title: "Lu ici", published: now)
+        try await first.add("urn:2", to: feed, title: "Pas lu", published: now)
+        try await first.articles.setRead([read.id], to: true)
+
+        // The second device follows the same feed and already has one article.
+        let sameFeed = try await second.subscriptions.subscribe(
+            to: Subscription(address: "https://feeds.example.com/f.xml", title: "A")
+        ).feed
+        try await second.add("urn:1", to: sameFeed, title: "Lu ici", published: now)
+
+        let records = try await first.payload.readStateChanges(at: now)
+        try await second.payload.apply(records)
+
+        #expect(try await second.articles.count(.unread, now: now) == 0)
+
+        // And the article it had not fetched yet arrives read when it does.
+        let fingerprints = try await second.readStates.fingerprints()
+        #expect(fingerprints.count == 1)
+    }
+
+    @Test("Applying the same records twice changes nothing the second time")
+    func applyingIsIdempotent() async throws {
+        let first = try Device(zone: zone)
+        let second = try Device(zone: zone)
+
+        let feed = try await first.subscriptions.subscribe(
+            to: Subscription(address: "https://feeds.example.com/f.xml", title: "A")
+        ).feed
+        let kept = try await first.add("urn:1", to: feed, title: "Gardé", published: now)
+        try await first.library.setStarred([kept.id], to: true, at: now)
+
+        let records = try await first.payload.everything()
+        try await second.payload.apply(records)
+        let again = try await second.payload.apply(records)
+
+        #expect(again.isEmpty)
+        #expect(try await second.subscriptions.count() == 1)
+        #expect(try await second.library.count() == 1)
+    }
+
+    @Test("What one device lets go of, the other lets go of too")
+    func deletionsTravel() async throws {
+        let first = try Device(zone: zone)
+        let second = try Device(zone: zone)
+
+        let feed = try await first.subscriptions.subscribe(
+            to: Subscription(address: "https://feeds.example.com/f.xml", title: "A")
+        ).feed
+        let kept = try await first.add("urn:1", to: feed, title: "Gardé", published: now)
+        try await first.library.setStarred([kept.id], to: true, at: now)
+        try await second.payload.apply(try await first.payload.everything())
+
+        // The article is in the second device's stream too, and starred by the
+        // record that arrived.
+        let sameFeed = try #require(try await second.subscriptions.feeds().first)
+        try await second.add("urn:1", to: sameFeed, title: "Gardé", published: now)
+        try await second.payload.apply(try await first.payload.everything())
+
+        let itemName = SyncRecords.name(forLibraryItemWithGUID: "urn:1", feedURL: feed.url)
+        let removed = try await second.payload.apply(deletions: [itemName])
+
+        #expect(removed.removed == 1)
+        #expect(try await second.library.count() == 0)
+        #expect(try await second.articles.summaries(.starred, now: now).isEmpty)
+    }
+
+    @Test("Two devices keeping the same article keep one article")
+    func concurrentPromotion() async throws {
+        let first = try Device(zone: zone)
+        let second = try Device(zone: zone)
+
+        for device in [first, second] {
+            let feed = try await device.subscriptions.subscribe(
+                to: Subscription(address: "https://feeds.example.com/f.xml", title: "A")
+            ).feed
+            let entry = try await device.add("urn:1", to: feed, title: "Gardé des deux côtés", published: now)
+            try await device.library.setStarred([entry.id], to: true, at: now)
+        }
+
+        // Both wrote a record ; both computed the same name for it, so CloudKit
+        // saw one record and not two.
+        let fromFirst = try await first.payload.everything()
+        let fromSecond = try await second.payload.everything()
+        #expect(fromFirst.map(\.recordID.recordName).sorted() == fromSecond.map(\.recordID.recordName).sorted())
+
+        try await second.payload.apply(fromFirst)
+        #expect(try await second.library.count() == 1)
+    }
+}
