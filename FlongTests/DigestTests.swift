@@ -158,7 +158,7 @@ struct DigestTests {
     func clustering() async throws {
         try await StoryBuilder(database).build(now: now)
 
-        let digest = try await service.digest(.month, now: now)
+        let digest = try await service.digest(now: now)
         let stories = digest.live + digest.stories
 
         #expect(stories.count == 3)
@@ -169,7 +169,7 @@ struct DigestTests {
     @Test("A story keeps its identity as it grows")
     func stability() async throws {
         try await StoryBuilder(database).build(now: now)
-        let first = try await service.digest(.month, now: now).live.first?.id
+        let first = try await service.digest(now: now).live.first?.id
 
         // Another newsroom picks the story up an hour later.
         let feed = try #require(feeds["Le Soir"])
@@ -187,7 +187,7 @@ struct DigestTests {
 
         try await StoryBuilder(database).build(now: now)
 
-        let digest = try await service.digest(.month, now: now)
+        let digest = try await service.digest(now: now)
         let story = try #require(digest.live.first)
 
         #expect(story.id == first)
@@ -212,7 +212,7 @@ struct DigestTests {
             }
         }
 
-        let digest = try await service.digest(.month, now: now)
+        let digest = try await service.digest(now: now)
         let story = try #require((digest.live + digest.stories).first { $0.articleCount == 4 })
 
         // The most recent picture, not the first one the story ever had.
@@ -222,10 +222,10 @@ struct DigestTests {
     @Test("Building twice changes nothing")
     func idempotence() async throws {
         try await StoryBuilder(database).build(now: now)
-        let first = try await service.digest(.month, now: now)
+        let first = try await service.digest(now: now)
 
         try await StoryBuilder(database).build(now: now)
-        let second = try await service.digest(.month, now: now)
+        let second = try await service.digest(now: now)
 
         #expect(first == second)
     }
@@ -235,30 +235,85 @@ struct DigestTests {
     @Test("Several rooms in a few hours is what makes a story live")
     func liveStories() async throws {
         try await StoryBuilder(database).build(now: now)
-        let digest = try await service.digest(.day, now: now)
+        let digest = try await service.digest(now: now)
 
-        // The school calendar has four rooms within five hours. The others are
-        // more than a day old.
+        // The school calendar has four rooms within five hours. The others came
+        // in more than six hours ago, so nothing is happening about them now.
         #expect(digest.live.count == 1)
         #expect(digest.live.first?.feedCount == 4)
         #expect(digest.live.first?.title.localizedCaseInsensitiveContains("calendrier") == true)
     }
 
-    @Test("A period only shows what belongs to it")
-    func periods() async throws {
+    @Test("The front page looks back three days, not one")
+    func window() async throws {
         try await StoryBuilder(database).build(now: now)
 
-        let day = try await service.digest(.day, now: now)
-        let month = try await service.digest(.month, now: now)
+        let page = try await service.digest(now: now)
 
-        #expect(day.live.count + day.stories.count == 1)
-        #expect(month.live.count + month.stories.count == 3)
+        // The Swift story is thirty hours old : a page that looked back a day
+        // would have lost it overnight, which is not what a front page is.
+        #expect(page.live.count + page.stories.count == 3)
+        #expect(page.stories.contains { $0.title.localizedCaseInsensitiveContains("macros") })
+    }
+
+    // MARK: - Subjects
+
+    @Test("The pills are the subjects on the page, most covered first")
+    func topics() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await put(["calendrier": "Éducation", "macros": "Logiciel", "grotesques": "Logiciel"])
+
+        let page = try await service.digest(now: now)
+
+        #expect(page.topics == ["Logiciel", "Éducation"])
+    }
+
+    @Test("A subject narrows the page to itself, and keeps the way back")
+    func narrowing() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await put(["calendrier": "Éducation", "macros": "Logiciel", "grotesques": "Logiciel"])
+
+        let page = try await service.digest(.named("Éducation"), now: now)
+
+        #expect(page.live.count + page.stories.count == 1)
+        #expect(page.live.first?.topic == "Éducation")
+        // The other subjects stay on the page, or there would be no way off it.
+        #expect(page.topics == ["Logiciel", "Éducation"])
+        // The tail belongs to no story, so it belongs to no subject either.
+        #expect(page.looseCount == 0)
+    }
+
+    @Test("A story the model put under nothing is still on the front page")
+    func unsorted() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await put(["calendrier": "Éducation"])
+
+        let front = try await service.digest(now: now)
+        let education = try await service.digest(.named("Éducation"), now: now)
+
+        #expect(front.live.count + front.stories.count == 3)
+        #expect(education.live.count + education.stories.count == 1)
+        #expect(front.looseCount == Corpus.loose.count)
+    }
+
+    /// Writes subjects onto the stories whose title holds each word, which is
+    /// what the model does when there is one.
+    private func put(_ topics: [String: String]) async throws {
+        try await database.writer.write { db in
+            for story in try Story.fetchAll(db) {
+                for (word, topic) in topics where story.title.localizedCaseInsensitiveContains(word) {
+                    var story = story
+                    story.topic = topic
+                    try story.update(db)
+                }
+            }
+        }
     }
 
     @Test("A story names the rooms talking about it")
     func sources() async throws {
         try await StoryBuilder(database).build(now: now)
-        let story = try #require(try await service.digest(.day, now: now).live.first)
+        let story = try #require(try await service.digest(now: now).live.first)
 
         #expect(story.feedCount == 4)
         #expect(story.feedTitles.count == DigestStore.namedFeeds)
@@ -268,7 +323,7 @@ struct DigestTests {
     @Test("The articles of a story are there, newest first")
     func articlesOfAStory() async throws {
         try await StoryBuilder(database).build(now: now)
-        let story = try #require(try await service.digest(.day, now: now).live.first)
+        let story = try #require(try await service.digest(now: now).live.first)
 
         let articles = try await service.articles(of: story.id)
         #expect(articles.count == 4)
@@ -279,9 +334,60 @@ struct DigestTests {
     func looseArticles() async throws {
         try await StoryBuilder(database).build(now: now)
 
-        let loose = try await service.looseArticles(.month, now: now)
+        let loose = try await service.looseArticles(now: now)
         #expect(loose.count == Corpus.loose.count)
         #expect(loose.contains { $0.title.contains("Cévennes") })
+    }
+}
+
+@Suite("Subjects")
+struct TopicNamerTests {
+    private let stories = (1...4).map { (id: UUID.v7(), title: "Story \($0)") }
+
+    private func topics(_ generated: [(String, [Int])]) -> GeneratedTopics {
+        GeneratedTopics(topics: generated.map { GeneratedTopic(name: $0.0, headlines: $0.1) })
+    }
+
+    @Test("Each story ends up under the subject that covers it")
+    func assigning() {
+        let assigned = TopicNamer.assign(topics([("Éducation", [1, 2]), ("Logiciel", [3, 4])]), to: stories)
+
+        #expect(assigned[stories[0].id] == "Éducation")
+        #expect(assigned[stories[1].id] == "Éducation")
+        #expect(assigned[stories[3].id] == "Logiciel")
+    }
+
+    @Test("A subject covering one story is not a subject")
+    func singletons() {
+        let assigned = TopicNamer.assign(topics([("Éducation", [1, 2]), ("Typographie", [3])]), to: stories)
+
+        // A pill covering one story says what the story underneath already says.
+        #expect(assigned[stories[2].id] == nil)
+        #expect(Set(assigned.values) == ["Éducation"])
+    }
+
+    @Test("A number that was never on the list is ignored")
+    func invention() {
+        let assigned = TopicNamer.assign(topics([("Éducation", [1, 2, 9, 0, -3])]), to: stories)
+
+        #expect(assigned.count == 2)
+        #expect(assigned[stories[0].id] == "Éducation")
+    }
+
+    @Test("A story claimed twice keeps the first subject that claimed it")
+    func overlap() {
+        let assigned = TopicNamer.assign(topics([("Éducation", [1, 2]), ("Logiciel", [2, 3, 4])]), to: stories)
+
+        #expect(assigned[stories[1].id] == "Éducation")
+        #expect(assigned[stories[2].id] == "Logiciel")
+    }
+
+    @Test("A subject with no name is no subject")
+    func unnamed() {
+        let assigned = TopicNamer.assign(topics([("   ", [1, 2]), ("Logiciel", [3, 4])]), to: stories)
+
+        #expect(assigned[stories[0].id] == nil)
+        #expect(assigned[stories[2].id] == "Logiciel")
     }
 }
 
@@ -332,15 +438,15 @@ struct DigestShapeTests {
 
     @Test("The model is asked to write in the reader's language, not the articles'")
     func briefLanguage() {
-        let instruction = StorySummarizer.languageInstruction(for: Locale(identifier: "fr_FR")) { _ in true }
+        let instruction = OnDeviceModel.languageInstruction(for: Locale(identifier: "fr_FR")) { _ in true }
 
         #expect(instruction == "Answer in French, whatever language the articles are written in.")
     }
 
     @Test("The region a reader is in is not the language they read in")
     func regionIsNotLanguage() {
-        let swiss = StorySummarizer.languageInstruction(for: Locale(identifier: "de_CH")) { _ in true }
-        let brazilian = StorySummarizer.languageInstruction(for: Locale(identifier: "pt_BR")) { _ in true }
+        let swiss = OnDeviceModel.languageInstruction(for: Locale(identifier: "de_CH")) { _ in true }
+        let brazilian = OnDeviceModel.languageInstruction(for: Locale(identifier: "pt_BR")) { _ in true }
 
         #expect(swiss.contains("German"))
         #expect(brazilian.contains("Portuguese"))
@@ -348,7 +454,7 @@ struct DigestShapeTests {
 
     @Test("A language the model does not speak leaves the articles in their own")
     func unsupportedLanguage() {
-        let instruction = StorySummarizer.languageInstruction(for: Locale(identifier: "br_FR")) { _ in false }
+        let instruction = OnDeviceModel.languageInstruction(for: Locale(identifier: "br_FR")) { _ in false }
 
         // Half Breton and half English would be worse than either.
         #expect(instruction == "Answer in the language the articles are written in.")

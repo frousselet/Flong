@@ -381,16 +381,6 @@
         }
       }
     },
-    "Day": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Jour"
-          }
-        }
-      }
-    },
     "Digest": {
       "localizations": {
         "fr": {
@@ -501,6 +491,16 @@
         }
       }
     },
+    "Front page": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À la une"
+          }
+        }
+      }
+    },
     "Group now": {
       "localizations": {
         "fr": {
@@ -587,16 +587,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Marquer comme non lu"
-          }
-        }
-      }
-    },
-    "Month": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mois"
           }
         }
       }
@@ -741,6 +731,16 @@
         }
       }
     },
+    "Stories": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sujets"
+          }
+        }
+      }
+    },
     "Story": {
       "localizations": {
         "fr": {
@@ -841,26 +841,6 @@
         }
       }
     },
-    "This month": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ce mois-ci"
-          }
-        }
-      }
-    },
-    "This week": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cette semaine"
-          }
-        }
-      }
-    },
     "Today": {
       "localizations": {
         "fr": {
@@ -907,16 +887,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "En attente d'iCloud"
-          }
-        }
-      }
-    },
-    "Week": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Semaine"
           }
         }
       }

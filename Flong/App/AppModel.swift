@@ -244,10 +244,10 @@ final class AppModel {
 
     // MARK: - The digest
 
-    /// What the digest looks back over.
-    var digestPeriod = DigestPeriod.day {
+    /// Which subject the front page is narrowed to, if any.
+    var digestTopic = DigestTopic.frontPage {
         didSet {
-            guard digestPeriod != oldValue else { return }
+            guard digestTopic != oldValue else { return }
             Task { await loadDigest() }
         }
     }
@@ -262,7 +262,16 @@ final class AppModel {
 
     func loadDigest() async {
         do {
-            digest = try await digestService.digest(digestPeriod)
+            var fetched = try await digestService.digest(digestTopic)
+
+            // A subject the page no longer has is a page narrowed to nothing,
+            // which happens when the last story under it ages out. Falling back
+            // to the front page beats an empty page with no way off it.
+            if let name = digestTopic.name, !fetched.topics.contains(name) {
+                fetched = try await digestService.digest(.frontPage)
+                digestTopic = .frontPage
+            }
+            digest = fetched
         } catch {
             Log.enrich.error("The digest could not be read : \(error, privacy: .public)")
         }
@@ -310,9 +319,9 @@ final class AppModel {
         storyArticles[story.id] = (try? await digestService.articles(of: story.id)) ?? []
     }
 
-    /// The articles of the period that made no story.
+    /// The articles of the window that made no story.
     func loadLooseArticles() async {
-        looseArticles = (try? await digestService.looseArticles(digestPeriod)) ?? []
+        looseArticles = (try? await digestService.looseArticles()) ?? []
     }
 
     // MARK: - The long work

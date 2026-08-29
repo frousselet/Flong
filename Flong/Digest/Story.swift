@@ -27,6 +27,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         case summary
         case isGenerated = "is_generated"
         case briefLocked = "brief_locked"
+        case topic
         case signature
         case articleCount = "article_count"
         case feedCount = "feed_count"
@@ -46,6 +47,10 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
     /// Whether the reader has settled the matter themselves.
     var briefLocked: Bool
 
+    /// The subject it falls under, as the model named it, or `nil` where there
+    /// is no model or the model put this story under nothing.
+    var topic: String?
+
     /// The vocabulary its articles share, which is what a new article is
     /// compared against.
     var signature: TextSignature?
@@ -62,6 +67,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         summary: String? = nil,
         isGenerated: Bool = false,
         briefLocked: Bool = false,
+        topic: String? = nil,
         signature: TextSignature? = nil,
         articleCount: Int = 0,
         feedCount: Int = 0,
@@ -74,6 +80,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         self.summary = summary
         self.isGenerated = isGenerated
         self.briefLocked = briefLocked
+        self.topic = topic
         self.signature = signature
         self.articleCount = articleCount
         self.feedCount = feedCount
@@ -88,6 +95,7 @@ nonisolated extension Story {
         static let id = Column(CodingKeys.id)
         static let lastAt = Column(CodingKeys.lastAt)
         static let articleCount = Column(CodingKeys.articleCount)
+        static let topic = Column(CodingKeys.topic)
     }
 }
 

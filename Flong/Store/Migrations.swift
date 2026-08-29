@@ -59,7 +59,24 @@ nonisolated extension AppDatabase {
             try addCovers(db)
         }
 
+        migrator.registerMigration("v6.topics") { db in
+            try addTopics(db)
+        }
+
         return migrator
+    }
+
+    /// The subject a story falls under, when the model found one.
+    ///
+    /// A column on the story rather than a table of its own : a story is under
+    /// exactly one subject, subjects are derived data that is never
+    /// synchronized, and the whole set is rewritten every time the page is
+    /// rebuilt. A table would be three joins to say what a string says.
+    private static func addTopics(_ db: Database) throws {
+        try db.alter(table: "story") { table in
+            table.add(column: "topic", .text)
+        }
+        try db.create(index: "story_on_topic", on: "story", columns: ["topic"])
     }
 
     /// The picture that stands for an article.

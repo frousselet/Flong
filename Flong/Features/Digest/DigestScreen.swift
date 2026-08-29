@@ -23,13 +23,14 @@ struct DigestScreen: View {
     let zoom: Namespace.ID
     let open: (Route) -> Void
 
-    /// Carries the rule from one period to the next.
-    @Namespace private var rule
+    /// Carries a pill's glass from one state to the next.
+    @Namespace private var pills
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                periods
+                masthead
+                topics
                 stories
             }
             .editorialColumn()
@@ -37,20 +38,27 @@ struct DigestScreen: View {
             .padding(.bottom, 90)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
-        .navigationTitle(Text("Digest"))
+        // No title and no refresh button. The tab bar already says which section
+        // this is, and a headline is a poor thing to put under a label ; the
+        // page refreshes itself on returning to the foreground and on a pull,
+        // which is every way a reader would ask on a touch screen.
         #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-        #endif
-        .toolbar {
-            ToolbarItem {
-                Button {
-                    Task { await model.refreshAll() }
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+        #else
+            // A Mac has no pull, so it keeps the command, in the place a Mac
+            // keeps commands.
+            .toolbar {
+                ToolbarItem {
+                    Button {
+                        Task { await model.refreshAll() }
+                    } label: {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
+                    .keyboardShortcut("r", modifiers: .command)
+                    .disabled(model.isRefreshing)
                 }
-                .disabled(model.isRefreshing)
             }
-        }
+        #endif
         .refreshable { await model.refreshAll() }
         .overlay {
             if model.digest.isEmpty {
@@ -83,7 +91,14 @@ struct DigestScreen: View {
         }
 
         if !model.digest.stories.isEmpty {
-            header { Text(Self.title(for: model.digestPeriod)) }
+            // Not "Front page" : that is what the pill above already says, and
+            // a page does not need to name itself twice.
+            header {
+                switch model.digestTopic {
+                case .frontPage: Text("Stories")
+                case .named(let topic): Text(verbatim: topic)
+                }
+            }
             ForEach(model.digest.stories) { story in
                 row(story)
             }
@@ -121,60 +136,81 @@ struct DigestScreen: View {
         model.digest.live.first?.id ?? model.digest.stories.first?.id
     }
 
-    /// The period sits in the page rather than in the toolbar, and is set in
-    /// type rather than drawn as a control.
+    /// The date, where a newspaper puts it.
     ///
-    /// On iPad the tab bar already floats at the top, and a second capsule of
-    /// glass under it is the stacking Apple's guidance warns against. A
-    /// segmented control would be worse : a grey slab across the measure,
-    /// speaking a different language from everything below it. Three words in
-    /// the same kerned uppercase as the section headers, with a rule that slides
-    /// under the one in force, say exactly as much and belong to the page.
-    private var periods: some View {
-        HStack(spacing: 20) {
-            ForEach(DigestPeriod.allCases) { period in
-                let isCurrent = model.digestPeriod == period
-                Button {
-                    withAnimation(.snappy(duration: 0.26)) { model.digestPeriod = period }
-                } label: {
-                    Text(Self.name(of: period))
-                        .font(.system(.footnote, weight: isCurrent ? .semibold : .regular))
-                        .textCase(.uppercase)
-                        .kerning(0.6)
-                        .foregroundStyle(isCurrent ? Color.primary : Color.secondary)
-                        .padding(.bottom, 5)
-                        .overlay(alignment: .bottom) {
-                            if isCurrent {
-                                Capsule()
-                                    .fill(Color.accentColor)
-                                    .frame(height: 1.5)
-                                    .matchedGeometryEffect(id: "period", in: rule)
-                            }
+    /// It replaces the name of the section, which the tab bar already carries
+    /// and which a page has no business repeating. A dateline says something the
+    /// label did not : how old what follows is allowed to be.
+    ///
+    /// In the page rather than in the navigation bar, because on iPad the tab
+    /// bar occupies that row and a title never appears there at all.
+    private var masthead: some View {
+        Text(Date.now, format: .dateTime.weekday(.wide).day().month(.wide))
+            .font(.system(.footnote, weight: .semibold))
+            .textCase(.uppercase)
+            .kerning(0.8)
+            .foregroundStyle(.tertiary)
+            .padding(.top, 4)
+            .padding(.bottom, Editorial.tightRhythm)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The subjects the model found, as pills that scroll.
+    ///
+    /// They replace the day, week and month selector. A period is a question
+    /// about the calendar, and nobody watching a subject asks it : they ask what
+    /// is happening, and then what is happening about one thing.
+    ///
+    /// This is the one place in the application that draws glass of its own, and
+    /// it is allowed here for the reason the rest is not : a pill is a control
+    /// floating over the page, which is the layer Apple's material is for. It
+    /// sits in the content and scrolls away with it rather than pinning itself
+    /// under the tab bar, since glass directly under glass is the stacking the
+    /// same guidance forbids.
+    ///
+    /// Where there is no model there are no subjects, and no pills : the front
+    /// page is entire on its own, and section 14 asks for exactly that.
+    @ViewBuilder
+    private var topics: some View {
+        if !model.digest.topics.isEmpty {
+            ScrollView(.horizontal) {
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        pill(.frontPage, title: Text("Front page"))
+                        ForEach(model.digest.topics, id: \.self) { topic in
+                            pill(.named(topic), title: Text(verbatim: topic))
                         }
-                        .contentShape(.rect)
+                    }
+                    .padding(.vertical, 6)
                 }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
             }
-        }
-        .padding(.top, 6)
-    }
-
-    private static func name(of period: DigestPeriod) -> LocalizedStringResource {
-        switch period {
-        case .day: "Day"
-        case .week: "Week"
-        case .month: "Month"
+            .scrollIndicators(.hidden)
+            .scrollClipDisabled()
         }
     }
 
-    private static func title(for period: DigestPeriod) -> LocalizedStringResource {
-        switch period {
-        case .day: "Today"
-        case .week: "This week"
-        case .month: "This month"
+    private func pill(_ topic: DigestTopic, title: Text) -> some View {
+        let isCurrent = model.digestTopic == topic
+
+        return Button {
+            withAnimation(.snappy(duration: 0.26)) { model.digestTopic = topic }
+        } label: {
+            title
+                .font(.system(.footnote, weight: isCurrent ? .semibold : .regular))
+                .foregroundStyle(isCurrent ? Color.white : Color.primary)
+                .lineLimit(1)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
         }
+        .buttonStyle(.plain)
+        .glassEffect(
+            isCurrent ? .regular.tint(.accentColor).interactive() : .regular.interactive(),
+            in: .capsule
+        )
+        .glassEffectID(topic, in: pills)
+        .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
     }
+
 }
 
 /// One story, set as an editor would set it.
