@@ -18,3 +18,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - SQLite storage through GRDB, holding the local data model of the specification behind versioned migrations, with UUIDv7 identifiers that sort by creation time.
 - Subscriptions : following a feed by its canonical URL, with folders, renaming, moving and unsubscribing, and a batch path that lands a whole import in one transaction.
 - OPML import, tolerant of the malformed files exporters produce, preserving the folder tree and reporting the lines it could not use, with a screen listing the subscriptions it brought over.
+- HTML parsing and whitelist sanitization, written without a dependency, dropping scripts, frames, forms and tracking pixels, and resolving every address against the article before vetting its scheme.
