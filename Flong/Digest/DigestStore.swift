@@ -147,7 +147,9 @@ nonisolated struct DigestStore: Sendable {
 
     func digest(_ topic: DigestTopic = .frontPage, now: Date = Date(), limit: Int = 60) async throws -> Digest {
         let since = now.addingTimeInterval(-Self.window)
-        let scores = try await TopicPreferences(database).scores()
+        let preferences = TopicPreferences(database)
+        let scores = try await preferences.scores()
+        let own = try await preferences.ownNames()
 
         let (stories, topics, members, loose) = try await database.writer.read { db in
             let stories =
@@ -215,7 +217,7 @@ nonisolated struct DigestStore: Sendable {
         // The pills are read from the whole page, then the page is narrowed :
         // the other subjects have to stay on screen, or the way back would be a
         // button that is no longer there.
-        var digest = Digest(topics: Self.topics(of: all, scores: scores), scores: scores)
+        var digest = Digest(topics: Self.topics(of: all, scores: scores, own: own), scores: scores)
         let built = all.filter { topic.holds($0.topics) }
 
         // What is happening now is ordered by when, and by nothing else : a
@@ -297,17 +299,29 @@ nonisolated struct DigestStore: Sendable {
     }
 
     /// The subjects on a page : what the reader asked for first, then the one
-    /// covering the most stories.
+    /// covering the most stories, and the reader's own subjects whether they
+    /// cover anything yet or not.
     ///
     /// Ties are broken by what moved last, so a page whose subjects are evenly
     /// matched still puts the live one first.
-    static func topics(of stories: [DigestStory], scores: [String: Int] = [:]) -> [String] {
+    static func topics(
+        of stories: [DigestStory],
+        scores: [String: Int] = [:],
+        own: [String] = []
+    ) -> [String] {
         var counts: [String: (stories: Int, lastAt: Date)] = [:]
         for story in stories {
             for topic in story.topics {
                 let seen = counts[topic] ?? (stories: 0, lastAt: .distantPast)
                 counts[topic] = (stories: seen.stories + 1, lastAt: max(seen.lastAt, story.lastAt))
             }
+        }
+
+        // A subject the reader wrote is on the page whether anything has been
+        // filed under it yet or not. One the model found is only there when it
+        // holds something : it was never asked for.
+        for name in own where counts[name] == nil {
+            counts[name] = (stories: 0, lastAt: .distantPast)
         }
 
         return

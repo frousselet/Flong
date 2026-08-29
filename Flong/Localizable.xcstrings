@@ -773,6 +773,16 @@
         }
       }
     },
+    "Nothing has been filed under this subject yet.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien n'est encore classé sous ce thème."
+          }
+        }
+      }
+    },
     "Nothing has come in yet": {
       "localizations": {
         "fr": {

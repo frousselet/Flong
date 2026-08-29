@@ -172,6 +172,32 @@ struct DigestScreen: View {
         model.digest.live.first?.id ?? model.digest.stories.first?.id
     }
 
+    /// An empty page and an empty subject are not the same emptiness.
+    ///
+    /// A reader who has just written a subject nothing has been filed under
+    /// yet is looking at a page working exactly as it should, and telling them
+    /// nothing has come in would be telling them something untrue.
+    @ViewBuilder
+    private var empty: some View {
+        if let name = model.digestTopic.name {
+            ContentUnavailableView {
+                Label(title: { Text(verbatim: name) }, icon: { Image(systemName: "square.stack.3d.up") })
+            } description: {
+                Text("Nothing has been filed under this subject yet.")
+            } actions: {
+                Button("Front page") { withAnimation { model.digestTopic = .frontPage } }
+            }
+        } else {
+            ContentUnavailableView {
+                Label("Nothing has come in yet", systemImage: "sparkles.rectangle.stack")
+            } description: {
+                Text("Flong groups your articles into stories as they arrive.")
+            } actions: {
+                Button("Group now") { Task { await model.rebuildDigest() } }
+            }
+        }
+    }
+
     /// Today, spelled the way the reader's language spells it.
     ///
     /// Read at each render rather than held : the page is rebuilt on returning
