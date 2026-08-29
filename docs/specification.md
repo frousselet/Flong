@@ -107,7 +107,7 @@ GRDB is the only external dependency, and it stays that way. A package is added 
 | `tag`, `tag_binding` | tags and assignments |
 | `rule` | condition, actions, order, enabled state |
 | `saved_query` | named queries |
-| `read_state` | flat states, compacted at synchronization time |
+| `read_state_block` | read states, compacted into one row per period |
 | `sync_state` | `CKSyncEngine` tokens |
 
 Technical keys are UUIDv7, for natural temporal ordering and lightly fragmented indexes.
@@ -128,7 +128,7 @@ This is the dominant design constraint. CloudKit degrades on record count and ch
 | ----------- | ---------------- | -------- |
 | feeds, folders, tags, rules, queries, settings | a few hundred | complete |
 | library items | 1,000 to 2,500 | frozen content, tags, annotations, vector |
-| read-state blocks | a few hundred | compressed sets of fingerprints |
+| read-state blocks | a few dozen | compressed sets of fingerprints, one per month |
 | catch-up headers | a few hundred, sliding | metadata only |
 | **target total** | **around 3,000** | |
 
@@ -136,9 +136,15 @@ For comparison, one record per article would mean more than a hundred thousand r
 
 ### Read-state compaction
 
-One record per feed and per month, holding the compressed set of short fingerprints of the articles read and starred during that period.
+One record per month, holding the compressed set of short fingerprints of the articles read in it.
 
-Merging is a union, so the operation is commutative and idempotent. There is no conflict resolution logic to write, which removes the main source of bugs in multi-device synchronization.
+Per month, and not per feed and per month : a reader following three hundred feeds would otherwise write three hundred records a month, which the budget above exists to prevent. A month of a heavy reader is a few tens of kilobytes, well inside one record.
+
+A fingerprint is eight bytes of a digest of the feed address and the article's own identity, which two devices work out to the same value without ever having spoken. Local identifiers cannot travel ; these can.
+
+Starred articles are not in these blocks. Being starred is what puts an article in the library, and a library item is a record with a real deletion, so it travels as itself. A set of fingerprints only grows, and unstarring would have nowhere to go in it.
+
+Merging is a union, so the operation is commutative and idempotent. There is no conflict resolution logic to write, which removes the main source of bugs in multi-device synchronization. It follows that reading is one way : marking an article unread is a local decision and does not travel. That is the price of having no conflict resolution at all, and it is worth paying.
 
 ### Catch-up headers
 

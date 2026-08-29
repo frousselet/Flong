@@ -282,6 +282,72 @@ struct SyncPayloadTests {
         #expect(try await second.articles.summaries(.starred, now: now).isEmpty)
     }
 
+    @Test("A device that was switched off learns what it missed")
+    func catchUp() async throws {
+        let first = try Device(zone: zone)
+        let second = try Device(zone: zone)
+
+        let feed = try await first.subscriptions.subscribe(
+            to: Subscription(address: "https://feeds.example.com/f.xml", title: "A")
+        ).feed
+        try await first.add("urn:1", to: feed, title: "Pendant l'absence", published: now)
+        try await first.add("urn:2", to: feed, title: "Aussi", published: now)
+
+        // The other device follows the feed and holds none of it.
+        try await second.payload.apply(try await first.payload.everything())
+
+        let changes = try await first.payload.catchUpChanges(now: now)
+        let applied = try await second.payload.apply(changes.records)
+
+        #expect(changes.records.count == 1)
+        #expect(applied.caughtUp == 2)
+
+        let summaries = try await second.articles.summaries(.all, now: now)
+        #expect(summaries.map(\.title).sorted() == ["Aussi", "Pendant l'absence"])
+        // Metadata only : the bodies were never sent, and the next refresh
+        // fetches them if the articles are still in the feed.
+        let newest = try #require(summaries.first)
+        let article = try #require(await second.articles.article(id: newest.id))
+        #expect(article.bodyHTML == nil)
+    }
+
+    @Test("A header for a feed nobody follows is not an invitation to follow it")
+    func catchUpStaysWithinTheSubscriptions() async throws {
+        let first = try Device(zone: zone)
+        let second = try Device(zone: zone)
+
+        let feed = try await first.subscriptions.subscribe(
+            to: Subscription(address: "https://feeds.example.com/f.xml", title: "A")
+        ).feed
+        try await first.add("urn:1", to: feed, title: "Un article", published: now)
+
+        let changes = try await first.payload.catchUpChanges(now: now)
+        let applied = try await second.payload.apply(changes.records)
+
+        #expect(applied.caughtUp == 0)
+        #expect(try await second.articles.count(.all, now: now) == 0)
+    }
+
+    @Test("An article caught up on arrives read when it was read elsewhere")
+    func catchUpRespectsReadStates() async throws {
+        let first = try Device(zone: zone)
+        let second = try Device(zone: zone)
+
+        let feed = try await first.subscriptions.subscribe(
+            to: Subscription(address: "https://feeds.example.com/f.xml", title: "A")
+        ).feed
+        let read = try await first.add("urn:1", to: feed, title: "Déjà lu ailleurs", published: now)
+        try await first.articles.setRead([read.id], to: true)
+        _ = try await first.readStates.compact(at: now)
+
+        try await second.payload.apply(try await first.payload.everything())
+        let changes = try await first.payload.catchUpChanges(now: now)
+        try await second.payload.apply(changes.records)
+
+        #expect(try await second.articles.count(.all, now: now) == 1)
+        #expect(try await second.articles.count(.unread, now: now) == 0)
+    }
+
     @Test("Two devices keeping the same article keep one article")
     func concurrentPromotion() async throws {
         let first = try Device(zone: zone)

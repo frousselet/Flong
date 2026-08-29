@@ -53,6 +53,11 @@ struct SidebarView: View {
                 }
             }
         }
+        .safeAreaInset(edge: .bottom) {
+            SyncStatusView(status: model.syncStatus) {
+                Task { await model.purge() }
+            }
+        }
         .overlay {
             if model.isEmpty {
                 ContentUnavailableView {
@@ -99,5 +104,69 @@ struct SidebarView: View {
         case .folder: "folder"
         case .feed: "dot.radiowaves.up.forward"
         }
+    }
+}
+
+/// What synchronization is doing, when there is anything worth saying.
+///
+/// Silence is the usual state. A reader with no iCloud account is not doing
+/// anything wrong, and a device that is up to date has nothing to report, so
+/// neither is told anything. What does get said is what a reader can act on.
+private struct SyncStatusView: View {
+    let status: SyncStatus
+    let purge: () -> Void
+
+    var body: some View {
+        switch status {
+        case .unavailable:
+            EmptyView()
+
+        case .idle(let date):
+            if let date {
+                row {
+                    Text("Synchronized \(date, format: .relative(presentation: .named))")
+                }
+            }
+
+        case .working:
+            row {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Synchronizing")
+                }
+            }
+
+        case .waiting:
+            row {
+                Label("Waiting for iCloud", systemImage: "clock")
+            }
+
+        case .quotaExceeded:
+            VStack(spacing: 4) {
+                Label("iCloud storage is full", systemImage: "exclamationmark.icloud")
+                    .font(.footnote)
+                Button("Free up space", action: purge)
+                    .font(.footnote)
+                    .buttonStyle(.borderless)
+            }
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .background(.bar)
+
+        case .failed(let reason):
+            row {
+                Label("iCloud is not answering", systemImage: "exclamationmark.icloud")
+                    .help(Text(verbatim: reason))
+            }
+        }
+    }
+
+    private func row(@ViewBuilder _ content: () -> some View) -> some View {
+        content()
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .background(.bar)
     }
 }

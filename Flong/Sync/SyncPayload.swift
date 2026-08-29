@@ -62,6 +62,64 @@ nonisolated struct SyncPayload: Sendable {
         return records
     }
 
+    /// The records the engine asked for, by name.
+    ///
+    /// Names are digests, so they cannot be read backwards : the store is walked
+    /// once per batch and the matches are picked out. A batch is a few hundred
+    /// records at most, and there are a few thousand rows in total, so one pass
+    /// is cheaper than keeping an index of names in step.
+    func records(named names: Set<String>) async throws -> [String: CKRecord] {
+        guard !names.isEmpty else { return [:] }
+        var records: [String: CKRecord] = [:]
+
+        for feed in try await subscriptions.feeds() {
+            let name = SyncRecords.name(forFeed: feed.url)
+            if names.contains(name) { records[name] = SyncRecords.record(for: feed, in: zone) }
+        }
+        for item in try await library.allItems() {
+            let name = SyncRecords.name(forLibraryItemWithGUID: item.guid, feedURL: item.feedURL)
+            if names.contains(name) { records[name] = SyncRecords.record(for: item, in: zone) }
+        }
+        for block in try await readStates.blocks() {
+            let name = SyncRecords.name(forReadStatePeriod: block.period, kind: block.kind)
+            if names.contains(name) { records[name] = SyncRecords.record(for: block, in: zone) }
+        }
+
+        return records
+    }
+
+    /// The names of everything this device would send, for the engine to queue.
+    func everyRecordName() async throws -> [String] {
+        try await everything().map(\.recordID.recordName)
+    }
+
+    /// Folds a record the server already had into what is here.
+    ///
+    /// Only read states can genuinely conflict, two devices adding to the same
+    /// month at once, and their merge is a union. Everything else is either
+    /// written once or owned by the reader, where the later write is the one
+    /// they meant.
+    func reconciled(_ server: CKRecord, with attempted: CKRecord) -> CKRecord? {
+        guard server.recordType == SyncRecords.RecordType.readState,
+            let serverBlock = SyncRecords.readStateBlock(from: server),
+            let localBlock = SyncRecords.readStateBlock(from: attempted)
+        else { return nil }
+
+        let merged = serverBlock.merged(with: localBlock)
+        server["fingerprints"] = merged.encoded()
+        return server
+    }
+
+    /// The headers of what this device fetched lately, and the ones that have
+    /// fallen out of the window.
+    func catchUpChanges(now: Date = Date()) async throws -> (records: [CKRecord], expired: [String]) {
+        let since = now.addingTimeInterval(-CatchUpHeaders.window)
+        return (
+            try await CatchUpHeaders.records(in: database, since: since, zone: zone),
+            try await CatchUpHeaders.expiredNames(in: database, now: now)
+        )
+    }
+
     /// The read states that have changed since they were last compacted.
     func readStateChanges(at date: Date = Date()) async throws -> [CKRecord] {
         try await readStates.compact(at: date).map { SyncRecords.record(for: $0, in: zone) }
@@ -74,9 +132,13 @@ nonisolated struct SyncPayload: Sendable {
         var feeds = 0
         var libraryItems = 0
         var readArticles = 0
+        /// Articles this device had missed while it was switched off.
+        var caughtUp = 0
         var removed = 0
 
-        var isEmpty: Bool { feeds == 0 && libraryItems == 0 && readArticles == 0 && removed == 0 }
+        var isEmpty: Bool {
+            feeds == 0 && libraryItems == 0 && readArticles == 0 && caughtUp == 0 && removed == 0
+        }
     }
 
     /// Writes records from elsewhere into this device's store.
@@ -101,6 +163,10 @@ nonisolated struct SyncPayload: Sendable {
             case SyncRecords.RecordType.readState:
                 guard let block = SyncRecords.readStateBlock(from: record) else { continue }
                 applied.readArticles += try await readStates.merge(block)
+
+            case SyncRecords.RecordType.catchUp:
+                let read = try await readStates.fingerprints()
+                applied.caughtUp += try await CatchUpHeaders.apply(record, into: database, read: read)
 
             default:
                 continue

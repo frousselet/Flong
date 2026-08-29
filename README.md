@@ -4,7 +4,7 @@ A feed reader for iOS, iPadOS and macOS, written in Swift with SwiftUI and SQLit
 
 No server, no account, no hosting. Every device collects the feeds itself and keeps them in a local database ; what you choose to keep propagates through your own private CloudKit database.
 
-> Status : early. Flong follows feeds, fetches them, lets you read and search them, and keeps what you star, in the application and in Spotlight. Synchronization between devices is next.
+> Status : early. Flong follows feeds, fetches them, lets you read and search them, keeps what you star, and carries subscriptions, kept articles and read states between your own devices through iCloud.
 
 ## Ideas
 
@@ -39,6 +39,7 @@ A single SwiftUI codebase serves the three platforms, and no feature exists on m
 ## Requirements
 
 - Xcode 26.5 or later
+- An iCloud account, only to synchronize between devices : Flong is fully usable on one device without one
 
 ## Building
 
@@ -87,6 +88,7 @@ The interface is authored in English and translated to French. All strings live 
 | [`docs/technical/ingestion.md`](docs/technical/ingestion.md) | What happens between a fetched feed and the store, and what bounds it |
 | [`docs/technical/search.md`](docs/technical/search.md) | The index, the query language, and why nothing typed into it is ever run |
 | [`docs/technical/library.md`](docs/technical/library.md) | What promotion copies, what keeps an article, and what Spotlight is told |
+| [`docs/technical/sync.md`](docs/technical/sync.md) | What travels between devices, what never does, and why the record budget shapes it |
 | [`docs/technical/freshrss-api.md`](docs/technical/freshrss-api.md) | The Google Reader API surface, kept for the FreshRSS import |
 
 ## License

@@ -1,0 +1,290 @@
+//
+//  CloudSync.swift
+//  Flong
+//
+//  Created by François Rousselet on 29/08/2026.
+//
+//  This Source Code Form is subject to the terms of the Mozilla Public
+//  License, v. 2.0. If a copy of the MPL was not distributed with this
+//  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+
+import CloudKit
+import Foundation
+import OSLog
+
+/// Synchronization, on the reader's own private database.
+///
+/// Section 7 of the specification is explicit that none of the hard parts are
+/// written here : `CKSyncEngine` owns the scheduling, the batching, the
+/// subscriptions, the retries and the backoff. What is written here is the two
+/// questions it cannot answer, which live in ``SyncPayload`` : what this device
+/// has to say, and what to do with what it hears.
+///
+/// This is the one file of the project that cannot be tested from the outside.
+/// It needs an account, a container and a network, none of which a test may
+/// assume. Everything either side of it is tested instead : the records, the
+/// merge, the compaction and the failure classification.
+actor CloudSync {
+    /// The container the reader's own data lives in.
+    static let containerIdentifier = "iCloud.com.rslt.Flong"
+
+    private let database: AppDatabase
+    private let payload: SyncPayload
+    private let state: SyncState
+    private let container: CKContainer
+    private let zoneID: CKRecordZone.ID
+    private let report: @Sendable (SyncStatus) -> Void
+
+    private var engine: CKSyncEngine?
+    private var status: SyncStatus = .idle(lastSynchronized: nil) {
+        didSet { report(status) }
+    }
+
+    init(
+        database: AppDatabase,
+        container: CKContainer = CKContainer(identifier: CloudSync.containerIdentifier),
+        report: @escaping @Sendable (SyncStatus) -> Void = { _ in }
+    ) {
+        self.database = database
+        self.container = container
+        self.zoneID = CKRecordZone.ID(zoneName: SyncRecords.zoneName, ownerName: CKCurrentUserDefaultName)
+        self.payload = SyncPayload(database, zone: zoneID)
+        self.state = SyncState(database)
+        self.report = report
+    }
+
+    // MARK: - Running
+
+    /// Starts synchronizing, unless there is no account to synchronize with.
+    ///
+    /// No account is not an error. Section 3 of the specification says Flong is
+    /// fully usable on one device without iCloud, and the interface says so
+    /// rather than complaining.
+    func start() async {
+        guard engine == nil else { return }
+
+        do {
+            guard try await container.accountStatus() == .available else {
+                status = .unavailable
+                return
+            }
+        } catch {
+            status = SyncFailure.status(for: error)
+            return
+        }
+
+        var configuration = CKSyncEngine.Configuration(
+            database: container.privateCloudDatabase,
+            stateSerialization: await serialization(),
+            delegate: self
+        )
+        configuration.automaticallySync = true
+
+        engine = CKSyncEngine(configuration)
+        Log.sync.notice("Synchronization started")
+
+        // A device that has never spoken says everything it knows, once.
+        if await serialization() == nil {
+            await enqueueEverything()
+        }
+    }
+
+    /// Sends and fetches now, which is what a pull to refresh means.
+    func synchronize() async {
+        guard let engine else {
+            await start()
+            return
+        }
+
+        status = .working
+        do {
+            try await engine.sendChanges()
+            try await engine.fetchChanges()
+            status = .idle(lastSynchronized: Date())
+        } catch {
+            status = SyncFailure.status(for: error)
+            Log.sync.error("Synchronization failed : \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Queues everything this device holds, for a first exchange or a repair.
+    func enqueueEverything() async {
+        guard let engine else { return }
+
+        do {
+            let names = try await payload.everyRecordName()
+            engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))])
+            engine.state.add(pendingRecordZoneChanges: names.map { .saveRecord(recordID(for: $0)) })
+            Log.sync.notice("Queued \(names.count) records for a first exchange")
+        } catch {
+            Log.sync.error("Nothing could be queued : \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Queues what changed, which is what every local edit calls.
+    func enqueue(recordNames names: [String]) {
+        guard let engine, !names.isEmpty else { return }
+        engine.state.add(pendingRecordZoneChanges: names.map { .saveRecord(recordID(for: $0)) })
+    }
+
+    func enqueue(deletions names: [String]) {
+        guard let engine, !names.isEmpty else { return }
+        engine.state.add(pendingRecordZoneChanges: names.map { .deleteRecord(recordID(for: $0)) })
+    }
+
+    /// Queues what this device saw lately, so a device that was switched off
+    /// learns what it missed, and drops what has fallen out of the window.
+    func enqueueCatchUp(now: Date = Date()) async {
+        do {
+            let changes = try await payload.catchUpChanges(now: now)
+            enqueue(recordNames: changes.records.map(\.recordID.recordName))
+            enqueue(deletions: changes.expired)
+        } catch {
+            Log.sync.error("The catch up headers failed : \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Compacts what has been read and queues the blocks that changed.
+    func enqueueReadStates() async {
+        do {
+            let records = try await payload.readStateChanges()
+            enqueue(recordNames: records.map(\.recordID.recordName))
+        } catch {
+            Log.sync.error("The read states could not be compacted : \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func recordID(for name: String) -> CKRecord.ID {
+        CKRecord.ID(recordName: name, zoneID: zoneID)
+    }
+
+    private func serialization() async -> CKSyncEngine.State.Serialization? {
+        guard let data = try? await state.engineState() else { return nil }
+        return try? JSONDecoder().decode(CKSyncEngine.State.Serialization.self, from: data)
+    }
+}
+
+extension CloudSync: CKSyncEngineDelegate {
+    func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
+        switch event {
+        case .stateUpdate(let update):
+            // Losing this is not a catastrophe, only a slow and expensive way to
+            // learn nothing new, so it is written down after every exchange.
+            let data = try? JSONEncoder().encode(update.stateSerialization)
+            try? await state.setEngineState(data)
+
+        case .accountChange(let change):
+            await handle(change)
+
+        case .fetchedRecordZoneChanges(let changes):
+            await apply(changes)
+
+        case .sentRecordZoneChanges(let sent):
+            await handle(sent)
+
+        case .willFetchChanges, .willSendChanges:
+            status = .working
+
+        case .didFetchChanges, .didSendChanges:
+            status = .idle(lastSynchronized: Date())
+
+        default:
+            break
+        }
+    }
+
+    func nextRecordZoneChangeBatch(
+        _ context: CKSyncEngine.SendChangesContext,
+        syncEngine: CKSyncEngine
+    ) async -> CKSyncEngine.RecordZoneChangeBatch? {
+        let scope = context.options.scope
+        let changes = syncEngine.state.pendingRecordZoneChanges.filter { scope.contains($0) }
+        guard !changes.isEmpty else { return nil }
+
+        // The records are gathered before the batch is built : the provider the
+        // batch takes is synchronous, and the store is not.
+        let names = Set(
+            changes.compactMap { change -> String? in
+                guard case .saveRecord(let id) = change else { return nil }
+                return id.recordName
+            }
+        )
+        let records = (try? await payload.records(named: names)) ?? [:]
+
+        return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: changes) { recordID in
+            records[recordID.recordName]
+        }
+    }
+
+    // MARK: - Events
+
+    private func apply(_ changes: CKSyncEngine.Event.FetchedRecordZoneChanges) async {
+        do {
+            let applied = try await payload.apply(changes.modifications.map(\.record))
+            let removed = try await payload.apply(deletions: changes.deletions.map(\.recordID.recordName))
+
+            if !applied.isEmpty || !removed.isEmpty {
+                Log.sync.notice(
+                    """
+                    Applied \(applied.feeds) feeds, \(applied.libraryItems) kept articles, \
+                    \(applied.readArticles) read states, \(removed.removed) removals
+                    """
+                )
+            }
+        } catch {
+            Log.sync.error("Changes could not be applied : \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func handle(_ sent: CKSyncEngine.Event.SentRecordZoneChanges) async {
+        for failure in sent.failedRecordSaves {
+            switch failure.error.code {
+            case .serverRecordChanged:
+                // The only real conflict is two devices adding to the same month
+                // of read states at once, and its merge is a union.
+                guard let server = failure.error.serverRecord else { continue }
+                if let reconciled = payload.reconciled(server, with: failure.record) {
+                    engine?.state.add(pendingRecordZoneChanges: [.saveRecord(reconciled.recordID)])
+                }
+
+            case .zoneNotFound:
+                // The zone was deleted from another device or from the settings.
+                engine?.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))])
+                await enqueueEverything()
+
+            case .quotaExceeded:
+                status = .quotaExceeded
+                Log.sync.error("The reader's iCloud storage is full")
+
+            case .unknownItem:
+                continue
+
+            default:
+                if SyncFailure.isTransient(failure.error) {
+                    status = SyncFailure.status(for: failure.error)
+                } else {
+                    Log.sync.error("A record was refused : \(failure.error.errorCode)")
+                }
+            }
+        }
+    }
+
+    private func handle(_ change: CKSyncEngine.Event.AccountChange) async {
+        switch change.changeType {
+        case .signIn:
+            await enqueueEverything()
+            status = .idle(lastSynchronized: nil)
+
+        case .signOut, .switchAccounts:
+            // What is here stays here : signing out of iCloud is not a reason to
+            // lose a library.
+            try? await state.setEngineState(nil)
+            engine = nil
+            status = .unavailable
+
+        @unknown default:
+            break
+        }
+    }
+}
