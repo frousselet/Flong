@@ -54,7 +54,7 @@ struct ArticleListView: View {
                 Text(verbatim: suggestion).searchCompletion(suggestion)
             }
         }
-        .navigationTitle(Text("Articles"))
+        .navigationTitle(model.isShowingLibrary ? Text("Library") : Text("Articles"))
         .toolbar {
             ToolbarItem {
                 Button {

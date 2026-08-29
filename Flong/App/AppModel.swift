@@ -79,6 +79,7 @@ final class AppModel {
     private let subscriptions: SubscriptionStore
     private let articles: ArticleStore
     private let library: LibraryStore
+    private let spotlight: SpotlightIndex
     private let refresher: FeedRefresh
     private let retention: Retention
     private let finder: FeedFinder
@@ -182,7 +183,9 @@ final class AppModel {
         let subscriptions = SubscriptionStore(database)
         self.subscriptions = subscriptions
         self.articles = ArticleStore(database)
-        self.library = LibraryStore(database)
+        let library = LibraryStore(database)
+        self.library = library
+        self.spotlight = SpotlightIndex(library)
         self.refresher = FeedRefresh(database: database, fetcher: fetcher)
         self.retention = Retention(database)
         self.finder = FeedFinder(fetcher: fetcher)
@@ -222,6 +225,38 @@ final class AppModel {
     func load() async {
         await loadSidebar()
         await loadArticles()
+    }
+
+    /// Writes the library to Spotlight when the two have drifted apart.
+    ///
+    /// Spotlight keeps the record of what it holds, so an index it has lost is
+    /// an index Flong writes again, without being told.
+    func synchronizeSpotlight() async {
+        do {
+            try await spotlight.rebuildIfNeeded()
+        } catch {
+            Log.index.error("The library could not be handed to Spotlight : \(error, privacy: .public)")
+        }
+    }
+
+    /// Follows what a Spotlight result stands for.
+    func open(spotlightIdentifier: String) async {
+        guard let id = UUID(uuidString: spotlightIdentifier) else { return }
+
+        selection = .library
+        await loadArticles()
+        selectedArticle = id
+    }
+
+    private func apply(_ change: LibraryChange) async {
+        guard !change.isEmpty else { return }
+
+        do {
+            try await spotlight.index(change.kept)
+            try await spotlight.remove(change.released)
+        } catch {
+            Log.index.error("Spotlight could not be told about the library : \(error, privacy: .public)")
+        }
     }
 
     func loadSidebar() async {
@@ -338,14 +373,15 @@ final class AppModel {
         do {
             switch summary.origin {
             case .stream:
-                try await library.setStarred([summary.id], to: !summary.isStarred)
+                let change = try await library.setStarred([summary.id], to: !summary.isStarred)
                 if let index = summaries.firstIndex(where: { $0.id == summary.id }) {
                     summaries[index].isStarred = !summary.isStarred
                 }
+                await apply(change)
                 await loadSidebar()
 
             case .library:
-                try await library.remove([summary.id])
+                await apply(try await library.remove([summary.id]))
                 await load()
             }
         } catch {
@@ -361,7 +397,7 @@ final class AppModel {
             switch article.origin {
             case .stream:
                 let isStarred = !article.isStarred
-                try await library.setStarred([article.id], to: isStarred)
+                await apply(try await library.setStarred([article.id], to: isStarred))
 
                 self.article?.isStarred = isStarred
                 if let index = summaries.firstIndex(where: { $0.id == article.id }) {
@@ -370,7 +406,7 @@ final class AppModel {
                 await loadSidebar()
 
             case .library:
-                try await library.remove([article.id])
+                await apply(try await library.remove([article.id]))
                 selectedArticle = nil
                 await load()
             }
