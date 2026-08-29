@@ -140,4 +140,52 @@ struct CoverImageTests {
         // relative one here means a body that never went through it.
         #expect(CoverImage.inBody(html)?.absoluteString == "https://example.com/photo.jpg")
     }
+
+    // MARK: - The mark of a source
+
+    @Test("A source is tried where it says, then where marks are kept")
+    func iconCandidates() throws {
+        let stated = URL(string: "https://cdn.example.com/logo.png")!
+        let site = URL(string: "https://www.example.com/blog/")!
+
+        let candidates = FeedIcon.candidates(stated: stated, site: site).map(\.absoluteString)
+
+        #expect(
+            candidates == [
+                "https://cdn.example.com/logo.png",
+                // Off the root of the site, never off the page the feed points at.
+                "https://www.example.com/apple-touch-icon.png",
+                "https://www.example.com/favicon.ico",
+            ]
+        )
+    }
+
+    @Test("A source that states nothing is still looked for")
+    func iconWithoutAStatedOne() throws {
+        let candidates = FeedIcon.candidates(
+            stated: nil,
+            site: URL(string: "https://example.com:8443/feed.xml")
+        )
+        .map(\.absoluteString)
+
+        // The port is part of where the site is.
+        #expect(
+            candidates == ["https://example.com:8443/apple-touch-icon.png", "https://example.com:8443/favicon.ico"])
+    }
+
+    @Test("A source with nowhere to look for a mark is not looked for")
+    func iconWithNothingToGoOn() {
+        #expect(FeedIcon.candidates(stated: nil, site: nil).isEmpty)
+    }
+
+    @Test("A stated mark that is already a well-known path is tried once")
+    func iconWithoutDuplicates() throws {
+        let candidates = FeedIcon.candidates(
+            stated: URL(string: "https://example.com/favicon.ico"),
+            site: URL(string: "https://example.com/")
+        )
+
+        #expect(candidates.count == 2)
+        #expect(candidates.first?.absoluteString == "https://example.com/favicon.ico")
+    }
 }

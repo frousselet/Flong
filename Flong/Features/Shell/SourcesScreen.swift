@@ -209,7 +209,13 @@ struct SourcesScreen: View {
                     }
                 }
             } icon: {
-                Image(systemName: Self.icon(of: item.kind))
+                // A feed wears its own mark ; the views above it are the
+                // application's own and wear the application's symbols.
+                if case .feed = item.kind {
+                    FeedIconView(stated: item.iconURL, site: item.siteURL)
+                } else {
+                    Image(systemName: Self.icon(of: item.kind))
+                }
             }
         }
         .buttonStyle(.plain)

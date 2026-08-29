@@ -49,6 +49,14 @@ Beside a picture on a phone the facts line runs out of room, and a line that wra
 
 A picture occupies nothing until it has something to show, and nothing again if the address turns out to be dead : a grey rectangle where a photograph failed is worse than no photograph, and a page of them looks broken. It is decorative and hidden from VoiceOver, since feeds almost never carry alternative text and reading a headline out twice helps nobody.
 
+## The mark of a source
+
+A list of feeds is a list of names, and names take reading. A mark is recognized before it is read, which is the whole of what a favicon is for. It stands beside a feed in the sources list, in place of the generic symbol, and beside the name of the room on every article row.
+
+Three addresses are tried, in order : **what the feed states**, since the publisher chose it ; **`apple-touch-icon.png`**, a well-known path, square by convention and large enough to stay crisp where a sixteen pixel favicon would not ; and **`favicon.ico`**, the oldest well-known path and still the most widely served, since browsers ask for it whether a page mentions it or not. The well-known ones hang off the root of the site, never off the page the feed happens to point at.
+
+Nothing is asked for until a row is on screen, and what comes back is kept on disk, so a feed costs one request rather than one per appearance. A feed that answers none of the three wears the generic mark : a list of sources must keep its column of marks whether a publisher serves one or not, which is the one place a picture does not simply vanish when it fails.
+
 ## Motion that says something
 
 Motion is either information or decoration, and decoration on a screen read every morning becomes noise by the second week. Three movements survive :

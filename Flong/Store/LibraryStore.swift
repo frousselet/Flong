@@ -224,6 +224,7 @@ nonisolated struct LibraryStore: Sendable {
                COALESCE(feed_title, '') AS feed_title,
                title, author, url,
                1 AS is_read, 1 AS is_starred, 0 AS has_media, image_url,
+               NULL AS icon_url, feed_url AS site_url, feed_url,
                SUBSTR(COALESCE(plain_text, ''), 1, 300) AS excerpt,
                COALESCE(published_at, promoted_at) AS date
         FROM library_item

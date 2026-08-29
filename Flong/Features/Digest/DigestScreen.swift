@@ -368,9 +368,12 @@ struct ArticleRow: View {
                             .multilineTextAlignment(.leading)
                     }
 
-                    HStack(spacing: 8) {
+                    HStack(spacing: 6) {
+                        FeedIconView(stated: article.feedIconURL, site: article.feedSiteURL, side: 13)
+
                         Text(verbatim: article.feedTitle)
                             .lineLimit(1)
+                            .padding(.trailing, 2)
                         Text(article.date, format: .relative(presentation: .numeric))
                             .lineLimit(1)
                         if article.isStarred {
