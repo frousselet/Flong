@@ -175,11 +175,10 @@ nonisolated struct DigestService: Sendable {
     /// rebuild made the subjects drift, and a preference the reader attached to
     /// a name that no longer exists is a preference silently thrown away.
     ///
-    /// The model is shown the vocabulary the reader already has, its own past
-    /// answers and its own additions alike, and reaches for those first. What it
-    /// answers is folded against that vocabulary, so `cybersecurite` is filed
-    /// under `Cybersécurité` rather than beside it, and only a genuinely new
-    /// name is added.
+    /// One story at a time, each against the vocabulary the reader already has.
+    /// A story that fits nothing in it gets one new subject, folded against the
+    /// vocabulary before it is kept, so a second spelling of something that
+    /// exists is not a second subject.
     ///
     /// Re-reading what is already filed is what `rewrite` is for, and it is the
     /// reader who asks for it.
@@ -190,40 +189,45 @@ nonisolated struct DigestService: Sendable {
             try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT s.id AS id, s.title AS title FROM story s
+                    SELECT s.id AS id, s.title AS title, s.summary AS summary FROM story s
                     LEFT JOIN story_topic t ON t.story_id = s.id
                     WHERE s.last_at >= ? AND t.story_id IS NULL
                     ORDER BY s.last_at DESC
-                    LIMIT \(TopicNamer.headlinesShown)
+                    LIMIT \(TopicNamer.storiesPerRun)
                     """,
                 arguments: [since]
             )
-            .map { (id: $0["id"] as UUID, title: $0["title"] as String) }
+            .map { (id: $0["id"] as UUID, title: $0["title"] as String, summary: $0["summary"] as String?) }
         }
         guard let stories, !stories.isEmpty else { return }
 
         let preferences = TopicPreferences(database)
-        let vocabulary = (try? await preferences.vocabulary()) ?? []
+        let namer = TopicNamer(locale: locale)
 
-        // No answer leaves the page as it is : see `TopicNamer.topics(of:)`.
-        guard let assigned = await TopicNamer(locale: locale).topics(of: stories, vocabulary: vocabulary) else {
-            return
-        }
+        for story in stories {
+            guard OnDeviceModel.isAvailable else { return }
 
-        // Every name is either one the reader already has, spelled some other
-        // way, or a new one worth keeping.
-        var filed: [UUID: [String]] = [:]
-        for (id, names) in assigned {
-            for name in names {
-                guard let settled = try? await preferences.record(name) else { continue }
-                if !(filed[id] ?? []).contains(settled) { filed[id, default: []].append(settled) }
+            let vocabulary = (try? await preferences.vocabulary()) ?? []
+            var filed = await namer.file(story.title, summary: story.summary, into: vocabulary)
+
+            // Nothing the reader has is about this story, so the model names one
+            // thing, once.
+            if filed?.isEmpty == true || (vocabulary.isEmpty && filed == nil) {
+                if let proposed = await namer.newSubject(for: story.title, summary: story.summary),
+                    let settled = try? await preferences.record(proposed)
+                {
+                    filed = [settled]
+                }
             }
-        }
 
-        try? await database.writer.write { db in
-            for (id, names) in filed {
-                for name in names {
-                    try StoryTopic(storyID: id, name: name).insert(db, onConflict: .ignore)
+            // No answer at all leaves the story unfiled, to be asked about again
+            // when the model is next available. An empty page is better than a
+            // wrong one.
+            guard let filed, !filed.isEmpty else { continue }
+
+            try? await database.writer.write { db in
+                for name in filed {
+                    try StoryTopic(storyID: story.id, name: name).insert(db, onConflict: .ignore)
                 }
             }
         }

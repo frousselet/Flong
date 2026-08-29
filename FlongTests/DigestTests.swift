@@ -553,6 +553,21 @@ struct DigestTests {
         #expect(page.topics.contains("Éducation"))
     }
 
+    @Test("A headline dressed as a subject is not a subject")
+    func fieldsRatherThanStories() {
+        let headline = "Les macros Swift, deux ans après"
+
+        #expect(TopicNamer.isField("Logiciel", of: headline))
+        #expect(TopicNamer.isField("Développement logiciel", of: headline))
+
+        // The headline back, in whole or in part.
+        #expect(!TopicNamer.isField("Les macros Swift", of: headline))
+        #expect(!TopicNamer.isField("macros swift", of: headline))
+        // A sentence is not a field.
+        #expect(!TopicNamer.isField("Ce que les macros ont changé au code", of: headline))
+        #expect(!TopicNamer.isField("   ", of: headline))
+    }
+
     // MARK: - A vocabulary that stays put
 
     @Test("A story keeps the subjects it was given")
@@ -688,22 +703,25 @@ struct DigestTests {
 
     // MARK: - Subjects
 
-    @Test("A page the model cannot read keeps the subjects it already had")
-    func modelSilence() async throws {
+    @Test("Filing the page again never disturbs what is already filed")
+    func alreadyFiled() async throws {
         try await StoryBuilder(database).build(now: now)
         try await put(["calendrier": "Éducation", "macros": "Logiciel", "grotesques": "Logiciel"])
 
-        // What the naming job does when the model says nothing : on a machine
-        // with no Apple Intelligence, that is every run.
-        let silent = await TopicNamer().topics(of: [])
-        #expect(silent == nil)
+        let before = try await database.writer.read { db in
+            try StoryTopic.fetchAll(db).map { "\($0.storyID)|\($0.name)" }.sorted()
+        }
 
+        // Whatever the model says, or fails to say : the job is only ever
+        // shown the stories nobody has filed.
         await service.nameTopics(now: now)
 
-        // Blanking a good page because the model was switched off for an
-        // afternoon would be losing work to a transient.
-        let page = try await service.digest(now: now)
-        #expect(!page.topics.isEmpty)
+        let after = try await database.writer.read { db in
+            try StoryTopic.fetchAll(db).map { "\($0.storyID)|\($0.name)" }.sorted()
+        }
+
+        #expect(after == before)
+        #expect(!(try await service.digest(now: now)).topics.isEmpty)
     }
 
     @Test("The pills are the subjects on the page, most covered first")
@@ -835,79 +853,6 @@ struct DigestTests {
         let loose = try await service.looseArticles(now: now)
         #expect(loose.count == Corpus.loose.count)
         #expect(loose.contains { $0.title.contains("Cévennes") })
-    }
-}
-
-@Suite("Subjects")
-struct TopicNamerTests {
-    private let stories = (1...4).map { (id: UUID.v7(), title: "Story \($0)") }
-
-    private func topics(_ generated: [(String, [Int])]) -> GeneratedTopics {
-        GeneratedTopics(topics: generated.map { GeneratedTopic(name: $0.0, headlines: $0.1) })
-    }
-
-    @Test("Each story ends up under the subjects that cover it")
-    func assigning() {
-        let assigned = TopicNamer.assign(topics([("Éducation", [1, 2]), ("Logiciel", [3, 4])]), to: stories)
-
-        #expect(assigned[stories[0].id] == ["Éducation"])
-        #expect(assigned[stories[1].id] == ["Éducation"])
-        #expect(assigned[stories[3].id] == ["Logiciel"])
-    }
-
-    @Test("A story is under every subject that claims it")
-    func severalSubjects() {
-        let assigned = TopicNamer.assign(
-            topics([("Sécurité", [1, 2]), ("Cybercriminalité", [2, 3])]),
-            to: stories
-        )
-
-        // An advisory about a stolen database is under both, and a reader who
-        // asked for more of either meant this one.
-        #expect(assigned[stories[1].id] == ["Sécurité", "Cybercriminalité"])
-        #expect(assigned[stories[0].id] == ["Sécurité"])
-        #expect(assigned[stories[2].id] == ["Cybercriminalité"])
-    }
-
-    @Test("A subject that claims a story twice claims it once")
-    func repeatedClaim() {
-        let assigned = TopicNamer.assign(topics([("Sécurité", [1, 1, 2])]), to: stories)
-
-        #expect(assigned[stories[0].id] == ["Sécurité"])
-    }
-
-    @Test("A subject covering one story is still a subject")
-    func singletons() {
-        let assigned = TopicNamer.assign(topics([("Éducation", [1, 2]), ("Typographie", [3])]), to: stories)
-
-        // Dropping these was measured against the real model and threw away
-        // everything : on a page of three stories the model gives three
-        // subjects, one story each.
-        #expect(assigned[stories[2].id] == ["Typographie"])
-        #expect(Set(assigned.values.flatMap { $0 }) == ["Éducation", "Typographie"])
-    }
-
-    @Test("A subject left holding nothing is dropped")
-    func empty() {
-        let assigned = TopicNamer.assign(topics([("Éducation", [1, 2]), ("Rien", [99])]), to: stories)
-
-        #expect(Set(assigned.values.flatMap { $0 }) == ["Éducation"])
-    }
-
-    @Test("A number that was never on the list is ignored")
-    func invention() {
-        let assigned = TopicNamer.assign(topics([("Éducation", [1, 2, 9, 0, -3])]), to: stories)
-
-        #expect(assigned.count == 2)
-        #expect(assigned[stories[0].id] == ["Éducation"])
-    }
-
-    @Test("A subject with no name is no subject")
-    func unnamed() {
-        let assigned = TopicNamer.assign(topics([("   ", [1, 2]), ("Logiciel", [3, 4])]), to: stories)
-
-        #expect(assigned[stories[0].id] == nil)
-        #expect(assigned[stories[2].id] == ["Logiciel"])
     }
 }
 
