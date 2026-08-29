@@ -342,7 +342,7 @@ No sending to a remote service by default. If the user configures an external pr
 
 ### Vectors and multiple devices
 
-Library vectors are synchronized, not recomputed : a 384-dimension vector weighs one and a half kilobytes in floating point, under four hundred bytes quantized to 8-bit integers, so about one megabyte for the whole library.
+Library vectors are synchronized, not recomputed. The system's own sentence embeddings produce them, on the device, with no download and no dependency on Apple Intelligence ; the dimension is the model's, around five hundred. Quantized to 8-bit integers, scaled by the vector's own largest component, that is about five hundred bytes each and a megabyte for the whole library. The scale is not stored : reading a vector normalizes it again, and a cosine does not care how long either vector was.
 
 **Compatibility rule, mandatory.** A vector is only comparable to those produced by the same model and the same revision, and system models evolve with the operating system. The model identifier and revision are stored with every vector. On a mismatch the received vector is ignored and recomputed locally, never mixed, and the most up-to-date device republishes its version.
 
@@ -361,7 +361,9 @@ Two workloads of different natures. Lexical indexing is negligible, on the order
 
 `BGContinuedProcessingTask` inverts the usual model : the task starts on an explicit action, a button press or a gesture, and the system then commits to letting it finish, showing its own progress interface which the user can follow and cancel. A dedicated entitlement allows background GPU access, subject to checking `BGTaskScheduler.supportedResources`.
 
-This API is not perfectly reliable in practice yet. Every long task is therefore written to be **resumable** : idempotent batches, a persisted resume point, automatic resumption at the next launch if the task did not finish.
+This API is not perfectly reliable in practice yet. Every long task is therefore written to be **resumable** : idempotent batches, and automatic resumption at the next launch if the task did not finish.
+
+The resume point is the data itself, not a checkpoint beside it. What is left to do is a question the store already answers : the feeds never fetched, the kept articles with no current vector. A checkpoint could only ever disagree with them, and a checkpoint that disagrees is worse than none, because it is believed.
 
 Background refresh is opportunistic by nature, the system alone deciding when according to activity, battery and expected consumption, and the user being able to turn it off. Permanent freshness is therefore not promised, and the interface never presents an unread count as though it were real time.
 
