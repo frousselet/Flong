@@ -71,7 +71,9 @@ Nothing else animates.
 
 ## The wire
 
-The section beside the digest shows everything, newest first, read or not. A queue is a thing to get to the end of, and a reader watching a subject is not trying to finish anything : what they want is to see what came in, and where they left off. The read ones stay, greyed by the loss of their dot and of the weight in their headline, which is how a reader finds their place.
+The section beside the digest shows everything, newest first, read or not. A queue is a thing to get to the end of, and a reader watching a subject is not trying to finish anything : what they want is to see what came in, and where they left off.
+
+**A read article is marked, not diminished.** It carried a blue dot when unread and a lighter headline when read, which made half the page look stale and quietly said that a story already opened was worth less. Every headline keeps one weight and one colour now, and a read one ends in a small tick : at the end of the words rather than beside them, where the reader stopped reading, costing the row no width. The count of unread still rides on the section for anyone who wants the number.
 
 It is broken by day, in the same kerned uppercase as the front page's sections. A long scroll with no landmarks is one a reader loses their place in, and the day is the landmark.
 
