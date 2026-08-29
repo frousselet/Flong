@@ -101,7 +101,7 @@ GRDB is the only external dependency, and it stays that way. A package is added 
 | `feed` | canonical URL, title, folder, conditionality metadata (`etag`, `last_modified`), health, observed periodicity, local settings |
 | `entry` | stream article, stable identifier, metadata, read state, reception date |
 | `entry_body` | sanitized body, extracted body, normalized plain text |
-| `entry_fts` | FTS5 virtual table, external content pointing at `entry_body` |
+| `entry_fts` | FTS5 virtual table, contentless, kept in step by triggers |
 | `library_item` | retained article, frozen content, annotations, vector, model identifier and revision |
 | `tag`, `tag_binding` | tags and assignments |
 | `rule` | condition, actions, order, enabled state |
@@ -236,7 +236,9 @@ Core Spotlight cannot serve as the primary index : `contentDescription` is cappe
 
 ### Lexical index of the stream
 
-An FTS5 virtual table with external content, weighting title, standfirst, body and author. The `unicode61` tokenizer with diacritics removed, `porter` for the languages it applies to. Language detection at ingestion, stored on the article.
+A contentless FTS5 virtual table, weighting title, standfirst, body and author, kept in step by triggers on the articles and their bodies. Contentless rather than external content : it holds an index and not a second copy of the articles, which is the point either way, and a row can be removed on its identifier alone. External content demands the exact original text back on every delete, and a cascade that has already removed the body has nothing to give back, which is how a full-text index quietly corrupts itself.
+
+The `unicode61` tokenizer with diacritics removed, wrapped in `porter`. The stemmer is English, the only one SQLite ships, and it is close enough on French suffixes to be worth having ; a per-language index is what doing better would take. Language detection at ingestion, stored on the article.
 
 A full rebuild is possible at any time, on the order of a minute over the target corpus.
 

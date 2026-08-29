@@ -43,8 +43,92 @@ nonisolated extension AppDatabase {
             try createSyncState(db)
         }
 
+        migrator.registerMigration("v2.search") { db in
+            try createSearchIndex(db)
+        }
+
         return migrator
     }
+
+    /// The full-text index of the stream, and the triggers that keep it in step.
+    ///
+    /// The table is **contentless** rather than external content : it holds an
+    /// index and not a second copy of the articles, which is what section 11 of
+    /// the specification is after, and `contentless_delete` lets a row go on its
+    /// identifier alone. External content would demand the exact original text
+    /// back on every delete, and a cascade that has already removed the body has
+    /// nothing to give back. That is how a full-text index quietly corrupts
+    /// itself.
+    ///
+    /// `porter` wraps `unicode61`, so `reforme` finds `réforme` and `calendrier`
+    /// finds `calendriers`. The stemmer is English, the only one SQLite ships :
+    /// close enough on French suffixes to be worth having, and a per-language
+    /// index is what doing better would take.
+    private static func createSearchIndex(_ db: Database) throws {
+        try db.execute(
+            sql: """
+                CREATE VIRTUAL TABLE entry_fts USING fts5(
+                    title, excerpt, body, author,
+                    content='', contentless_delete=1,
+                    tokenize='porter unicode61 remove_diacritics 2',
+                    prefix='2 3'
+                )
+                """
+        )
+
+        // What is already in the store, indexed once.
+        try db.execute(sql: "\(indexInsert) \(indexSelect) WHERE 1")
+
+        try db.execute(
+            sql: """
+                CREATE TRIGGER entry_fts_after_insert AFTER INSERT ON entry BEGIN
+                    \(indexInsert) \(indexSelect) WHERE e.id = new.id;
+                END
+                """
+        )
+        try db.execute(
+            sql: """
+                CREATE TRIGGER entry_fts_after_update AFTER UPDATE OF title, excerpt, author ON entry BEGIN
+                    DELETE FROM entry_fts WHERE rowid = old.rowid;
+                    \(indexInsert) \(indexSelect) WHERE e.id = new.id;
+                END
+                """
+        )
+        try db.execute(
+            sql: """
+                CREATE TRIGGER entry_fts_after_delete AFTER DELETE ON entry BEGIN
+                    DELETE FROM entry_fts WHERE rowid = old.rowid;
+                END
+                """
+        )
+
+        // The body arrives after its article and changes on its own, so it
+        // reindexes the whole row rather than one column of it.
+        for (name, event, row) in [
+            ("entry_body_fts_after_insert", "AFTER INSERT ON entry_body", "new"),
+            ("entry_body_fts_after_update", "AFTER UPDATE OF plain_text ON entry_body", "new"),
+            ("entry_body_fts_after_delete", "AFTER DELETE ON entry_body", "old"),
+        ] {
+            try db.execute(
+                sql: """
+                    CREATE TRIGGER \(name) \(event) BEGIN
+                        DELETE FROM entry_fts WHERE rowid = (SELECT rowid FROM entry WHERE id = \(row).entry_id);
+                        \(indexInsert) \(indexSelect) WHERE e.id = \(row).entry_id;
+                    END
+                    """
+            )
+        }
+    }
+
+    /// The one shape every write to the index takes.
+    ///
+    /// Trigger and rebuild share it, so the index can never end up holding
+    /// different columns depending on which of them wrote the row.
+    static let indexInsert = "INSERT INTO entry_fts(rowid, title, excerpt, body, author)"
+    static let indexSelect = """
+        SELECT e.rowid, e.title, e.excerpt, b.plain_text, e.author
+        FROM entry e LEFT JOIN entry_body b ON b.entry_id = e.id
+        """
 
     /// The stream : feeds and their articles, a cache bounded in age and volume.
     private static func createStream(_ db: Database) throws {

@@ -196,7 +196,16 @@ nonisolated struct FeedRefresh: Sendable {
         let base = item.url ?? feed.siteURL
         let bodyHTML = item.contentHTML ?? item.summaryHTML
         let sanitized = bodyHTML.map { HTMLSanitizer.sanitize($0, relativeTo: base) }
+        let plainText = sanitized.map(HTMLSanitizer.plainText)
         let excerpt = Self.excerpt(of: item)
+
+        // Detected once, at ingestion, since the index and the stemmer both
+        // want to know and neither may guess again later.
+        let language = LanguageDetection.language(
+            stated: item.language ?? parsed.language,
+            title: item.title,
+            body: plainText
+        )
 
         let existing =
             try Entry
@@ -212,7 +221,7 @@ nonisolated struct FeedRefresh: Sendable {
             entry.author = item.author ?? entry.author
             entry.publishedAt = item.publishedAt ?? entry.publishedAt
             entry.updatedAt = item.updatedAt ?? entry.updatedAt
-            entry.language = item.language ?? parsed.language ?? entry.language
+            entry.language = language ?? entry.language
             if !item.enclosures.isEmpty {
                 entry.enclosures = item.enclosures
                 entry.hasMedia = true
@@ -235,7 +244,7 @@ nonisolated struct FeedRefresh: Sendable {
             title: item.title ?? String(localized: "Untitled"),
             excerpt: excerpt,
             author: item.author,
-            language: item.language ?? parsed.language,
+            language: language,
             publishedAt: item.publishedAt,
             updatedAt: item.updatedAt,
             receivedAt: now,
@@ -245,8 +254,7 @@ nonisolated struct FeedRefresh: Sendable {
         try entry.insert(db)
 
         if let sanitized {
-            try EntryBody(entryID: entry.id, sanitizedHTML: sanitized, plainText: HTMLSanitizer.plainText(sanitized))
-                .insert(db)
+            try EntryBody(entryID: entry.id, sanitizedHTML: sanitized, plainText: plainText).insert(db)
         }
         return true
     }
