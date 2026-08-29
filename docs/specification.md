@@ -83,6 +83,7 @@ A single application, shared code, distinct interface layers per platform.
 | `Extractor` | full-text extraction, reader mode |
 | `Store` | SQLite through GRDB, migrations, purge |
 | `Indexer` | FTS5 for the stream, Core Spotlight for the library |
+| `Search` | The query language, and its compilation to SQL |
 | `Enricher` | vectors, classification, rule execution |
 | `Sync` | `CKSyncEngine` on the private database |
 | `Automation` | App Intents, widgets, local MCP server on macOS |

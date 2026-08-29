@@ -95,25 +95,57 @@ nonisolated struct ArticleStore: Sendable {
 
     // MARK: - Reading
 
+    /// The columns a list needs, whichever way the rows were found.
+    private static let columns = """
+        SELECT e.id, e.feed_id, e.title, e.excerpt, e.author, e.url,
+               e.is_read, e.is_starred, e.has_media,
+               COALESCE(e.published_at, e.received_at) AS date,
+               f.title AS feed_title
+        """
+
     /// The articles of a view, newest first.
     ///
     /// Hidden articles never appear : hiding is what a rule does to something
     /// the reader said they never want to see.
+    ///
+    /// A query narrows the view further. When the whole of it is answered by the
+    /// index, the rows come back ranked : a word in a title says far more than
+    /// the same word in a body, and a reader searching for something wants the
+    /// article about it before the one that mentions it. Anything the index
+    /// cannot answer whole is ordered by date, which is the honest fallback.
     func summaries(
         _ filter: ArticleFilter,
+        matching query: QueryNode? = nil,
         limit: Int = 500,
         now: Date = Date()
     ) async throws -> [ArticleSummary] {
-        let (condition, arguments) = filter.condition(now: now)
+        let (condition, arguments) = self.condition(filter, query: query, now: now)
+
+        if let query, let match = QueryCompiler.compile(query, now: now).matchExpression {
+            let (filterCondition, filterArguments) = filter.condition(now: now)
+
+            return try await database.writer.read { db in
+                try ArticleSummary.fetchAll(
+                    db,
+                    sql: """
+                        \(Self.columns)
+                        FROM entry_fts
+                        JOIN entry e ON e.rowid = entry_fts.rowid
+                        JOIN feed f ON f.id = e.feed_id
+                        WHERE entry_fts MATCH ? AND e.is_hidden = 0 AND \(filterCondition)
+                        ORDER BY \(QueryCompiler.ranking)
+                        LIMIT \(limit)
+                        """,
+                    arguments: [match] + filterArguments
+                )
+            }
+        }
 
         return try await database.writer.read { db in
             try ArticleSummary.fetchAll(
                 db,
                 sql: """
-                    SELECT e.id, e.feed_id, e.title, e.excerpt, e.author, e.url,
-                           e.is_read, e.is_starred, e.has_media,
-                           COALESCE(e.published_at, e.received_at) AS date,
-                           f.title AS feed_title
+                    \(Self.columns)
                     FROM entry e
                     JOIN feed f ON f.id = e.feed_id
                     WHERE e.is_hidden = 0 AND \(condition)
@@ -123,6 +155,19 @@ nonisolated struct ArticleStore: Sendable {
                 arguments: arguments
             )
         }
+    }
+
+    /// The view and the query, as one condition.
+    private func condition(
+        _ filter: ArticleFilter,
+        query: QueryNode?,
+        now: Date
+    ) -> (String, StatementArguments) {
+        let (condition, arguments) = filter.condition(now: now)
+        guard let query else { return (condition, arguments) }
+
+        let compiled = QueryCompiler.compile(query, now: now)
+        return ("(\(condition)) AND (\(compiled.condition))", arguments + compiled.arguments)
     }
 
     /// One article, with its body and the feed it came from.
@@ -151,8 +196,8 @@ nonisolated struct ArticleStore: Sendable {
         }
     }
 
-    func count(_ filter: ArticleFilter, now: Date = Date()) async throws -> Int {
-        let (condition, arguments) = filter.condition(now: now)
+    func count(_ filter: ArticleFilter, matching query: QueryNode? = nil, now: Date = Date()) async throws -> Int {
+        let (condition, arguments) = self.condition(filter, query: query, now: now)
 
         return try await database.writer.read { db in
             try Int.fetchOne(
