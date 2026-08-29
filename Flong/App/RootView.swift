@@ -53,7 +53,11 @@ struct ReadingView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             SidebarView(model: model, isAddingFeed: $isAddingFeed, isChoosingFile: $isChoosingFile)
         } content: {
-            ArticleListView(model: model)
+            if model.isShowingDigest {
+                DigestView(model: model)
+            } else {
+                ArticleListView(model: model)
+            }
         } detail: {
             ArticleReaderView(model: model)
         }
@@ -65,6 +69,9 @@ struct ReadingView: View {
             BackgroundScheduler.schedule()
 
             await model.load()
+            // Grouping is incremental and cheap, so the digest is current when
+            // the window opens rather than after the first refresh.
+            await model.rebuildDigest()
             await model.startSync()
             await model.synchronizeSpotlight()
             await model.refreshDue()

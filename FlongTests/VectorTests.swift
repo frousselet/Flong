@@ -221,4 +221,20 @@ struct VectorStoreTests {
         // with the question.
         #expect(matches.first == school.id)
     }
+
+    @Test("A question nothing answers is answered by nothing", .enabled(if: hasFrenchEmbedding))
+    func semanticSearchRejects() async throws {
+        for index in 0..<8 {
+            try await keep(
+                "Article \(index)",
+                text: "Un texte de remplissage sans rapport avec quoi que ce soit, numéro \(index)."
+            )
+        }
+        try await vectors.vectorize(try await vectors.itemsNeedingVectors())
+
+        // Everything scores about the same, so nothing stands out, so nothing is
+        // returned. A fixed threshold would have returned all eight.
+        let matches = try await vectors.semanticMatches(for: "un texte de remplissage")
+        #expect(matches.count < 4)
+    }
 }

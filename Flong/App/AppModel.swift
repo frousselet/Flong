@@ -17,6 +17,7 @@ struct SidebarItem: Identifiable, Hashable {
     /// What an entry stands for. It is also the selection, so it holds nothing
     /// that changes when a feed is renamed.
     enum Kind: Hashable {
+        case digest
         case unread, today, library, starred, all
         case folder(String)
         case feed(UUID)
@@ -36,6 +37,8 @@ struct SidebarItem: Identifiable, Hashable {
         case .unread: .unread
         case .today: .today
         case .starred: .starred
+        // The digest reads the stories, not a view of the stream.
+        case .digest: .all
         // The library is not a view over the stream : it is its own table, and
         // the list reads it directly.
         case .library, .all: .all
@@ -80,6 +83,7 @@ final class AppModel {
     private let articles: ArticleStore
     private let library: LibraryStore
     private let spotlight: SpotlightIndex
+    private let digestService: DigestService
     private var cloud: CloudSync?
     private let refresher: FeedRefresh
     private let retention: Retention
@@ -107,7 +111,7 @@ final class AppModel {
     /// Whether the list is showing the answer to a query rather than a view.
     var isShowingResults: Bool { query != nil }
 
-    var selection: SidebarItem.Kind? = .unread {
+    var selection: SidebarItem.Kind? = .digest {
         didSet { Task { await loadArticles() } }
     }
     var selectedArticle: UUID? {
@@ -199,6 +203,7 @@ final class AppModel {
         let library = LibraryStore(database)
         self.library = library
         self.spotlight = SpotlightIndex(library)
+        self.digestService = DigestService(database)
         self.refresher = FeedRefresh(database: database, fetcher: fetcher)
         self.retention = Retention(database)
         self.finder = FeedFinder(fetcher: fetcher)
@@ -209,7 +214,7 @@ final class AppModel {
     var smartLists: [SidebarItem] {
         sidebar.filter { item in
             switch item.kind {
-            case .unread, .today, .library, .starred, .all: true
+            case .digest, .unread, .today, .library, .starred, .all: true
             default: false
             }
         }
@@ -239,6 +244,56 @@ final class AppModel {
         await loadSidebar()
         await loadArticles()
         await countOutstandingWork()
+    }
+
+    // MARK: - The digest
+
+    /// What the digest looks back over.
+    var digestPeriod = DigestPeriod.day {
+        didSet {
+            guard digestPeriod != oldValue else { return }
+            Task { await loadDigest() }
+        }
+    }
+
+    private(set) var digest = Digest()
+    /// The articles of the story the reader opened, and of that one only : a
+    /// digest that loaded every article of every story would be the list it
+    /// exists to replace.
+    private(set) var storyArticles: [UUID: [ArticleSummary]] = [:]
+    private(set) var looseArticles: [ArticleSummary] = []
+    var openStory: UUID?
+
+    func loadDigest() async {
+        do {
+            digest = try await digestService.digest(digestPeriod)
+        } catch {
+            Log.enrich.error("The digest could not be read : \(error, privacy: .public)")
+        }
+    }
+
+    /// Groups what has arrived, names the new stories, and shows the result.
+    func rebuildDigest() async {
+        await digestService.rebuild()
+        await loadDigest()
+        await loadLooseArticles()
+    }
+
+    /// Opens a story, or closes the one that was open.
+    func toggle(_ story: DigestStory) async {
+        guard openStory != story.id else {
+            openStory = nil
+            return
+        }
+        openStory = story.id
+
+        guard storyArticles[story.id] == nil else { return }
+        storyArticles[story.id] = (try? await digestService.articles(of: story.id)) ?? []
+    }
+
+    /// The articles of the period that made no story.
+    func loadLooseArticles() async {
+        looseArticles = (try? await digestService.looseArticles(digestPeriod)) ?? []
     }
 
     // MARK: - The long work
@@ -305,6 +360,7 @@ final class AppModel {
     /// What a processing task does with the time it is given, on power.
     func backgroundProcessing() async {
         await doOutstandingWork()
+        await digestService.rebuild()
         _ = try? await Retention(database).purge()
         try? await SearchIndex(database).optimize()
         await cloud?.enqueueCatchUp()
@@ -391,6 +447,7 @@ final class AppModel {
             let counts = try await articles.unreadCounts()
 
             var items: [SidebarItem] = [
+                SidebarItem(kind: .digest, title: nil, unreadCount: 0),
                 SidebarItem(kind: .unread, title: nil, unreadCount: try await articles.count(.unread)),
                 SidebarItem(kind: .today, title: nil, unreadCount: try await articles.count(.today)),
                 SidebarItem(kind: .library, title: nil, unreadCount: 0),
@@ -430,7 +487,15 @@ final class AppModel {
     /// Whether the list is showing the library rather than a view of the stream.
     var isShowingLibrary: Bool { selection == .library }
 
+    /// Whether the window is showing the digest rather than a list at all.
+    var isShowingDigest: Bool { selection == .digest }
+
     func loadArticles() async {
+        guard !isShowingDigest else {
+            await loadDigest()
+            return
+        }
+
         do {
             summaries =
                 isShowingLibrary
@@ -581,6 +646,7 @@ final class AppModel {
 
         _ = await refresher.refreshAll()
         _ = try? await retention.purge()
+        await digestService.rebuild()
         await cloud?.enqueueReadStates()
         await cloud?.enqueueCatchUp()
         await load()

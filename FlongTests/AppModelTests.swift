@@ -79,8 +79,8 @@ struct AppModelTests {
 
         await model.load()
 
-        #expect(model.smartLists.map(\.kind) == [.unread, .today, .library, .starred, .all])
-        #expect(model.smartLists.first?.unreadCount == 2)
+        #expect(model.smartLists.map(\.kind) == [.digest, .unread, .today, .library, .starred, .all])
+        #expect(model.smartLists.first { $0.kind == .unread }?.unreadCount == 2)
 
         #expect(model.feedItems.map(\.title) == ["Presse", "Loose"])
         #expect(model.feedItems.first?.unreadCount == 1)
@@ -99,6 +99,7 @@ struct AppModelTests {
         try await seed("one", feed: first)
         try await seed("two", feed: second, isRead: true)
 
+        model.selection = .unread
         await model.load()
         #expect(model.summaries.map(\.title) == ["one"])
 
@@ -119,6 +120,7 @@ struct AppModelTests {
             to: Subscription(address: "https://a.example.com/f.xml", title: "A")
         ).feed
         let id = try await seed("one", feed: feed)
+        model.selection = .unread
         await model.load()
 
         model.selectedArticle = id
@@ -137,6 +139,7 @@ struct AppModelTests {
             to: Subscription(address: "https://a.example.com/f.xml", title: "A")
         ).feed
         let id = try await seed("one", feed: feed)
+        model.selection = .unread
         await model.load()
 
         model.selectedArticle = id
@@ -153,6 +156,7 @@ struct AppModelTests {
             to: Subscription(address: "https://a.example.com/f.xml", title: "A")
         ).feed
         try await seed("one", feed: feed)
+        model.selection = .unread
         await model.load()
 
         let summary = try #require(model.summaries.first)
@@ -170,6 +174,7 @@ struct AppModelTests {
         ).feed
         try await seed("one", feed: feed)
         try await seed("two", feed: feed)
+        model.selection = .unread
         await model.load()
 
         await model.markAllRead()
@@ -187,6 +192,7 @@ struct AppModelTests {
         ).feed
         try await seed("Une réforme du calendrier", feed: feed)
         try await seed("Les macros Swift", feed: feed)
+        model.selection = .unread
         await model.load()
 
         model.searchText = "réforme"

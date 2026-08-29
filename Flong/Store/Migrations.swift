@@ -51,7 +51,55 @@ nonisolated extension AppDatabase {
             try createReadStateBlocks(db)
         }
 
+        migrator.registerMigration("v4.stories") { db in
+            try createStories(db)
+        }
+
         return migrator
+    }
+
+    /// The stories of the digest.
+    ///
+    /// A story is a group of articles about one event, and its signature is the
+    /// vocabulary its articles share. Section 11 proposed vectorizing a recent
+    /// window of the stream for this ; measurement said otherwise, and
+    /// `TextSignature` says why.
+    ///
+    /// Stories are derived data. They are never synchronized, any more than the
+    /// full-text index is : another device holds the same articles and works out
+    /// the same stories, and sending them would cost records to say what the
+    /// other end already knows.
+    private static func createStories(_ db: Database) throws {
+        try db.create(table: "story") { table in
+            table.primaryKey("id", .blob)
+            table.column("title", .text).notNull()
+            table.column("summary", .text)
+            // Section 14 : anything produced automatically says so, in the
+            // interface and in exports.
+            table.column("is_generated", .boolean).notNull().defaults(to: false)
+
+            // The vocabulary the story's articles share, as terms and weights.
+            table.column("signature", .jsonText)
+
+            table.column("article_count", .integer).notNull().defaults(to: 0)
+            table.column("feed_count", .integer).notNull().defaults(to: 0)
+            table.column("first_at", .datetime).notNull()
+            table.column("last_at", .datetime).notNull()
+            table.column("updated_at", .datetime).notNull()
+        }
+
+        try db.create(index: "story_on_last_at", on: "story", columns: ["last_at"])
+
+        try db.create(table: "story_member") { table in
+            table.column("story_id", .blob).notNull().references("story", onDelete: .cascade)
+            table.column("entry_id", .blob).notNull().references("entry", onDelete: .cascade)
+            table.column("similarity", .double).notNull()
+            table.primaryKey(["story_id", "entry_id"])
+        }
+
+        // An article belongs to one story at most : two would mean showing the
+        // same article twice in a digest that exists to show less.
+        try db.create(index: "story_member_on_entry", on: "story_member", columns: ["entry_id"], options: .unique)
     }
 
     /// The read states, as one row per period rather than one per article.
