@@ -55,7 +55,9 @@ Subscribing to an address already followed is not an error : it returns the feed
 
 **What the reader did outranks what an import carries.** A title they changed and a folder they moved the feed to are never overwritten. Only a field still empty is filled in, which lets a second import complete a feed with the site URL or the icon the first one lacked.
 
-A feed with no title of its own is called after its host, `www.` stripped, until the parser reads the title the feed states.
+A feed with no title of its own is called after its host, `www.` stripped, until the feed states one.
+
+That is the only moment a refresh may rename a feed : while the stored title is still that host fallback. A title carried by an OPML file is already somebody's choice, and a rename certainly is, so neither is ever overwritten by what a publisher decides to call themselves next month.
 
 ## Ordering
 
