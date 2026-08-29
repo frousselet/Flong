@@ -12,6 +12,7 @@
 import Foundation
 import FoundationModels
 import GRDB
+import NaturalLanguage
 import Testing
 
 @testable import Flong
@@ -48,6 +49,46 @@ struct TopicNamerLiveTests {
         "Pourquoi les caractères grotesques reviennent",
         "Le retour des grotesques dans la presse imprimée",
     ]
+
+    /// English articles, a French reader : the case the screenshot showed.
+    private let english = [
+        "Microsoft releases security updates for SharePoint Server",
+        "Citrix publishes advisories for NetScaler ADC and Gateway",
+        "PaperCut warns of an active exploit in its print management software",
+    ]
+
+    @Test("A brief for English articles is written in the reader's language")
+    func briefOfEnglishArticles() async throws {
+        let articles = english.map { (title: $0, excerpt: Optional($0)) }
+        let brief = await StorySummarizer(locale: Locale(identifier: "fr_FR")).brief(forArticles: articles)
+
+        let summary = try #require(brief.summary)
+        #expect(brief.isGenerated)
+
+        // Judged by the system's own language recognizer rather than by the
+        // wording, which the model is entitled to choose. Three English
+        // headlines used to pull the answer into English whatever the
+        // instructions said.
+        #expect(Self.language(of: brief.title) == .french)
+        #expect(Self.language(of: summary) == .french)
+    }
+
+    @Test("Subjects for English headlines are named in the reader's language")
+    func subjectsOfEnglishHeadlines() async throws {
+        let stories = english.map { (id: UUID.v7(), title: $0) }
+
+        let assigned = try #require(await TopicNamer(locale: Locale(identifier: "fr_FR")).topics(of: stories))
+        let names = Set(assigned.values).joined(separator: ". ")
+
+        #expect(!names.isEmpty)
+        #expect(Self.language(of: names) == .french)
+    }
+
+    private static func language(of text: String) -> NLLanguage? {
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(text)
+        return recognizer.dominantLanguage
+    }
 
     @Test("Every headline the model is shown comes back under a subject")
     func everyHeadlineIsSorted() async throws {

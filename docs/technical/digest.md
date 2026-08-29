@@ -60,11 +60,26 @@ What comes back is read with suspicion. A number that was never on the list is i
 
 **A subject covering a single story is kept.** Dropping those was the first rule, on the argument that such a pill says what the story underneath already says. Measured against the real model it threw away everything : shown three stories, the model answers with three subjects covering one story each, so the rule left no subjects at all and the page looked exactly like a page with no model. That is what `TopicNamerLiveTests` exists to catch, since no test without a model can tell the two apart.
 
-**The language is said twice**, in the instructions and again beside the headlines. A small model answers in the language of the words nearest its answer, and the headlines are nearer than the instructions ; the first version also gave `Education, Software, Typography` as examples of a subject, which primed it to answer in English whatever the instructions said. The examples are gone and the language is repeated.
+**The language is said twice, and the second time in the language itself.** Measured against the model, on English articles with a French reader :
+
+| Where the demand is | What comes back |
+| ------------------- | --------------- |
+| in the instructions, in English | English |
+| there and again after the articles | French, clumsy |
+| there, and `not in English` after them | French, an English word left in |
+| **there, and the demand written in French after them** | **French, and the best of the four** |
+
+A model answers in the language of the words nearest its answer, and a sentence in that language is worth more than any number of sentences about it. So the demand is a translated string like any other, and a language the application is not translated into falls back to the English sentence about it rather than asking for the wrong language altogether. Said only once, at the top, A small model answers in the language of the words nearest its answer, and the headlines are nearer than the instructions ; three English headlines pulled the whole answer into English. The first version also gave `Education, Software, Typography` as examples of a subject, which primed it further. The examples are gone.
 
 The whole set is rewritten on each rebuild. A subject is a reading of the page as it stands, and a page that has changed deserves a fresh one rather than yesterday's with today's stories bolted on. They are stored as a column on the story, never a table : a story is under one subject, subjects are derived data that is never synchronized, and a table would be three joins to say what a string says.
 
 The front page looks back **three days**. Not a day, or a reader opening Flong on Monday morning would find a page emptied by the weekend ; not a month, since a front page is about what is current.
+
+## When the model will not
+
+A model that will not write about one story is not a model that has stopped working, and only the second is worth giving up on. `guardrailViolation`, `refusal`, `decodingFailure`, `exceededContextWindowSize` and `unsupportedGuide` are about the thing being asked ; `assetsUnavailable`, `unsupportedLanguageOrLocale`, `rateLimited` and `concurrentRequests` are about the model.
+
+Only the second kind counts towards the three failures that leave the model alone for the rest of the run. Counting the first meant three awkward headlines in a row silenced it, and every story after them kept whatever it already said, in whatever language it already said it : a page of security advisories half in French and half in English.
 
 ## Pictures
 

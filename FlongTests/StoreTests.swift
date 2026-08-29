@@ -33,7 +33,8 @@ struct StoreTests {
 
         let expected: Set<String> = [
             "feed", "entry", "entry_body", "library_item", "tag", "tag_binding",
-            "rule", "saved_query", "read_state_block", "sync_state", "entry_fts", "story", "story_member",
+            "rule", "saved_query", "read_state_block", "sync_state", "sync_record", "entry_fts", "story",
+            "story_member",
         ]
         #expect(expected.isSubset(of: tables))
     }
@@ -48,7 +49,7 @@ struct StoreTests {
         #expect(
             applied == [
                 "v1.model", "v2.search", "v3.readStates", "v4.stories", "v5.covers", "v6.topics",
-                "v7.briefLanguage",
+                "v7.briefLanguage", "v8.recordTags",
             ]
         )
     }

@@ -67,7 +67,29 @@ nonisolated extension AppDatabase {
             try addBriefLanguage(db)
         }
 
+        migrator.registerMigration("v8.recordTags") { db in
+            try createRecordTags(db)
+        }
+
         return migrator
+    }
+
+    /// What the server last said about each record it holds.
+    ///
+    /// CloudKit refuses a record that carries no change tag when it already
+    /// has one under that name : `record to insert already exists`. A record
+    /// built from the store alone carries none, so every second save of
+    /// anything was refused, for ever. The tag travels inside the system
+    /// fields of the record the server hands back, which is what is kept here.
+    ///
+    /// It is a cache : losing it costs one refused save per record, after
+    /// which the server hands the record back and the tag is learned again.
+    private static func createRecordTags(_ db: Database) throws {
+        try db.create(table: "sync_record") { table in
+            table.primaryKey("record_name", .text)
+            table.column("system_fields", .blob).notNull()
+            table.column("updated_at", .datetime).notNull()
+        }
     }
 
     /// The language a brief was written in.

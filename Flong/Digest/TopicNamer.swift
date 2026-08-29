@@ -106,7 +106,7 @@ nonisolated struct TopicNamer: Sendable {
             // the task. A small model asked once at the top answers in the
             // language of the words nearest its answer, and the headlines are
             // nearer than the instructions.
-            let prompt = Self.prompt(for: shown, language: OnDeviceModel.languageInstruction(for: locale))
+            let prompt = Self.prompt(for: shown, language: OnDeviceModel.languageReminder(for: locale))
 
             if #available(iOS 26.4, macOS 26.4, *) {
                 let model = SystemLanguageModel.default

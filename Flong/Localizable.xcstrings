@@ -361,6 +361,17 @@
         }
       }
     },
+    "Answer in English. Write every word of your answer in English.": {
+      "comment": "Sent to the on-device model, in the reader's own language, to make it answer in that language",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réponds en français. Écris chaque mot de ta réponse en français."
+          }
+        }
+      }
+    },
     "By %@": {
       "localizations": {
         "fr": {

@@ -30,6 +30,7 @@ nonisolated struct SyncPayload: Sendable {
     private let library: LibraryStore
     private let readStates: ReadStateStore
     private let embedder: Embedder
+    private let state: SyncState
     private let zone: CKRecordZone.ID
 
     init(_ database: AppDatabase, zone: CKRecordZone.ID) {
@@ -38,6 +39,7 @@ nonisolated struct SyncPayload: Sendable {
         self.library = LibraryStore(database)
         self.readStates = ReadStateStore(database)
         self.embedder = Embedder()
+        self.state = SyncState(database)
         self.zone = zone
     }
 
@@ -87,7 +89,10 @@ nonisolated struct SyncPayload: Sendable {
             if names.contains(name) { records[name] = SyncRecords.record(for: block, in: zone) }
         }
 
-        return records
+        // Each one starts from what the server last said about it, or the
+        // server refuses every save after the first.
+        let tags = try await state.systemFields(for: Set(records.keys))
+        return records.mapValues { SyncRecords.rebased($0, onto: tags[$0.recordID.recordName]) }
     }
 
     /// The names of everything this device would send, for the engine to queue.

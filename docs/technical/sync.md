@@ -61,3 +61,11 @@ Treating only the documented name for rate limiting is how a client ends up hamm
 `CloudSync` is the one file of the project that cannot be tested from the outside : it needs an account, a container and a network, none of which a test may assume. Everything on either side of it is tested instead, with records carried between two stores by hand : setting up a second device from records alone, read states meeting in the middle, deletions travelling, the same records applied twice changing nothing, two devices keeping one article, and a device catching up on what it missed.
 
 The container is `iCloud.com.rslt.Flong`, and the entitlement is in `Config/Flong.entitlements`.
+
+## What the server said about each record
+
+CloudKit refuses a record carrying no change tag when it already holds one under that name : `Server Record Changed (14/2004)`, `record to insert already exists`. A record built from the local store alone carries no tag, so **every save after the first was refused, for ever**, and the read-state blocks of the current month failed on every exchange.
+
+The tag travels inside the system fields of the record the server hands back. Those are kept in `sync_record`, written whenever the server says anything about a record : when it hands one over, when it confirms one saved, and when it refuses one and hands back its own copy. A save starts from them and copies the values over.
+
+It is a cache, not a source of truth. Losing it costs one refused save per record, after which the server hands the record back and the tag is learned again. A zone that has gone takes every tag with it.

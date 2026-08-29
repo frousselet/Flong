@@ -220,6 +220,11 @@ extension CloudSync: CKSyncEngineDelegate {
     // MARK: - Events
 
     private func apply(_ changes: CKSyncEngine.Event.FetchedRecordZoneChanges) async {
+        // What the server hands over is also what it will expect back : the
+        // tag travels with it, and a save built without it is refused.
+        try? await state.remember(changes.modifications.map(\.record))
+        try? await state.forget(changes.deletions.map(\.recordID.recordName))
+
         do {
             let applied = try await payload.apply(changes.modifications.map(\.record))
             let removed = try await payload.apply(deletions: changes.deletions.map(\.recordID.recordName))
@@ -238,18 +243,29 @@ extension CloudSync: CKSyncEngineDelegate {
     }
 
     private func handle(_ sent: CKSyncEngine.Event.SentRecordZoneChanges) async {
+        try? await state.remember(sent.savedRecords)
+        try? await state.forget(sent.deletedRecordIDs.map(\.recordName))
+
         for failure in sent.failedRecordSaves {
             switch failure.error.code {
             case .serverRecordChanged:
                 // The only real conflict is two devices adding to the same month
                 // of read states at once, and its merge is a union.
                 guard let server = failure.error.serverRecord else { continue }
+
+                // The server has just said what it holds and under which tag.
+                // Keeping the tag is what stops the retry being refused for
+                // the same reason as the attempt.
+                try? await state.remember([server])
+
                 if let reconciled = payload.reconciled(server, with: failure.record) {
                     engine?.state.add(pendingRecordZoneChanges: [.saveRecord(reconciled.recordID)])
                 }
 
             case .zoneNotFound:
                 // The zone was deleted from another device or from the settings.
+                // Nothing the server said about it holds any more.
+                try? await state.forgetEveryRecord()
                 engine?.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))])
                 await enqueueEverything()
 
@@ -258,7 +274,8 @@ extension CloudSync: CKSyncEngineDelegate {
                 Log.sync.error("The reader's iCloud storage is full")
 
             case .unknownItem:
-                continue
+                // The server does not have it after all, so neither does this.
+                try? await state.forget([failure.record.recordID.recordName])
 
             default:
                 if SyncFailure.isTransient(failure.error) {
