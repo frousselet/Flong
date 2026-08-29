@@ -338,6 +338,8 @@ In practice, classification and tagging fit the budget in a single pass, and sum
 
 Anything produced automatically is flagged as such in the interface and in exports.
 
+**What the model writes is written in the reader's language**, not in the language of the articles. Someone watching a subject follows the press that covers it, whatever it is written in, and a digest half in one language and half in another is one the reader has to translate themselves. The articles keep their own language ; only the headline and the line above them are written. A language the model does not support falls back to the articles' own, since a model asked for a language it does not speak answers in a mixture of the two.
+
 No sending to a remote service by default. If the user configures an external provider, consent is asked per feed and outgoing calls are logged locally.
 
 ### Vectors and multiple devices
@@ -381,6 +383,8 @@ Not a list of articles : a list of **stories**, each one several articles from s
 - **Today, this week, this month**, chosen by a selector, ranked by weight.
 - **The tail** : what grouped with nothing, still there as the ordinary articles it is.
 
+The first story on the page runs its picture across the column, above a larger headline ; the others keep theirs to a square at the side. A page where every story is the same size is a list, and a list makes the reader do the ranking the digest exists to do.
+
 Each story carries its name, one line saying what happened, the number of rooms talking about it, the number of articles, the shape of their arrival and how long ago the last one came. Opening a story lists its articles ; opening an article reads it. Not a card : a rule, a headline, a line and the facts underneath.
 
 The model names and summarizes ; without one, a story takes the title and standfirst of its most central article, and the page says which of the two it is. `docs/technical/digest.md` records how stories are grouped, and why it is not by the vectors of section 11.
@@ -398,6 +402,8 @@ The digest, a story and an article are set as a page rather than as a control pa
 ### List
 
 Adjustable density, a one- to three-line excerpt, an optional thumbnail, a feed indicator, optional mark-as-read on scroll, configurable swipe gestures, multiple selection and batch actions.
+
+The picture an article carries is taken from the feed, or failing that from the first picture in the body, and only its address is stored : the file stays the publisher's and is asked for when a screen shows it. `docs/technical/ingestion.md` records the order, `docs/technical/interface.md` how the page uses it.
 
 ### Article
 

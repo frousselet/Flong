@@ -13,16 +13,26 @@
       "content_html": "<p>Body</p>",
       "summary": "A summary",
       "date_published": "2026-08-25T10:00:00Z",
-      "authors": [{ "name": "Dana" }],
+      "authors": [
+        {
+          "name": "Dana"
+        }
+      ],
       "attachments": [
-        { "url": "https://json.example.com/1.mp3", "mime_type": "audio/mpeg", "size_in_bytes": 99 }
-      ]
+        {
+          "url": "https://json.example.com/1.mp3",
+          "mime_type": "audio/mpeg",
+          "size_in_bytes": 99
+        }
+      ],
+      "image": "https://json.example.com/1.jpg"
     },
     {
       "id": "2",
       "url": "https://json.example.com/2",
       "content_text": "Plain <text>",
-      "date_published": "2026-08-24T10:00:00Z"
+      "date_published": "2026-08-24T10:00:00Z",
+      "banner_image": "https://json.example.com/2-banner.jpg"
     }
   ]
 }

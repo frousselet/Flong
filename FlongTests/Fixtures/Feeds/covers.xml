@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"
+     xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Illustrated Weekly</title>
+    <link>https://example.com/</link>
+    <description>A feed that illustrates its headlines</description>
+    <item>
+      <title>Stated as a thumbnail</title>
+      <link>https://example.com/posts/1</link>
+      <guid>urn:example:1</guid>
+      <media:thumbnail url="https://example.com/covers/1.jpg" width="600" height="400"/>
+    </item>
+    <item>
+      <title>Stated as media content</title>
+      <link>https://example.com/posts/2</link>
+      <guid>urn:example:2</guid>
+      <media:content url="https://example.com/covers/2.jpg" type="image/jpeg" fileSize="4096"/>
+    </item>
+    <item>
+      <title>Stated the podcast way</title>
+      <link>https://example.com/posts/3</link>
+      <guid>urn:example:3</guid>
+      <itunes:image href="https://example.com/covers/3.jpg"/>
+      <enclosure url="https://example.com/media/3.mp3" type="audio/mpeg" length="9000"/>
+    </item>
+    <item>
+      <title>Enclosed rather than stated</title>
+      <link>https://example.com/posts/4</link>
+      <guid>urn:example:4</guid>
+      <enclosure url="https://example.com/media/4.png" type="image/png" length="2048"/>
+    </item>
+  </channel>
+</rss>

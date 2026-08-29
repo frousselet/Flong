@@ -55,6 +55,10 @@ nonisolated enum JSONFeedParser {
         item.author = author(object)
         item.enclosures = (object["attachments"] as? [[String: Any]] ?? []).compactMap(enclosure)
 
+        // 1.1 names both : `image` illustrates the article, `banner_image` runs
+        // above it. Either is the article's picture.
+        item.imageURL = address(object["image"]) ?? address(object["banner_image"])
+
         guard item.identity != nil else { return nil }
         return item
     }

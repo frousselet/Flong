@@ -44,6 +44,7 @@ nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
         case isHidden = "is_hidden"
         case enclosures
         case hasMedia = "has_media"
+        case imageURL = "image_url"
     }
 
     var id: UUID
@@ -70,6 +71,11 @@ nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
     var enclosures: [Enclosure]?
     var hasMedia: Bool
 
+    /// The picture that stands for the article, wherever `CoverImage` found it.
+    /// Only its address is kept : the file itself is the publisher's, and is
+    /// asked for when a screen actually shows it.
+    var imageURL: URL?
+
     init(
         id: UUID = .v7(),
         feedID: UUID,
@@ -86,7 +92,8 @@ nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
         readAt: Date? = nil,
         isStarred: Bool = false,
         isHidden: Bool = false,
-        enclosures: [Enclosure]? = nil
+        enclosures: [Enclosure]? = nil,
+        imageURL: URL? = nil
     ) {
         self.id = id
         self.feedID = feedID
@@ -105,6 +112,7 @@ nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
         self.isHidden = isHidden
         self.enclosures = enclosures
         self.hasMedia = !(enclosures ?? []).isEmpty
+        self.imageURL = imageURL
     }
 
     /// The date the article is sorted on : when it was published, or when it

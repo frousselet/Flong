@@ -50,6 +50,7 @@ struct LibraryStoreTests {
             receivedAt: now.addingTimeInterval(-age)
         )
         entry.hasMedia = false
+        entry.imageURL = URL(string: "https://example.com/covers/\(abs(title.hashValue)).jpg")
 
         try await database.writer.write { db in
             try entry.insert(db)
@@ -78,6 +79,7 @@ struct LibraryStoreTests {
         #expect(item.author == "Camille Dupuis")
         #expect(item.contentHTML == "<p>Le corps de l'article.</p>")
         #expect(item.plainText == "Le corps de l'article.")
+        #expect(item.imageURL == entry.imageURL)
         #expect(item.promotedAt == now)
 
         let stored = try await database.writer.read { db in try Entry.fetchOne(db, key: entry.id) }
@@ -95,6 +97,9 @@ struct LibraryStoreTests {
         let item = try #require(try await library.allItems().first)
         #expect(item.entryID == nil)
         #expect(item.contentHTML == "<p>Le corps de l'article.</p>")
+        // The picture is an address, so it survives the row and may still go
+        // dead on the publisher's side. The text does not.
+        #expect(item.imageURL == entry.imageURL)
         #expect(try await library.count() == 1)
     }
 

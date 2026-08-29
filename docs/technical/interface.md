@@ -35,6 +35,18 @@ The result is that the application contains **no** `glassEffect` call of its own
 
 On macOS the same five sections become a sidebar, through `tabViewStyle(.sidebarAdaptable)` : there is no bar to minimize on a Mac, and a window is already out of its own way.
 
+## Pictures
+
+An editorial page without pictures is a page of grey, and a page where every picture is the same size is a list. So there is a hierarchy of exactly one : **the first story runs its picture across the column**, in a band rather than a square, above a larger headline ; everything below it keeps its picture to a square at the side. That is how a front page has said what matters for two centuries, and it costs one line of code to say it.
+
+Sixteen by nine across a column of six hundred and eighty points is a picture four hundred points tall, which is one story per screen and a front page that says nothing at all. The band is `Editorial.bandAspect`, two point two to one : the same picture, and the rest of the page given back.
+
+Beside a picture on a phone the facts line runs out of room, and a line that wraps to hyphenate `rédac-tions` is worse than a line that says less. `ViewThatFits` drops the sparkline first, then the article count : what survives is who is talking and when they last did, which is the irreducible part.
+
+`AsyncImage` is not used. It keeps no decoded image, so scrolling back up decodes everything again, and it decodes at full size, so a two thousand pixel photograph is unpacked whole to fill a sixty four point square. `ImageStore` makes the thumbnail straight from the encoded bytes with `ImageIO`, which is faster and an order of magnitude cheaper in memory, and keeps the result at the size it was asked for.
+
+A picture occupies nothing until it has something to show, and nothing again if the address turns out to be dead : a grey rectangle where a photograph failed is worse than no photograph, and a page of them looks broken. It is decorative and hidden from VoiceOver, since feeds almost never carry alternative text and reading a headline out twice helps nobody.
+
 ## Motion that says something
 
 Motion is either information or decoration, and decoration on a screen read every morning becomes noise by the second week. Three movements survive :

@@ -45,7 +45,7 @@ struct StoreTests {
         _ = try AppDatabase(queue)
 
         let applied = try queue.read { db in try AppDatabase.migrator.appliedIdentifiers(db) }
-        #expect(applied == ["v1.model", "v2.search", "v3.readStates", "v4.stories"])
+        #expect(applied == ["v1.model", "v2.search", "v3.readStates", "v4.stories", "v5.covers"])
     }
 
     @Test("A feed, an article and its body round trip with every column filled")
@@ -92,7 +92,8 @@ struct StoreTests {
             readAt: date.addingTimeInterval(180),
             isStarred: true,
             isHidden: true,
-            enclosures: [Enclosure(url: URL(string: "https://example.com/1.mp3")!, type: "audio/mpeg", length: 42)]
+            enclosures: [Enclosure(url: URL(string: "https://example.com/1.mp3")!, type: "audio/mpeg", length: 42)],
+            imageURL: URL(string: "https://example.com/1.jpg")
         )
         let body = EntryBody(
             entryID: entry.id,
@@ -119,6 +120,7 @@ struct StoreTests {
         #expect(read.entry == entry)
         #expect(read.body == body)
         #expect(read.entry?.hasMedia == true)
+        #expect(read.entry?.imageURL?.absoluteString == "https://example.com/1.jpg")
         #expect(read.feed?.notModifiedRate == 0.75)
     }
 

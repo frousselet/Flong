@@ -36,6 +36,11 @@ nonisolated struct ParsedItem: Hashable, Sendable {
     var language: String?
     var enclosures: [Enclosure] = []
 
+    /// The picture the feed states for this article : `media:thumbnail`,
+    /// `itunes:image`, JSON Feed's `image`, an `u-photo`. It is a statement
+    /// about the article, unlike an enclosure, which is a file attached to it.
+    var imageURL: URL?
+
     /// What identifies the article for good.
     ///
     /// A GUID when the feed states one, and otherwise the link paired with the

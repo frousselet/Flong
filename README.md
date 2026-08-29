@@ -14,7 +14,7 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **Search is genuinely indexed.** A full-text index over the whole local corpus, a query language with operators, and semantic search over the library through Spotlight.
 
-**Enrichment happens on the device.** Classification, tagging and summaries come from the system model, and no article content is sent anywhere.
+**Enrichment happens on the device.** Classification, tagging and summaries come from the system model, in your own language whatever language the articles are in, and no article content is sent anywhere.
 
 **It is set like a page, not like a control panel.** One column at a time, held to a readable measure, serif headlines, hairline rules, no cards and no boxes. Liquid Glass stays in the navigation layer, where Apple puts it, and never in the content.
 
@@ -38,7 +38,7 @@ Rendered articles follow the system appearance, light and dark :
 | ------ | ------- |
 | ![The unread articles on iPad](docs/images/unread-ipad.png) | ![The sources on iPad](docs/images/sources-ipad.png) |
 
-The feeds shown are made up, and every address in them points at `example.com`.
+The feeds shown are made up, every address in them points at `example.com`, and the pictures are generated : nothing here belongs to anybody.
 
 ## Platforms
 
@@ -77,7 +77,7 @@ Everything else comes from the system frameworks.
 
 ## Privacy
 
-No data leaves the device, apart from the private CloudKit database and the requests to the feeds themselves. No telemetry, no tracker, no third-party service active by default. Feed credentials and secret feed URLs live in the keychain only, and never appear in the database, in an export, or in a log.
+No data leaves the device, apart from the private CloudKit database, the requests to the feeds themselves, and the pictures those feeds point at, which are asked for from the publisher when a screen shows one. No telemetry, no tracker, no third-party service active by default. Feed credentials and secret feed URLs live in the keychain only, and never appear in the database, in an export, or in a log.
 
 ## Other services
 

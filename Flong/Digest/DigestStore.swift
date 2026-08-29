@@ -48,6 +48,8 @@ nonisolated struct DigestStory: Identifiable, Hashable, Sendable {
     let arrivals: [Int]
     /// Several rooms, in the last few hours : something is happening.
     let isLive: Bool
+    /// The picture of the most recent article that has one.
+    let imageURL: URL?
 }
 
 /// What the main screen shows.
@@ -58,6 +60,14 @@ nonisolated struct Digest: Hashable, Sendable {
     var looseCount = 0
 
     var isEmpty: Bool { live.isEmpty && stories.isEmpty && looseCount == 0 }
+}
+
+/// One article of a story, as the digest query returns it.
+private struct StoryArticle {
+    let storyID: UUID
+    let feedTitle: String
+    let date: Date
+    let imageURL: URL?
 }
 
 /// Reads the digest out of the store.
@@ -92,7 +102,7 @@ nonisolated struct DigestStore: Sendable {
             let members = try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT m.story_id AS story_id, f.title AS feed_title,
+                    SELECT m.story_id AS story_id, f.title AS feed_title, e.image_url AS image_url,
                            COALESCE(e.published_at, e.received_at) AS date
                     FROM story_member m
                     JOIN entry e ON e.id = m.entry_id
@@ -101,8 +111,13 @@ nonisolated struct DigestStore: Sendable {
                     """,
                 arguments: [since]
             )
-            .map {
-                (storyID: $0["story_id"] as UUID, feedTitle: $0["feed_title"] as String, date: $0["date"] as Date)
+            .map { row in
+                StoryArticle(
+                    storyID: row["story_id"],
+                    feedTitle: row["feed_title"],
+                    date: row["date"],
+                    imageURL: (row["image_url"] as String?).flatMap(URL.init(string:))
+                )
             }
 
             let loose =
@@ -139,7 +154,7 @@ nonisolated struct DigestStore: Sendable {
 
     private static func story(
         _ story: Story,
-        members: [(storyID: UUID, feedTitle: String, date: Date)],
+        members: [StoryArticle],
         liveSince: Date
     ) -> DigestStory {
         let dates = members.map(\.date).sorted()
@@ -165,7 +180,10 @@ nonisolated struct DigestStore: Sendable {
             firstAt: dates.first ?? story.firstAt,
             lastAt: dates.last ?? story.lastAt,
             arrivals: sparkline(dates),
-            isLive: isLive
+            isLive: isLive,
+            // The latest article to carry a picture, since a story is shown for
+            // where it has got to rather than for where it started.
+            imageURL: members.sorted { $0.date > $1.date }.lazy.compactMap(\.imageURL).first
         )
     }
 

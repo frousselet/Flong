@@ -38,6 +38,7 @@ nonisolated struct LibraryItem: Identifiable, Hashable, StoredRecord {
         case contentHTML = "content_html"
         case plainText = "plain_text"
         case annotation
+        case imageURL = "image_url"
         case vector
         case vectorModel = "vector_model"
         case vectorRevision = "vector_revision"
@@ -63,6 +64,10 @@ nonisolated struct LibraryItem: Identifiable, Hashable, StoredRecord {
     /// What the reader wrote about it.
     var annotation: String?
 
+    /// The address of the article's picture. The file stays the publisher's,
+    /// which is why a kept article can lose its illustration and not its text.
+    var imageURL: URL?
+
     /// The vector and the model that produced it, both arriving with M4.
     var vector: Data?
     var vectorModel: String?
@@ -82,7 +87,8 @@ nonisolated struct LibraryItem: Identifiable, Hashable, StoredRecord {
         promotedAt: Date = Date(),
         contentHTML: String? = nil,
         plainText: String? = nil,
-        annotation: String? = nil
+        annotation: String? = nil,
+        imageURL: URL? = nil
     ) {
         self.id = id
         self.entryID = entryID
@@ -98,6 +104,7 @@ nonisolated struct LibraryItem: Identifiable, Hashable, StoredRecord {
         self.contentHTML = contentHTML
         self.plainText = plainText
         self.annotation = annotation
+        self.imageURL = imageURL
     }
 
     /// The date a list sorts on : when the article was published, or failing

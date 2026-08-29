@@ -30,10 +30,10 @@ nonisolated struct StoryBrief: Hashable, Sendable {
 /// it returns two fields.
 @Generable
 nonisolated struct GeneratedBrief {
-    @Guide(description: "A short neutral headline for the group, at most eight words, in the language of the articles")
+    @Guide(description: "A short neutral headline for the group, at most eight words")
     var title: String
 
-    @Guide(description: "One sentence saying what happened, at most thirty words, in the language of the articles")
+    @Guide(description: "One sentence saying what happened, at most thirty words")
     var summary: String
 }
 
@@ -55,12 +55,52 @@ nonisolated struct StorySummarizer: Sendable {
     /// What is left for the answer, whatever the prompt turns out to cost.
     static let reservedTokens = 400
 
-    private let instructions = """
+    /// The language the reader reads in.
+    ///
+    /// Not the language of the articles. Someone watching a subject follows the
+    /// press that covers it, whatever language it is written in, and a digest
+    /// that answers half in French and half in English is a digest they have to
+    /// translate themselves. Writing the line above an article in the reader's
+    /// own language is most of what a model is for here.
+    ///
+    /// The articles are untouched : only the headline and the one line the model
+    /// writes are in the reader's language.
+    let locale: Locale
+
+    init(locale: Locale = .current) {
+        self.locale = locale
+    }
+
+    private var instructions: String {
+        """
         You name and summarize groups of news articles about the same event.
-        Answer in the language the articles are written in.
+        \(Self.languageInstruction(for: locale))
         Be factual and plain. Never add an opinion, a judgement or a call to action.
         Never mention that you are a model or that you were asked anything.
         """
+    }
+
+    /// What to tell the model about the language to answer in.
+    ///
+    /// A model asked for a language it does not speak answers in a mixture of
+    /// that language and the one it was given, which is worse than either. So a
+    /// locale the model does not support falls back to the articles' own
+    /// language, and the reader gets a headline in the language they were going
+    /// to read anyway.
+    static func languageInstruction(
+        for locale: Locale,
+        supports isSupported: (Locale) -> Bool = { SystemLanguageModel.default.supportsLocale($0) }
+    ) -> String {
+        let articles = "Answer in the language the articles are written in."
+        guard let name = Self.englishName(of: locale), isSupported(locale) else { return articles }
+        return "Answer in \(name), whatever language the articles are written in."
+    }
+
+    /// The language named in English, since the instructions are in English.
+    private static func englishName(of locale: Locale) -> String? {
+        guard let code = locale.language.languageCode?.identifier else { return nil }
+        return Locale(identifier: "en").localizedString(forLanguageCode: code)
+    }
 
     /// How many refusals in a row before the model is left alone.
     ///

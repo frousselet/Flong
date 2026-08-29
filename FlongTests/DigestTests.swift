@@ -194,6 +194,31 @@ struct DigestTests {
         #expect(story.articleCount == 5)
     }
 
+    @Test("A story shows the picture of its most recent illustrated article")
+    func cover() async throws {
+        try await StoryBuilder(database).build(now: now)
+
+        // Two of the four articles carry a picture, and the latest of the four
+        // is not one of them.
+        let illustrated = [
+            "Une réforme du calendrier scolaire à l'étude": "https://example.com/first.jpg",
+            "Calendrier scolaire : trois académies pilotes dès l'an prochain": "https://example.com/latest.jpg",
+        ]
+        try await database.writer.write { db in
+            for (title, address) in illustrated {
+                var entry = try #require(try Entry.filter(Column("title") == title).fetchOne(db))
+                entry.imageURL = URL(string: address)
+                try entry.update(db)
+            }
+        }
+
+        let digest = try await service.digest(.month, now: now)
+        let story = try #require((digest.live + digest.stories).first { $0.articleCount == 4 })
+
+        // The most recent picture, not the first one the story ever had.
+        #expect(story.imageURL?.absoluteString == "https://example.com/latest.jpg")
+    }
+
     @Test("Building twice changes nothing")
     func idempotence() async throws {
         try await StoryBuilder(database).build(now: now)
@@ -301,5 +326,36 @@ struct DigestShapeTests {
 
         #expect(brief.title.isEmpty)
         #expect(brief.summary == nil)
+    }
+
+    // MARK: - The language of the brief
+
+    @Test("The model is asked to write in the reader's language, not the articles'")
+    func briefLanguage() {
+        let instruction = StorySummarizer.languageInstruction(for: Locale(identifier: "fr_FR")) { _ in true }
+
+        #expect(instruction == "Answer in French, whatever language the articles are written in.")
+    }
+
+    @Test("The region a reader is in is not the language they read in")
+    func regionIsNotLanguage() {
+        let swiss = StorySummarizer.languageInstruction(for: Locale(identifier: "de_CH")) { _ in true }
+        let brazilian = StorySummarizer.languageInstruction(for: Locale(identifier: "pt_BR")) { _ in true }
+
+        #expect(swiss.contains("German"))
+        #expect(brazilian.contains("Portuguese"))
+    }
+
+    @Test("A language the model does not speak leaves the articles in their own")
+    func unsupportedLanguage() {
+        let instruction = StorySummarizer.languageInstruction(for: Locale(identifier: "br_FR")) { _ in false }
+
+        // Half Breton and half English would be worse than either.
+        #expect(instruction == "Answer in the language the articles are written in.")
+    }
+
+    @Test("The summarizer reads the device's language by default")
+    func defaultLocale() {
+        #expect(StorySummarizer().locale == Locale.current)
     }
 }
