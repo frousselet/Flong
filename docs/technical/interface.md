@@ -93,7 +93,10 @@ They are pills rather than type because they are a filter that changes what is b
 
 They stay at the head of the page as it scrolls, as a pinned section header. `safeAreaBar` was the first attempt and lays out under a large title while drawing itself two hundred points lower ; a pinned header is where this one belongs anyway, at the head of what it filters. A filter that leaves the screen is a filter a reader has to scroll back up to change.
 
-**A long press on a subject says more of this, or less of this.** A subject is the only thing on the page general enough to hold an opinion : an article is one article and a story is one event, and a preference about either would be a preference about something that will not happen again. The score starts at nought, moves by one, and stops at three either way : past that the reader is no longer expressing a preference, they are hiding things from themselves, and the front page is not the place to do that.
+**A long press on a subject says more of this, or less of this.** It is a `Menu` with a primary action rather than a `Button` with a `contextMenu` : the tap does the tap, the long press opens the menu, and both are the control's own business. The context menu never fired at all over the pill's glass, measured on the simulator with a real long press, and a menu also gives the whole capsule as the target instead of the text inside it. The Mac keeps a context menu on top, since right-clicking is how a Mac says the same thing.
+
+Every pill keeps one weight, chosen or not. Bolder when chosen made the pill three and a half points wider when chosen, and every pill after it moved as the reader tapped.
+ A subject is the only thing on the page general enough to hold an opinion : an article is one article and a story is one event, and a preference about either would be a preference about something that will not happen again. The score starts at nought, moves by one, and stops at three either way : past that the reader is no longer expressing a preference, they are hiding things from themselves, and the front page is not the place to do that.
 
 A pill carries an arrow only when something was said about it. A row of arrows on every pill is a row of arrows nobody reads.
 

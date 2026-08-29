@@ -196,38 +196,62 @@ struct DigestScreen: View {
         }
     }
 
+    @ViewBuilder
     private func pill(_ topic: DigestTopic, title: Text) -> some View {
-        let isCurrent = model.digestTopic == topic
+        // A menu with a primary action rather than a button with a context menu :
+        // a tap does the tap, a long press opens the menu, and both are the
+        // control's own business. A context menu over glass never fired at all,
+        // measured on the simulator, and there is nothing to say about the front
+        // page anyway, so that one stays a button.
+        if topic.name == nil {
+            Button {
+                choose(topic)
+            } label: {
+                label(topic, title: title)
+            }
+            .buttonStyle(.plain)
+            .modifier(PillShape(isCurrent: model.digestTopic == topic, topic: topic, namespace: pills))
+        } else {
+            Menu {
+                preferences(for: topic)
+            } label: {
+                label(topic, title: title)
+            } primaryAction: {
+                choose(topic)
+            }
+            .buttonStyle(.plain)
+            .modifier(PillShape(isCurrent: model.digestTopic == topic, topic: topic, namespace: pills))
+            // The Mac says the same thing by right-clicking.
+            .contextMenu { preferences(for: topic) }
+        }
+    }
 
+    private func choose(_ topic: DigestTopic) {
+        withAnimation(.snappy(duration: 0.26)) { model.digestTopic = topic }
+    }
+
+    private func label(_ topic: DigestTopic, title: Text) -> some View {
+        let isCurrent = model.digestTopic == topic
         let score = topic.name.map { model.digest.scores[$0] ?? 0 } ?? 0
 
-        return Button {
-            withAnimation(.snappy(duration: 0.26)) { model.digestTopic = topic }
-        } label: {
-            HStack(spacing: 4) {
-                // Only when there is something to say : a row of arrows on
-                // every pill would be a row of arrows nobody reads.
-                if score != 0 {
-                    Image(systemName: score > 0 ? "arrow.up" : "arrow.down")
-                        .font(.system(.caption2, weight: .semibold))
-                        .accessibilityLabel(score > 0 ? Text("Seeing more") : Text("Seeing less"))
-                }
-                title
-                    .font(.system(.footnote, weight: isCurrent ? .semibold : .regular))
-                    .lineLimit(1)
+        return HStack(spacing: 4) {
+            // Only when there is something to say : a row of arrows on every
+            // pill would be a row of arrows nobody reads.
+            if score != 0 {
+                Image(systemName: score > 0 ? "arrow.up" : "arrow.down")
+                    .font(.system(.caption2, weight: .semibold))
+                    .accessibilityLabel(score > 0 ? Text("Seeing more") : Text("Seeing less"))
             }
-            .foregroundStyle(isCurrent ? Color.white : Color.primary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            title
+                // One weight for every pill, chosen or not. Bolder when chosen
+                // made the pill wider when chosen, and every pill after it moved
+                // as the reader tapped.
+                .font(.system(.footnote, weight: .medium))
+                .lineLimit(1)
         }
-        .buttonStyle(.plain)
-        .glassEffect(
-            isCurrent ? .regular.tint(.accentColor).interactive() : .regular.interactive(),
-            in: .capsule
-        )
-        .glassEffectID(topic, in: pills)
-        .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
-        .contextMenu { preferences(for: topic) }
+        .foregroundStyle(isCurrent ? Color.white : Color.primary)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
     }
 
     /// What a reader can say about a subject, on a long press.
@@ -491,5 +515,26 @@ struct ArticleRow: View {
         .accessibilityLabel(
             article.isRead ? Text("\(article.title), read") : Text("\(article.title), unread")
         )
+    }
+}
+
+/// The glass a subject pill is drawn on.
+///
+/// Its own modifier so a button and a menu wear exactly the same one, and so
+/// that what changes when a pill is chosen is its colour and nothing about its
+/// size.
+private struct PillShape: ViewModifier {
+    let isCurrent: Bool
+    let topic: DigestTopic
+    let namespace: Namespace.ID
+
+    func body(content: Content) -> some View {
+        content
+            .glassEffect(
+                isCurrent ? .regular.tint(.accentColor).interactive() : .regular.interactive(),
+                in: .capsule
+            )
+            .glassEffectID(topic, in: namespace)
+            .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
     }
 }
