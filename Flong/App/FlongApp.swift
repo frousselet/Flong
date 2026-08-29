@@ -16,9 +16,9 @@ import SwiftUI
 struct FlongApp: App {
     /// The store, opened once for the lifetime of the process.
     ///
-    /// Nothing reads it yet : the reading interface arrives with M0. Opening it
-    /// at launch is what runs the migrations and creates the file with its data
-    /// protection class, rather than leaving both to the first query.
+    /// Opening it at launch is what runs the migrations and creates the file
+    /// with its data protection class, rather than leaving both to the first
+    /// query.
     private let database: AppDatabase?
 
     init() {
@@ -33,7 +33,7 @@ struct FlongApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            RootView(database: database)
         }
         #if os(macOS)
             .defaultSize(width: 1100, height: 700)
