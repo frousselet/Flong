@@ -168,36 +168,62 @@ nonisolated struct DigestService: Sendable {
         return summary
     }
 
-    /// Sorts the page into subjects, in one call for the whole page.
+    /// Files the stories nobody has filed yet.
     ///
-    /// After the briefs rather than before : the model groups what it is shown,
-    /// and a written headline says what a story is about far better than the
-    /// title of whichever article happened to be nearest its middle.
+    /// **Only the ones with no subject.** A story keeps the subjects it was
+    /// given for as long as it lives : sorting the whole page afresh on every
+    /// rebuild made the subjects drift, and a preference the reader attached to
+    /// a name that no longer exists is a preference silently thrown away.
     ///
-    /// The whole set is rewritten each time. A subject is a reading of the page
-    /// as it stands, and a page that has changed deserves a fresh one rather
-    /// than yesterday's with today's stories bolted on.
+    /// The model is shown the vocabulary the reader already has, its own past
+    /// answers and its own additions alike, and reaches for those first. What it
+    /// answers is folded against that vocabulary, so `cybersecurite` is filed
+    /// under `Cybersécurité` rather than beside it, and only a genuinely new
+    /// name is added.
+    ///
+    /// Re-reading what is already filed is what `rewrite` is for, and it is the
+    /// reader who asks for it.
     func nameTopics(now: Date = Date()) async {
         let since = now.addingTimeInterval(-DigestStore.window)
 
         let stories = try? await database.writer.read { db in
-            try Story
-                .filter(Story.Columns.lastAt >= since)
-                .order(Story.Columns.lastAt.desc)
-                .limit(TopicNamer.headlinesShown)
-                .fetchAll(db)
-                .map { (id: $0.id, title: $0.title) }
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT s.id AS id, s.title AS title FROM story s
+                    LEFT JOIN story_topic t ON t.story_id = s.id
+                    WHERE s.last_at >= ? AND t.story_id IS NULL
+                    ORDER BY s.last_at DESC
+                    LIMIT \(TopicNamer.headlinesShown)
+                    """,
+                arguments: [since]
+            )
+            .map { (id: $0["id"] as UUID, title: $0["title"] as String) }
         }
         guard let stories, !stories.isEmpty else { return }
 
+        let preferences = TopicPreferences(database)
+        let vocabulary = (try? await preferences.vocabulary()) ?? []
+
         // No answer leaves the page as it is : see `TopicNamer.topics(of:)`.
-        guard let assigned = await TopicNamer(locale: locale).topics(of: stories) else { return }
+        guard let assigned = await TopicNamer(locale: locale).topics(of: stories, vocabulary: vocabulary) else {
+            return
+        }
+
+        // Every name is either one the reader already has, spelled some other
+        // way, or a new one worth keeping.
+        var filed: [UUID: [String]] = [:]
+        for (id, names) in assigned {
+            for name in names {
+                guard let settled = try? await preferences.record(name) else { continue }
+                if !(filed[id] ?? []).contains(settled) { filed[id, default: []].append(settled) }
+            }
+        }
 
         try? await database.writer.write { db in
-            for (id, _) in stories {
-                try db.execute(sql: "DELETE FROM story_topic WHERE story_id = ?", arguments: [id])
-                for name in assigned[id] ?? [] {
-                    try StoryTopic(storyID: id, name: name).insert(db)
+            for (id, names) in filed {
+                for name in names {
+                    try StoryTopic(storyID: id, name: name).insert(db, onConflict: .ignore)
                 }
             }
         }
@@ -207,7 +233,6 @@ nonisolated struct DigestService: Sendable {
         try await DigestStore(database).digest(topic, now: now)
     }
 
-    /// Gives a story back the headline of its own most central article.
     /// Throws away what the model wrote and asks it again.
     ///
     /// Nothing normally needs this : a brief is rewritten when a model turns

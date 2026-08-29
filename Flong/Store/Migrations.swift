@@ -91,6 +91,10 @@ nonisolated extension AppDatabase {
             try keyExistingArticles(db)
         }
 
+        migrator.registerMigration("v14.vocabulary") { db in
+            try createVocabulary(db)
+        }
+
         return migrator
     }
 
@@ -110,6 +114,40 @@ nonisolated extension AppDatabase {
             table.add(column: "duplicate_of", .blob).references("entry", onDelete: .setNull)
         }
         try db.create(index: "entry_on_canonical_key", on: "entry", columns: ["canonical_key"])
+    }
+
+    /// The subjects there are, as a vocabulary rather than a reading.
+    ///
+    /// The model used to name the subjects of the whole page on every
+    /// rebuild, so they drifted : `Sécurité informatique` one run and
+    /// `Cybersécurité` the next, and the preference the reader had attached to
+    /// the first was left hanging off a name nothing used any more.
+    ///
+    /// A subject is a thing now. It is written once, it stays, and a story is
+    /// sorted into it once and keeps it. The reader may add subjects of their
+    /// own, which are theirs to delete ; the model may add one when nothing it
+    /// is shown fits, and never renames what is already here.
+    private static func createVocabulary(_ db: Database) throws {
+        try db.create(table: "topic") { table in
+            table.primaryKey("name", .text)
+            table.column("is_own", .boolean).notNull().defaults(to: false)
+            table.column("created_at", .datetime).notNull()
+        }
+
+        // Everything the model has already found becomes the first vocabulary,
+        // so a reader upgrading keeps the subjects and the preferences on them.
+        try db.execute(
+            sql: """
+                INSERT OR IGNORE INTO topic (name, is_own, created_at)
+                SELECT DISTINCT name, 0, CURRENT_TIMESTAMP FROM story_topic
+                """
+        )
+        try db.execute(
+            sql: """
+                INSERT OR IGNORE INTO topic (name, is_own, created_at)
+                SELECT DISTINCT name, 0, CURRENT_TIMESTAMP FROM topic_preference
+                """
+        )
     }
 
     /// Keys the articles that were already here, and marks the copies.
