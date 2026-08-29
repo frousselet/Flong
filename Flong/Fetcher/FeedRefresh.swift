@@ -54,10 +54,12 @@ nonisolated struct FeedRefresh: Sendable {
 
     private let database: AppDatabase
     private let fetcher: FeedFetcher
+    private let readStates: ReadStateStore
 
     init(database: AppDatabase, fetcher: FeedFetcher = FeedFetcher()) {
         self.database = database
         self.fetcher = fetcher
+        self.readStates = ReadStateStore(database)
     }
 
     // MARK: - Refreshing
@@ -122,7 +124,10 @@ nonisolated struct FeedRefresh: Sendable {
         case .updated(let document):
             do {
                 let parsed = try FeedParser.parse(document.data, url: document.url, contentType: document.contentType)
-                let new = try await store(parsed, from: document, into: feed)
+                // An article fetched today may have been read on another device
+                // last week, and has to land read rather than announce itself.
+                let read = (try? await readStates.fingerprints()) ?? []
+                let new = try await store(parsed, from: document, into: feed, read: read)
                 return .updated(newArticles: new)
             } catch {
                 // Bytes arrived and made no sense. That is the publisher's
@@ -140,7 +145,12 @@ nonisolated struct FeedRefresh: Sendable {
     }
 
     /// Writes a parsed feed and its articles down, in one transaction.
-    private func store(_ parsed: ParsedFeed, from document: FetchedDocument, into feed: Feed) async throws -> Int {
+    private func store(
+        _ parsed: ParsedFeed,
+        from document: FetchedDocument,
+        into feed: Feed,
+        read: Set<ArticleFingerprint>
+    ) async throws -> Int {
         let now = Date()
 
         return try await database.writer.write { db in
@@ -168,7 +178,7 @@ nonisolated struct FeedRefresh: Sendable {
 
             var newArticles = 0
             for item in parsed.items {
-                if try Self.store(item, of: parsed, feed: stored, at: now, in: db) { newArticles += 1 }
+                if try Self.store(item, of: parsed, feed: stored, at: now, read: read, in: db) { newArticles += 1 }
             }
 
             // The interval a feed suggests is read from what it just served,
@@ -189,6 +199,7 @@ nonisolated struct FeedRefresh: Sendable {
         of parsed: ParsedFeed,
         feed: Feed,
         at now: Date,
+        read: Set<ArticleFingerprint>,
         in db: Database
     ) throws -> Bool {
         guard let identity = item.identity else { return false }
@@ -237,6 +248,8 @@ nonisolated struct FeedRefresh: Sendable {
             return false
         }
 
+        let fingerprint = ArticleFingerprint(feedURL: feed.url, guid: identity)
+
         var entry = Entry(
             feedID: feed.id,
             guid: identity,
@@ -248,6 +261,7 @@ nonisolated struct FeedRefresh: Sendable {
             publishedAt: item.publishedAt,
             updatedAt: item.updatedAt,
             receivedAt: now,
+            isRead: read.contains(fingerprint),
             enclosures: item.enclosures.isEmpty ? nil : item.enclosures
         )
         entry.hasMedia = !item.enclosures.isEmpty
