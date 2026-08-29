@@ -195,10 +195,10 @@ nonisolated struct DigestService: Sendable {
 
         try? await database.writer.write { db in
             for (id, _) in stories {
-                try db.execute(
-                    sql: "UPDATE story SET topic = ? WHERE id = ?",
-                    arguments: [assigned[id], id]
-                )
+                try db.execute(sql: "DELETE FROM story_topic WHERE story_id = ?", arguments: [id])
+                for name in assigned[id] ?? [] {
+                    try StoryTopic(storyID: id, name: name).insert(db)
+                }
             }
         }
     }
@@ -230,8 +230,14 @@ nonisolated struct DigestService: Sendable {
             try db.execute(
                 sql: """
                     UPDATE story
-                    SET summary = NULL, is_generated = 0, brief_locale = NULL, topic = NULL
+                    SET summary = NULL, is_generated = 0, brief_locale = NULL
                     WHERE brief_locked = 0
+                    """
+            )
+            try db.execute(
+                sql: """
+                    DELETE FROM story_topic
+                    WHERE story_id IN (SELECT id FROM story WHERE brief_locked = 0)
                     """
             )
         }

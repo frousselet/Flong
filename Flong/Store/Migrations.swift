@@ -75,7 +75,61 @@ nonisolated extension AppDatabase {
             try askAgain(db)
         }
 
+        migrator.registerMigration("v10.topicPreferences") { db in
+            try createTopicPreferences(db)
+        }
+
+        migrator.registerMigration("v11.severalTopics") { db in
+            try createStoryTopics(db)
+        }
+
         return migrator
+    }
+
+    /// The subjects a story falls under, which are more than one.
+    ///
+    /// A column held exactly one, which is not how a page reads : a security
+    /// advisory about a stolen database is under both computer security and
+    /// cybercrime, and a reader who asked for more of either means this one.
+    ///
+    /// What the single column held is carried over rather than thrown away,
+    /// so a page already sorted stays sorted until the next rebuild.
+    private static func createStoryTopics(_ db: Database) throws {
+        try db.create(table: "story_topic") { table in
+            table.column("story_id", .blob).notNull().references("story", onDelete: .cascade)
+            table.column("name", .text).notNull()
+            table.primaryKey(["story_id", "name"])
+        }
+        try db.create(index: "story_topic_on_name", on: "story_topic", columns: ["name"])
+
+        try db.execute(
+            sql: """
+                INSERT OR IGNORE INTO story_topic (story_id, name)
+                SELECT id, topic FROM story WHERE topic IS NOT NULL
+                """
+        )
+        // The index of the single column goes with the column it indexes, or
+        // SQLite refuses the drop and leaves the schema half changed.
+        try db.execute(sql: "DROP INDEX IF EXISTS story_on_topic")
+        try db.alter(table: "story") { table in
+            table.drop(column: "topic")
+        }
+    }
+
+    /// What the reader wants more or less of.
+    ///
+    /// Keyed by the name of the subject, since a subject has nothing else to
+    /// be known by : it is written afresh by the model on each rebuild, and
+    /// the reader pressed on a word rather than on a row of a table.
+    ///
+    /// Nought is the absence of an opinion and is never stored, so the table
+    /// holds one row per subject the reader has actually spoken about.
+    private static func createTopicPreferences(_ db: Database) throws {
+        try db.create(table: "topic_preference") { table in
+            table.primaryKey("name", .text)
+            table.column("score", .integer).notNull()
+            table.column("updated_at", .datetime).notNull()
+        }
     }
 
     /// Asks the model about every story once more.

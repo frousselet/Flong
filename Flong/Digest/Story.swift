@@ -28,7 +28,6 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         case isGenerated = "is_generated"
         case briefLocked = "brief_locked"
         case briefLocale = "brief_locale"
-        case topic
         case signature
         case articleCount = "article_count"
         case feedCount = "feed_count"
@@ -51,10 +50,6 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
     /// The language the brief was written in, when a model wrote it.
     var briefLocale: String?
 
-    /// The subject it falls under, as the model named it, or `nil` where there
-    /// is no model or the model put this story under nothing.
-    var topic: String?
-
     /// The vocabulary its articles share, which is what a new article is
     /// compared against.
     var signature: TextSignature?
@@ -72,7 +67,6 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         isGenerated: Bool = false,
         briefLocked: Bool = false,
         briefLocale: String? = nil,
-        topic: String? = nil,
         signature: TextSignature? = nil,
         articleCount: Int = 0,
         feedCount: Int = 0,
@@ -86,7 +80,6 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         self.isGenerated = isGenerated
         self.briefLocked = briefLocked
         self.briefLocale = briefLocale
-        self.topic = topic
         self.signature = signature
         self.articleCount = articleCount
         self.feedCount = feedCount
@@ -101,8 +94,23 @@ nonisolated extension Story {
         static let id = Column(CodingKeys.id)
         static let lastAt = Column(CodingKeys.lastAt)
         static let articleCount = Column(CodingKeys.articleCount)
-        static let topic = Column(CodingKeys.topic)
     }
+}
+
+/// One subject a story falls under.
+///
+/// Several rows per story : a story is rarely about one thing, and a reader
+/// who asked for more of any of them meant this story.
+nonisolated struct StoryTopic: Hashable, StoredRecord {
+    static let databaseTableName = "story_topic"
+
+    enum CodingKeys: String, CodingKey {
+        case storyID = "story_id"
+        case name
+    }
+
+    var storyID: UUID
+    var name: String
 }
 
 /// One article's membership of a story.

@@ -87,6 +87,18 @@ A model that will not write about one story is not a model that has stopped work
 
 Only the second kind counts towards the three failures that leave the model alone for the rest of the run. Counting the first meant three awkward headlines in a row silenced it, and every story after them kept whatever it already said, in whatever language it already said it : a page of security advisories half in French and half in English.
 
+## More of this, less of this
+
+A long press on a subject moves it up or down, by one, between three and minus three. Nought is the absence of an opinion and is never stored, so the table holds one row per subject the reader has actually spoken about.
+
+**The score comes before the weight, not mixed into it.** A reader who says more of this expects more of this, not a story two articles heavier than the one they asked for. What is happening now is ordered by when and by nothing else : asking for less of a subject is not asking to hear about it late.
+
+**A story is under several subjects**, and takes the strongest thing said about any of them : asking for more of anything wins, and it is only when nothing about it was asked for that asking for less applies. An advisory about a stolen database is under both computer security and cybercrime, and a reader who asked for more of either meant this one.
+
+The key is the name of the subject, because a subject has nothing else to be known by : it is written afresh by the model on each rebuild, and the reader pressed on a word rather than on a row of a table. A model that renames `Cybercriminalité` to `Cybersécurité` loses the preference attached to it, which is the price of a name being the only handle there is.
+
+**It does not travel yet.** A preference is a choice, and choices are what this application synchronizes, so it ought to ; it would be one more record type, a few dozen records, well inside the budget of section 8. It is not done here, and a reader with two devices will state their preferences twice until it is.
+
 ## Pictures
 
 A story shows the marks of the rooms covering it, in the order those rooms picked it up, which is the order a reader would tell it in. Four of them, and a count of the rest.

@@ -683,6 +683,16 @@
         }
       }
     },
+    "No preference": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sans préférence"
+          }
+        }
+      }
+    },
     "Nothing has come in yet": {
       "localizations": {
         "fr": {
@@ -759,6 +769,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rechercher"
+          }
+        }
+      }
+    },
+    "See less of this": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En voir moins"
+          }
+        }
+      }
+    },
+    "See more of this": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En voir plus"
+          }
+        }
+      }
+    },
+    "Seeing less": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vu moins souvent"
+          }
+        }
+      }
+    },
+    "Seeing more": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vu plus souvent"
           }
         }
       }

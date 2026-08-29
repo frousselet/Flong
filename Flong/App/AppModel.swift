@@ -301,6 +301,21 @@ final class AppModel {
         await loadDigest()
     }
 
+    /// Says the reader wants more of a subject, or less of it.
+    ///
+    /// The page is read again straight away : a preference nobody can see the
+    /// effect of is a preference nobody trusts.
+    func prefer(_ topic: String, by delta: Int) async {
+        try? await TopicPreferences(database).adjust(topic, by: delta)
+        await loadDigest()
+    }
+
+    /// Takes back what was said about a subject.
+    func forgetPreference(of topic: String) async {
+        try? await TopicPreferences(database).clear(topic)
+        await loadDigest()
+    }
+
     /// Asks the model to write the page again, whatever it wrote before.
     func rewriteDigest() async {
         guard !isRewriting else { return }

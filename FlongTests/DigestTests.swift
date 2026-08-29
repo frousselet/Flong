@@ -411,9 +411,9 @@ struct DigestTests {
                 story.summary = "Written by the model."
                 story.isGenerated = true
                 story.briefLocale = "en_GB"
-                story.topic = "Software"
                 story.briefLocked = index == 0
                 try story.update(db)
+                try StoryTopic(storyID: story.id, name: "Software").insert(db)
             }
         }
 
@@ -425,15 +425,96 @@ struct DigestTests {
         let settled = try #require(stories.first { $0.briefLocked })
         let rest = stories.filter { !$0.briefLocked }
 
-        // What the reader settled stays settled, subject included.
+        let remaining = try await database.writer.read { db in try StoryTopic.fetchAll(db) }
+
+        // What the reader settled stays settled, subjects included.
         #expect(settled.summary == "Written by the model.")
-        #expect(settled.topic == "Software")
+        #expect(remaining.map(\.storyID) == [settled.id])
 
         #expect(rest.count == 2)
         #expect(rest.allSatisfy { $0.summary == nil })
         #expect(rest.allSatisfy { !$0.isGenerated })
         #expect(rest.allSatisfy { $0.briefLocale == nil })
-        #expect(rest.allSatisfy { $0.topic == nil })
+    }
+
+    // MARK: - What the reader wants more or less of
+
+    @Test("A subject the reader asked more of comes first, whatever its weight")
+    func preference() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await put(["calendrier": "Éducation", "macros": "Logiciel", "grotesques": "Typographie"])
+
+        let before = try await service.digest(now: now)
+        // The heaviest story leads, as it did before anyone said anything.
+        #expect(before.stories.first?.topics == ["Logiciel"])
+
+        try await TopicPreferences(database).adjust("Typographie", by: 1)
+        let after = try await service.digest(now: now)
+
+        #expect(after.stories.first?.topics == ["Typographie"])
+        // And the pills lead with it too.
+        #expect(after.topics.first == "Typographie")
+        #expect(after.scores == ["Typographie": 1])
+    }
+
+    @Test("A subject the reader asked less of goes last")
+    func dislike() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await put(["macros": "Logiciel", "grotesques": "Typographie"])
+
+        try await TopicPreferences(database).adjust("Logiciel", by: -1)
+        let page = try await service.digest(now: now)
+
+        #expect(page.stories.last?.topics == ["Logiciel"])
+        #expect(page.topics.last == "Logiciel")
+    }
+
+    @Test("Wanting more of one of a story's subjects is wanting more of the story")
+    func severalSubjects() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await put(["macros": "Logiciel", "grotesques": "Typographie"])
+
+        // The typography story is also about software, and the reader wants
+        // less of software and more of typography.
+        try await database.writer.write { db in
+            for story in try Story.fetchAll(db) where story.title.localizedCaseInsensitiveContains("grotesques") {
+                try StoryTopic(storyID: story.id, name: "Logiciel").insert(db, onConflict: .ignore)
+            }
+        }
+        let preferences = TopicPreferences(database)
+        try await preferences.adjust("Logiciel", by: -2)
+        try await preferences.adjust("Typographie", by: 1)
+
+        let page = try await service.digest(now: now)
+        let typography = try #require(page.stories.first { $0.topics.contains("Typographie") })
+
+        // Asking for more of anything wins.
+        #expect(typography.score(page.scores) == 1)
+        #expect(page.stories.first?.id == typography.id)
+    }
+
+    @Test("A reader can only push a subject so far")
+    func clamped() async throws {
+        let preferences = TopicPreferences(database)
+
+        for _ in 0..<6 { try await preferences.adjust("Logiciel", by: 1) }
+        #expect(try await preferences.score(of: "Logiciel") == TopicPreferences.limit)
+
+        for _ in 0..<12 { try await preferences.adjust("Logiciel", by: -1) }
+        #expect(try await preferences.score(of: "Logiciel") == -TopicPreferences.limit)
+    }
+
+    @Test("Saying nothing about a subject leaves no trace of it")
+    func neutral() async throws {
+        let preferences = TopicPreferences(database)
+
+        try await preferences.adjust("Logiciel", by: 1)
+        try await preferences.adjust("Logiciel", by: -1)
+        #expect(try await preferences.scores().isEmpty)
+
+        try await preferences.adjust("Logiciel", by: 2)
+        try await preferences.clear("Logiciel")
+        #expect(try await preferences.scores().isEmpty)
     }
 
     // MARK: - Subjects
@@ -474,7 +555,7 @@ struct DigestTests {
         let page = try await service.digest(.named("Éducation"), now: now)
 
         #expect(page.live.count + page.stories.count == 1)
-        #expect(page.live.first?.topic == "Éducation")
+        #expect(page.live.first?.topics == ["Éducation"])
         // The other subjects stay on the page, or there would be no way off it.
         #expect(page.topics == ["Logiciel", "Éducation"])
         // The tail belongs to no story, so it belongs to no subject either.
@@ -495,14 +576,12 @@ struct DigestTests {
     }
 
     /// Writes subjects onto the stories whose title holds each word, which is
-    /// what the model does when there is one.
+    /// what the model does when there is one. A story may take several.
     private func put(_ topics: [String: String]) async throws {
         try await database.writer.write { db in
             for story in try Story.fetchAll(db) {
                 for (word, topic) in topics where story.title.localizedCaseInsensitiveContains(word) {
-                    var story = story
-                    story.topic = topic
-                    try story.update(db)
+                    try StoryTopic(storyID: story.id, name: topic).insert(db, onConflict: .ignore)
                 }
             }
         }
@@ -548,13 +627,34 @@ struct TopicNamerTests {
         GeneratedTopics(topics: generated.map { GeneratedTopic(name: $0.0, headlines: $0.1) })
     }
 
-    @Test("Each story ends up under the subject that covers it")
+    @Test("Each story ends up under the subjects that cover it")
     func assigning() {
         let assigned = TopicNamer.assign(topics([("Éducation", [1, 2]), ("Logiciel", [3, 4])]), to: stories)
 
-        #expect(assigned[stories[0].id] == "Éducation")
-        #expect(assigned[stories[1].id] == "Éducation")
-        #expect(assigned[stories[3].id] == "Logiciel")
+        #expect(assigned[stories[0].id] == ["Éducation"])
+        #expect(assigned[stories[1].id] == ["Éducation"])
+        #expect(assigned[stories[3].id] == ["Logiciel"])
+    }
+
+    @Test("A story is under every subject that claims it")
+    func severalSubjects() {
+        let assigned = TopicNamer.assign(
+            topics([("Sécurité", [1, 2]), ("Cybercriminalité", [2, 3])]),
+            to: stories
+        )
+
+        // An advisory about a stolen database is under both, and a reader who
+        // asked for more of either meant this one.
+        #expect(assigned[stories[1].id] == ["Sécurité", "Cybercriminalité"])
+        #expect(assigned[stories[0].id] == ["Sécurité"])
+        #expect(assigned[stories[2].id] == ["Cybercriminalité"])
+    }
+
+    @Test("A subject that claims a story twice claims it once")
+    func repeatedClaim() {
+        let assigned = TopicNamer.assign(topics([("Sécurité", [1, 1, 2])]), to: stories)
+
+        #expect(assigned[stories[0].id] == ["Sécurité"])
     }
 
     @Test("A subject covering one story is still a subject")
@@ -564,15 +664,15 @@ struct TopicNamerTests {
         // Dropping these was measured against the real model and threw away
         // everything : on a page of three stories the model gives three
         // subjects, one story each.
-        #expect(assigned[stories[2].id] == "Typographie")
-        #expect(Set(assigned.values) == ["Éducation", "Typographie"])
+        #expect(assigned[stories[2].id] == ["Typographie"])
+        #expect(Set(assigned.values.flatMap { $0 }) == ["Éducation", "Typographie"])
     }
 
     @Test("A subject left holding nothing is dropped")
     func empty() {
         let assigned = TopicNamer.assign(topics([("Éducation", [1, 2]), ("Rien", [99])]), to: stories)
 
-        #expect(Set(assigned.values) == ["Éducation"])
+        #expect(Set(assigned.values.flatMap { $0 }) == ["Éducation"])
     }
 
     @Test("A number that was never on the list is ignored")
@@ -580,16 +680,7 @@ struct TopicNamerTests {
         let assigned = TopicNamer.assign(topics([("Éducation", [1, 2, 9, 0, -3])]), to: stories)
 
         #expect(assigned.count == 2)
-        #expect(assigned[stories[0].id] == "Éducation")
-    }
-
-    @Test("A story claimed twice keeps the first subject that claimed it")
-    func overlap() {
-        let assigned = TopicNamer.assign(topics([("Éducation", [1, 2]), ("Logiciel", [2, 3, 4])]), to: stories)
-
-        #expect(assigned[stories[1].id] == "Éducation")
-        #expect(assigned[stories[2].id] == "Logiciel")
-        #expect(assigned[stories[3].id] == "Logiciel")
+        #expect(assigned[stories[0].id] == ["Éducation"])
     }
 
     @Test("A subject with no name is no subject")
@@ -597,7 +688,7 @@ struct TopicNamerTests {
         let assigned = TopicNamer.assign(topics([("   ", [1, 2]), ("Logiciel", [3, 4])]), to: stories)
 
         #expect(assigned[stories[0].id] == nil)
-        #expect(assigned[stories[2].id] == "Logiciel")
+        #expect(assigned[stories[2].id] == ["Logiciel"])
     }
 }
 

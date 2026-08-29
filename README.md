@@ -24,7 +24,7 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 | ---------- | --------- | ------- |
 | ![The digest on iPad](docs/images/digest-ipad.png) | ![The page narrowed to one subject](docs/images/topic-ipad.png) | ![A story on iPad](docs/images/story-ipad.png) |
 
-The pills are the subjects the system model found across the page. Tapping one narrows the page to it ; the others stay, so there is always a way back.
+The pills are the subjects the system model found across the page, pinned at its head. Tapping one narrows the page to it ; the others stay, so there is always a way back. A long press says more of this, or less of this, and the page reorders itself.
 
 | An article | Live | Sources |
 | ---------- | ---- | ------- |

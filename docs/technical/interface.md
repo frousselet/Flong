@@ -91,6 +91,12 @@ The page opened on a day, week and month selector. A period is a question about 
 
 They are pills rather than type because they are a filter that changes what is below, which type would understate, and because there may be six of them and they have to scroll. The row scrolls horizontally, hides its indicator, and disables scroll clipping so a pill's glass is not shaved at the edge of the column.
 
+They stay at the head of the page as it scrolls, as a pinned section header. `safeAreaBar` was the first attempt and lays out under a large title while drawing itself two hundred points lower ; a pinned header is where this one belongs anyway, at the head of what it filters. A filter that leaves the screen is a filter a reader has to scroll back up to change.
+
+**A long press on a subject says more of this, or less of this.** A subject is the only thing on the page general enough to hold an opinion : an article is one article and a story is one event, and a preference about either would be a preference about something that will not happen again. The score starts at nought, moves by one, and stops at three either way : past that the reader is no longer expressing a preference, they are hiding things from themselves, and the front page is not the place to do that.
+
+A pill carries an arrow only when something was said about it. A row of arrows on every pill is a row of arrows nobody reads.
+
 The section under the pills is called `Stories`, never `Front page` : that is what the pill already says, and a page does not need to name itself twice. Narrowing to a subject renames the section to the subject, and leaves the other pills on screen : take them away and the way back is a button that is no longer there.
 
 Where there is no model there are no subjects, and no pills at all. The front page is entire on its own, which is what section 14 asks of every path that touches the model.
