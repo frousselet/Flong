@@ -13,67 +13,48 @@ import Foundation
 import FoundationModels
 import OSLog
 
-/// The subjects the model finds across a page of stories.
-@Generable
-nonisolated struct GeneratedTopics {
-    @Guide(description: "The subjects these headlines fall under", .count(2...6))
-    var topics: [GeneratedTopic]
-}
-
+/// A subject the model proposes when nothing it was shown fits.
 @Generable
 nonisolated struct GeneratedTopic {
     @Guide(description: "The subject, one or two words, capitalized as a title")
     var name: String
-
-    @Guide(description: "The numbers of the headlines that fall under this subject")
-    var headlines: [Int]
 }
 
-/// Files the stories of the page under the subjects the reader already has.
+/// Files stories under the subjects the reader already has.
 ///
-/// A story is one event ; a topic is the subject several events belong to. The
+/// A story is one event ; a subject is the field several events belong to. The
 /// difference is what makes the pills worth having : filtering by `Éducation`
 /// says something the list of stories underneath does not already say, whereas
 /// a pill per story would be the same page twice.
 ///
-/// This is one call for the whole page rather than one per story. The model is
-/// given the vocabulary and the headlines, numbered, and answers with the
-/// subjects and which numbers fall under each, which is a far smaller thing to
-/// ask than naming a subject for a story in isolation, where it has nothing to
-/// compare against.
+/// **One story per call, and the answer chosen from a list.** The first version
+/// showed the model thirty numbered headlines and asked which numbers fell under
+/// which subjects. That is index bookkeeping, which a small model does badly :
+/// it filed wildfires under `Sport` and a page of security advisories under
+/// `Économie · Sport · Politique`, every number in range and every one wrong.
+/// Asked about one headline at a time, against a list it must choose from, it
+/// has nothing to keep track of and cannot answer something that is not a
+/// subject.
 ///
-/// **It is shown what the reader already has, and reaches for that first.** A
-/// subject the model invents afresh every week is a subject nobody can hold an
-/// opinion about : the preference the reader attached to `Sécurité
-/// informatique` means nothing once the page is filed under `Cybersécurité`.
-/// A new subject is for when nothing it is shown fits.
-///
-/// Where there has never been a model there are no subjects, and the page is
-/// the front page. Section 14 asks for the path without the model to be
-/// entire, and a front page is entire : the pills are a way of narrowing it,
-/// never the only way in.
+/// The list is the reader's vocabulary, its own past answers and the reader's
+/// own additions alike, plus one way out. Taking that way out is the only time
+/// it is asked to name anything.
 nonisolated struct TopicNamer: Sendable {
-    /// How many headlines the model is shown.
+    /// How many stories are filed in one run.
     ///
-    /// The window is four thousand tokens for the prompt and the answer
-    /// together. Thirty headlines of a dozen words sit well inside it, and a
-    /// page showing more than thirty stories has a bigger problem than its
-    /// pills.
-    static let headlinesShown = 30
+    /// One call each, a second or so apiece. A page of unfiled stories is
+    /// worked through over a few openings rather than in one long wait, and
+    /// since a story is filed once and keeps it, the backlog only ever shrinks.
+    static let storiesPerRun = 12
 
-    /// What is left for the answer, whatever the prompt turns out to cost.
-    static let reservedTokens = 500
+    /// How many subjects a story is allowed.
+    ///
+    /// Two. Given more, the model uses more : the page that prompted this
+    /// carried four subjects on one story, of which one was right.
+    static let subjectsPerStory = 2
 
-    /// How many stories a page needs before its subjects are worth asking for.
-    ///
-    /// A page of one story has one subject, and a filter with one thing on
-    /// each side of it is not a filter.
-    ///
-    /// A subject covering a single story is kept, though. Dropping those was
-    /// measured against the real model and threw away everything : with three
-    /// stories on a page the model gives three subjects, each covering one,
-    /// and a rule that wants two per subject leaves no subjects at all.
-    static let minimumStories = 2
+    /// What the model picks when the vocabulary has nothing for this story.
+    static let noneOfThese = "None of these"
 
     let locale: Locale
 
@@ -83,119 +64,125 @@ nonisolated struct TopicNamer: Sendable {
 
     private var instructions: String {
         """
-        You file news headlines under subjects a reader already has.
+        You file one news headline under the subjects a reader already has.
         A subject is a field of interest, not a single event.
-        A headline may fall under more than one subject.
-        Use the subjects you are given. Propose a new one only when none of them fits.
-        \(OnDeviceModel.languageInstruction(for: locale))
-        Never invent a headline, and never use a number you were not given.
+        Choose only from the subjects you are given. Choose the fewest that fit.
+        Choose \(Self.noneOfThese) when none of them is about this headline.
         Never mention that you are a model or that you were asked anything.
         """
     }
 
-    /// The subjects of each story, for the stories the model put under any, or
-    /// `nil` when the model said nothing at all.
+    /// The subjects one story belongs to, chosen from the vocabulary.
     ///
-    /// The difference matters. An empty answer is the model saying these
-    /// stories fall under no common subject, and the pills go. No answer is
-    /// the model being unavailable, or refusing, or the page being too long to
-    /// show it, and the subjects already on the page are the best reading
-    /// anyone has : blanking them because Apple Intelligence was switched off
-    /// for an afternoon would be losing work to a transient.
-    ///
-    /// Stories the model leaves out keep no subject, which is right : they are
-    /// still on the front page, they are simply on no pill.
-    func topics(of stories: [(id: UUID, title: String)], vocabulary: [String] = []) async -> [UUID: [String]]? {
-        guard OnDeviceModel.isAvailable, stories.count >= Self.minimumStories else { return nil }
+    /// `nil` when the model said nothing at all : unavailable, refusing, or
+    /// unable to read the page. An empty answer is the model saying this story
+    /// falls under nothing it was shown, which is a different thing and is what
+    /// `newSubject` is for.
+    func file(_ headline: String, summary: String?, into vocabulary: [String]) async -> [String]? {
+        guard OnDeviceModel.isAvailable, !vocabulary.isEmpty else { return nil }
 
-        let shown = Array(stories.prefix(Self.headlinesShown))
         do {
+            let schema = try Self.schema(for: vocabulary)
             let session = LanguageModelSession(instructions: instructions)
-            // The language is said twice, in the instructions and again beside
-            // the task. A small model asked once at the top answers in the
-            // language of the words nearest its answer, and the headlines are
-            // nearer than the instructions.
-            let prompt = Self.prompt(
-                for: shown,
-                vocabulary: vocabulary,
-                language: OnDeviceModel.languageReminder(for: locale)
-            )
+            let response = try await session.respond(to: Self.prompt(headline, summary: summary), schema: schema)
 
-            if #available(iOS 26.4, macOS 26.4, *) {
-                let model = SystemLanguageModel.default
-                let cost = try await model.tokenCount(for: prompt)
-
-                guard cost + Self.reservedTokens < model.contextSize else {
-                    Log.enrich.notice("The page was too long to sort into subjects")
-                    return nil
-                }
-            }
-
-            let response = try await session.respond(to: prompt, generating: GeneratedTopics.self)
+            let chosen = try response.content.value([String].self, forProperty: "subjects")
             OnDeviceModel.succeeded()
-            return Self.assign(response.content, to: shown)
+
+            // The way out is not a subject, and choosing it beside real ones
+            // means it fits those.
+            return chosen.filter { $0 != Self.noneOfThese && vocabulary.contains($0) }
         } catch {
             OnDeviceModel.refused(error)
             return nil
         }
     }
 
-    /// Reads the answer back, keeping only what it is entitled to say.
+    /// A subject for a story that fits nothing the reader has.
     ///
-    /// A model asked for numbers returns numbers, and now and then returns one
-    /// that was never on the list. A subject left holding nothing is dropped,
-    /// and a story claimed by several subjects keeps them all : an advisory
-    /// about a stolen database is under both computer security and cybercrime,
-    /// and a reader who asked for more of either meant this one.
-    ///
-    /// The subjects of a story stay in the order the model gave them.
-    static func assign(
-        _ generated: GeneratedTopics,
-        to stories: [(id: UUID, title: String)]
-    ) -> [UUID: [String]] {
-        var assigned: [UUID: [String]] = [:]
+    /// Free text, and the only time the model is allowed to name anything. What
+    /// it answers is folded against the vocabulary before it is kept, so a
+    /// second spelling of a subject that exists is not a second subject.
+    func newSubject(for headline: String, summary: String?) async -> String? {
+        guard OnDeviceModel.isAvailable else { return nil }
 
-        for topic in generated.topics {
-            let name = topic.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !name.isEmpty else { continue }
+        do {
+            let session = LanguageModelSession(
+                instructions: """
+                    You name the field of interest a news headline belongs to.
+                    A field is what a section of a newspaper is called : it outlives any one story.
+                    One or two words. Never the headline, never a name, never a date.
+                    \(OnDeviceModel.languageInstruction(for: locale))
+                    Answer with the field and nothing else.
+                    """
+            )
+            let asked = """
+                \(Self.prompt(headline, summary: summary))
 
-            let claimed = topic.headlines.compactMap { number -> UUID? in
-                let index = number - 1
-                guard stories.indices.contains(index) else { return nil }
-                return stories[index].id
+                \(OnDeviceModel.languageReminder(for: locale))
+                """
+
+            var response = try await session.respond(to: asked, generating: GeneratedTopic.self)
+            var name = response.content.name.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // Measured : asked once, it answers with the headline about half
+            // the time. `Les macros Swift` is not a field ; `Logiciel` is.
+            if !Self.isField(name, of: headline) {
+                response = try await session.respond(
+                    to: "That is the story, not the field it belongs to. Answer with the field.",
+                    generating: GeneratedTopic.self
+                )
+                name = response.content.name.trimmingCharacters(in: .whitespacesAndNewlines)
             }
 
-            guard !claimed.isEmpty else { continue }
-            for id in claimed where !(assigned[id] ?? []).contains(name) {
-                assigned[id, default: []].append(name)
+            OnDeviceModel.succeeded()
+            guard Self.isField(name, of: headline) else {
+                Log.enrich.notice("The model named a story rather than a subject, twice")
+                return nil
             }
+            return name
+        } catch {
+            OnDeviceModel.refused(error)
+            return nil
         }
-        return assigned
     }
 
-    private static func prompt(
-        for stories: [(id: UUID, title: String)],
-        vocabulary: [String],
-        language: String
-    ) -> String {
-        let lines = stories.enumerated().map { index, story in
-            "\(index + 1). \(story.title)"
-        }
+    /// Whether a proposed subject is a field rather than the story itself.
+    ///
+    /// Short, and not lifted out of the headline. A model asked for a field
+    /// and given one headline answers with that headline about half the time,
+    /// and a vocabulary of headlines is a vocabulary with one story in each.
+    static func isField(_ name: String, of headline: String) -> Bool {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name.count <= 30 else { return false }
 
-        // The subjects first, so that what the reader already has is what the
-        // model reaches for. A page sorted into fresh names every week is a
-        // page nobody can hold an opinion about.
-        let known =
-            vocabulary.isEmpty
-            ? "There are no subjects yet. Name a few."
-            : "The subjects to file them under :\n\(vocabulary.map { "- \($0)" }.joined(separator: "\n"))"
+        let words = TopicPreferences.fold(name).split(separator: " ")
+        guard (1...3).contains(words.count) else { return false }
 
-        return """
-            File these headlines under subjects.
-            \(known)
-            \(language)
+        // Nothing the headline already says.
+        let folded = TopicPreferences.fold(headline)
+        return !folded.contains(TopicPreferences.fold(name))
+    }
 
-            \(lines.joined(separator: "\n"))
-            """
+    /// A schema the model cannot answer outside of.
+    ///
+    /// The subjects are the values of an enumeration rather than words in a
+    /// prompt, so `Cybersécurité` cannot come back as `Cyber sécurité` and a
+    /// subject nobody has cannot come back at all.
+    static func schema(for vocabulary: [String]) throws -> GenerationSchema {
+        let choice = DynamicGenerationSchema(name: "Subject", anyOf: vocabulary + [noneOfThese])
+        let list = DynamicGenerationSchema(arrayOf: choice, minimumElements: 1, maximumElements: subjectsPerStory)
+        let root = DynamicGenerationSchema(
+            name: "Filing",
+            properties: [
+                .init(name: "subjects", description: "The subjects this headline is about", schema: list)
+            ]
+        )
+        return try GenerationSchema(root: root, dependencies: [])
+    }
+
+    private static func prompt(_ headline: String, summary: String?) -> String {
+        guard let summary, !summary.isEmpty else { return "Headline : \(headline)" }
+        return "Headline : \(headline)\n\(String(summary.prefix(240)))"
     }
 }

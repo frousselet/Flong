@@ -73,35 +73,58 @@ struct TopicNamerLiveTests {
         #expect(Self.language(of: summary) == .french)
     }
 
-    @Test("Subjects for English headlines are named in the reader's language")
-    func subjectsOfEnglishHeadlines() async throws {
-        let stories = english.map { (id: UUID.v7(), title: $0) }
-
-        let assigned = try #require(await TopicNamer(locale: Locale(identifier: "fr_FR")).topics(of: stories))
-        let names = Set(assigned.values.flatMap { $0 }).joined(separator: ". ")
-
-        #expect(!names.isEmpty)
-        #expect(Self.language(of: names) == .french)
-    }
-
     private static func language(of text: String) -> NLLanguage? {
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(text)
         return recognizer.dominantLanguage
     }
 
-    @Test("Every headline the model is shown comes back under a subject")
-    func everyHeadlineIsSorted() async throws {
-        let stories = headlines.map { (id: UUID.v7(), title: $0) }
+    @Test("A headline is filed under a subject that is about it")
+    func filing() async throws {
+        // The vocabulary a reader of the French press would have, including one
+        // subject that has nothing to do with any of the headlines.
+        let vocabulary = ["Éducation", "Logiciel", "Typographie", "Sport", "Cybersécurité"]
+        let namer = TopicNamer(locale: Locale(identifier: "fr_FR"))
 
-        let assigned = try #require(await TopicNamer(locale: Locale(identifier: "fr_FR")).topics(of: stories))
+        let expected: [(headline: String, subject: String)] = [
+            ("Une réforme du calendrier scolaire à l'étude", "Éducation"),
+            ("Les macros Swift, deux ans après", "Logiciel"),
+            ("Pourquoi les caractères grotesques reviennent", "Typographie"),
+        ]
 
-        // The model chooses how many subjects it finds and which headlines fall
-        // under them, and it is entitled to. What is asserted is that the page
-        // is not left with nothing : a subject covering a single story used to
-        // be dropped, which on a page of three stories dropped all three.
-        #expect(!assigned.isEmpty)
-        #expect(assigned.count * 2 >= stories.count)
+        for (headline, subject) in expected {
+            let filed = try #require(await namer.file(headline, summary: nil, into: vocabulary))
+            print("=== \(headline) -> \(filed)")
+
+            #expect(filed.contains(subject))
+            // Two at most, and nothing that was never offered.
+            #expect(filed.count <= TopicNamer.subjectsPerStory)
+            #expect(filed.allSatisfy { vocabulary.contains($0) })
+            // The page that prompted this filed wildfires under `Sport`.
+            #expect(!filed.contains("Sport"))
+        }
+    }
+
+    @Test("A headline about nothing the reader has is filed under nothing")
+    func nothingFits() async throws {
+        let namer = TopicNamer(locale: Locale(identifier: "fr_FR"))
+
+        let filed = try #require(
+            await namer.file(
+                "Les macros Swift, deux ans après",
+                summary: "Ce que les macros ont changé au code que nous écrivons.",
+                into: ["Jardinage", "Cuisine"]
+            )
+        )
+        print("=== nothing fits -> \(filed)")
+        #expect(filed.isEmpty)
+
+        // And then it is asked to name one.
+        let proposed = try #require(await namer.newSubject(for: "Les macros Swift, deux ans après", summary: nil))
+        print("=== proposed -> \(proposed)")
+
+        // A field, not the story : `Les macros Swift` is the headline back.
+        #expect(TopicNamer.isField(proposed, of: "Les macros Swift, deux ans après"))
     }
 
     @Test("The page the window builds comes out with briefs and pills")
