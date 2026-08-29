@@ -15,7 +15,9 @@ import OSLog
 nonisolated enum Log {
     private static let subsystem = "com.rslt.Flong"
 
-    static let auth = Logger(subsystem: subsystem, category: "auth")
-    static let network = Logger(subsystem: subsystem, category: "network")
+    static let fetch = Logger(subsystem: subsystem, category: "fetch")
+    static let parse = Logger(subsystem: subsystem, category: "parse")
+    static let store = Logger(subsystem: subsystem, category: "store")
+    static let index = Logger(subsystem: subsystem, category: "index")
     static let sync = Logger(subsystem: subsystem, category: "sync")
 }

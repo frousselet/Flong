@@ -1,6 +1,8 @@
 # FreshRSS API
 
-Flong talks to FreshRSS through its Google Reader compatible API, not through the native FreshRSS API and not through the Fever one. That surface is also served by Miniflux, Inoreader, The Old Reader and BazQux, so a single client implementation opens the door to other backends later.
+Flong is not a FreshRSS client. It has no backend, and it keeps no permanent link with any service. This page documents the API used for the one-shot import of an existing account, described in section 19 of the specification and scheduled for M7.
+
+That surface is the Google Reader compatible API, not the native FreshRSS API and not the Fever one. It is also served by Miniflux, Inoreader, The Old Reader and BazQux, so one import implementation covers several services.
 
 There is no specification to work from. Google never published or documented this API, and Google Reader shut down in July 2013. FreshRSS's own developer page is deliberately short and points at archived third-party write-ups. **The authority for everything below is the FreshRSS implementation itself**, read at version 1.29.1 :
 
@@ -65,7 +67,7 @@ Built-in streams : `user/-/state/com.google/reading-list`, `.../starred`, `.../r
 
 `stream/contents` returns the long form above, while `stream/items/ids` returns the plain decimal identifier. A client mixing the two endpoints has to convert : the long form is `str_pad(dechex($id), 16, '0', STR_PAD_LEFT)`.
 
-`edit-tag` accepts either. It treats a value as decimal when it is all digits and does not start with `0`, and otherwise strips the prefix and reads it as hexadecimal. Round-tripping the long form untouched is therefore always safe, and is what Flong does.
+`edit-tag` accepts either. It treats a value as decimal when it is all digits and does not start with `0`, and otherwise strips the prefix and reads it as hexadecimal. Round-tripping the long form untouched is therefore always safe, and is what an importer should do.
 
 ## Endpoints
 
