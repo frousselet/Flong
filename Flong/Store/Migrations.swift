@@ -71,7 +71,22 @@ nonisolated extension AppDatabase {
             try createRecordTags(db)
         }
 
+        migrator.registerMigration("v9.askAgain") { db in
+            try askAgain(db)
+        }
+
         return migrator
+    }
+
+    /// Asks the model about every story once more.
+    ///
+    /// A build in between wrote briefs in the language of the articles and
+    /// stamped them with the language of the reader, so they read as answered
+    /// and nothing would ever have asked again : a page of English headlines
+    /// for a French reader, permanently. Forgetting what was asked costs one
+    /// question per story, once.
+    private static func askAgain(_ db: Database) throws {
+        try db.execute(sql: "UPDATE story SET brief_locale = NULL")
     }
 
     /// What the server last said about each record it holds.

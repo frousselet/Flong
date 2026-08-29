@@ -130,6 +130,16 @@ struct SourcesScreen: View {
     /// since been switched back on.
     @ViewBuilder
     private var rewrite: some View {
+        if let absence = OnDeviceModel.absence {
+            Text(absence)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        } else {
+            rewriteButton
+        }
+    }
+
+    private var rewriteButton: some View {
         Button {
             Task { await model.rewriteDigest() }
         } label: {

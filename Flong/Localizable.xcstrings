@@ -372,6 +372,46 @@
         }
       }
     },
+    "Apple Intelligence is not available on this device. Stories keep the headline of their own article.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence n'est pas disponible sur cet appareil. Les sujets gardent le titre de leur propre article."
+          }
+        }
+      }
+    },
+    "Apple Intelligence is not available. Stories keep the headline of their own article.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence n'est pas disponible. Les sujets gardent le titre de leur propre article."
+          }
+        }
+      }
+    },
+    "Apple Intelligence is still downloading. Stories keep the headline of their own article until it is ready.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence est en cours de téléchargement. Les sujets gardent le titre de leur propre article en attendant."
+          }
+        }
+      }
+    },
+    "Apple Intelligence is switched off. Stories keep the headline of their own article.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence est désactivé. Les sujets gardent le titre de leur propre article."
+          }
+        }
+      }
+    },
     "By %@": {
       "localizations": {
         "fr": {

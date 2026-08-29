@@ -49,7 +49,7 @@ struct StoreTests {
         #expect(
             applied == [
                 "v1.model", "v2.search", "v3.readStates", "v4.stories", "v5.covers", "v6.topics",
-                "v7.briefLanguage", "v8.recordTags",
+                "v7.briefLanguage", "v8.recordTags", "v9.askAgain",
             ]
         )
     }
