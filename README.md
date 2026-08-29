@@ -4,7 +4,7 @@ A feed reader for iOS, iPadOS and macOS, written in Swift with SwiftUI and SQLit
 
 No server, no account, no hosting. Every device collects the feeds itself and keeps them in a local database ; what you choose to keep propagates through your own private CloudKit database.
 
-> Status : early. Flong reads an OPML file and keeps the subscriptions it holds, with their folder tree, and lists them. Fetching the feeds and reading the articles are next.
+> Status : early. Flong follows feeds, fetches them, and lets you read them, on the three platforms. Search, the library and synchronization are next.
 
 ## Ideas
 
@@ -13,6 +13,18 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 **Search is genuinely indexed.** A full-text index over the whole local corpus, a query language with operators, and semantic search over the library through Spotlight.
 
 **Enrichment happens on the device.** Classification, tagging and summaries come from the system model, and no article content is sent anywhere.
+
+## Screenshots
+
+| Sources | Articles | Reader |
+| ------- | -------- | ------ |
+| ![The sidebar on iPhone](docs/images/sources-iphone.png) | ![The article list on iPhone](docs/images/articles-iphone.png) | ![An article on iPad](docs/images/reader-ipad-light.png) |
+
+Rendered articles follow the system appearance, light and dark :
+
+![The same article in dark mode](docs/images/reader-ipad-dark.png)
+
+The feeds shown are made up, and every address in them points at `example.com`.
 
 ## Platforms
 

@@ -24,8 +24,8 @@ nonisolated struct ArticleSummary: Identifiable, Hashable, Sendable, FetchableRe
     let excerpt: String?
     let author: String?
     let date: Date
-    let isRead: Bool
-    let isStarred: Bool
+    var isRead: Bool
+    var isStarred: Bool
     let hasMedia: Bool
     let url: URL?
 

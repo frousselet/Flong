@@ -1,6 +1,26 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@, read": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, lu"
+          }
+        }
+      }
+    },
+    "%@, unread": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, non lu"
+          }
+        }
+      }
+    },
     "%lld already followed": {
       "localizations": {
         "en": {
@@ -121,13 +141,112 @@
         }
       }
     },
-    "Add a feed to start reading.": {
-      "extractionState": "stale",
+    "Add": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Ajoutez un flux pour commencer à lire."
+            "value": "Ajouter"
+          }
+        }
+      }
+    },
+    "Add a feed": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter un flux"
+          }
+        }
+      }
+    },
+    "Add a feed, or import an OPML file to bring your subscriptions over.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajoutez un flux, ou importez un fichier OPML pour reprendre vos abonnements."
+          }
+        }
+      }
+    },
+    "Add to favourites": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mettre en favori"
+          }
+        }
+      }
+    },
+    "Address of a feed or of a site": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adresse d'un flux ou d'un site"
+          }
+        }
+      }
+    },
+    "All articles": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tous les articles"
+          }
+        }
+      }
+    },
+    "Articles": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Articles"
+          }
+        }
+      }
+    },
+    "By %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Par %@"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler"
+          }
+        }
+      }
+    },
+    "Everything here has been read.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tout a été lu ici."
+          }
+        }
+      }
+    },
+    "Feeds": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flux"
           }
         }
       }
@@ -142,32 +261,32 @@
         }
       }
     },
+    "Flong reads the page to find its feed when the address is not one already.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flong lit la page pour y trouver son flux quand l'adresse n'en est pas déjà un."
+          }
+        }
+      }
+    },
+    "Holds media": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contient un média"
+          }
+        }
+      }
+    },
     "Import an OPML file": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Importer un fichier OPML"
-          }
-        }
-      }
-    },
-    "Import an OPML file to bring your subscriptions over.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Importez un fichier OPML pour reprendre vos abonnements."
-          }
-        }
-      }
-    },
-    "Import failed": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Échec de l'import"
           }
         }
       }
@@ -182,6 +301,56 @@
         }
       }
     },
+    "Mark all as read": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tout marquer comme lu"
+          }
+        }
+      }
+    },
+    "Mark as read": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marquer comme lu"
+          }
+        }
+      }
+    },
+    "Mark as unread": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marquer comme non lu"
+          }
+        }
+      }
+    },
+    "No article selected": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun article sélectionné"
+          }
+        }
+      }
+    },
+    "No feed was found at this address.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun flux n'a été trouvé à cette adresse."
+          }
+        }
+      }
+    },
     "No feed yet": {
       "localizations": {
         "fr": {
@@ -192,12 +361,12 @@
         }
       }
     },
-    "No folder": {
+    "Nothing to read": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sans dossier"
+            "value": "Rien à lire"
           }
         }
       }
@@ -212,6 +381,76 @@
         }
       }
     },
+    "Open in browser": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ouvrir dans le navigateur"
+          }
+        }
+      }
+    },
+    "Pick an article from the list.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choisissez un article dans la liste."
+          }
+        }
+      }
+    },
+    "Refresh": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Actualiser"
+          }
+        }
+      }
+    },
+    "Remove from favourites": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retirer des favoris"
+          }
+        }
+      }
+    },
+    "Share": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partager"
+          }
+        }
+      }
+    },
+    "Something went wrong": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quelque chose n'a pas fonctionné"
+          }
+        }
+      }
+    },
+    "Starred": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favoris"
+          }
+        }
+      }
+    },
     "Storage unavailable": {
       "localizations": {
         "fr": {
@@ -222,22 +461,32 @@
         }
       }
     },
-    "Subscriptions": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abonnements"
-          }
-        }
-      }
-    },
     "The subscriptions could not be saved.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Les abonnements n'ont pas pu être enregistrés."
+          }
+        }
+      }
+    },
+    "This address could not be reached.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette adresse n'a pas pu être atteinte."
+          }
+        }
+      }
+    },
+    "This address is not one Flong can follow.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette adresse n'est pas une adresse que Flong peut suivre."
           }
         }
       }
@@ -258,6 +507,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ce fichier n'a pas pu être lu comme un OPML."
+          }
+        }
+      }
+    },
+    "Today": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aujourd'hui"
+          }
+        }
+      }
+    },
+    "Unread": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non lus"
           }
         }
       }

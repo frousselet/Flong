@@ -25,9 +25,10 @@ struct LocalizationTests {
 
     @Test("Plain strings reach their French translation")
     func plainStrings() {
-        #expect(String(localized: "Subscriptions", locale: french) == "Abonnements")
+        #expect(String(localized: "Unread", locale: french) == "Non lus")
         #expect(String(localized: "Import an OPML file", locale: french) == "Importer un fichier OPML")
-        #expect(String(localized: "No folder", locale: french) == "Sans dossier")
+        #expect(String(localized: "Mark all as read", locale: french) == "Tout marquer comme lu")
+        #expect(String(localized: "Add to favourites", locale: french) == "Mettre en favori")
     }
 
     @Test("The import summary agrees with French plural rules")
