@@ -13,7 +13,7 @@ import Foundation
 import OSLog
 
 /// An entry of the sidebar.
-struct SidebarItem: Identifiable, Hashable {
+nonisolated struct SidebarItem: Identifiable, Hashable, Sendable {
     /// What an entry stands for. It is also the selection, so it holds nothing
     /// that changes when a feed is renamed.
     enum Kind: Hashable {
@@ -49,7 +49,7 @@ struct SidebarItem: Identifiable, Hashable {
 }
 
 /// Why something the reader asked for did not happen.
-enum AppFailure: Hashable, Identifiable {
+nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
     case unreadableFile
     case notOPML
     case notSaved
@@ -111,12 +111,8 @@ final class AppModel {
     /// Whether the list is showing the answer to a query rather than a view.
     var isShowingResults: Bool { query != nil }
 
-    var selection: SidebarItem.Kind? = .digest {
-        didSet { Task { await loadArticles() } }
-    }
-    var selectedArticle: UUID? {
-        didSet { Task { await openSelectedArticle() } }
-    }
+    var selection: SidebarItem.Kind? = .all
+    var selectedArticle: UUID?
 
     /// The summary of the last import, until the reader dismisses it.
     var report: OPMLImportReport?
@@ -273,10 +269,33 @@ final class AppModel {
     }
 
     /// Groups what has arrived, names the new stories, and shows the result.
+    /// Groups what has arrived and shows it, then writes the headlines behind.
+    ///
+    /// The page appears as soon as the grouping is done. Naming is a call to a
+    /// model per story, and a page that waited for it would be a page that
+    /// arrives a second late to say what it already knew.
     func rebuildDigest() async {
-        await digestService.rebuild()
+        await digestService.buildStories()
         await loadDigest()
         await loadLooseArticles()
+
+        await digestService.brief()
+        await loadDigest()
+    }
+
+    /// Loads a story's articles for its own page.
+    func openStoryPage(_ storyID: UUID) async {
+        guard storyArticles[storyID] == nil else { return }
+        storyArticles[storyID] = (try? await digestService.articles(of: storyID)) ?? []
+    }
+
+    /// Gives a story back the headline of its own article.
+    ///
+    /// The assistant is optional : a reader who does not want a written headline
+    /// says so once and gets the article's, and the application does not argue.
+    func dropGeneratedBrief(of storyID: UUID) async {
+        await digestService.dropBrief(of: storyID)
+        await loadDigest()
     }
 
     /// Opens a story, or closes the one that was open.
@@ -487,15 +506,17 @@ final class AppModel {
     /// Whether the list is showing the library rather than a view of the stream.
     var isShowingLibrary: Bool { selection == .library }
 
-    /// Whether the window is showing the digest rather than a list at all.
-    var isShowingDigest: Bool { selection == .digest }
+    /// The name of a feed or a folder, for a screen that only has its identity.
+    func title(of kind: SidebarItem.Kind) -> String? {
+        sidebar.flatMap { [$0] + $0.children }.first { $0.kind == kind }?.title
+    }
+
+    /// How many articles are waiting, for the badge on the bar.
+    var unreadCount: Int {
+        sidebar.first { $0.kind == .unread }?.unreadCount ?? 0
+    }
 
     func loadArticles() async {
-        guard !isShowingDigest else {
-            await loadDigest()
-            return
-        }
-
         do {
             summaries =
                 isShowingLibrary
@@ -509,13 +530,20 @@ final class AppModel {
         }
     }
 
+    /// Opens an article, wherever it was tapped.
+    func open(article id: UUID) async {
+        selectedArticle = id
+        await openSelectedArticle()
+    }
+
     private func openSelectedArticle() async {
         guard let selectedArticle else {
             article = nil
             return
         }
 
-        let origin = summaries.first { $0.id == selectedArticle }?.origin ?? .stream
+        let known = summaries + storyArticles.values.flatMap { $0 } + looseArticles
+        let origin = known.first { $0.id == selectedArticle }?.origin ?? .stream
 
         do {
             switch origin {
@@ -539,9 +567,15 @@ final class AppModel {
     /// Updates what is on screen after a read state changed, without refetching
     /// the whole list.
     private func refreshCounts(markingRead id: UUID?) async {
-        if let id, let index = summaries.firstIndex(where: { $0.id == id }), !summaries[index].isRead {
-            summaries[index].isRead = true
+        guard let id else { return }
+
+        if let index = summaries.firstIndex(where: { $0.id == id }) { summaries[index].isRead = true }
+        if let index = looseArticles.firstIndex(where: { $0.id == id }) { looseArticles[index].isRead = true }
+        for (story, articles) in storyArticles {
+            guard let index = articles.firstIndex(where: { $0.id == id }) else { continue }
+            storyArticles[story]?[index].isRead = true
         }
+
         await loadSidebar()
     }
 

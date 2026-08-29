@@ -77,6 +77,9 @@ nonisolated extension AppDatabase {
             // Section 14 : anything produced automatically says so, in the
             // interface and in exports.
             table.column("is_generated", .boolean).notNull().defaults(to: false)
+            // Set when the reader has said they would rather have the article's
+            // own headline, so the model does not write over their choice.
+            table.column("brief_locked", .boolean).notNull().defaults(to: false)
 
             // The vocabulary the story's articles share, as terms and weights.
             table.column("signature", .jsonText)

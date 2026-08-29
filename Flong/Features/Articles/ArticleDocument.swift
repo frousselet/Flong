@@ -9,69 +9,7 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //
 
-import SwiftUI
-
-/// The third level : the article itself.
-struct ArticleReaderView: View {
-    let model: AppModel
-
-    var body: some View {
-        Group {
-            if let article = model.article {
-                ArticleWebView(html: ArticleDocument.html(for: article))
-                    .ignoresSafeArea(edges: .bottom)
-                    .toolbar { toolbar(for: article) }
-                    .navigationTitle(Text(verbatim: article.feedTitle))
-                    #if os(iOS)
-                        .navigationBarTitleDisplayMode(.inline)
-                    #endif
-            } else {
-                ContentUnavailableView {
-                    Label("No article selected", systemImage: "doc.text")
-                } description: {
-                    Text("Pick an article from the list.")
-                }
-            }
-        }
-    }
-
-    @ToolbarContentBuilder
-    private func toolbar(for article: Article) -> some ToolbarContent {
-        ToolbarItem {
-            Button {
-                Task { await model.toggleStarredCurrent() }
-            } label: {
-                Label(
-                    article.isStarred ? "Remove from favourites" : "Add to favourites",
-                    systemImage: article.isStarred ? "star.fill" : "star"
-                )
-            }
-        }
-
-        if article.origin == .stream {
-            ToolbarItem {
-                Button {
-                    Task { await model.markCurrentUnread() }
-                } label: {
-                    Label("Mark as unread", systemImage: "circle")
-                }
-            }
-        }
-
-        if let url = article.url {
-            ToolbarItem {
-                ShareLink(item: url) {
-                    Label("Share", systemImage: "square.and.arrow.up")
-                }
-            }
-            ToolbarItem {
-                Link(destination: url) {
-                    Label("Open in browser", systemImage: "safari")
-                }
-            }
-        }
-    }
-}
+import Foundation
 
 /// Builds the page an article is displayed as.
 ///
@@ -116,23 +54,31 @@ nonisolated enum ArticleDocument {
     /// Deliberately small : an article is text, and the reader's own settings
     /// decide the rest once section 10 typography arrives.
     private static let stylesheet = """
-        :root { color-scheme: light dark; --text: #1c1c1e; --muted: #6c6c70; --rule: #d8d8dc; --link: #0b6bcb; }
+        :root {
+          color-scheme: light dark;
+          --text: #1c1c1e; --muted: #6c6c70; --rule: #d8d8dc; --link: #0b6bcb;
+          --voice: -apple-system, system-ui, sans-serif;
+        }
         @media (prefers-color-scheme: dark) {
           :root { --text: #f2f2f7; --muted: #9c9ca1; --rule: #3a3a3c; --link: #6fb2ff; }
         }
         body {
           margin: 0 auto; padding: 16px; max-width: 42em;
-          font: -apple-system-body; line-height: 1.55; color: var(--text);
+          /* The shorthand carries Dynamic Type ; the family after it carries the
+             voice. Serif for what was written, as everywhere else. */
+          font: -apple-system-body; font-family: ui-serif, "New York", Georgia, serif;
+          line-height: 1.55; color: var(--text);
           -webkit-text-size-adjust: 100%; overflow-wrap: break-word;
         }
         h1 { font-size: 1.6em; line-height: 1.25; margin: 0 0 8px; }
         h2, h3, h4 { line-height: 1.3; margin: 1.4em 0 0.4em; }
-        .byline { color: var(--muted); font-size: 0.9em; margin: 0 0 16px; }
+        /* What the application says about the article, rather than the article. */
+        .byline { font-family: var(--voice); color: var(--muted); font-size: 0.9em; margin: 0 0 16px; }
         header { border-bottom: 1px solid var(--rule); padding-bottom: 12px; margin-bottom: 16px; }
         a { color: var(--link); }
         img, video, audio, iframe { max-width: 100%; height: auto; }
         figure { margin: 1em 0; }
-        figcaption { color: var(--muted); font-size: 0.85em; }
+        figcaption { font-family: var(--voice); color: var(--muted); font-size: 0.85em; }
         blockquote {
           margin: 1em 0; padding: 0 0 0 1em;
           border-left: 3px solid var(--rule); color: var(--muted);

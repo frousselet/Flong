@@ -13,6 +13,7 @@ import Foundation
 import FoundationModels
 import GRDB
 import OSLog
+import Synchronization
 
 /// What a story is called, and what it says in one line.
 nonisolated struct StoryBrief: Hashable, Sendable {
@@ -61,8 +62,23 @@ nonisolated struct StorySummarizer: Sendable {
         Never mention that you are a model or that you were asked anything.
         """
 
+    /// How many refusals in a row before the model is left alone.
+    ///
+    /// It answers `available` and then fails on every call, which happens on a
+    /// simulator and on a device where the assets are not there yet. Asking a
+    /// fourth time costs a quarter of a second to learn what the third already
+    /// said, and the digest is perfectly good without it.
+    static let refusalsBeforeGivingUp = 3
+    private static let refusals = Mutex(0)
+
     static var isAvailable: Bool {
-        SystemLanguageModel.default.availability == .available
+        guard refusals.withLock({ $0 }) < refusalsBeforeGivingUp else { return false }
+        return SystemLanguageModel.default.availability == .available
+    }
+
+    /// Forgets the refusals, for the next launch or a deliberate retry.
+    static func reconsider() {
+        refusals.withLock { $0 = 0 }
     }
 
     /// Why the model cannot be used, when it cannot, in the system's own terms.
@@ -106,9 +122,19 @@ nonisolated struct StorySummarizer: Sendable {
             let summary = generated.summary.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !title.isEmpty else { return fallback }
 
+            Self.refusals.withLock { $0 = 0 }
             return StoryBrief(title: title, summary: summary.isEmpty ? fallback.summary : summary, isGenerated: true)
         } catch {
-            Log.enrich.notice("The model did not answer : \(error.localizedDescription, privacy: .public)")
+            let refusals = Self.refusals.withLock { count -> Int in
+                count += 1
+                return count
+            }
+            // Said once, not once per story.
+            if refusals == Self.refusalsBeforeGivingUp {
+                Log.enrich.notice(
+                    "The model refused \(refusals) times and will not be asked again this run : \(error.localizedDescription, privacy: .public)"
+                )
+            }
             return fallback
         }
     }

@@ -101,46 +101,6 @@
         }
       }
     },
-    "%lld articles made no story": {
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld article made no story"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld articles made no story"
-                }
-              }
-            }
-          }
-        },
-        "fr": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld article isolé"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld articles isolés"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "%lld feeds added": {
       "localizations": {
         "en": {
@@ -301,6 +261,46 @@
         }
       }
     },
+    "%lld rooms": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld room"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld rooms"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld rédaction"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld rédactions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "Add": {
       "localizations": {
         "fr": {
@@ -357,16 +357,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tous les articles"
-          }
-        }
-      }
-    },
-    "Articles": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Articles"
           }
         }
       }
@@ -611,16 +601,6 @@
         }
       }
     },
-    "No article selected": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Aucun article sélectionné"
-          }
-        }
-      }
-    },
     "No feed was found at this address.": {
       "localizations": {
         "fr": {
@@ -681,16 +661,6 @@
         }
       }
     },
-    "Pick an article from the list.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choisissez un article dans la liste."
-          }
-        }
-      }
-    },
     "Refresh": {
       "localizations": {
         "fr": {
@@ -741,6 +711,16 @@
         }
       }
     },
+    "Sources": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sources"
+          }
+        }
+      }
+    },
     "Starred": {
       "localizations": {
         "fr": {
@@ -761,6 +741,16 @@
         }
       }
     },
+    "Story": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sujet"
+          }
+        }
+      }
+    },
     "Synchronized %@": {
       "localizations": {
         "fr": {
@@ -777,6 +767,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Synchronisation en cours"
+          }
+        }
+      }
+    },
+    "The headline and the line above were written on this device, from the articles below. Nothing was sent anywhere.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le titre et la ligne ci-dessus ont été écrits sur cet appareil, à partir des articles ci-dessous. Rien n'a été envoyé nulle part."
           }
         }
       }
@@ -891,6 +891,16 @@
         }
       }
     },
+    "Use the article's own headline": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utiliser le titre de l'article"
+          }
+        }
+      }
+    },
     "Waiting for iCloud": {
       "localizations": {
         "fr": {
@@ -907,6 +917,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Semaine"
+          }
+        }
+      }
+    },
+    "Words, or a query : title:, author:, tag:, is:unread, after:2026-01.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Des mots, ou une requête : title:, author:, tag:, is:unread, after:2026-01."
           }
         }
       }

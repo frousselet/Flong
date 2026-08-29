@@ -44,12 +44,22 @@ nonisolated struct BriefStoriesJob: ResumableJob {
         }
         guard !stories.isEmpty else { return 0 }
 
+        var changed = 0
         for story in stories {
             let articles = try await self.articles(of: story.id)
             let brief = await summarizer.brief(forArticles: articles)
+
+            // A batch that changes nothing will change nothing next time
+            // either, and saying so is what stops the runner.
+            guard
+                brief.title != story.title || brief.summary != story.summary
+                    || brief.isGenerated != story.isGenerated
+            else { continue }
+
             try await save(brief, for: story.id)
+            changed += 1
         }
-        return stories.count
+        return changed
     }
 
     /// A story wants a brief when it has none, and again when a model turns up
@@ -59,8 +69,8 @@ nonisolated struct BriefStoriesJob: ResumableJob {
     /// so the count reaches zero and the job stops rather than asking for ever.
     private static var condition: String {
         StorySummarizer.isAvailable
-            ? "summary IS NULL OR is_generated = 0"
-            : "summary IS NULL"
+            ? "brief_locked = 0 AND (summary IS NULL OR is_generated = 0)"
+            : "brief_locked = 0 AND summary IS NULL"
     }
 
     private func articles(of storyID: UUID) async throws -> [(title: String, excerpt: String?)] {
@@ -104,16 +114,55 @@ nonisolated struct DigestService: Sendable {
     ///
     /// The order matters and is not negotiable : a story with no articles has
     /// nothing to be named after.
+    /// Groups what has arrived. Fast, and what the screen waits for.
+    @discardableResult
+    func buildStories(now: Date = Date()) async -> StoryBuilder.Summary {
+        (try? await StoryBuilder(database).build(now: now)) ?? StoryBuilder.Summary()
+    }
+
+    /// Names and summarizes. Slow, and what the screen does not wait for : a
+    /// story with no headline of its own still has its article's.
+    func brief(until deadline: Date? = nil) async {
+        await JobRunner(BriefStoriesJob(database)).run(until: deadline)
+    }
+
     @discardableResult
     func rebuild(until deadline: Date? = nil, now: Date = Date()) async -> StoryBuilder.Summary {
-        let summary = (try? await StoryBuilder(database).build(now: now)) ?? StoryBuilder.Summary()
-        await JobRunner(BriefStoriesJob(database)).run(until: deadline)
-
+        let summary = await buildStories(now: now)
+        await brief(until: deadline)
         return summary
     }
 
     func digest(_ period: DigestPeriod, now: Date = Date()) async throws -> Digest {
         try await DigestStore(database).digest(period, now: now)
+    }
+
+    /// Gives a story back the headline of its own most central article.
+    func dropBrief(of storyID: UUID) async {
+        let articles = try? await database.writer.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT e.title AS title, e.excerpt AS excerpt
+                    FROM story_member m JOIN entry e ON e.id = m.entry_id
+                    WHERE m.story_id = ? ORDER BY m.similarity DESC LIMIT 1
+                    """,
+                arguments: [storyID]
+            )
+            .map { (title: $0["title"] as String, excerpt: $0["excerpt"] as String?) }
+        }
+
+        let brief = StorySummarizer.fallback(for: articles ?? [])
+        try? await database.writer.write { db in
+            guard var story = try Story.fetchOne(db, key: storyID) else { return }
+            story.title = brief.title.isEmpty ? story.title : brief.title
+            story.summary = brief.summary
+            // Marked as the reader's choice, so the job does not write over it.
+            story.isGenerated = false
+            story.briefLocked = true
+            story.updatedAt = Date()
+            try story.update(db)
+        }
     }
 
     /// The articles of one story, newest first, for the list beneath a card.
