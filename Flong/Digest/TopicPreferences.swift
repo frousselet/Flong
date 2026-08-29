@@ -105,6 +105,17 @@ nonisolated struct TopicPreferences: Sendable {
         }
     }
 
+    /// The subjects the reader wrote themselves.
+    ///
+    /// They are on the page whether anything has been filed under them yet or
+    /// not : a reader who has just written one and cannot see it has no way of
+    /// knowing it took.
+    func ownNames() async throws -> [String] {
+        try await database.writer.read { db in
+            try String.fetchAll(db, sql: "SELECT name FROM topic WHERE is_own = 1 ORDER BY created_at")
+        }
+    }
+
     /// The vocabulary the model is shown, most used first.
     func vocabulary(limit: Int = 40) async throws -> [String] {
         try await database.writer.read { db in

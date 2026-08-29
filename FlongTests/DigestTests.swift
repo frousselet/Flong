@@ -519,6 +519,40 @@ struct DigestTests {
         #expect(try await preferences.scores().isEmpty)
     }
 
+    @Test("A subject the reader wrote is on the page before anything is filed under it")
+    func ownSubjectsAreOnThePage() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await put(["calendrier": "Éducation"])
+
+        let preferences = TopicPreferences(database)
+        try await preferences.add("Cyclisme")
+        // One the model found, holding nothing today.
+        try await preferences.record("Cyclotourisme")
+
+        let page = try await service.digest(now: now)
+
+        // A reader who has just written a subject and cannot see it has no way
+        // of knowing it took.
+        #expect(page.topics.contains("Cyclisme"))
+        // One the model found was never asked for, and is on the page only
+        // while it holds something.
+        #expect(!page.topics.contains("Cyclotourisme"))
+        #expect(page.topics.first == "Éducation")
+    }
+
+    @Test("Narrowing to a subject that holds nothing gives an empty page, not a broken one")
+    func emptySubject() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await put(["calendrier": "Éducation"])
+        try await TopicPreferences(database).add("Cyclisme")
+
+        let page = try await service.digest(.named("Cyclisme"), now: now)
+
+        #expect(page.isEmpty)
+        // And the way back is still on the page.
+        #expect(page.topics.contains("Éducation"))
+    }
+
     // MARK: - A vocabulary that stays put
 
     @Test("A story keeps the subjects it was given")
