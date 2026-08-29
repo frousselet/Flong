@@ -67,4 +67,6 @@ Where a feed gives no address at all, the key is the headline, folded to its let
 
 The second copy **keeps its row** and points at the first. It belongs to a feed the reader follows, and unsubscribing from that feed must take its own article away rather than someone else's. It is shown nowhere : not in a list, not in a count of unread, not in the stories, not in the tail. `ON DELETE SET NULL` on the pointer means that when the first copy is purged by age, the second stops being a duplicate of anything and becomes the article.
 
-A duplicate is only ever found in **another** feed. One feed listing the same article twice is caught by its GUID long before this, and a third copy points at the original rather than at the second.
+A duplicate is found **wherever it is**, this feed included. A feed whose builder gives its articles a fresh identifier every time hands the same piece over again and again, and the identifier is exactly what stops the ordinary path from noticing ; the key notices. A third copy points at the original rather than at the second.
+
+The key arrived as an empty column, so only articles fetched after it existed had one, and a reader who had been running Flong for a week kept every copy they already had. `v13` keys the whole stream once and marks the copies : the earliest of each key is the article and the rest point at it. One pass, a second on a large stream, and never again, which is cheaper than the machinery of a resumable job for something that runs once.
