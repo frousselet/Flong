@@ -67,6 +67,14 @@ struct StoryScreen: View {
                     .padding(.bottom, 2)
             }
 
+            if !story.topics.isEmpty {
+                Text(verbatim: story.topics.joined(separator: " · "))
+                    .font(.system(.caption, weight: .semibold))
+                    .textCase(.uppercase)
+                    .kerning(0.6)
+                    .foregroundStyle(.tertiary)
+            }
+
             Text(verbatim: story.title)
                 .font(Editorial.headline(.largeTitle))
                 .fixedSize(horizontal: false, vertical: true)

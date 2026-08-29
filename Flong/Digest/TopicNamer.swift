@@ -29,7 +29,7 @@ nonisolated struct GeneratedTopic {
     var headlines: [Int]
 }
 
-/// Groups the stories of the page under a handful of named subjects.
+/// Files the stories of the page under the subjects the reader already has.
 ///
 /// A story is one event ; a topic is the subject several events belong to. The
 /// difference is what makes the pills worth having : filtering by `Éducation`
@@ -37,9 +37,16 @@ nonisolated struct GeneratedTopic {
 /// a pill per story would be the same page twice.
 ///
 /// This is one call for the whole page rather than one per story. The model is
-/// given the headlines, numbered, and answers with the subjects and which
-/// numbers fall under each, which is a far smaller thing to ask than naming a
-/// subject for a story in isolation, where it has nothing to compare against.
+/// given the vocabulary and the headlines, numbered, and answers with the
+/// subjects and which numbers fall under each, which is a far smaller thing to
+/// ask than naming a subject for a story in isolation, where it has nothing to
+/// compare against.
+///
+/// **It is shown what the reader already has, and reaches for that first.** A
+/// subject the model invents afresh every week is a subject nobody can hold an
+/// opinion about : the preference the reader attached to `Sécurité
+/// informatique` means nothing once the page is filed under `Cybersécurité`.
+/// A new subject is for when nothing it is shown fits.
 ///
 /// Where there has never been a model there are no subjects, and the page is
 /// the front page. Section 14 asks for the path without the model to be
@@ -76,9 +83,10 @@ nonisolated struct TopicNamer: Sendable {
 
     private var instructions: String {
         """
-        You group news headlines under a few broad subjects.
+        You file news headlines under subjects a reader already has.
         A subject is a field of interest, not a single event.
         A headline may fall under more than one subject.
+        Use the subjects you are given. Propose a new one only when none of them fits.
         \(OnDeviceModel.languageInstruction(for: locale))
         Never invent a headline, and never use a number you were not given.
         Never mention that you are a model or that you were asked anything.
@@ -97,7 +105,7 @@ nonisolated struct TopicNamer: Sendable {
     ///
     /// Stories the model leaves out keep no subject, which is right : they are
     /// still on the front page, they are simply on no pill.
-    func topics(of stories: [(id: UUID, title: String)]) async -> [UUID: [String]]? {
+    func topics(of stories: [(id: UUID, title: String)], vocabulary: [String] = []) async -> [UUID: [String]]? {
         guard OnDeviceModel.isAvailable, stories.count >= Self.minimumStories else { return nil }
 
         let shown = Array(stories.prefix(Self.headlinesShown))
@@ -107,7 +115,11 @@ nonisolated struct TopicNamer: Sendable {
             // the task. A small model asked once at the top answers in the
             // language of the words nearest its answer, and the headlines are
             // nearer than the instructions.
-            let prompt = Self.prompt(for: shown, language: OnDeviceModel.languageReminder(for: locale))
+            let prompt = Self.prompt(
+                for: shown,
+                vocabulary: vocabulary,
+                language: OnDeviceModel.languageReminder(for: locale)
+            )
 
             if #available(iOS 26.4, macOS 26.4, *) {
                 let model = SystemLanguageModel.default
@@ -161,13 +173,26 @@ nonisolated struct TopicNamer: Sendable {
         return assigned
     }
 
-    private static func prompt(for stories: [(id: UUID, title: String)], language: String) -> String {
+    private static func prompt(
+        for stories: [(id: UUID, title: String)],
+        vocabulary: [String],
+        language: String
+    ) -> String {
         let lines = stories.enumerated().map { index, story in
             "\(index + 1). \(story.title)"
         }
 
+        // The subjects first, so that what the reader already has is what the
+        // model reaches for. A page sorted into fresh names every week is a
+        // page nobody can hold an opinion about.
+        let known =
+            vocabulary.isEmpty
+            ? "There are no subjects yet. Name a few."
+            : "The subjects to file them under :\n\(vocabulary.map { "- \($0)" }.joined(separator: "\n"))"
+
         return """
-            Group these headlines under a few broad subjects.
+            File these headlines under subjects.
+            \(known)
             \(language)
 
             \(lines.joined(separator: "\n"))

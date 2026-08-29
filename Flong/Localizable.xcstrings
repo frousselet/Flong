@@ -371,6 +371,16 @@
         }
       }
     },
+    "Add a subject": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter un thème"
+          }
+        }
+      }
+    },
     "Add to favourites": {
       "localizations": {
         "fr": {
@@ -478,6 +488,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Annuler"
+          }
+        }
+      }
+    },
+    "Delete": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer"
           }
         }
       }
@@ -953,6 +973,16 @@
         }
       }
     },
+    "Subject": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thème"
+          }
+        }
+      }
+    },
     "Subjects": {
       "localizations": {
         "fr": {
@@ -999,6 +1029,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Le titre et la ligne ci-dessus ont été écrits sur cet appareil, à partir des articles ci-dessous. Rien n'a été envoyé nulle part."
+          }
+        }
+      }
+    },
+    "The model files stories under the subjects you have, and reaches for yours as readily as its own.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle classe les sujets sous les thèmes que vous avez, et prend les vôtres aussi volontiers que les siens."
           }
         }
       }
@@ -1149,6 +1189,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Écrit par le modèle"
+          }
+        }
+      }
+    },
+    "Yours": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le vôtre"
           }
         }
       }

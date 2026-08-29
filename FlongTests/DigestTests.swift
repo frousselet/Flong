@@ -405,6 +405,7 @@ struct DigestTests {
     func rewriting() async throws {
         try await StoryBuilder(database).build(now: now)
 
+        try await TopicPreferences(database).record("Software")
         try await database.writer.write { db in
             for (index, story) in try Story.fetchAll(db).enumerated() {
                 var story = story
@@ -476,6 +477,7 @@ struct DigestTests {
 
         // The typography story is also about software, and the reader wants
         // less of software and more of typography.
+        try await TopicPreferences(database).record("Logiciel")
         try await database.writer.write { db in
             for story in try Story.fetchAll(db) where story.title.localizedCaseInsensitiveContains("grotesques") {
                 try StoryTopic(storyID: story.id, name: "Logiciel").insert(db, onConflict: .ignore)
@@ -517,6 +519,93 @@ struct DigestTests {
         #expect(try await preferences.scores().isEmpty)
     }
 
+    // MARK: - A vocabulary that stays put
+
+    @Test("A story keeps the subjects it was given")
+    func subjectsStayPut() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await put(["calendrier": "Éducation"])
+
+        // What the naming job does on a machine with no model : nothing to
+        // the ones already filed, whatever else happens.
+        await service.nameTopics(now: now)
+
+        let page = try await service.digest(now: now)
+        let calendar = try #require((page.live + page.stories).first { $0.title.contains("calendrier") })
+        #expect(calendar.topics == ["Éducation"])
+    }
+
+    @Test("A subject the reader writes is theirs, and is folded against what exists")
+    func ownSubjects() async throws {
+        let preferences = TopicPreferences(database)
+
+        #expect(try await preferences.add("Cybersécurité") == "Cybersécurité")
+        // The same word said another way is the same subject.
+        #expect(try await preferences.add("cybersecurite") == "Cybersécurité")
+        #expect(try await preferences.add("   ") == nil)
+
+        let known = try await preferences.known()
+        #expect(known.map(\.name) == ["Cybersécurité"])
+        #expect(known.first?.isOwn == true)
+        #expect(known.first?.stories == 0)
+    }
+
+    @Test("What the model comes back with is folded into the vocabulary")
+    func modelSubjectsAreFolded() async throws {
+        let preferences = TopicPreferences(database)
+        try await preferences.add("Sécurité informatique")
+
+        // The model answering the same subject in another spelling has not
+        // found a new one.
+        #expect(try await preferences.record("sécurité informatique") == "Sécurité informatique")
+        #expect(try await preferences.record("Typographie") == "Typographie")
+
+        let known = try await preferences.known()
+        #expect(known.map(\.name).sorted() == ["Sécurité informatique", "Typographie"])
+        #expect(known.first { $0.name == "Typographie" }?.isOwn == false)
+    }
+
+    @Test("The vocabulary shown to the model leads with what is used most")
+    func vocabularyOrder() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await put(["calendrier": "Éducation", "macros": "Logiciel", "grotesques": "Logiciel"])
+
+        let preferences = TopicPreferences(database)
+        try await preferences.add("Cyclisme")
+
+        let vocabulary = try await preferences.vocabulary()
+        #expect(vocabulary.first == "Logiciel")
+        #expect(Set(vocabulary) == ["Logiciel", "Éducation", "Cyclisme"])
+    }
+
+    @Test("Removing a subject the reader wrote takes its filings with it")
+    func removingOwnSubject() async throws {
+        try await StoryBuilder(database).build(now: now)
+        let preferences = TopicPreferences(database)
+        try await preferences.add("Cyclisme")
+        try await put(["calendrier": "Cyclisme"])
+        try await preferences.adjust("Cyclisme", by: 2)
+
+        try await preferences.remove("Cyclisme")
+
+        #expect(try await preferences.known().isEmpty)
+        #expect(try await preferences.scores().isEmpty)
+        let filed = try await database.writer.read { db in try StoryTopic.fetchCount(db) }
+        #expect(filed == 0)
+    }
+
+    @Test("A subject the model found is not the reader's to delete")
+    func removingAModelSubject() async throws {
+        let preferences = TopicPreferences(database)
+        try await preferences.record("Typographie")
+
+        try await preferences.remove("Typographie")
+
+        // It would only be found again on the next page. What a reader wants
+        // from one of those is the preference.
+        #expect(try await preferences.known().map(\.name) == ["Typographie"])
+    }
+
     // MARK: - Managing the subjects
 
     @Test("Every subject is listed, with what covers it and what was said")
@@ -555,7 +644,12 @@ struct DigestTests {
         try await preferences.clearAll()
 
         #expect(try await preferences.scores().isEmpty)
-        #expect(try await preferences.known().isEmpty)
+
+        // The subjects stay : forgetting what was said about a subject is not
+        // forgetting the subject, and the model still files under them.
+        let known = try await preferences.known()
+        #expect(known.map(\.name).sorted() == ["Logiciel", "Éducation"])
+        #expect(known.allSatisfy { $0.score == 0 })
     }
 
     // MARK: - Subjects
@@ -619,6 +713,12 @@ struct DigestTests {
     /// Writes subjects onto the stories whose title holds each word, which is
     /// what the model does when there is one. A story may take several.
     private func put(_ topics: [String: String]) async throws {
+        // Through the vocabulary, as the naming job does : a subject is a
+        // thing before it is a filing.
+        for topic in Set(topics.values) {
+            try await TopicPreferences(database).record(topic)
+        }
+
         try await database.writer.write { db in
             for story in try Story.fetchAll(db) {
                 for (word, topic) in topics where story.title.localizedCaseInsensitiveContains(word) {

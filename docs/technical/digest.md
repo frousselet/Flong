@@ -60,7 +60,15 @@ The prompt is bounded before it is sent : six articles and two hundred and forty
 
 A story is one event ; a subject is the field several events belong to. The difference is the whole reason the pills are worth having : filtering by `Éducation` says something the list of stories underneath does not already say, whereas a pill per story would be the same page twice.
 
-The model is given the headlines of the page, numbered, and answers with a handful of subjects and which numbers fall under each. That is one call for the whole page rather than one per story, and it is a far easier question than naming the subject of a story in isolation, where there is nothing to compare it against. It runs after the briefs, since a written headline says what a story is about better than the title of whichever article happened to be nearest its middle.
+**A subject is a thing, not a reading.** The model used to name the subjects of the whole page on every rebuild, so they drifted : `Sécurité informatique` one run and `Cybersécurité` the next, and the preference the reader had attached to the first was left hanging off a name nothing used any more. There is a vocabulary now. It is written once, it stays, and a story is filed into it once and keeps it.
+
+The model is shown that vocabulary and files the **unfiled** stories into it, answering with subjects and which headlines fall under each. It reaches for what is there and proposes a new subject only when nothing fits. What it answers is folded against the vocabulary, case and accents ignored, so `cybersecurite` is filed under `Cybersécurité` rather than beside it : a vocabulary that grows a near-twin every week is a vocabulary nobody can hold an opinion about.
+
+**Stories already filed are never re-read.** That is what makes the page stable, and it is the reader who asks for a second reading, through `Réécrire le digest`, which throws everything away and files it all again.
+
+**The reader writes subjects too.** One they add is theirs, sits in the same vocabulary, and the model reaches for it as readily as its own. It is also theirs to delete, along with everything filed under it ; a subject the model found is not, since deleting it would only have it found again on the next page, and what a reader wants from one of those is the preference.
+
+The old description of the call follows. That is one call for the whole page rather than one per story, and it is a far easier question than naming the subject of a story in isolation, where there is nothing to compare it against. It runs after the briefs, since a written headline says what a story is about better than the title of whichever article happened to be nearest its middle.
 
 What comes back is read with suspicion. A number that was never on the list is ignored, a story claimed twice keeps the first subject that claimed it, and a subject left holding nothing is dropped. Every story therefore ends up under exactly one subject or none, and a story under none is still on the front page : it is simply on no pill.
 

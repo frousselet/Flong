@@ -374,6 +374,18 @@ struct StoryRow: View {
 
     private func text(headline: Font.TextStyle) -> some View {
         VStack(alignment: .leading, spacing: 7) {
+            // What the story is filed under, above what it says : a reader
+            // scanning the page reads the subject before the headline, the way
+            // a rubric is read before the piece under it.
+            if !story.topics.isEmpty {
+                Text(verbatim: story.topics.joined(separator: " · "))
+                    .font(.system(.caption2, weight: .semibold))
+                    .textCase(.uppercase)
+                    .kerning(0.5)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+
             Text(verbatim: story.title)
                 .font(Editorial.headline(headline))
                 .foregroundStyle(.primary)

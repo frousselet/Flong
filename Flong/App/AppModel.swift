@@ -321,6 +321,19 @@ final class AppModel {
         await loadDigest()
     }
 
+    /// Adds a subject of the reader's own, which the model then files under.
+    func addTopic(_ name: String) async {
+        try? await TopicPreferences(database).add(name)
+        await loadKnownTopics()
+    }
+
+    /// Removes a subject the reader wrote, and everything hanging off it.
+    func removeTopic(_ name: String) async {
+        try? await TopicPreferences(database).remove(name)
+        await loadKnownTopics()
+        await loadDigest()
+    }
+
     /// Takes back everything the reader has said about every subject.
     func forgetEveryPreference() async {
         try? await TopicPreferences(database).clearAll()

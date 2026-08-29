@@ -22,6 +22,9 @@ import SwiftUI
 struct TopicsScreen: View {
     let model: AppModel
 
+    @State private var isAdding = false
+    @State private var name = ""
+
     var body: some View {
         List {
             if !model.knownTopics.isEmpty {
@@ -38,7 +41,7 @@ struct TopicsScreen: View {
                 }
             }
 
-            if model.knownTopics.contains(where: { $0.score != 0 }) {
+            if model.knownTopics.contains(where: { $0.score != 0 || $0.isOwn }) {
                 Section {
                     Button(role: .destructive) {
                         Task { await model.forgetEveryPreference() }
@@ -49,6 +52,23 @@ struct TopicsScreen: View {
             }
         }
         .navigationTitle(Text("Subjects"))
+        .toolbar {
+            ToolbarItem {
+                Button {
+                    name = ""
+                    isAdding = true
+                } label: {
+                    Label("Add a subject", systemImage: "plus")
+                }
+            }
+        }
+        .alert("Add a subject", isPresented: $isAdding) {
+            TextField("Subject", text: $name)
+            Button("Add") { Task { await model.addTopic(name) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The model files stories under the subjects you have, and reaches for yours as readily as its own.")
+        }
         #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
         #endif
@@ -64,13 +84,19 @@ struct TopicsScreen: View {
         .task { await model.loadKnownTopics() }
     }
 
+    @ViewBuilder
     private func row(_ topic: TopicPreferences.Known) -> some View {
-        HStack(spacing: 12) {
+        let content = HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: topic.name)
-                Text("\(topic.stories) stories")
-                    .font(Editorial.metadata)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    if topic.isOwn {
+                        Text("Yours")
+                    }
+                    Text("\(topic.stories) stories")
+                }
+                .font(Editorial.metadata)
+                .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 8)
@@ -89,6 +115,21 @@ struct TopicsScreen: View {
             .frame(width: 132)
         }
         .accessibilityElement(children: .contain)
+
+        // A subject the reader wrote is theirs to take back. One the model
+        // found is not : deleting it would only have it found again on the
+        // next page, and what a reader wants from those is the preference.
+        if topic.isOwn {
+            content.swipeActions {
+                Button(role: .destructive) {
+                    Task { await model.removeTopic(topic.name) }
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        } else {
+            content
+        }
     }
 
     /// The direction, rather than the number.

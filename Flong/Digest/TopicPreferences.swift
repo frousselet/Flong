@@ -12,6 +12,29 @@
 import Foundation
 import GRDB
 
+/// One subject of the vocabulary.
+nonisolated struct Topic: Hashable, StoredRecord {
+    static let databaseTableName = "topic"
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case isOwn = "is_own"
+        case createdAt = "created_at"
+    }
+
+    var name: String
+    /// Whether the reader wrote it themselves, which is what makes it theirs
+    /// to delete.
+    var isOwn: Bool
+    var createdAt: Date
+
+    init(name: String, isOwn: Bool = false, createdAt: Date = Date()) {
+        self.name = name
+        self.isOwn = isOwn
+        self.createdAt = createdAt
+    }
+}
+
 /// What the reader has said they want more or less of.
 ///
 /// A subject starts at nought, which is the reader saying nothing. Asking for
@@ -40,30 +63,36 @@ nonisolated struct TopicPreferences: Sendable {
         let name: String
         let stories: Int
         let score: Int
+        /// Whether the reader wrote it themselves.
+        let isOwn: Bool
 
         var id: String { name }
     }
 
     /// Every subject there is, whether it is on the page today or not.
     ///
-    /// Subjects the model has stopped using are still listed while a
-    /// preference hangs off them : a reader who asked for less of something
-    /// and cannot find it again to take it back is a reader stuck with it.
+    /// From the vocabulary, so a subject the reader has just written is there
+    /// before any story has been sorted into it, and a subject the model has
+    /// stopped using is still there for the reader to take back what they said
+    /// about it. A preference nobody can find is a preference nobody can undo.
     func known() async throws -> [Known] {
         try await database.writer.read { db in
             let rows = try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT name, SUM(stories) AS stories, SUM(score) AS score FROM (
-                        SELECT name, COUNT(*) AS stories, 0 AS score FROM story_topic GROUP BY name
-                        UNION ALL
-                        SELECT name, 0 AS stories, score FROM topic_preference
-                    )
-                    GROUP BY name
+                    SELECT t.name AS name, t.is_own AS is_own,
+                           (SELECT COUNT(*) FROM story_topic s WHERE s.name = t.name) AS stories,
+                           COALESCE((SELECT p.score FROM topic_preference p WHERE p.name = t.name), 0) AS score
+                    FROM topic t
                     """
             )
             .map {
-                Known(name: $0["name"], stories: $0["stories"] ?? 0, score: $0["score"] ?? 0)
+                Known(
+                    name: $0["name"],
+                    stories: $0["stories"] ?? 0,
+                    score: $0["score"] ?? 0,
+                    isOwn: $0["is_own"] ?? false
+                )
             }
 
             // What the reader spoke about first, then what covers the most,
@@ -74,6 +103,78 @@ nonisolated struct TopicPreferences: Sendable {
                 (abs($0.score), $0.stories, $1.name) > (abs($1.score), $1.stories, $0.name)
             }
         }
+    }
+
+    /// The vocabulary the model is shown, most used first.
+    func vocabulary(limit: Int = 40) async throws -> [String] {
+        try await database.writer.read { db in
+            try String.fetchAll(
+                db,
+                sql: """
+                    SELECT t.name FROM topic t
+                    LEFT JOIN story_topic s ON s.name = t.name
+                    GROUP BY t.name
+                    ORDER BY COUNT(s.story_id) DESC, t.created_at
+                    LIMIT \(limit)
+                    """
+            )
+        }
+    }
+
+    /// Adds a subject the reader wrote themselves.
+    ///
+    /// Folded against what is already there : a reader writing `cybersécurité`
+    /// where `Cybersécurité` exists meant the one that exists.
+    @discardableResult
+    func add(_ name: String, at date: Date = Date()) async throws -> String? {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return nil }
+
+        return try await database.writer.write { db in
+            if let existing = try Self.folded(name, in: db) { return existing }
+            try Topic(name: name, isOwn: true, createdAt: date).insert(db)
+            return name
+        }
+    }
+
+    /// Records a subject the model came up with, when nothing it was shown fit.
+    @discardableResult
+    func record(_ name: String, at date: Date = Date()) async throws -> String? {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return nil }
+
+        return try await database.writer.write { db in
+            if let existing = try Self.folded(name, in: db) { return existing }
+            try Topic(name: name, createdAt: date).insert(db)
+            return name
+        }
+    }
+
+    /// Removes a subject the reader wrote, and everything hanging off it.
+    func remove(_ name: String) async throws {
+        try await database.writer.write { db in
+            try db.execute(sql: "DELETE FROM story_topic WHERE name = ?", arguments: [name])
+            try db.execute(sql: "DELETE FROM topic_preference WHERE name = ?", arguments: [name])
+            try db.execute(sql: "DELETE FROM topic WHERE name = ? AND is_own = 1", arguments: [name])
+        }
+    }
+
+    /// The subject already in the vocabulary that this name means.
+    ///
+    /// Case and accents folded : a model that answers `cybersecurite` where
+    /// `Cybersécurité` is already a subject has not found a new one, and a
+    /// vocabulary that grows a near-twin every week is a vocabulary nobody can
+    /// hold an opinion about.
+    static func folded(_ name: String, in db: Database) throws -> String? {
+        let wanted = fold(name)
+        return try String.fetchAll(db, sql: "SELECT name FROM topic").first { fold($0) == wanted }
+    }
+
+    static func fold(_ name: String) -> String {
+        name.folding(options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive], locale: nil)
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 
     /// Takes back everything the reader has said.
@@ -102,6 +203,11 @@ nonisolated struct TopicPreferences: Sendable {
         guard !name.isEmpty else { return 0 }
 
         return try await database.writer.write { db in
+            // A preference on a subject the vocabulary does not have would be
+            // a preference the reader can never find again to take back.
+            let name = try Self.folded(name, in: db) ?? name
+            try Topic(name: name, createdAt: date).insert(db, onConflict: .ignore)
+
             let current =
                 try Int.fetchOne(db, sql: "SELECT score FROM topic_preference WHERE name = ?", arguments: [name]) ?? 0
             let score = min(max(current + delta, -Self.limit), Self.limit)
