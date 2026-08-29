@@ -285,6 +285,31 @@ struct StoryRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// Who is saying it, by their marks rather than by a count of them.
+    ///
+    /// `4 rédactions` is a number a reader has to turn back into rooms. Four
+    /// marks are the rooms, and they say which ones, which is the question
+    /// behind the number : a story every paper is running and a story only the
+    /// trade press is running are not the same story.
+    ///
+    /// The count survives for anyone listening to the page rather than looking
+    /// at it, and for the rooms there was no room to show.
+    private var rooms: some View {
+        HStack(spacing: 3) {
+            ForEach(story.feedMarks) { mark in
+                FeedIconView(stated: mark.iconURL, site: mark.siteURL, side: 14)
+            }
+
+            if story.feedCount > story.feedMarks.count {
+                Text(verbatim: "+\(story.feedCount - story.feedMarks.count)")
+                    .lineLimit(1)
+                    .padding(.leading, 1)
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel(Text("\(story.feedCount) rooms"))
+    }
+
     /// Why this is here : who is saying it, how many of them, and how fast.
     ///
     /// It is the explanation the 2026 trend towards visible reasoning asks for,
@@ -306,11 +331,9 @@ struct StoryRow: View {
 
     private func factsLine(sparkline: Bool = true, articles: Bool = true) -> some View {
         HStack(spacing: 10) {
-            Text("\(story.feedCount) rooms")
-                .lineLimit(1)
+            rooms
 
             if articles {
-                Text(verbatim: "·")
                 Text("\(story.articleCount) articles")
                     .lineLimit(1)
             }
