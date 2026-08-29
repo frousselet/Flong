@@ -173,7 +173,7 @@ nonisolated struct DigestStore: Sendable {
                     FROM story_member m
                     JOIN entry e ON e.id = m.entry_id
                     JOIN feed f ON f.id = e.feed_id
-                    WHERE COALESCE(e.published_at, e.received_at) >= ?
+                    WHERE e.duplicate_of IS NULL AND COALESCE(e.published_at, e.received_at) >= ?
                     """,
                 arguments: [since]
             )

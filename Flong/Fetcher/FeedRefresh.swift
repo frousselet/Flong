@@ -283,7 +283,7 @@ nonisolated struct FeedRefresh: Sendable {
         // The same article reaching the reader through a second feed of the
         // same newsroom. It keeps its row, since it belongs to a feed they
         // follow, and points at the copy that arrived first.
-        entry.duplicateOf = key.flatMap { try? Self.original(of: $0, besides: feed.id, in: db) }
+        entry.duplicateOf = key.flatMap { try? Self.original(of: $0, in: db) }
         try entry.insert(db)
 
         if let sanitized {
@@ -292,18 +292,18 @@ nonisolated struct FeedRefresh: Sendable {
         return true
     }
 
-    /// The first copy of an article, when another feed already brought it in.
+    /// The first copy of an article, wherever it came from.
     ///
-    /// Another feed, never this one : one feed listing the same article twice
-    /// is the same feed, and its second listing is caught by the GUID long
-    /// before this. And never a duplicate itself, so a third copy points at
-    /// the original rather than at the second.
-    private static func original(of key: String, besides feedID: UUID, in db: Database) throws -> UUID? {
+    /// Whatever feed, this one included. A feed that gives its articles a
+    /// fresh identifier on every build hands the same piece over again and
+    /// again, and the identifier is exactly what stops the ordinary path from
+    /// noticing. The key notices.
+    ///
+    /// Never a duplicate itself, so a third copy points at the original rather
+    /// than at the second.
+    private static func original(of key: String, in db: Database) throws -> UUID? {
         try Entry
-            .filter(
-                Column("canonical_key") == key && Column("feed_id") != feedID
-                    && Column("duplicate_of") == nil
-            )
+            .filter(Column("canonical_key") == key && Column("duplicate_of") == nil)
             .order(Column("received_at"))
             .fetchOne(db)?
             .id

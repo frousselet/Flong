@@ -103,6 +103,42 @@ struct FeedRefreshTests {
         #expect(try await articles.count(.unread) == 1)
     }
 
+    @Test("A feed that renumbers its own articles still delivers them once")
+    func duplicatesWithinOneFeed() async throws {
+        let feed = try await subscribe()
+
+        // The same article, twice in one document, under two identifiers : a
+        // feed whose builder renumbers everything it emits.
+        let body = Data(
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0"><channel>
+              <title>Libération</title><link>https://refresh.example.com/</link><description>d</description>
+              <item>
+                <title>Sophie Binet accuse une partie du patronat</title>
+                <link>https://refresh.example.com/2026/binet-patronat</link>
+                <guid>urn:example:build-1</guid>
+              </item>
+              <item>
+                <title>Sophie Binet accuse une partie du patronat</title>
+                <link>https://refresh.example.com/2026/binet-patronat?utm_source=rss</link>
+                <guid>urn:example:build-2</guid>
+              </item>
+            </channel></rss>
+            """.utf8
+        )
+        server.install { _ in
+            StubResponse(statusCode: 200, headers: ["Content-Type": "application/rss+xml"], body: body)
+        }
+        defer { server.reset() }
+
+        _ = await refresh.refresh(feed)
+
+        let rows = try await database.writer.read { db in try Entry.fetchCount(db) }
+        #expect(rows == 2)
+        #expect(try await articles.summaries(.all).count == 1)
+    }
+
     @Test("An article arrives with the picture that stands for it")
     func covers() async throws {
         let feed = try await subscribe()

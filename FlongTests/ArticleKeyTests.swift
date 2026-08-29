@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import GRDB
 import Testing
 
 @testable import Flong
@@ -85,5 +86,90 @@ struct ArticleKeyTests {
         #expect(ArticleKey.of(url: nil, title: "Une nouvelle", publishedAt: nil, room: nil) == nil)
         #expect(ArticleKey.of(url: nil, title: "   ", publishedAt: nil, room: room) == nil)
         #expect(ArticleKey.address(URL(string: "file:///tmp/a.html")) == nil)
+    }
+
+    // MARK: - Catching up with what was already here
+
+    @Test("The articles already in the store are keyed and their copies marked")
+    func backfill() async throws {
+        let database = try AppDatabase.inMemory()
+        let subscriptions = SubscriptionStore(database)
+        let now = Date(timeIntervalSince1970: 1_787_646_600)
+
+        // Two desks of one paper, and the same piece three times : the state a
+        // reader was left in by the version that keyed only new articles.
+        var feeds: [Feed] = []
+        for desk in ["societe", "politique"] {
+            feeds.append(
+                try await subscriptions.subscribe(
+                    to: Subscription(address: "https://liberation.example.com/\(desk)/rss.xml", title: desk)
+                ).feed
+            )
+        }
+
+        let addresses = [
+            "https://liberation.example.com/2026/binet-patronat",
+            "https://liberation.example.com/2026/binet-patronat?utm_source=rss",
+            "https://www.liberation.example.com/2026/binet-patronat/",
+        ]
+        try await database.writer.write { db in
+            for (index, address) in addresses.enumerated() {
+                var entry = Entry(
+                    feedID: feeds[index % feeds.count].id,
+                    guid: "urn:example:build-\(index)",
+                    url: URL(string: address),
+                    title: "Sophie Binet accuse une partie du patronat",
+                    publishedAt: now,
+                    receivedAt: now.addingTimeInterval(Double(index))
+                )
+                // As they were written before the key existed.
+                entry.canonicalKey = nil
+                entry.duplicateOf = nil
+                try entry.insert(db)
+            }
+        }
+
+        try await database.writer.write { db in try AppDatabase.keyExistingArticles(db) }
+
+        let stored = try await database.writer.read { db in
+            try Entry.order(Column("received_at")).fetchAll(db)
+        }
+        #expect(stored.count == 3)
+        #expect(stored.allSatisfy { $0.canonicalKey != nil })
+
+        // The first is the article, the other two point at it and not at each
+        // other.
+        #expect(stored[0].duplicateOf == nil)
+        #expect(stored[1].duplicateOf == stored[0].id)
+        #expect(stored[2].duplicateOf == stored[0].id)
+
+        #expect(try await ArticleStore(database).summaries(.all).count == 1)
+    }
+
+    @Test("Keying what is already here leaves what is not a copy alone")
+    func backfillSparesTheRest() async throws {
+        let database = try AppDatabase.inMemory()
+        let feed = try await SubscriptionStore(database)
+            .subscribe(to: Subscription(address: "https://liberation.example.com/rss.xml", title: "Libération")).feed
+        let now = Date(timeIntervalSince1970: 1_787_646_600)
+
+        try await database.writer.write { db in
+            for index in 0..<3 {
+                try Entry(
+                    feedID: feed.id,
+                    guid: "urn:example:\(index)",
+                    url: URL(string: "https://liberation.example.com/2026/article-\(index)"),
+                    title: "Article \(index)",
+                    publishedAt: now,
+                    receivedAt: now
+                ).insert(db)
+            }
+        }
+
+        try await database.writer.write { db in try AppDatabase.keyExistingArticles(db) }
+
+        let stored = try await database.writer.read { db in try Entry.fetchAll(db) }
+        #expect(stored.allSatisfy { $0.duplicateOf == nil })
+        #expect(try await ArticleStore(database).summaries(.all).count == 3)
     }
 }

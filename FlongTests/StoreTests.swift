@@ -50,7 +50,7 @@ struct StoreTests {
             applied == [
                 "v1.model", "v2.search", "v3.readStates", "v4.stories", "v5.covers", "v6.topics",
                 "v7.briefLanguage", "v8.recordTags", "v9.askAgain", "v10.topicPreferences",
-                "v11.severalTopics", "v12.duplicates",
+                "v11.severalTopics", "v12.duplicates", "v13.keyWhatIsAlreadyHere",
             ]
         )
     }

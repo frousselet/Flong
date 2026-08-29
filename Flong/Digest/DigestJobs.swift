@@ -110,7 +110,7 @@ nonisolated struct BriefStoriesJob: ResumableJob {
                 sql: """
                     SELECT e.title AS title, e.excerpt AS excerpt
                     FROM story_member m JOIN entry e ON e.id = m.entry_id
-                    WHERE m.story_id = ?
+                    WHERE m.story_id = ? AND e.duplicate_of IS NULL
                     ORDER BY m.similarity DESC
                     """,
                 arguments: [storyID]
@@ -280,7 +280,7 @@ nonisolated struct DigestService: Sendable {
                     FROM story_member m
                     JOIN entry e ON e.id = m.entry_id
                     JOIN feed f ON f.id = e.feed_id
-                    WHERE m.story_id = ?
+                    WHERE m.story_id = ? AND e.duplicate_of IS NULL
                     ORDER BY date DESC
                     """,
                 arguments: [storyID]

@@ -87,6 +87,10 @@ nonisolated extension AppDatabase {
             try addDuplicates(db)
         }
 
+        migrator.registerMigration("v13.keyWhatIsAlreadyHere") { db in
+            try keyExistingArticles(db)
+        }
+
         return migrator
     }
 
@@ -106,6 +110,59 @@ nonisolated extension AppDatabase {
             table.add(column: "duplicate_of", .blob).references("entry", onDelete: .setNull)
         }
         try db.create(index: "entry_on_canonical_key", on: "entry", columns: ["canonical_key"])
+    }
+
+    /// Keys the articles that were already here, and marks the copies.
+    ///
+    /// The column arrived empty and only new articles were keyed, so a reader
+    /// who had been running Flong for a week kept every copy they already had
+    /// : the fault they would report, and did.
+    ///
+    /// One pass over the stream. It costs a second on a large one, once, which
+    /// is cheaper than the machinery of a resumable job for something that
+    /// never runs again.
+    static func keyExistingArticles(_ db: Database) throws {
+        let rows = try Row.fetchAll(
+            db,
+            sql: """
+                SELECT e.id AS id, e.url AS url, e.title AS title, e.published_at AS published_at,
+                       COALESCE(f.site_url, f.url) AS site_url
+                FROM entry e JOIN feed f ON f.id = e.feed_id
+                WHERE e.canonical_key IS NULL
+                """
+        )
+
+        for row in rows {
+            let key = ArticleKey.of(
+                url: (row["url"] as String?).flatMap(URL.init(string:)),
+                title: row["title"] as String? ?? "",
+                publishedAt: row["published_at"] as Date?,
+                room: FeedURL.room(of: (row["site_url"] as String?).flatMap(URL.init(string:)))
+            )
+            guard let key else { continue }
+            try db.execute(
+                sql: "UPDATE entry SET canonical_key = ? WHERE id = ?",
+                arguments: [key, row["id"] as UUID]
+            )
+        }
+
+        // The earliest copy of each key is the article ; the rest point at it.
+        try db.execute(
+            sql: """
+                UPDATE entry AS e
+                SET duplicate_of = (
+                    SELECT o.id FROM entry o
+                    WHERE o.canonical_key = e.canonical_key
+                    ORDER BY o.received_at, o.id LIMIT 1
+                )
+                WHERE e.canonical_key IS NOT NULL
+                  AND e.id <> (
+                    SELECT o.id FROM entry o
+                    WHERE o.canonical_key = e.canonical_key
+                    ORDER BY o.received_at, o.id LIMIT 1
+                  )
+                """
+        )
     }
 
     /// The subjects a story falls under, which are more than one.
