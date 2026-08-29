@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		0F3001003100000000000001 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 0F3001003100000000000002 /* GRDB */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		0F2221F13041ED9C00E8D130 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0F3001003100000000000001 /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = Flong;
 			packageProductDependencies = (
+				0F3001003100000000000002 /* GRDB */,
 			);
 			productName = Flong;
 			productReference = 0F2221E13041ED9B00E8D130 /* Flong.app */;
@@ -196,6 +202,9 @@
 			);
 			mainGroup = 0F2221D83041ED9B00E8D130;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				0F3001003100000000000003 /* XCRemoteSwiftPackageReference "GRDB" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0F2221E23041ED9B00E8D130 /* Products */;
 			projectDirPath = "";
@@ -612,6 +621,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		0F3001003100000000000003 /* XCRemoteSwiftPackageReference "GRDB" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.11.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0F3001003100000000000002 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0F3001003100000000000003 /* XCRemoteSwiftPackageReference "GRDB" */;
+			productName = GRDB;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 0F2221D93041ED9B00E8D130 /* Project object */;
 }

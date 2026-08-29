@@ -76,6 +76,7 @@ A module directory is created when its first real file lands, not before.
 
 ### Key patterns
 
+- **No external dependency unless it is indispensable** : the system frameworks come first, and a package is added only when writing the equivalent ourselves would be unreasonable. GRDB is the only one today, and it earns its place by replacing the connection pool, the migrator, the typed row decoding and the change observation the store would otherwise have to own. Adding another one is a decision to put to the user, never a default.
 - **Storage is GRDB, never SwiftData** : the corpus reaches 125,000 articles, concurrency needs fine control, and the FTS5 virtual table needs direct SQL. Schema changes go through a numbered `DatabaseMigrator` registration, never an edit of an existing migration once it has shipped.
 - **Technical keys are UUIDv7**, so identifiers sort by creation time and indexes stay lightly fragmented. Remote identity stays separate : an article is matched by its GUID, or failing that by the pair of link and publication date.
 - **Stream and library are different things** : the stream is purged by age and volume, the library never is. Promotion freezes and copies the content, which is what lets a library item survive its source disappearing. Never make a library feature read through to a stream row.

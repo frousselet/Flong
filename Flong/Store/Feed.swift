@@ -1,0 +1,124 @@
+//
+//  Feed.swift
+//  Flong
+//
+//  Created by François Rousselet on 29/08/2026.
+//
+//  This Source Code Form is subject to the terms of the Mozilla Public
+//  License, v. 2.0. If a copy of the MPL was not distributed with this
+//  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+
+import Foundation
+import GRDB
+
+/// A source of articles, identified by its canonical URL.
+nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
+    static let databaseTableName = "feed"
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case url
+        case siteURL = "site_url"
+        case iconURL = "icon_url"
+        case title
+        case folder
+        case language
+        case etag
+        case lastModified = "last_modified"
+        case fetchCount = "fetch_count"
+        case notModifiedCount = "not_modified_count"
+        case failureCount = "failure_count"
+        case lastFailureReason = "last_failure_reason"
+        case lastFetchAt = "last_fetch_at"
+        case lastSuccessAt = "last_success_at"
+        case quarantinedAt = "quarantined_at"
+        case observedInterval = "observed_interval"
+        case refreshInterval = "refresh_interval"
+        case readerModeEnabled = "reader_mode_enabled"
+        case loadsImages = "loads_images"
+        case createdAt = "created_at"
+    }
+
+    var id: UUID
+    var url: URL
+    var siteURL: URL?
+    var iconURL: URL?
+    var title: String
+    var folder: String?
+    var language: String?
+
+    /// Conditional request state, replayed on the next fetch.
+    var etag: String?
+    var lastModified: String?
+
+    var fetchCount: Int
+    var notModifiedCount: Int
+    var failureCount: Int
+    var lastFailureReason: String?
+    var lastFetchAt: Date?
+    var lastSuccessAt: Date?
+    var quarantinedAt: Date?
+
+    /// The median publication gap observed on this feed, in seconds.
+    var observedInterval: TimeInterval?
+    /// A manual refresh interval, in seconds, which wins over the observed one.
+    var refreshInterval: TimeInterval?
+
+    var readerModeEnabled: Bool
+    var loadsImages: Bool
+    var createdAt: Date
+
+    init(
+        id: UUID = .v7(),
+        url: URL,
+        siteURL: URL? = nil,
+        iconURL: URL? = nil,
+        title: String,
+        folder: String? = nil,
+        language: String? = nil,
+        etag: String? = nil,
+        lastModified: String? = nil,
+        fetchCount: Int = 0,
+        notModifiedCount: Int = 0,
+        failureCount: Int = 0,
+        lastFailureReason: String? = nil,
+        lastFetchAt: Date? = nil,
+        lastSuccessAt: Date? = nil,
+        quarantinedAt: Date? = nil,
+        observedInterval: TimeInterval? = nil,
+        refreshInterval: TimeInterval? = nil,
+        readerModeEnabled: Bool = false,
+        loadsImages: Bool = true,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.url = url
+        self.siteURL = siteURL
+        self.iconURL = iconURL
+        self.title = title
+        self.folder = folder
+        self.language = language
+        self.etag = etag
+        self.lastModified = lastModified
+        self.fetchCount = fetchCount
+        self.notModifiedCount = notModifiedCount
+        self.failureCount = failureCount
+        self.lastFailureReason = lastFailureReason
+        self.lastFetchAt = lastFetchAt
+        self.lastSuccessAt = lastSuccessAt
+        self.quarantinedAt = quarantinedAt
+        self.observedInterval = observedInterval
+        self.refreshInterval = refreshInterval
+        self.readerModeEnabled = readerModeEnabled
+        self.loadsImages = loadsImages
+        self.createdAt = createdAt
+    }
+
+    /// The share of fetches the server answered with a 304, the health indicator
+    /// of section 8 of the specification. `nil` until the feed has been fetched.
+    var notModifiedRate: Double? {
+        guard fetchCount > 0 else { return nil }
+        return Double(notModifiedCount) / Double(fetchCount)
+    }
+}
