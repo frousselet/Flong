@@ -58,6 +58,12 @@ struct ReadingView: View {
             ArticleReaderView(model: model)
         }
         .task {
+            FlongApp.work.set(
+                refresh: { @Sendable in await model.backgroundRefresh() },
+                process: { @Sendable in await model.backgroundProcessing() }
+            )
+            BackgroundScheduler.schedule()
+
             await model.load()
             await model.startSync()
             await model.synchronizeSpotlight()

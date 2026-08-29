@@ -54,8 +54,18 @@ struct SidebarView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            SyncStatusView(status: model.syncStatus) {
-                Task { await model.purge() }
+            VStack(spacing: 0) {
+                if model.hasOutstandingWork {
+                    OutstandingWorkView(
+                        feeds: model.outstandingFeeds,
+                        isWorking: model.isWorking
+                    ) {
+                        Task { await model.finishSetup() }
+                    }
+                }
+                SyncStatusView(status: model.syncStatus) {
+                    Task { await model.purge() }
+                }
             }
         }
         .overlay {
@@ -168,5 +178,38 @@ private struct SyncStatusView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
             .background(.bar)
+    }
+}
+
+/// What is left of a long job, and the way to get on with it.
+///
+/// An import leaves a thousand subscriptions and nothing in any of them, and a
+/// reader who is not told will conclude that the import failed. The work is
+/// resumable, so this says how much is left and offers to press on.
+private struct OutstandingWorkView: View {
+    let feeds: Int
+    let isWorking: Bool
+    let start: () -> Void
+
+    var body: some View {
+        VStack(spacing: 4) {
+            if feeds > 0 {
+                Text("\(feeds) feeds left to fetch")
+            } else {
+                Text("Finishing in the background")
+            }
+
+            if isWorking {
+                ProgressView().controlSize(.small)
+            } else {
+                Button("Finish now", action: start)
+                    .buttonStyle(.borderless)
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(.bar)
     }
 }

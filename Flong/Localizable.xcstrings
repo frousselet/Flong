@@ -101,6 +101,46 @@
         }
       }
     },
+    "%lld feeds left to fetch": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld feed left to fetch"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld feeds left to fetch"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld flux à récupérer"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld flux à récupérer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld ignored": {
       "localizations": {
         "en": {
@@ -287,6 +327,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "Flux"
+          }
+        }
+      }
+    },
+    "Fetching your feeds": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Récupération de vos flux"
+          }
+        }
+      }
+    },
+    "Finish now": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminer maintenant"
+          }
+        }
+      }
+    },
+    "Finishing in the background": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finalisation en arrière-plan"
+          }
+        }
+      }
+    },
+    "Finishing the setup": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finalisation de l'installation"
           }
         }
       }

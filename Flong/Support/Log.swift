@@ -20,4 +20,5 @@ nonisolated enum Log {
     static let store = Logger(subsystem: subsystem, category: "store")
     static let index = Logger(subsystem: subsystem, category: "index")
     static let sync = Logger(subsystem: subsystem, category: "sync")
+    static let enrich = Logger(subsystem: subsystem, category: "enrich")
 }

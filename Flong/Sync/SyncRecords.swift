@@ -114,13 +114,20 @@ nonisolated enum SyncRecords {
         record["annotation"] = item.annotation
         record["contentHTML"] = compressed(item.contentHTML)
         record["plainText"] = compressed(item.plainText)
+
+        // A vector travels with the pair that says what it can be compared to.
+        // Section 14 is emphatic : a vector without them is not a vector, it is
+        // five hundred numbers.
+        record["vector"] = item.vector
+        record["vectorModel"] = item.vectorModel
+        record["vectorRevision"] = item.vectorRevision
         return record
     }
 
     static func libraryItem(from record: CKRecord) -> LibraryItem? {
         guard record.recordType == RecordType.libraryItem, let guid = record["guid"] as? String else { return nil }
 
-        return LibraryItem(
+        var item = LibraryItem(
             feedURL: (record["feedURL"] as? String).flatMap(URL.init(string:)),
             feedTitle: record["feedTitle"] as? String,
             guid: guid,
@@ -134,6 +141,11 @@ nonisolated enum SyncRecords {
             plainText: expanded(record["plainText"] as? Data),
             annotation: record["annotation"] as? String
         )
+
+        item.vector = record["vector"] as? Data
+        item.vectorModel = record["vectorModel"] as? String
+        item.vectorRevision = record["vectorRevision"] as? String
+        return item
     }
 
     // MARK: - Read states

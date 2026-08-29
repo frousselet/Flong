@@ -95,6 +95,15 @@ final class AppModel {
     /// What synchronization is doing, in terms the sidebar can show.
     private(set) var syncStatus = SyncStatus.idle(lastSynchronized: nil)
 
+    /// What is left of the long work : feeds never fetched, articles with no
+    /// vector. Both are questions the store answers, which is what makes the
+    /// work resumable without a checkpoint to keep in step.
+    private(set) var outstandingFeeds = 0
+    private(set) var outstandingVectors = 0
+    private(set) var isWorking = false
+
+    var hasOutstandingWork: Bool { outstandingFeeds + outstandingVectors > 0 }
+
     /// Whether the list is showing the answer to a query rather than a view.
     var isShowingResults: Bool { query != nil }
 
@@ -229,6 +238,76 @@ final class AppModel {
     func load() async {
         await loadSidebar()
         await loadArticles()
+        await countOutstandingWork()
+    }
+
+    // MARK: - The long work
+
+    /// Counts what is left to do, so the reader is told rather than left
+    /// wondering why an import looks half done.
+    func countOutstandingWork() async {
+        outstandingFeeds = (try? await FirstFetchJob(database).remaining()) ?? 0
+        outstandingVectors = (try? await VectorStore(database).outstandingCount()) ?? 0
+    }
+
+    /// Fetches the feeds that have never been fetched, then vectorizes what has
+    /// been kept, for as long as it is given.
+    ///
+    /// Every batch stands alone. Stopping between two of them loses nothing, and
+    /// the next run picks up exactly where this one left off, which is what
+    /// section 15 means by resumable.
+    func doOutstandingWork(until deadline: Date? = nil) async {
+        guard !isWorking else { return }
+        isWorking = true
+        defer { isWorking = false }
+
+        await JobRunner(FirstFetchJob(database)).run(until: deadline)
+
+        let vectorize = VectorizeJob(database) { [weak self] items in
+            // A vector computed here spares every other device the same work.
+            await self?.enqueueVectors(for: items)
+        }
+        await JobRunner(vectorize).run(until: deadline)
+
+        await countOutstandingWork()
+        await load()
+    }
+
+    /// Starts the long work with the system watching over it.
+    ///
+    /// On iOS the system is asked to see it through and shows its own progress.
+    /// A refusal is not a failure : the work carries on here instead, and again
+    /// at the next launch, since it was written to be resumable anyway.
+    func finishSetup() async {
+        let accepted = BackgroundScheduler.requestContinuedProcessing(
+            title: String(localized: "Finishing the setup"),
+            subtitle: String(localized: "Fetching your feeds")
+        )
+        guard !accepted else { return }
+
+        await doOutstandingWork()
+    }
+
+    private func enqueueVectors(for items: [LibraryItem]) async {
+        await cloud?.enqueue(
+            recordNames: items.map { SyncRecords.name(forLibraryItemWithGUID: $0.guid, feedURL: $0.feedURL) }
+        )
+    }
+
+    /// What a background refresh does with the half minute it is given.
+    func backgroundRefresh() async {
+        let deadline = Date().addingTimeInterval(BackgroundScheduler.refreshBudget)
+        _ = await refresher.refreshDue()
+        await JobRunner(FirstFetchJob(database)).run(until: deadline)
+        await cloud?.enqueueReadStates()
+    }
+
+    /// What a processing task does with the time it is given, on power.
+    func backgroundProcessing() async {
+        await doOutstandingWork()
+        _ = try? await Retention(database).purge()
+        try? await SearchIndex(database).optimize()
+        await cloud?.enqueueCatchUp()
     }
 
     /// Starts synchronizing with the reader's own iCloud.

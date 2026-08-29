@@ -29,6 +29,7 @@ nonisolated struct SyncPayload: Sendable {
     private let subscriptions: SubscriptionStore
     private let library: LibraryStore
     private let readStates: ReadStateStore
+    private let embedder: Embedder
     private let zone: CKRecordZone.ID
 
     init(_ database: AppDatabase, zone: CKRecordZone.ID) {
@@ -36,6 +37,7 @@ nonisolated struct SyncPayload: Sendable {
         self.subscriptions = SubscriptionStore(database)
         self.library = LibraryStore(database)
         self.readStates = ReadStateStore(database)
+        self.embedder = Embedder()
         self.zone = zone
     }
 
@@ -193,8 +195,15 @@ nonisolated struct SyncPayload: Sendable {
     }
 
     /// Keeps an article another device kept, and stars it here if it is here.
+    ///
+    /// A vector that arrives is kept only when this device runs the same model
+    /// at the same revision. Otherwise it is dropped and computed again here :
+    /// comparing vectors from two revisions does not fail loudly, it quietly
+    /// returns nonsense, and the device that recomputes republishes its version.
     private func keep(_ item: LibraryItem) async throws -> Bool {
-        try await database.writer.write { db in
+        let arriving = Self.vetted(item, with: embedder)
+
+        return try await database.writer.write { db in
             let existing =
                 try LibraryItem
                 .filter(LibraryItem.Columns.guid == item.guid && LibraryItem.Columns.feedURL == item.feedURL)
@@ -202,25 +211,55 @@ nonisolated struct SyncPayload: Sendable {
 
             // The article may be in this device's stream, in which case its star
             // has to agree with the library.
-            let entryID = try Self.entryID(forGUID: item.guid, feedURL: item.feedURL, in: db)
+            let entryID = try Self.entryID(forGUID: arriving.guid, feedURL: arriving.feedURL, in: db)
             if let entryID {
                 _ = try Entry.filter(key: entryID).updateAll(db, Column("is_starred").set(to: true))
             }
 
             if var existing {
+                var changed = false
+
                 // The article may have reached this device's stream after the
                 // record did, in which case the link is made now.
-                guard existing.entryID == nil, entryID != nil else { return false }
-                existing.entryID = entryID
-                try existing.update(db)
+                if existing.entryID == nil, entryID != nil {
+                    existing.entryID = entryID
+                    changed = true
+                }
+                // A vector computed elsewhere spares this device the work.
+                if existing.vector == nil, arriving.vector != nil {
+                    existing.vector = arriving.vector
+                    existing.vectorModel = arriving.vectorModel
+                    existing.vectorRevision = arriving.vectorRevision
+                    changed = true
+                }
+
+                if changed { try existing.update(db) }
                 return false
             }
 
-            var item = item
+            var item = arriving
             item.entryID = entryID
             try item.insert(db)
             return true
         }
+    }
+
+    /// The item as this device may keep it.
+    ///
+    /// A vector made by another model, or another revision of this one, is
+    /// dropped rather than stored : comparing across revisions does not fail
+    /// loudly, it quietly returns nonsense. This device computes its own and
+    /// republishes it.
+    private static func vetted(_ item: LibraryItem, with embedder: Embedder) -> LibraryItem {
+        guard let model = item.vectorModel, let revision = item.vectorRevision.flatMap(Int.init),
+            !embedder.isCurrent(model: model, revision: revision)
+        else { return item }
+
+        var item = item
+        item.vector = nil
+        item.vectorModel = nil
+        item.vectorRevision = nil
+        return item
     }
 
     private func unsubscribe(named name: String) async throws -> Bool {
