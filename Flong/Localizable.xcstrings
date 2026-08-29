@@ -311,6 +311,16 @@
         }
       }
     },
+    "Free up space": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Libérer de l'espace"
+          }
+        }
+      }
+    },
     "Holds media": {
       "localizations": {
         "fr": {
@@ -521,6 +531,26 @@
         }
       }
     },
+    "Synchronized %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synchronisé %@"
+          }
+        }
+      }
+    },
+    "Synchronizing": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Synchronisation en cours"
+          }
+        }
+      }
+    },
     "The subscriptions could not be saved.": {
       "localizations": {
         "fr": {
@@ -597,6 +627,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sans titre"
+          }
+        }
+      }
+    },
+    "Waiting for iCloud": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En attente d'iCloud"
+          }
+        }
+      }
+    },
+    "iCloud is not answering": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud ne répond pas"
+          }
+        }
+      }
+    },
+    "iCloud storage is full": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le stockage iCloud est plein"
           }
         }
       }

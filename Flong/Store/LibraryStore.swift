@@ -16,7 +16,9 @@ import OSLog
 /// What a library operation changed, for the indexer to follow.
 nonisolated struct LibraryChange: Hashable, Sendable {
     var kept: [LibraryItem] = []
-    var released: [UUID] = []
+    /// The items themselves, not merely their identifiers : an item that is
+    /// gone still has to be named to Spotlight and to CloudKit.
+    var released: [LibraryItem] = []
 
     var isEmpty: Bool { kept.isEmpty && released.isEmpty }
 }
@@ -154,7 +156,7 @@ nonisolated struct LibraryStore: Sendable {
 
             _ = try Entry.filter(keys: entryIDs).updateAll(db, Column("is_starred").set(to: false))
             _ = try LibraryItem.filter(keys: itemIDs).deleteAll(db)
-            return LibraryChange(released: items.map(\.id))
+            return LibraryChange(released: items)
         }
     }
 
@@ -205,12 +207,12 @@ nonisolated struct LibraryStore: Sendable {
     ///
     /// An annotation outlives a star : unstarring an article somebody wrote
     /// about must not throw away what they wrote.
-    private static func demoteIfNothingElseKeepsIt(_ entryID: UUID, in db: Database) throws -> UUID? {
+    private static func demoteIfNothingElseKeepsIt(_ entryID: UUID, in db: Database) throws -> LibraryItem? {
         guard let item = try LibraryItem.filter(LibraryItem.Columns.entryID == entryID).fetchOne(db) else { return nil }
         guard item.annotation?.isEmpty ?? true else { return nil }
 
         _ = try item.delete(db)
-        return item.id
+        return item
     }
 
     // MARK: - Shapes

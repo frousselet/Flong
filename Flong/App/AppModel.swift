@@ -80,6 +80,7 @@ final class AppModel {
     private let articles: ArticleStore
     private let library: LibraryStore
     private let spotlight: SpotlightIndex
+    private var cloud: CloudSync?
     private let refresher: FeedRefresh
     private let retention: Retention
     private let finder: FeedFinder
@@ -90,6 +91,9 @@ final class AppModel {
     private(set) var article: Article?
     private(set) var isRefreshing = false
     private(set) var feedCount = 0
+
+    /// What synchronization is doing, in terms the sidebar can show.
+    private(set) var syncStatus = SyncStatus.idle(lastSynchronized: nil)
 
     /// Whether the list is showing the answer to a query rather than a view.
     var isShowingResults: Bool { query != nil }
@@ -227,6 +231,40 @@ final class AppModel {
         await loadArticles()
     }
 
+    /// Starts synchronizing with the reader's own iCloud.
+    ///
+    /// No account is not an error : Flong is fully usable on one device without
+    /// one, and the sidebar says nothing rather than complaining.
+    func startSync() async {
+        guard cloud == nil else { return }
+
+        let cloud = CloudSync(database: database) { [weak self] status in
+            Task { @MainActor [weak self] in self?.syncStatus = status }
+        }
+        self.cloud = cloud
+        await cloud.start()
+    }
+
+    /// Sends and fetches now, and folds in whatever arrived.
+    func synchronize() async {
+        guard let cloud else { return }
+
+        await cloud.enqueueReadStates()
+        await cloud.synchronize()
+        await load()
+    }
+
+    /// Frees what the stream is holding, which is what a full iCloud calls for.
+    func purge() async {
+        do {
+            let summary = try await retention.purge()
+            Log.store.notice("Purged \(summary.removed) articles on request")
+            await load()
+        } catch {
+            Log.store.error("The purge failed : \(error, privacy: .public)")
+        }
+    }
+
     /// Writes the library to Spotlight when the two have drifted apart.
     ///
     /// Spotlight keeps the record of what it holds, so an index it has lost is
@@ -253,10 +291,19 @@ final class AppModel {
 
         do {
             try await spotlight.index(change.kept)
-            try await spotlight.remove(change.released)
+            try await spotlight.remove(change.released.map(\.id))
         } catch {
             Log.index.error("Spotlight could not be told about the library : \(error, privacy: .public)")
         }
+
+        // The other devices hear about it on the next exchange, which the
+        // engine schedules for itself.
+        await cloud?.enqueue(
+            recordNames: change.kept.map { SyncRecords.name(forLibraryItemWithGUID: $0.guid, feedURL: $0.feedURL) }
+        )
+        await cloud?.enqueue(
+            deletions: change.released.map { SyncRecords.name(forLibraryItemWithGUID: $0.guid, feedURL: $0.feedURL) }
+        )
     }
 
     func loadSidebar() async {
@@ -455,6 +502,8 @@ final class AppModel {
 
         _ = await refresher.refreshAll()
         _ = try? await retention.purge()
+        await cloud?.enqueueReadStates()
+        await cloud?.enqueueCatchUp()
         await load()
     }
 
@@ -481,6 +530,7 @@ final class AppModel {
                 iconURL: found.iconURL
             )
             let result = try await subscriptions.subscribe(to: subscription)
+            await cloud?.enqueue(recordNames: [SyncRecords.name(forFeed: result.feed.url)])
 
             _ = await refresher.refresh(result.feed)
             selection = .feed(result.feed.id)
@@ -498,7 +548,9 @@ final class AppModel {
 
     func unsubscribe(_ id: UUID) async {
         do {
+            let url = try await subscriptions.feed(id: id)?.url
             try await subscriptions.unsubscribe(id)
+            if let url { await cloud?.enqueue(deletions: [SyncRecords.name(forFeed: url)]) }
             if case .feed(let selected) = selection, selected == id { selection = .unread }
             await load()
         } catch {
@@ -509,6 +561,7 @@ final class AppModel {
     func importOPML(from url: URL) async {
         do {
             report = try await opml(contentsOf: url)
+            await cloud?.enqueueEverything()
             await load()
             await refreshAll()
         } catch let error as OPMLError {

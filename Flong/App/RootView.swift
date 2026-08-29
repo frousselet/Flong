@@ -59,6 +59,7 @@ struct ReadingView: View {
         }
         .task {
             await model.load()
+            await model.startSync()
             await model.synchronizeSpotlight()
             await model.refreshDue()
         }
