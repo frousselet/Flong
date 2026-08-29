@@ -236,7 +236,7 @@ nonisolated enum HTMLTokenizer {
     }
 }
 
-extension Character {
+nonisolated extension Character {
     fileprivate var isHTMLWhitespace: Bool {
         self == " " || self == "\t" || self == "\n" || self == "\r" || self == "\u{0C}"
     }

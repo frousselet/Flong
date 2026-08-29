@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="fr">
+  <title type="text">Journal</title>
+  <link rel="self" href="https://example.org/atom.xml"/>
+  <link rel="alternate" type="text/html" href="https://example.org/"/>
+  <icon>https://example.org/icon.png</icon>
+  <updated>2026-08-26T09:00:00Z</updated>
+  <entry>
+    <title>Une entrée</title>
+    <id>tag:example.org,2026:1</id>
+    <link rel="alternate" type="text/html" href="https://example.org/1"/>
+    <link rel="enclosure" type="video/mp4" href="https://example.org/1.mp4" length="42"/>
+    <published>2026-08-25T06:30:00Z</published>
+    <updated>2026-08-25T07:00:00+02:00</updated>
+    <author><name>Bernard Auteur</name><email>b@example.org</email></author>
+    <summary type="text">Un résumé</summary>
+    <content type="xhtml">
+      <div xmlns="http://www.w3.org/1999/xhtml"><p>Le <em>corps</em> de l'article.</p></div>
+    </content>
+  </entry>
+  <entry>
+    <title>Sans contenu</title>
+    <id>tag:example.org,2026:2</id>
+    <link href="https://example.org/2"/>
+    <updated>2026-08-24T07:00:00Z</updated>
+    <content type="text">Texte &amp; caractères</content>
+  </entry>
+</feed>

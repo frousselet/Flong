@@ -71,6 +71,31 @@ nonisolated final class HTMLElement {
         descendants.filter { $0.classNames.contains(className) }
     }
 
+    /// The markup this element holds, rebuilt.
+    ///
+    /// It is what an h-feed entry hands over as an article body, and what the
+    /// reader mode of M2 will hand over once it has found the article in a page.
+    var innerHTML: String {
+        children.reduce(into: "") { html, node in
+            switch node {
+            case .text(let text): html += HTMLEntities.escape(text)
+            case .element(let element): html += element.outerHTML
+            }
+        }
+    }
+
+    /// This element and what it holds, rebuilt.
+    var outerHTML: String {
+        let written =
+            attributes.keys
+            .sorted()
+            .map { " \($0)=\"\(HTMLEntities.escapeAttribute(attributes[$0] ?? ""))\"" }
+            .joined()
+
+        guard !HTMLTokenizer.voidElements.contains(name) else { return "<\(name)\(written)>" }
+        return "<\(name)\(written)>\(innerHTML)</\(name)>"
+    }
+
     /// The text this element holds, entities already decoded, markup dropped.
     var textContent: String {
         children.reduce(into: "") { result, node in
