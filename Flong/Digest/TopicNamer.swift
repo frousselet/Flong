@@ -78,13 +78,14 @@ nonisolated struct TopicNamer: Sendable {
         """
         You group news headlines under a few broad subjects.
         A subject is a field of interest, not a single event.
+        A headline may fall under more than one subject.
         \(OnDeviceModel.languageInstruction(for: locale))
         Never invent a headline, and never use a number you were not given.
         Never mention that you are a model or that you were asked anything.
         """
     }
 
-    /// The subject of each story, for the stories the model put under one, or
+    /// The subjects of each story, for the stories the model put under any, or
     /// `nil` when the model said nothing at all.
     ///
     /// The difference matters. An empty answer is the model saying these
@@ -96,7 +97,7 @@ nonisolated struct TopicNamer: Sendable {
     ///
     /// Stories the model leaves out keep no subject, which is right : they are
     /// still on the front page, they are simply on no pill.
-    func topics(of stories: [(id: UUID, title: String)]) async -> [UUID: String]? {
+    func topics(of stories: [(id: UUID, title: String)]) async -> [UUID: [String]]? {
         guard OnDeviceModel.isAvailable, stories.count >= Self.minimumStories else { return nil }
 
         let shown = Array(stories.prefix(Self.headlinesShown))
@@ -130,27 +131,32 @@ nonisolated struct TopicNamer: Sendable {
     /// Reads the answer back, keeping only what it is entitled to say.
     ///
     /// A model asked for numbers returns numbers, and now and then returns one
-    /// that was never on the list. A story named twice keeps the first subject
-    /// that claimed it, so that every story ends up under exactly one, and a
-    /// subject left holding nothing is dropped.
-    static func assign(_ generated: GeneratedTopics, to stories: [(id: UUID, title: String)]) -> [UUID: String] {
-        var assigned: [UUID: String] = [:]
+    /// that was never on the list. A subject left holding nothing is dropped,
+    /// and a story claimed by several subjects keeps them all : an advisory
+    /// about a stolen database is under both computer security and cybercrime,
+    /// and a reader who asked for more of either meant this one.
+    ///
+    /// The subjects of a story stay in the order the model gave them.
+    static func assign(
+        _ generated: GeneratedTopics,
+        to stories: [(id: UUID, title: String)]
+    ) -> [UUID: [String]] {
+        var assigned: [UUID: [String]] = [:]
 
         for topic in generated.topics {
             let name = topic.name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !name.isEmpty else { continue }
 
-            let claimed =
-                topic.headlines
-                .compactMap { number -> UUID? in
-                    let index = number - 1
-                    guard stories.indices.contains(index) else { return nil }
-                    return stories[index].id
-                }
-                .filter { assigned[$0] == nil }
+            let claimed = topic.headlines.compactMap { number -> UUID? in
+                let index = number - 1
+                guard stories.indices.contains(index) else { return nil }
+                return stories[index].id
+            }
 
             guard !claimed.isEmpty else { continue }
-            for id in claimed { assigned[id] = name }
+            for id in claimed where !(assigned[id] ?? []).contains(name) {
+                assigned[id, default: []].append(name)
+            }
         }
         return assigned
     }

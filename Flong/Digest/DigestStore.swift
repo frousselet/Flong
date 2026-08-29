@@ -31,10 +31,10 @@ nonisolated enum DigestTopic: Hashable, Sendable, Identifiable {
         return name
     }
 
-    func holds(_ topic: String?) -> Bool {
+    func holds(_ topics: [String]) -> Bool {
         switch self {
         case .frontPage: true
-        case .named(let name): topic == name
+        case .named(let name): topics.contains(name)
         }
     }
 }
@@ -72,8 +72,19 @@ nonisolated struct DigestStory: Identifiable, Hashable, Sendable {
     let isLive: Bool
     /// The picture of the most recent article that has one.
     let imageURL: URL?
-    /// The subject the model put it under, when it put it under one.
-    let topic: String?
+    /// The subjects the model put it under, which may be none and may be
+    /// several : a story is rarely about one thing.
+    let topics: [String]
+
+    /// What the reader has said about this story, taken from its subjects.
+    ///
+    /// Asking for more of anything wins : a reader who wants more of one of
+    /// its subjects meant this story, whatever they think of the others. It is
+    /// only when nothing about it was asked for that asking for less applies.
+    func score(_ scores: [String: Int]) -> Int {
+        let said = topics.compactMap { scores[$0] }
+        return said.max().map { $0 > 0 ? $0 : (said.min() ?? 0) } ?? 0
+    }
 }
 
 /// What the main screen shows.
@@ -83,10 +94,14 @@ nonisolated struct Digest: Hashable, Sendable {
     /// Articles that made no story, which the tail shows as themselves.
     var looseCount = 0
 
-    /// The subjects on the page, most covered first, whichever one is being
-    /// shown : narrowing to one must not take the others off the page, or the
-    /// only way back would be a button that is no longer there.
+    /// The subjects on the page, whichever one is being shown : narrowing to
+    /// one must not take the others off the page, or the only way back would
+    /// be a button that is no longer there.
     var topics: [String] = []
+
+    /// What the reader has said about them, for the ones they have spoken
+    /// about at all.
+    var scores: [String: Int] = [:]
 
     var isEmpty: Bool { live.isEmpty && stories.isEmpty && looseCount == 0 }
 }
@@ -129,14 +144,21 @@ nonisolated struct DigestStore: Sendable {
 
     func digest(_ topic: DigestTopic = .frontPage, now: Date = Date(), limit: Int = 60) async throws -> Digest {
         let since = now.addingTimeInterval(-Self.window)
+        let scores = try await TopicPreferences(database).scores()
 
-        let (stories, members, loose) = try await database.writer.read { db in
+        let (stories, topics, members, loose) = try await database.writer.read { db in
             let stories =
                 try Story
                 .filter(Story.Columns.lastAt >= since)
                 .order(Story.Columns.lastAt.desc)
                 .limit(limit)
                 .fetchAll(db)
+
+            // One row per subject a story is under, folded back into a list
+            // per story.
+            let topics = try StoryTopic.fetchAll(db).reduce(into: [UUID: [String]]()) { topics, row in
+                topics[row.storyID, default: []].append(row.name)
+            }
 
             let members = try Row.fetchAll(
                 db,
@@ -175,7 +197,7 @@ nonisolated struct DigestStore: Sendable {
                     arguments: [since]
                 ) ?? 0
 
-            return (stories, members, loose)
+            return (stories, topics, members, loose)
         }
 
         let grouped = Dictionary(grouping: members, by: \.storyID)
@@ -184,18 +206,30 @@ nonisolated struct DigestStore: Sendable {
         let all = stories.compactMap { story -> DigestStory? in
             let members = grouped[story.id] ?? []
             guard members.count > 1 else { return nil }
-            return Self.story(story, members: members, liveSince: live)
+            return Self.story(story, members: members, topics: topics[story.id] ?? [], liveSince: live)
         }
 
         // The pills are read from the whole page, then the page is narrowed :
         // the other subjects have to stay on screen, or the way back would be a
         // button that is no longer there.
-        var digest = Digest(topics: Self.topics(of: all))
-        let built = all.filter { topic.holds($0.topic) }
+        var digest = Digest(topics: Self.topics(of: all, scores: scores), scores: scores)
+        let built = all.filter { topic.holds($0.topics) }
 
+        // What is happening now is ordered by when, and by nothing else : a
+        // reader who asked for less of a subject did not ask to hear about it
+        // late.
         digest.live = built.filter(\.isLive).sorted { $0.lastAt > $1.lastAt }
+
+        // The rest is ordered by what the reader asked for, then by weight.
+        // The score comes first rather than being mixed into the weight : a
+        // reader who says more of this expects more of this, not a story two
+        // articles heavier than the one they asked for.
         digest.stories = built.filter { !$0.isLive }
-            .sorted { ($0.articleCount, $0.lastAt) > ($1.articleCount, $1.lastAt) }
+            .sorted {
+                let left = ($0.score(scores), $0.articleCount, $0.lastAt)
+                let right = ($1.score(scores), $1.articleCount, $1.lastAt)
+                return left > right
+            }
 
         // The tail is what fell under no story at all, so it belongs to no
         // subject either, and it is shown on the front page only.
@@ -207,6 +241,7 @@ nonisolated struct DigestStore: Sendable {
     private static func story(
         _ story: Story,
         members: [StoryArticle],
+        topics: [String],
         liveSince: Date
     ) -> DigestStory {
         let dates = members.map(\.date).sorted()
@@ -241,25 +276,31 @@ nonisolated struct DigestStore: Sendable {
             // The latest article to carry a picture, since a story is shown for
             // where it has got to rather than for where it started.
             imageURL: members.sorted { $0.date > $1.date }.lazy.compactMap(\.imageURL).first,
-            topic: story.topic
+            topics: topics
         )
     }
 
-    /// The subjects on a page, the one covering the most stories first.
+    /// The subjects on a page : what the reader asked for first, then the one
+    /// covering the most stories.
     ///
     /// Ties are broken by what moved last, so a page whose subjects are evenly
     /// matched still puts the live one first.
-    static func topics(of stories: [DigestStory]) -> [String] {
+    static func topics(of stories: [DigestStory], scores: [String: Int] = [:]) -> [String] {
         var counts: [String: (stories: Int, lastAt: Date)] = [:]
         for story in stories {
-            guard let topic = story.topic else { continue }
-            let seen = counts[topic] ?? (stories: 0, lastAt: .distantPast)
-            counts[topic] = (stories: seen.stories + 1, lastAt: max(seen.lastAt, story.lastAt))
+            for topic in story.topics {
+                let seen = counts[topic] ?? (stories: 0, lastAt: .distantPast)
+                counts[topic] = (stories: seen.stories + 1, lastAt: max(seen.lastAt, story.lastAt))
+            }
         }
 
         return
             counts
-            .sorted { ($0.value.stories, $0.value.lastAt) > ($1.value.stories, $1.value.lastAt) }
+            .sorted {
+                let left = (scores[$0.key] ?? 0, $0.value.stories, $0.value.lastAt)
+                let right = (scores[$1.key] ?? 0, $1.value.stories, $1.value.lastAt)
+                return left > right
+            }
             .map(\.key)
     }
 

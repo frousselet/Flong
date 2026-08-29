@@ -28,9 +28,16 @@ struct DigestScreen: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                topics
-                stories
+            // A pinned section header rather than a bar in the safe area : the
+            // bar lays out under a large title and draws itself somewhere else
+            // entirely, and a header is where this one belongs anyway, at the
+            // head of what it filters.
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                Section {
+                    stories
+                } header: {
+                    topics
+                }
             }
             .editorialColumn()
             .padding(.horizontal, 22)
@@ -165,6 +172,9 @@ struct DigestScreen: View {
     /// under the tab bar, since glass directly under glass is the stacking the
     /// same guidance forbids.
     ///
+    /// They stay at the head of the page as it scrolls, since a filter that
+    /// leaves the screen is a filter a reader has to go back up to change.
+    ///
     /// Where there is no model there are no subjects, and no pills : the front
     /// page is entire on its own, and section 14 asks for exactly that.
     @ViewBuilder
@@ -178,7 +188,7 @@ struct DigestScreen: View {
                             pill(.named(topic), title: Text(verbatim: topic))
                         }
                     }
-                    .padding(.vertical, 6)
+                    .padding(.vertical, 8)
                 }
             }
             .scrollIndicators(.hidden)
@@ -189,15 +199,26 @@ struct DigestScreen: View {
     private func pill(_ topic: DigestTopic, title: Text) -> some View {
         let isCurrent = model.digestTopic == topic
 
+        let score = topic.name.map { model.digest.scores[$0] ?? 0 } ?? 0
+
         return Button {
             withAnimation(.snappy(duration: 0.26)) { model.digestTopic = topic }
         } label: {
-            title
-                .font(.system(.footnote, weight: isCurrent ? .semibold : .regular))
-                .foregroundStyle(isCurrent ? Color.white : Color.primary)
-                .lineLimit(1)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+            HStack(spacing: 4) {
+                // Only when there is something to say : a row of arrows on
+                // every pill would be a row of arrows nobody reads.
+                if score != 0 {
+                    Image(systemName: score > 0 ? "arrow.up" : "arrow.down")
+                        .font(.system(.caption2, weight: .semibold))
+                        .accessibilityLabel(score > 0 ? Text("Seeing more") : Text("Seeing less"))
+                }
+                title
+                    .font(.system(.footnote, weight: isCurrent ? .semibold : .regular))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(isCurrent ? Color.white : Color.primary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
         }
         .buttonStyle(.plain)
         .glassEffect(
@@ -206,6 +227,45 @@ struct DigestScreen: View {
         )
         .glassEffectID(topic, in: pills)
         .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
+        .contextMenu { preferences(for: topic) }
+    }
+
+    /// What a reader can say about a subject, on a long press.
+    ///
+    /// A subject is the only thing on the page general enough to have an
+    /// opinion about : more of this, less of this. An article is one article
+    /// and a story is one event, and a preference about either would be a
+    /// preference about something that will not happen again.
+    ///
+    /// The front page has no preferences : it is where everything is.
+    @ViewBuilder
+    private func preferences(for topic: DigestTopic) -> some View {
+        if let name = topic.name {
+            let score = model.digest.scores[name] ?? 0
+
+            Button {
+                Task { await model.prefer(name, by: 1) }
+            } label: {
+                Label("See more of this", systemImage: "arrow.up")
+            }
+            .disabled(score >= TopicPreferences.limit)
+
+            Button {
+                Task { await model.prefer(name, by: -1) }
+            } label: {
+                Label("See less of this", systemImage: "arrow.down")
+            }
+            .disabled(score <= -TopicPreferences.limit)
+
+            if score != 0 {
+                Divider()
+                Button {
+                    Task { await model.forgetPreference(of: name) }
+                } label: {
+                    Label("No preference", systemImage: "minus")
+                }
+            }
+        }
     }
 
 }
