@@ -103,4 +103,28 @@ struct FolderPathTests {
         #expect(FolderPath.ancestors(of: "Tech/iOS/SwiftUI") == ["Tech", "Tech/iOS"])
         #expect(FolderPath.ancestors(of: "Tech").isEmpty)
     }
+
+    // MARK: - Newsrooms
+
+    @Test("A paper with a feed per desk is one newsroom")
+    func rooms() {
+        let society = URL(string: "https://www.leparisien.fr/societe/rss.xml")
+        let politics = URL(string: "https://leparisien.fr/politique/rss.xml")
+
+        #expect(FeedURL.room(of: society) == "leparisien.fr")
+        #expect(FeedURL.room(of: politics) == "leparisien.fr")
+        #expect(FeedURL.room(of: society) == FeedURL.room(of: politics))
+    }
+
+    @Test("A blog on its own host is its own newsroom")
+    func separateRooms() {
+        #expect(FeedURL.room(of: URL(string: "https://blog.example.com/feed")) == "blog.example.com")
+        #expect(FeedURL.room(of: URL(string: "https://example.com/feed")) == "example.com")
+    }
+
+    @Test("An address with no host is no newsroom")
+    func noRoom() {
+        #expect(FeedURL.room(of: nil) == nil)
+        #expect(FeedURL.room(of: URL(string: "file:///tmp/feed.xml")) == nil)
+    }
 }

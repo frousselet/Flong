@@ -71,6 +71,23 @@ nonisolated enum FeedURL {
         return url
     }
 
+    /// The newsroom an address belongs to.
+    ///
+    /// A paper that publishes a section feed per desk is one newsroom, not
+    /// six : `lemonde.fr/politique/rss` and `lemonde.fr/societe/rss` are the
+    /// same room, and a story both of them ran is one room covering it, which
+    /// is what the digest counts and what decides whether anything is
+    /// happening at all.
+    ///
+    /// The host, lowercased, without its `www`. Not the registrable domain,
+    /// which would need the public suffix list and would fold a paper and its
+    /// unrelated blog into one : `blog.example.com` is its own room, and that
+    /// is usually right.
+    static func room(of url: URL?) -> String? {
+        guard let host = url?.host()?.lowercased(), !host.isEmpty else { return nil }
+        return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    }
+
     /// Canonicalizes an address that is already a `URL`.
     static func canonical(_ url: URL) throws(FeedURLError) -> URL {
         try canonical(url.absoluteString)

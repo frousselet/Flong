@@ -151,8 +151,11 @@ nonisolated struct StorySummarizer: Sendable {
             // the fallback is kept and the story is not asked about again until
             // the reader changes language.
             guard Self.isWritten(in: locale, title: title, summary: summary) else {
-                Log.enrich.notice("A brief came back in the wrong language and was left to its article")
-                return fallback.asked(in: locale)
+                // Asked once more, in the same session so the model can see what
+                // it just wrote. Measured : the first answer comes back in the
+                // language of the articles about half the time whatever the
+                // prompt says, and being told so fixes most of those.
+                return await retry(in: session, fallback: fallback)
             }
 
             return StoryBrief(
@@ -186,6 +189,40 @@ nonisolated struct StorySummarizer: Sendable {
             summary: (summary?.isEmpty ?? true) ? nil : summary,
             isGenerated: false
         )
+    }
+
+    /// Asks again, saying what was wrong with the first answer.
+    ///
+    /// One retry and no more : a model that answers in the wrong language
+    /// twice is a model that will not answer in that language today, and the
+    /// article's own headline is a better use of the next second than a third
+    /// try. It is at least in a language somebody chose.
+    private func retry(in session: LanguageModelSession, fallback: StoryBrief) async -> StoryBrief {
+        let demand = OnDeviceModel.languageReminder(for: locale)
+
+        do {
+            let response = try await session.respond(
+                to: "That answer was not in the right language. \(demand)",
+                generating: GeneratedBrief.self
+            )
+            let title = response.content.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let summary = response.content.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard !title.isEmpty, Self.isWritten(in: locale, title: title, summary: summary) else {
+                Log.enrich.notice("A brief came back in the wrong language twice and was left to its article")
+                return fallback.asked(in: locale)
+            }
+
+            return StoryBrief(
+                title: title,
+                summary: summary.isEmpty ? fallback.summary : summary,
+                isGenerated: true,
+                askedIn: locale
+            )
+        } catch {
+            OnDeviceModel.refused(error)
+            return fallback.asked(in: locale)
+        }
     }
 
     /// Whether what came back is in the language it was asked for.
