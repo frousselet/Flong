@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <title>Cook & Book</title>
+  <link>https://broken.example.com/</link>
+  <item>
+    <title>Caf&eacute; & croissants</title>
+    <link>https://broken.example.com/1?a=1&b=2</link>
+    <pubDate>Tue, 25 Aug 2026 08:30:00 GMT</pubDate>
+    <description>Beurre & confiture</description>
+  </item>
+</channel></rss>

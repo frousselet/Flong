@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"
+     xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Example Weekly</title>
+    <link>https://example.com/</link>
+    <description>A feed</description>
+    <language>en-gb</language>
+    <lastBuildDate>Wed, 26 Aug 2026 09:00:00 GMT</lastBuildDate>
+    <atom:link rel="self" href="https://feeds.example.com/rss2.xml" type="application/rss+xml"/>
+    <image><url>https://example.com/logo.png</url><title>Example Weekly</title><link>https://example.com/</link></image>
+    <item>
+      <title>The &lt;b&gt;first&lt;/b&gt; post</title>
+      <link>https://example.com/posts/1</link>
+      <guid isPermaLink="false">urn:example:1</guid>
+      <pubDate>Tue, 25 Aug 2026 08:30:00 +0200</pubDate>
+      <dc:creator>Alice Author</dc:creator>
+      <description><![CDATA[<p>A summary with an <a href="/relative">link</a>.</p>]]></description>
+      <content:encoded><![CDATA[<p>The body.</p><script>alert(1)</script>]]></content:encoded>
+      <enclosure url="https://example.com/media/1.mp3" type="audio/mpeg" length="1234"/>
+    </item>
+    <item>
+      <title>Second post</title>
+      <link>https://example.com/posts/2</link>
+      <pubDate>Mon, 24 Aug 2026 10:00:00 GMT</pubDate>
+      <description>Plain summary</description>
+    </item>
+  </channel>
+</rss>

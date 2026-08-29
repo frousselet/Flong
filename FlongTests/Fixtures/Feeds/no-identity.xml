@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <title>Careless</title>
+  <link>https://careless.example.com/</link>
+  <item><title>No link, no guid, no date</title><description>Body</description></item>
+  <item><title>Link only</title><link>https://careless.example.com/2</link></item>
+  <item><title>Link and date</title><link>https://careless.example.com/3</link>
+        <pubDate>25 Aug 2026 08:30:00 GMT</pubDate></item>
+</channel></rss>
