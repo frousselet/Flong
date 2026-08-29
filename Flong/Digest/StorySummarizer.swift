@@ -12,6 +12,7 @@
 import Foundation
 import FoundationModels
 import GRDB
+import NaturalLanguage
 import OSLog
 
 /// What a story is called, and what it says in one line.
@@ -20,6 +21,29 @@ nonisolated struct StoryBrief: Hashable, Sendable {
     let summary: String?
     /// Whether a model wrote it, which the card says out loud.
     let isGenerated: Bool
+
+    /// The language the model was asked in, when it was asked at all.
+    ///
+    /// It is what stops a story being asked about for ever. A model that was
+    /// never consulted leaves it empty, so the story is asked as soon as one
+    /// appears ; a model that answered, refused, or answered in the wrong
+    /// language has been asked, in this language, and asking again in the same
+    /// one would get the same answer.
+    var askedIn: Locale?
+
+    init(title: String, summary: String?, isGenerated: Bool, askedIn: Locale? = nil) {
+        self.title = title
+        self.summary = summary
+        self.isGenerated = isGenerated
+        self.askedIn = askedIn
+    }
+
+    /// The same brief, marked as one the model has already been asked for.
+    func asked(in locale: Locale) -> StoryBrief {
+        var brief = self
+        brief.askedIn = locale
+        return brief
+    }
 }
 
 /// The shape the model is asked to fill in.
@@ -117,13 +141,33 @@ nonisolated struct StorySummarizer: Sendable {
 
             let title = generated.title.trimmingCharacters(in: .whitespacesAndNewlines)
             let summary = generated.summary.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !title.isEmpty else { return fallback }
+            guard !title.isEmpty else { return fallback.asked(in: locale) }
 
             OnDeviceModel.succeeded()
-            return StoryBrief(title: title, summary: summary.isEmpty ? fallback.summary : summary, isGenerated: true)
+
+            // A headline in the wrong language is worse than the article's own,
+            // which is at least the language somebody chose to write it in.
+            // Asked again in the same language it would answer the same way, so
+            // the fallback is kept and the story is not asked about again until
+            // the reader changes language.
+            guard Self.isWritten(in: locale, title: title, summary: summary) else {
+                Log.enrich.notice("A brief came back in the wrong language and was left to its article")
+                return fallback.asked(in: locale)
+            }
+
+            return StoryBrief(
+                title: title,
+                summary: summary.isEmpty ? fallback.summary : summary,
+                isGenerated: true,
+                askedIn: locale
+            )
         } catch {
             OnDeviceModel.refused(error)
-            return fallback
+
+            // A model that will not write about this story will not write about
+            // it next time either, so the asking stops. A model that is broken
+            // may well be working at the next launch, so it does not.
+            return OnDeviceModel.isTheModelItself(error) ? fallback : fallback.asked(in: locale)
         }
     }
 
@@ -142,6 +186,26 @@ nonisolated struct StorySummarizer: Sendable {
             summary: (summary?.isEmpty ?? true) ? nil : summary,
             isGenerated: false
         )
+    }
+
+    /// Whether what came back is in the language it was asked for.
+    ///
+    /// Judged by the system's own recognizer rather than by looking for words :
+    /// a headline is a handful of them, and half of those are proper nouns that
+    /// belong to no language at all. Too short to judge counts as right, since
+    /// refusing a two-word headline for want of evidence would refuse most of
+    /// them.
+    static func isWritten(in locale: Locale, title: String, summary: String) -> Bool {
+        guard let wanted = locale.language.languageCode?.identifier else { return true }
+
+        let text = ([title, summary].filter { !$0.isEmpty }).joined(separator: ". ")
+        guard text.count >= 24 else { return true }
+
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(text)
+        guard let found = recognizer.dominantLanguage else { return true }
+
+        return found.rawValue.hasPrefix(wanted)
     }
 
     private static func prompt(for articles: [(title: String, excerpt: String?)], language: String) -> String {

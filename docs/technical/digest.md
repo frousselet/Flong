@@ -46,6 +46,12 @@ Without a model the story takes the title of its most central article, so it is 
 
 **The language a brief was written in is stored with it.** Nothing else about a story changes when a reader changes the language of their device, so nothing else would ever ask for the brief to be written again, and the page would stay in a language its reader no longer reads. A brief whose language is not the reader's current one goes back in the queue, exactly as one written without a model does when a model turns up.
 
+The rule for asking is one thing : **has the model been asked about this story, in this language?** A story it was never asked about is asked as soon as a model appears ; one it answered, refused, or answered in the wrong language has been asked, and asking again in the same language would get the same answer ; and a reader who changes language has changed the question. It is the language *asked in* rather than the language written in, because a refusal has no language, and counting a refusal as unanswered asked about it for ever.
+
+**What comes back is checked against the language it was asked for**, by the system's own recognizer rather than by looking for words, and a brief in the wrong language is dropped for the article's own headline : better the language somebody chose to write in than a machine's wrong one. A headline too short to judge is taken at its word, since half the words in one are proper nouns that belong to no language at all.
+
+**Where there is no model at all, the sources list says so**, and says which of the three reasons it is. A page whose stories are all named after their own articles and which carries no subjects is a page working exactly as section 14 says it should, and it looks exactly like a page that is broken. One line separates the two.
+
 There is also a command, at the foot of the sources list, that throws away everything the model wrote and asks it again. Nothing normally needs it : it is there for the reader who wants a fresh reading of the page, and for the one whose model refused all morning and has since been switched back on, which is why it forgets the refusals on the way. A story whose headline the reader settled themselves is left alone by it, subject included.
 
 The prompt is bounded before it is sent : six articles and two hundred and forty characters each, and where the system can count tokens exactly, a prompt that would leave no room for an answer is not sent at all. The cost of asking anyway is a refusal, and the cost of a refusal is a story with no headline.

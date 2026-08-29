@@ -41,6 +41,29 @@ nonisolated enum OnDeviceModel {
         return String(describing: reason)
     }
 
+    /// What to tell the reader when there is no model, or `nil` when there is.
+    ///
+    /// A page whose stories are all named after their own articles and which
+    /// carries no subjects is a page working exactly as section 14 says it
+    /// should, and it looks exactly like a page that is broken. One line is
+    /// what separates the two, and it says what the reader can do about it,
+    /// which for most of these is nothing.
+    static var absence: LocalizedStringResource? {
+        guard case .unavailable(let reason) = SystemLanguageModel.default.availability else { return nil }
+
+        switch reason {
+        case .deviceNotEligible:
+            return "Apple Intelligence is not available on this device. Stories keep the headline of their own article."
+        case .appleIntelligenceNotEnabled:
+            return "Apple Intelligence is switched off. Stories keep the headline of their own article."
+        case .modelNotReady:
+            return
+                "Apple Intelligence is still downloading. Stories keep the headline of their own article until it is ready."
+        @unknown default:
+            return "Apple Intelligence is not available. Stories keep the headline of their own article."
+        }
+    }
+
     static func succeeded() {
         refusals.withLock { $0 = 0 }
     }

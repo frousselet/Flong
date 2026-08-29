@@ -288,6 +288,92 @@ struct DigestTests {
         #expect(waiting == 2)
     }
 
+    @Test("A story the model would not write about is not asked about again")
+    func refusedOnce() async throws {
+        try await StoryBuilder(database).build(now: now)
+
+        // What the job stores when the model refuses this one story : the
+        // article's own title, and the language it was asked in.
+        try await database.writer.write { db in
+            for story in try Story.fetchAll(db) {
+                var story = story
+                story.summary = "Le chapeau de son propre article."
+                story.isGenerated = false
+                story.briefLocale = "fr_FR"
+                try story.update(db)
+            }
+        }
+
+        let work = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true)
+        let waiting = try await database.writer.read { db in
+            try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM story WHERE \(work.sql)",
+                arguments: work.arguments
+            ) ?? 0
+        }
+
+        // Asking again in the same language would get the same refusal, and
+        // the count would never reach zero.
+        #expect(waiting == 0)
+    }
+
+    @Test("A story no model has ever been asked about is asked as soon as one appears")
+    func neverAsked() async throws {
+        try await StoryBuilder(database).build(now: now)
+
+        try await database.writer.write { db in
+            for story in try Story.fetchAll(db) {
+                var story = story
+                story.summary = "Le chapeau de son propre article."
+                story.isGenerated = false
+                story.briefLocale = nil
+                try story.update(db)
+            }
+        }
+
+        let withModel = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true)
+        let without = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: false)
+
+        let counts = try await database.writer.read { db in
+            (
+                asked: try Int.fetchOne(
+                    db, sql: "SELECT COUNT(*) FROM story WHERE \(withModel.sql)", arguments: withModel.arguments
+                ) ?? 0,
+                quiet: try Int.fetchOne(
+                    db, sql: "SELECT COUNT(*) FROM story WHERE \(without.sql)", arguments: without.arguments
+                ) ?? 0
+            )
+        }
+
+        #expect(counts.asked == 3)
+        // And without a model it asks for nothing, so the count reaches zero.
+        #expect(counts.quiet == 0)
+    }
+
+    @Test("A brief in the wrong language is refused before it is stored")
+    func wrongLanguage() {
+        let french = Locale(identifier: "fr_FR")
+
+        let right = StorySummarizer.isWritten(
+            in: french,
+            title: "Réforme du calendrier scolaire",
+            summary: "Le ministère envisage de décaler la rentrée dans trois académies pilotes."
+        )
+        let wrong = StorySummarizer.isWritten(
+            in: french,
+            title: "Microsoft Security Updates",
+            summary: "Microsoft released security updates to address vulnerabilities in its SharePoint Server."
+        )
+        // A headline too short to judge is taken at its word : half the words
+        // in one are proper nouns that belong to no language at all.
+        let short = StorySummarizer.isWritten(in: french, title: "Ivanti Sentry", summary: "")
+
+        #expect(right)
+        #expect(!wrong)
+        #expect(short)
+    }
+
     @Test("A headline the reader settled themselves is never written again")
     func lockedBriefs() async throws {
         try await StoryBuilder(database).build(now: now)

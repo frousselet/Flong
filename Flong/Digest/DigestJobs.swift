@@ -61,6 +61,7 @@ nonisolated struct BriefStoriesJob: ResumableJob {
             guard
                 brief.title != story.title || brief.summary != story.summary
                     || brief.isGenerated != story.isGenerated
+                    || brief.askedIn?.identifier != story.briefLocale
             else { continue }
 
             try await save(brief, for: story.id)
@@ -71,10 +72,16 @@ nonisolated struct BriefStoriesJob: ResumableJob {
 
     /// Which stories want a brief.
     ///
-    /// One that has none ; one written without a model, when a model turns up
-    /// afterwards ; and one written in a language that is no longer the
-    /// reader's, since a brief is written in their language and nothing else
-    /// about the story would ever ask for it to be written again.
+    /// The rule is one thing : **has the model been asked about this story, in
+    /// this language?** A story it was never asked about is asked as soon as a
+    /// model appears ; one it answered, refused, or answered in the wrong
+    /// language has been asked, and asking again in the same language would
+    /// get the same answer ; and a reader who changes language has changed the
+    /// question, so every story is asked again.
+    ///
+    /// That is why it is the language asked in rather than the language
+    /// written in : a refusal has no language, and counting it as unanswered
+    /// asked about it for ever.
     ///
     /// Without a model the summary is filled from the article's own standfirst,
     /// so the count reaches zero and the job stops rather than asking for ever.
@@ -89,8 +96,7 @@ nonisolated struct BriefStoriesJob: ResumableJob {
         return (
             """
             brief_locked = 0 AND (
-                summary IS NULL OR is_generated = 0
-                OR brief_locale IS NULL OR brief_locale <> ?
+                summary IS NULL OR brief_locale IS NULL OR brief_locale <> ?
             )
             """,
             [locale.identifier]
@@ -120,7 +126,7 @@ nonisolated struct BriefStoriesJob: ResumableJob {
             story.title = brief.title.isEmpty ? story.title : brief.title
             story.summary = brief.summary
             story.isGenerated = brief.isGenerated
-            story.briefLocale = brief.isGenerated ? summarizer.locale.identifier : nil
+            story.briefLocale = brief.askedIn?.identifier
             story.updatedAt = Date()
             try story.update(db)
         }
