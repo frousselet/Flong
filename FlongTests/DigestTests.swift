@@ -517,6 +517,47 @@ struct DigestTests {
         #expect(try await preferences.scores().isEmpty)
     }
 
+    // MARK: - Managing the subjects
+
+    @Test("Every subject is listed, with what covers it and what was said")
+    func knownTopics() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await put(["calendrier": "Éducation", "macros": "Logiciel", "grotesques": "Logiciel"])
+
+        let preferences = TopicPreferences(database)
+        try await preferences.adjust("Logiciel", by: -2)
+        // A subject the model has stopped using, which the reader must still
+        // be able to find to take back what they said about it.
+        try await preferences.adjust("Cyclisme", by: 1)
+
+        let known = try await preferences.known()
+
+        #expect(known.map(\.name).sorted() == ["Cyclisme", "Logiciel", "Éducation"])
+        let software = try #require(known.first { $0.name == "Logiciel" })
+        let cycling = try #require(known.first { $0.name == "Cyclisme" })
+
+        #expect(software.stories == 2)
+        // A score below nought is a score, not an absence.
+        #expect(software.score == -2)
+        #expect(cycling.stories == 0)
+        #expect(cycling.score == 1)
+
+        // What was spoken about comes first.
+        #expect(known.first?.name == "Logiciel")
+    }
+
+    @Test("Everything said can be taken back at once")
+    func forgetting() async throws {
+        let preferences = TopicPreferences(database)
+        try await preferences.adjust("Logiciel", by: -2)
+        try await preferences.adjust("Éducation", by: 3)
+
+        try await preferences.clearAll()
+
+        #expect(try await preferences.scores().isEmpty)
+        #expect(try await preferences.known().isEmpty)
+    }
+
     // MARK: - Subjects
 
     @Test("A page the model cannot read keeps the subjects it already had")

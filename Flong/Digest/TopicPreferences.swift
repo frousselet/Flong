@@ -34,6 +34,53 @@ nonisolated struct TopicPreferences: Sendable {
         self.database = database
     }
 
+    /// A subject as the reader manages it : what it is called, how much of the
+    /// page it covers, and what they have said about it.
+    nonisolated struct Known: Hashable, Sendable, Identifiable {
+        let name: String
+        let stories: Int
+        let score: Int
+
+        var id: String { name }
+    }
+
+    /// Every subject there is, whether it is on the page today or not.
+    ///
+    /// Subjects the model has stopped using are still listed while a
+    /// preference hangs off them : a reader who asked for less of something
+    /// and cannot find it again to take it back is a reader stuck with it.
+    func known() async throws -> [Known] {
+        try await database.writer.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT name, SUM(stories) AS stories, SUM(score) AS score FROM (
+                        SELECT name, COUNT(*) AS stories, 0 AS score FROM story_topic GROUP BY name
+                        UNION ALL
+                        SELECT name, 0 AS stories, score FROM topic_preference
+                    )
+                    GROUP BY name
+                    """
+            )
+            .map {
+                Known(name: $0["name"], stories: $0["stories"] ?? 0, score: $0["score"] ?? 0)
+            }
+
+            // What the reader spoke about first, then what covers the most,
+            // then the alphabet. The names are compared the other way round
+            // so that the whole comparison stays a single descending one
+            // while the names read forwards.
+            return rows.sorted {
+                (abs($0.score), $0.stories, $1.name) > (abs($1.score), $1.stories, $0.name)
+            }
+        }
+    }
+
+    /// Takes back everything the reader has said.
+    func clearAll() async throws {
+        try await database.writer.write { db in try db.execute(sql: "DELETE FROM topic_preference") }
+    }
+
     /// Every subject the reader has an opinion about.
     func scores() async throws -> [String: Int] {
         try await database.writer.read { db in

@@ -93,10 +93,8 @@ struct SourcesScreen: View {
     /// more thing between them and the article.
     @ViewBuilder
     private var status: some View {
-        Section {
-            rewrite
-
-            Group {
+        if model.hasOutstandingWork || Self.isWorthSaying(model.syncStatus) {
+            Section {
                 if model.hasOutstandingWork {
                     HStack {
                         if model.outstandingFeeds > 0 {
@@ -119,39 +117,6 @@ struct SourcesScreen: View {
             .font(.footnote)
             .foregroundStyle(.secondary)
         }
-    }
-
-    /// Asks the model to write the digest again.
-    ///
-    /// Nothing normally needs it : a story is written again when a model
-    /// turns up, and again when the reader's language changes. It is here for
-    /// the case neither covers, which is a reader who wants a fresh reading of
-    /// the page, and for the one where the model refused all morning and has
-    /// since been switched back on.
-    @ViewBuilder
-    private var rewrite: some View {
-        if let absence = OnDeviceModel.absence {
-            Text(absence)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        } else {
-            rewriteButton
-        }
-    }
-
-    private var rewriteButton: some View {
-        Button {
-            Task { await model.rewriteDigest() }
-        } label: {
-            HStack {
-                Label("Write the digest again", systemImage: "sparkles")
-                Spacer(minLength: 8)
-                if model.isRewriting {
-                    ProgressView().controlSize(.small)
-                }
-            }
-        }
-        .disabled(model.isRewriting)
     }
 
     @ViewBuilder

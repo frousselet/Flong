@@ -52,6 +52,31 @@ struct DigestScreen: View {
         // A large title like every other section's, so it shrinks into the bar
         // as the reader scrolls into the page.
         .navigationTitle(Text(verbatim: Self.today()))
+        // The reader's own menu. Not an account : there is no account, and
+        // nothing here belongs to anyone but the person holding the device.
+        // What it holds is what they have decided, starting with the subjects.
+        .toolbar {
+            ToolbarItem {
+                Menu {
+                    Button {
+                        open(.topics)
+                    } label: {
+                        Label("Subjects", systemImage: "square.stack.3d.up")
+                    }
+
+                    Divider()
+
+                    Button {
+                        Task { await model.rewriteDigest() }
+                    } label: {
+                        Label("Write the digest again", systemImage: "sparkles")
+                    }
+                    .disabled(model.isRewriting || OnDeviceModel.absence != nil)
+                } label: {
+                    Label("Settings", systemImage: "gearshape")
+                }
+            }
+        }
         // No refresh button : the page refreshes itself on returning to the
         // foreground and on a pull, which is every way a reader asks on a touch
         // screen.

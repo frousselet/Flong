@@ -301,6 +301,33 @@ final class AppModel {
         await loadDigest()
     }
 
+    /// Every subject there is, for the screen that manages them.
+    private(set) var knownTopics: [TopicPreferences.Known] = []
+
+    func loadKnownTopics() async {
+        knownTopics = (try? await TopicPreferences(database).known()) ?? []
+    }
+
+    /// Sets a subject to a direction rather than to a number : down, nothing,
+    /// or up. The pill is where a reader nudges ; this is where they decide.
+    func setPreference(of topic: String, to direction: Int) async {
+        let preferences = TopicPreferences(database)
+        try? await preferences.clear(topic)
+        if direction != 0 {
+            try? await preferences.adjust(topic, by: direction)
+        }
+
+        await loadKnownTopics()
+        await loadDigest()
+    }
+
+    /// Takes back everything the reader has said about every subject.
+    func forgetEveryPreference() async {
+        try? await TopicPreferences(database).clearAll()
+        await loadKnownTopics()
+        await loadDigest()
+    }
+
     /// Says the reader wants more of a subject, or less of it.
     ///
     /// The page is read again straight away : a preference nobody can see the
@@ -308,12 +335,14 @@ final class AppModel {
     func prefer(_ topic: String, by delta: Int) async {
         try? await TopicPreferences(database).adjust(topic, by: delta)
         await loadDigest()
+        await loadKnownTopics()
     }
 
     /// Takes back what was said about a subject.
     func forgetPreference(of topic: String) async {
         try? await TopicPreferences(database).clear(topic)
         await loadDigest()
+        await loadKnownTopics()
     }
 
     /// Asks the model to write the page again, whatever it wrote before.
