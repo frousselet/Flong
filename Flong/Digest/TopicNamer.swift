@@ -40,13 +40,6 @@ nonisolated struct GeneratedTopic {
 /// own additions alike, plus one way out. Taking that way out is the only time
 /// it is asked to name anything.
 nonisolated struct TopicNamer: Sendable {
-    /// How many stories are filed in one run.
-    ///
-    /// One call each, a second or so apiece. A page of unfiled stories is
-    /// worked through over a few openings rather than in one long wait, and
-    /// since a story is filed once and keeps it, the backlog only ever shrinks.
-    static let storiesPerRun = 12
-
     /// How many subjects a story is allowed.
     ///
     /// Two. Given more, the model uses more : the page that prompted this

@@ -50,3 +50,7 @@ Only the library is vectorized. A hundred and twenty five thousand vectors would
 Cosine similarity over the whole library, which needs no index structure at this scale : a few thousand vectors against one is a few million multiplications.
 
 The query is embedded **once per model the library holds**, not once. A search is three words long and has no language to detect ; guessing one would send a French question to an English model, which comes back with nothing rather than with an error.
+
+## Filing the stories
+
+One more of the same shape : the stories nobody has filed under a subject yet, one call to the model each. It is resumable for the reason the others are, and for one of its own : a page brings in more stories between two openings than any fixed handful would get through, so a job that stopped after a handful would leave a backlog that never emptied. It runs until there is nothing left, the time runs out, or the model gives up, and a story it could not file is asked about again later, when the vocabulary has grown.

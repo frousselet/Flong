@@ -62,6 +62,8 @@ A story is one event ; a subject is the field several events belong to. The diff
 
 **A subject is a thing, not a reading.** The model used to name the subjects of the whole page on every rebuild, so they drifted : `Sécurité informatique` one run and `Cybersécurité` the next, and the preference the reader had attached to the first was left hanging off a name nothing used any more. There is a vocabulary now. It is written once, it stays, and a story is filed into it once and keeps it.
 
+**Filing is a resumable job**, like the briefs and the vectors. A fixed handful per run left a reader with a permanent backlog, since a page brings in more stories between two openings than a handful : it runs until the backlog is empty, the time runs out, or the model gives up, and picks up where it stopped at the next opening. A story is filed once and keeps it, so the backlog only ever shrinks.
+
 **One story per call, and the answer chosen from a list.** The first version showed the model thirty numbered headlines and asked which numbers fell under which subjects. That is index bookkeeping, which a small model does badly : measured on a real page, it filed wildfires under `Sport` and a set of security advisories under `Économie · Sport · Politique · Sécurité`, every number in range and every one wrong. Asked about one headline at a time, against a schema whose subjects are the values of an enumeration it must choose from, it has nothing to keep track of and cannot answer something that is not a subject. Measured again on the same headlines : `Éducation`, `Logiciel`, `Typographie`, one each.
 
 Two subjects at most. Given more it uses more, and the page that prompted this carried four on one story, of which one was right.
