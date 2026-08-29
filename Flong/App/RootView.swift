@@ -9,6 +9,7 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //
 
+import CoreSpotlight
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -58,7 +59,13 @@ struct ReadingView: View {
         }
         .task {
             await model.load()
+            await model.synchronizeSpotlight()
             await model.refreshDue()
+        }
+        .onContinueUserActivity(CSSearchableItemActionType) { activity in
+            // A kept article opened from the system search opens here.
+            guard let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String else { return }
+            Task { await model.open(spotlightIdentifier: identifier) }
         }
         .onChange(of: scenePhase) { _, phase in
             // Returning to the foreground is the main refresh, the background

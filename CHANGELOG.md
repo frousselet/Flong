@@ -26,3 +26,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Full-text index over every stored article, kept in step by triggers, insensitive to accents and to endings, rebuildable at any time, with the language of an article detected on the device as it arrives.
 - Query language with fields, states, dates, brackets and exclusion, parsed into a tree and compiled to SQL with every value bound, understanding the FreshRSS syntax, and ranking results by relevance when the index can answer the whole query.
 - Search from the article list, following what is typed, completing feed and folder names, and held to the targets of the specification by a test over 125,000 articles.
+- Library : starring or annotating an article copies it whole, so it survives the purge of the stream and the disappearance of its source, and what is kept is handed to Spotlight and found in the system search.

@@ -13,6 +13,14 @@ import Foundation
 import GRDB
 import OSLog
 
+/// What a library operation changed, for the indexer to follow.
+nonisolated struct LibraryChange: Hashable, Sendable {
+    var kept: [LibraryItem] = []
+    var released: [UUID] = []
+
+    var isEmpty: Bool { kept.isEmpty && released.isEmpty }
+}
+
 /// The library : what the reader chose to keep.
 ///
 /// An article enters it by being starred, annotated, or by a rule saying so, as
@@ -90,19 +98,22 @@ nonisolated struct LibraryStore: Sendable {
     /// Starring is the ordinary way into the library, so the two happen in one
     /// transaction : an article that is starred and not kept, or kept and not
     /// starred, is a state nothing in the interface could explain.
-    func setStarred(_ entryIDs: [UUID], to isStarred: Bool, at date: Date = Date()) async throws {
-        guard !entryIDs.isEmpty else { return }
+    @discardableResult
+    func setStarred(_ entryIDs: [UUID], to isStarred: Bool, at date: Date = Date()) async throws -> LibraryChange {
+        guard !entryIDs.isEmpty else { return LibraryChange() }
 
-        try await database.writer.write { db in
+        return try await database.writer.write { db in
             _ = try Entry.filter(keys: entryIDs).updateAll(db, Column("is_starred").set(to: isStarred))
 
+            var change = LibraryChange()
             for entryID in entryIDs {
                 if isStarred {
-                    _ = try Self.promote(entryID, at: date, in: db)
-                } else {
-                    try Self.demoteIfNothingElseKeepsIt(entryID, in: db)
+                    if let item = try Self.promote(entryID, at: date, in: db) { change.kept.append(item) }
+                } else if let released = try Self.demoteIfNothingElseKeepsIt(entryID, in: db) {
+                    change.released.append(released)
                 }
             }
+            return change
         }
     }
 
@@ -110,22 +121,24 @@ nonisolated struct LibraryStore: Sendable {
     ///
     /// This is the path a rule takes at M5, and the one an annotation takes.
     @discardableResult
-    func promote(_ entryIDs: [UUID], at date: Date = Date()) async throws -> Int {
+    func promote(_ entryIDs: [UUID], at date: Date = Date()) async throws -> LibraryChange {
         try await database.writer.write { db in
-            try entryIDs.reduce(into: 0) { count, entryID in
-                if try Self.promote(entryID, at: date, in: db) != nil { count += 1 }
+            try entryIDs.reduce(into: LibraryChange()) { change, entryID in
+                if let item = try Self.promote(entryID, at: date, in: db) { change.kept.append(item) }
             }
         }
     }
 
     /// Writes what the reader thinks of an article, keeping it in the process.
-    func annotate(_ entryID: UUID, with note: String?, at date: Date = Date()) async throws {
+    @discardableResult
+    func annotate(_ entryID: UUID, with note: String?, at date: Date = Date()) async throws -> LibraryChange {
         let note = note?.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        try await database.writer.write { db in
-            guard var item = try Self.promote(entryID, at: date, in: db) else { return }
+        return try await database.writer.write { db in
+            guard var item = try Self.promote(entryID, at: date, in: db) else { return LibraryChange() }
             item.annotation = (note?.isEmpty ?? true) ? nil : note
             try item.update(db)
+            return LibraryChange(kept: [item])
         }
     }
 
@@ -133,13 +146,15 @@ nonisolated struct LibraryStore: Sendable {
     ///
     /// The stream row, if it is still there, loses its star with it : the two
     /// always agree.
-    func remove(_ itemIDs: [UUID]) async throws {
+    @discardableResult
+    func remove(_ itemIDs: [UUID]) async throws -> LibraryChange {
         try await database.writer.write { db in
             let items = try LibraryItem.filter(keys: itemIDs).fetchAll(db)
             let entryIDs = items.compactMap(\.entryID)
 
             _ = try Entry.filter(keys: entryIDs).updateAll(db, Column("is_starred").set(to: false))
             _ = try LibraryItem.filter(keys: itemIDs).deleteAll(db)
+            return LibraryChange(released: items.map(\.id))
         }
     }
 
@@ -190,11 +205,12 @@ nonisolated struct LibraryStore: Sendable {
     ///
     /// An annotation outlives a star : unstarring an article somebody wrote
     /// about must not throw away what they wrote.
-    private static func demoteIfNothingElseKeepsIt(_ entryID: UUID, in db: Database) throws {
-        guard let item = try LibraryItem.filter(LibraryItem.Columns.entryID == entryID).fetchOne(db) else { return }
-        guard item.annotation?.isEmpty ?? true else { return }
+    private static func demoteIfNothingElseKeepsIt(_ entryID: UUID, in db: Database) throws -> UUID? {
+        guard let item = try LibraryItem.filter(LibraryItem.Columns.entryID == entryID).fetchOne(db) else { return nil }
+        guard item.annotation?.isEmpty ?? true else { return nil }
 
         _ = try item.delete(db)
+        return item.id
     }
 
     // MARK: - Shapes
