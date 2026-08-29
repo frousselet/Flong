@@ -1,0 +1,374 @@
+//
+//  AppModel.swift
+//  Flong
+//
+//  Created by François Rousselet on 29/08/2026.
+//
+//  This Source Code Form is subject to the terms of the Mozilla Public
+//  License, v. 2.0. If a copy of the MPL was not distributed with this
+//  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+
+import Foundation
+import OSLog
+
+/// An entry of the sidebar.
+struct SidebarItem: Identifiable, Hashable {
+    /// What an entry stands for. It is also the selection, so it holds nothing
+    /// that changes when a feed is renamed.
+    enum Kind: Hashable {
+        case unread, today, starred, all
+        case folder(String)
+        case feed(UUID)
+    }
+
+    let kind: Kind
+    /// The name of a folder or a feed. Smart lists are named by the interface,
+    /// in the reader's language.
+    let title: String?
+    let unreadCount: Int
+    var children: [SidebarItem] = []
+
+    var id: Kind { kind }
+
+    var filter: ArticleFilter {
+        switch kind {
+        case .unread: .unread
+        case .today: .today
+        case .starred: .starred
+        case .all: .all
+        case .folder(let path): .folder(path)
+        case .feed(let id): .feed(id)
+        }
+    }
+}
+
+/// Why something the reader asked for did not happen.
+enum AppFailure: Hashable, Identifiable {
+    case unreadableFile
+    case notOPML
+    case notSaved
+    case invalidAddress
+    case unreachableFeed
+    case noFeedFound
+
+    var id: Self { self }
+
+    var message: LocalizedStringResource {
+        switch self {
+        case .unreadableFile: "This file could not be opened."
+        case .notOPML: "This file could not be read as OPML."
+        case .notSaved: "The subscriptions could not be saved."
+        case .invalidAddress: "This address is not one Flong can follow."
+        case .unreachableFeed: "This address could not be reached."
+        case .noFeedFound: "No feed was found at this address."
+        }
+    }
+}
+
+/// What the window shows, and what the reader can do to it.
+///
+/// One object for one window : the three levels of section 16 of the
+/// specification move together, and splitting them would mean keeping three
+/// copies of the same selection in step.
+@Observable
+final class AppModel {
+    private let database: AppDatabase
+    private let subscriptions: SubscriptionStore
+    private let articles: ArticleStore
+    private let refresher: FeedRefresh
+    private let retention: Retention
+    private let finder: FeedFinder
+    private let opml: OPMLImport
+
+    private(set) var sidebar: [SidebarItem] = []
+    private(set) var summaries: [ArticleSummary] = []
+    private(set) var article: Article?
+    private(set) var isRefreshing = false
+    private(set) var feedCount = 0
+
+    var selection: SidebarItem.Kind? = .unread {
+        didSet { Task { await loadArticles() } }
+    }
+    var selectedArticle: UUID? {
+        didSet { Task { await openSelectedArticle() } }
+    }
+
+    /// The summary of the last import, until the reader dismisses it.
+    var report: OPMLImportReport?
+    var failure: AppFailure?
+
+    init(database: AppDatabase, fetcher: FeedFetcher = FeedFetcher()) {
+        self.database = database
+        let subscriptions = SubscriptionStore(database)
+        self.subscriptions = subscriptions
+        self.articles = ArticleStore(database)
+        self.refresher = FeedRefresh(database: database, fetcher: fetcher)
+        self.retention = Retention(database)
+        self.finder = FeedFinder(fetcher: fetcher)
+        self.opml = OPMLImport(subscriptions)
+    }
+
+    /// The fixed views, which every reader has whatever they follow.
+    var smartLists: [SidebarItem] {
+        sidebar.filter { item in
+            switch item.kind {
+            case .unread, .today, .starred, .all: true
+            default: false
+            }
+        }
+    }
+
+    /// The folders and the feeds outside them.
+    var feedItems: [SidebarItem] {
+        sidebar.filter { item in
+            switch item.kind {
+            case .folder, .feed: true
+            default: false
+            }
+        }
+    }
+
+    var filter: ArticleFilter {
+        sidebar.flatMap { [$0] + $0.children }.first { $0.kind == selection }?.filter ?? .unread
+    }
+
+    /// Whether Flong follows anything at all, which is what the first launch
+    /// of section 16 turns on.
+    var isEmpty: Bool { feedCount == 0 }
+
+    // MARK: - Loading
+
+    func load() async {
+        await loadSidebar()
+        await loadArticles()
+    }
+
+    func loadSidebar() async {
+        do {
+            let feeds = try await subscriptions.feeds()
+            let counts = try await articles.unreadCounts()
+
+            var items: [SidebarItem] = [
+                SidebarItem(kind: .unread, title: nil, unreadCount: try await articles.count(.unread)),
+                SidebarItem(kind: .today, title: nil, unreadCount: try await articles.count(.today)),
+                SidebarItem(kind: .starred, title: nil, unreadCount: 0),
+                SidebarItem(kind: .all, title: nil, unreadCount: 0),
+            ]
+
+            let grouped = Dictionary(grouping: feeds, by: \.folder)
+            let folders = grouped.keys.compactMap { $0 }.sorted {
+                $0.localizedStandardCompare($1) == .orderedAscending
+            }
+
+            for folder in folders {
+                let children = (grouped[folder] ?? []).map { item(for: $0, counts: counts) }
+                items.append(
+                    SidebarItem(
+                        kind: .folder(folder),
+                        title: folder,
+                        unreadCount: children.reduce(0) { $0 + $1.unreadCount },
+                        children: children
+                    )
+                )
+            }
+            items += (grouped[nil] ?? []).map { item(for: $0, counts: counts) }
+
+            sidebar = items
+            feedCount = feeds.count
+        } catch {
+            Log.store.error("The sidebar could not be built : \(error, privacy: .public)")
+        }
+    }
+
+    private func item(for feed: Feed, counts: [UUID: Int]) -> SidebarItem {
+        SidebarItem(kind: .feed(feed.id), title: feed.title, unreadCount: counts[feed.id] ?? 0)
+    }
+
+    func loadArticles() async {
+        do {
+            summaries = try await articles.summaries(filter)
+            if let selectedArticle, !summaries.contains(where: { $0.id == selectedArticle }) {
+                self.selectedArticle = nil
+            }
+        } catch {
+            Log.store.error("The articles could not be read : \(error, privacy: .public)")
+        }
+    }
+
+    private func openSelectedArticle() async {
+        guard let selectedArticle else {
+            article = nil
+            return
+        }
+
+        do {
+            article = try await articles.article(id: selectedArticle)
+            // Opening an article is what marks it read. Nothing waits on
+            // anything : the row changes now.
+            try await articles.setRead([selectedArticle], to: true)
+            await refreshCounts(markingRead: selectedArticle)
+        } catch {
+            Log.store.error("The article could not be opened : \(error, privacy: .public)")
+        }
+    }
+
+    /// Updates what is on screen after a read state changed, without refetching
+    /// the whole list.
+    private func refreshCounts(markingRead id: UUID?) async {
+        if let id, let index = summaries.firstIndex(where: { $0.id == id }), !summaries[index].isRead {
+            summaries[index].isRead = true
+        }
+        await loadSidebar()
+    }
+
+    // MARK: - Reading
+
+    func toggleRead(_ summary: ArticleSummary) async {
+        do {
+            try await articles.setRead([summary.id], to: !summary.isRead)
+            if let index = summaries.firstIndex(where: { $0.id == summary.id }) {
+                summaries[index].isRead = !summary.isRead
+            }
+            await loadSidebar()
+        } catch {
+            Log.store.error("The read state could not be changed : \(error, privacy: .public)")
+        }
+    }
+
+    func toggleStarred(_ summary: ArticleSummary) async {
+        do {
+            try await articles.setStarred([summary.id], to: !summary.isStarred)
+            if let index = summaries.firstIndex(where: { $0.id == summary.id }) {
+                summaries[index].isStarred = !summary.isStarred
+            }
+        } catch {
+            Log.store.error("The starred state could not be changed : \(error, privacy: .public)")
+        }
+    }
+
+    /// Stars or unstars the article being read.
+    func toggleStarredCurrent() async {
+        guard let article else { return }
+        let isStarred = !article.entry.isStarred
+
+        do {
+            try await articles.setStarred([article.id], to: isStarred)
+            var entry = article.entry
+            entry.isStarred = isStarred
+            self.article = Article(entry: entry, feedTitle: article.feedTitle, bodyHTML: article.bodyHTML)
+
+            if let index = summaries.firstIndex(where: { $0.id == article.id }) {
+                summaries[index].isStarred = isStarred
+            }
+        } catch {
+            Log.store.error("The starred state could not be changed : \(error, privacy: .public)")
+        }
+    }
+
+    /// Puts the article being read back in the unread pile, and closes it.
+    ///
+    /// Reading an article marks it read, so the only way this is ever asked for
+    /// is deliberately, to come back to it later.
+    func markCurrentUnread() async {
+        guard let article else { return }
+
+        do {
+            try await articles.setRead([article.id], to: false)
+            if let index = summaries.firstIndex(where: { $0.id == article.id }) {
+                summaries[index].isRead = false
+            }
+            selectedArticle = nil
+            await loadSidebar()
+        } catch {
+            Log.store.error("The read state could not be changed : \(error, privacy: .public)")
+        }
+    }
+
+    func markAllRead() async {
+        do {
+            _ = try await articles.markRead(filter)
+            await load()
+        } catch {
+            Log.store.error("The view could not be marked read : \(error, privacy: .public)")
+        }
+    }
+
+    // MARK: - Refreshing
+
+    /// Refreshes every feed, which is what a pull means.
+    func refreshAll() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        _ = await refresher.refreshAll()
+        _ = try? await retention.purge()
+        await load()
+    }
+
+    /// Refreshes the feeds that are due, on returning to the foreground.
+    func refreshDue() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        let summary = await refresher.refreshDue()
+        guard summary.attempted > 0 else { return }
+        await load()
+    }
+
+    // MARK: - Subscribing
+
+    func addFeed(at address: String) async {
+        do {
+            let found = try await finder.find(at: address)
+            let subscription = try Subscription(
+                url: found.url,
+                title: found.title ?? "",
+                siteURL: found.siteURL,
+                iconURL: found.iconURL
+            )
+            let result = try await subscriptions.subscribe(to: subscription)
+
+            _ = await refresher.refresh(result.feed)
+            selection = .feed(result.feed.id)
+            await load()
+        } catch let error as FeedFinderError {
+            switch error {
+            case .invalidAddress: failure = .invalidAddress
+            case .unreachable: failure = .unreachableFeed
+            case .noFeedFound: failure = .noFeedFound
+            }
+        } catch {
+            failure = .notSaved
+        }
+    }
+
+    func unsubscribe(_ id: UUID) async {
+        do {
+            try await subscriptions.unsubscribe(id)
+            if case .feed(let selected) = selection, selected == id { selection = .unread }
+            await load()
+        } catch {
+            Log.store.error("The feed could not be removed : \(error, privacy: .public)")
+        }
+    }
+
+    func importOPML(from url: URL) async {
+        do {
+            report = try await opml(contentsOf: url)
+            await load()
+            await refreshAll()
+        } catch let error as OPMLError {
+            failure = .notOPML
+            Log.store.error("The file is not an OPML document : \(String(describing: error), privacy: .public)")
+        } catch let error as CocoaError {
+            failure = .unreadableFile
+            Log.store.error("The file could not be read : \(error, privacy: .public)")
+        } catch {
+            failure = .notSaved
+            Log.store.error("The import could not be saved : \(error, privacy: .public)")
+        }
+    }
+}
