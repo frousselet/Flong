@@ -469,12 +469,21 @@ struct TopicNamerTests {
         #expect(assigned[stories[3].id] == "Logiciel")
     }
 
-    @Test("A subject covering one story is not a subject")
+    @Test("A subject covering one story is still a subject")
     func singletons() {
         let assigned = TopicNamer.assign(topics([("Éducation", [1, 2]), ("Typographie", [3])]), to: stories)
 
-        // A pill covering one story says what the story underneath already says.
-        #expect(assigned[stories[2].id] == nil)
+        // Dropping these was measured against the real model and threw away
+        // everything : on a page of three stories the model gives three
+        // subjects, one story each.
+        #expect(assigned[stories[2].id] == "Typographie")
+        #expect(Set(assigned.values) == ["Éducation", "Typographie"])
+    }
+
+    @Test("A subject left holding nothing is dropped")
+    func empty() {
+        let assigned = TopicNamer.assign(topics([("Éducation", [1, 2]), ("Rien", [99])]), to: stories)
+
         #expect(Set(assigned.values) == ["Éducation"])
     }
 
@@ -492,6 +501,7 @@ struct TopicNamerTests {
 
         #expect(assigned[stories[1].id] == "Éducation")
         #expect(assigned[stories[2].id] == "Logiciel")
+        #expect(assigned[stories[3].id] == "Logiciel")
     }
 
     @Test("A subject with no name is no subject")

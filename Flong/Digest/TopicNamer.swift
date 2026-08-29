@@ -57,10 +57,15 @@ nonisolated struct TopicNamer: Sendable {
     /// What is left for the answer, whatever the prompt turns out to cost.
     static let reservedTokens = 500
 
-    /// Under this many stories, a subject is not a subject.
+    /// How many stories a page needs before its subjects are worth asking for.
     ///
-    /// A pill covering one story is a pill that says what the story underneath
-    /// already says, and six pills for six stories is a page of buttons.
+    /// A page of one story has one subject, and a filter with one thing on
+    /// each side of it is not a filter.
+    ///
+    /// A subject covering a single story is kept, though. Dropping those was
+    /// measured against the real model and threw away everything : with three
+    /// stories on a page the model gives three subjects, each covering one,
+    /// and a rule that wants two per subject leaves no subjects at all.
     static let minimumStories = 2
 
     let locale: Locale
@@ -72,8 +77,8 @@ nonisolated struct TopicNamer: Sendable {
     private var instructions: String {
         """
         You group news headlines under a few broad subjects.
+        A subject is a field of interest, not a single event.
         \(OnDeviceModel.languageInstruction(for: locale))
-        A subject is a field, not an event : `Education`, `Software`, `Typography`.
         Never invent a headline, and never use a number you were not given.
         Never mention that you are a model or that you were asked anything.
         """
@@ -97,7 +102,11 @@ nonisolated struct TopicNamer: Sendable {
         let shown = Array(stories.prefix(Self.headlinesShown))
         do {
             let session = LanguageModelSession(instructions: instructions)
-            let prompt = Self.prompt(for: shown)
+            // The language is said twice, in the instructions and again beside
+            // the task. A small model asked once at the top answers in the
+            // language of the words nearest its answer, and the headlines are
+            // nearer than the instructions.
+            let prompt = Self.prompt(for: shown, language: OnDeviceModel.languageInstruction(for: locale))
 
             if #available(iOS 26.4, macOS 26.4, *) {
                 let model = SystemLanguageModel.default
@@ -121,9 +130,9 @@ nonisolated struct TopicNamer: Sendable {
     /// Reads the answer back, keeping only what it is entitled to say.
     ///
     /// A model asked for numbers returns numbers, and now and then returns one
-    /// that was never on the list. A subject covering a single story is dropped
-    /// with it, and a story named twice keeps the first subject that claimed it,
-    /// so that every story ends up under exactly one.
+    /// that was never on the list. A story named twice keeps the first subject
+    /// that claimed it, so that every story ends up under exactly one, and a
+    /// subject left holding nothing is dropped.
     static func assign(_ generated: GeneratedTopics, to stories: [(id: UUID, title: String)]) -> [UUID: String] {
         var assigned: [UUID: String] = [:]
 
@@ -140,19 +149,20 @@ nonisolated struct TopicNamer: Sendable {
                 }
                 .filter { assigned[$0] == nil }
 
-            guard claimed.count >= minimumStories else { continue }
+            guard !claimed.isEmpty else { continue }
             for id in claimed { assigned[id] = name }
         }
         return assigned
     }
 
-    private static func prompt(for stories: [(id: UUID, title: String)]) -> String {
+    private static func prompt(for stories: [(id: UUID, title: String)], language: String) -> String {
         let lines = stories.enumerated().map { index, story in
             "\(index + 1). \(story.title)"
         }
 
         return """
             Group these headlines under a few broad subjects.
+            \(language)
 
             \(lines.joined(separator: "\n"))
             """
