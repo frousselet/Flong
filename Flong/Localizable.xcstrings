@@ -341,6 +341,16 @@
         }
       }
     },
+    "Library": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bibliothèque"
+          }
+        }
+      }
+    },
     "Mark all as read": {
       "localizations": {
         "fr": {

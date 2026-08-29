@@ -17,7 +17,7 @@ struct SidebarItem: Identifiable, Hashable {
     /// What an entry stands for. It is also the selection, so it holds nothing
     /// that changes when a feed is renamed.
     enum Kind: Hashable {
-        case unread, today, starred, all
+        case unread, today, library, starred, all
         case folder(String)
         case feed(UUID)
     }
@@ -36,7 +36,9 @@ struct SidebarItem: Identifiable, Hashable {
         case .unread: .unread
         case .today: .today
         case .starred: .starred
-        case .all: .all
+        // The library is not a view over the stream : it is its own table, and
+        // the list reads it directly.
+        case .library, .all: .all
         case .folder(let path): .folder(path)
         case .feed(let id): .feed(id)
         }
@@ -76,6 +78,7 @@ final class AppModel {
     private let database: AppDatabase
     private let subscriptions: SubscriptionStore
     private let articles: ArticleStore
+    private let library: LibraryStore
     private let refresher: FeedRefresh
     private let retention: Retention
     private let finder: FeedFinder
@@ -179,6 +182,7 @@ final class AppModel {
         let subscriptions = SubscriptionStore(database)
         self.subscriptions = subscriptions
         self.articles = ArticleStore(database)
+        self.library = LibraryStore(database)
         self.refresher = FeedRefresh(database: database, fetcher: fetcher)
         self.retention = Retention(database)
         self.finder = FeedFinder(fetcher: fetcher)
@@ -189,7 +193,7 @@ final class AppModel {
     var smartLists: [SidebarItem] {
         sidebar.filter { item in
             switch item.kind {
-            case .unread, .today, .starred, .all: true
+            case .unread, .today, .library, .starred, .all: true
             default: false
             }
         }
@@ -228,6 +232,7 @@ final class AppModel {
             var items: [SidebarItem] = [
                 SidebarItem(kind: .unread, title: nil, unreadCount: try await articles.count(.unread)),
                 SidebarItem(kind: .today, title: nil, unreadCount: try await articles.count(.today)),
+                SidebarItem(kind: .library, title: nil, unreadCount: 0),
                 SidebarItem(kind: .starred, title: nil, unreadCount: 0),
                 SidebarItem(kind: .all, title: nil, unreadCount: 0),
             ]
@@ -261,9 +266,15 @@ final class AppModel {
         SidebarItem(kind: .feed(feed.id), title: feed.title, unreadCount: counts[feed.id] ?? 0)
     }
 
+    /// Whether the list is showing the library rather than a view of the stream.
+    var isShowingLibrary: Bool { selection == .library }
+
     func loadArticles() async {
         do {
-            summaries = try await articles.summaries(filter, matching: query)
+            summaries =
+                isShowingLibrary
+                ? try await library.summaries(matching: searchText)
+                : try await articles.summaries(filter, matching: query)
             if let selectedArticle, !summaries.contains(where: { $0.id == selectedArticle }) {
                 self.selectedArticle = nil
             }
@@ -278,12 +289,22 @@ final class AppModel {
             return
         }
 
+        let origin = summaries.first { $0.id == selectedArticle }?.origin ?? .stream
+
         do {
-            article = try await articles.article(id: selectedArticle)
-            // Opening an article is what marks it read. Nothing waits on
-            // anything : the row changes now.
-            try await articles.setRead([selectedArticle], to: true)
-            await refreshCounts(markingRead: selectedArticle)
+            switch origin {
+            case .library:
+                // A kept article was read the day it was kept, and reading it
+                // again changes nothing about it.
+                article = try await library.article(id: selectedArticle)
+
+            case .stream:
+                article = try await articles.article(id: selectedArticle)
+                // Opening an article is what marks it read. Nothing waits on
+                // anything : the row changes now.
+                try await articles.setRead([selectedArticle], to: true)
+                await refreshCounts(markingRead: selectedArticle)
+            }
         } catch {
             Log.store.error("The article could not be opened : \(error, privacy: .public)")
         }
@@ -312,11 +333,20 @@ final class AppModel {
         }
     }
 
+    /// Stars an article, which is what keeps it, or lets go of a kept one.
     func toggleStarred(_ summary: ArticleSummary) async {
         do {
-            try await articles.setStarred([summary.id], to: !summary.isStarred)
-            if let index = summaries.firstIndex(where: { $0.id == summary.id }) {
-                summaries[index].isStarred = !summary.isStarred
+            switch summary.origin {
+            case .stream:
+                try await library.setStarred([summary.id], to: !summary.isStarred)
+                if let index = summaries.firstIndex(where: { $0.id == summary.id }) {
+                    summaries[index].isStarred = !summary.isStarred
+                }
+                await loadSidebar()
+
+            case .library:
+                try await library.remove([summary.id])
+                await load()
             }
         } catch {
             Log.store.error("The starred state could not be changed : \(error, privacy: .public)")
@@ -326,16 +356,23 @@ final class AppModel {
     /// Stars or unstars the article being read.
     func toggleStarredCurrent() async {
         guard let article else { return }
-        let isStarred = !article.entry.isStarred
 
         do {
-            try await articles.setStarred([article.id], to: isStarred)
-            var entry = article.entry
-            entry.isStarred = isStarred
-            self.article = Article(entry: entry, feedTitle: article.feedTitle, bodyHTML: article.bodyHTML)
+            switch article.origin {
+            case .stream:
+                let isStarred = !article.isStarred
+                try await library.setStarred([article.id], to: isStarred)
 
-            if let index = summaries.firstIndex(where: { $0.id == article.id }) {
-                summaries[index].isStarred = isStarred
+                self.article?.isStarred = isStarred
+                if let index = summaries.firstIndex(where: { $0.id == article.id }) {
+                    summaries[index].isStarred = isStarred
+                }
+                await loadSidebar()
+
+            case .library:
+                try await library.remove([article.id])
+                selectedArticle = nil
+                await load()
             }
         } catch {
             Log.store.error("The starred state could not be changed : \(error, privacy: .public)")
@@ -344,10 +381,12 @@ final class AppModel {
 
     /// Puts the article being read back in the unread pile, and closes it.
     ///
+    /// A kept article has no unread state to go back to.
+    ///
     /// Reading an article marks it read, so the only way this is ever asked for
     /// is deliberately, to come back to it later.
     func markCurrentUnread() async {
-        guard let article else { return }
+        guard let article, article.origin == .stream else { return }
 
         do {
             try await articles.setRead([article.id], to: false)

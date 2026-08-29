@@ -79,7 +79,7 @@ struct AppModelTests {
 
         await model.load()
 
-        #expect(model.smartLists.map(\.kind) == [.unread, .today, .starred, .all])
+        #expect(model.smartLists.map(\.kind) == [.unread, .today, .library, .starred, .all])
         #expect(model.smartLists.first?.unreadCount == 2)
 
         #expect(model.feedItems.map(\.title) == ["Presse", "Loose"])
