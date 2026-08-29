@@ -63,7 +63,22 @@ nonisolated extension AppDatabase {
             try addTopics(db)
         }
 
+        migrator.registerMigration("v7.briefLanguage") { db in
+            try addBriefLanguage(db)
+        }
+
         return migrator
+    }
+
+    /// The language a brief was written in.
+    ///
+    /// A brief is written in the reader's language, and a reader who changes it
+    /// would otherwise keep yesterday's for ever : nothing else about the story
+    /// has changed, so nothing else would ask for it to be written again.
+    private static func addBriefLanguage(_ db: Database) throws {
+        try db.alter(table: "story") { table in
+            table.add(column: "brief_locale", .text)
+        }
     }
 
     /// The subject a story falls under, when the model found one.

@@ -253,6 +253,8 @@ final class AppModel {
     }
 
     private(set) var digest = Digest()
+    /// Whether the model is writing the page again, asked for by the reader.
+    private(set) var isRewriting = false
     /// The articles of the story the reader opened, and of that one only : a
     /// digest that loaded every article of every story would be the list it
     /// exists to replace.
@@ -288,8 +290,23 @@ final class AppModel {
         await loadDigest()
         await loadLooseArticles()
 
+        // The briefs first, then the subjects : the model sorts the page it
+        // is shown, and a written headline says what a story is about far
+        // better than the title of whichever article was nearest its middle.
         await digestService.brief()
+        await digestService.nameTopics()
         await loadDigest()
+    }
+
+    /// Asks the model to write the page again, whatever it wrote before.
+    func rewriteDigest() async {
+        guard !isRewriting else { return }
+        isRewriting = true
+        defer { isRewriting = false }
+
+        await digestService.rewrite()
+        await loadDigest()
+        await loadLooseArticles()
     }
 
     /// Loads a story's articles for its own page.
@@ -693,6 +710,12 @@ final class AppModel {
         await cloud?.enqueueReadStates()
         await cloud?.enqueueCatchUp()
         await load()
+
+        // The rebuild wrote new stories, briefs and subjects. Reading the
+        // feeds back without reading the page back would leave the reader
+        // looking at the page from before the pull.
+        await loadDigest()
+        await loadLooseArticles()
     }
 
     /// Refreshes the feeds that are due, on returning to the foreground.

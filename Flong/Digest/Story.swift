@@ -27,6 +27,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         case summary
         case isGenerated = "is_generated"
         case briefLocked = "brief_locked"
+        case briefLocale = "brief_locale"
         case topic
         case signature
         case articleCount = "article_count"
@@ -46,6 +47,9 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
     var isGenerated: Bool
     /// Whether the reader has settled the matter themselves.
     var briefLocked: Bool
+
+    /// The language the brief was written in, when a model wrote it.
+    var briefLocale: String?
 
     /// The subject it falls under, as the model named it, or `nil` where there
     /// is no model or the model put this story under nothing.
@@ -67,6 +71,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         summary: String? = nil,
         isGenerated: Bool = false,
         briefLocked: Bool = false,
+        briefLocale: String? = nil,
         topic: String? = nil,
         signature: TextSignature? = nil,
         articleCount: Int = 0,
@@ -80,6 +85,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         self.summary = summary
         self.isGenerated = isGenerated
         self.briefLocked = briefLocked
+        self.briefLocale = briefLocale
         self.topic = topic
         self.signature = signature
         self.articleCount = articleCount

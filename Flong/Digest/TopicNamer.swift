@@ -41,9 +41,10 @@ nonisolated struct GeneratedTopic {
 /// numbers fall under each, which is a far smaller thing to ask than naming a
 /// subject for a story in isolation, where it has nothing to compare against.
 ///
-/// Where there is no model there are no topics, and the page is the front page.
-/// Section 14 asks for the path without the model to be entire, and a front page
-/// is entire : the pills are a way of narrowing it, never the only way in.
+/// Where there has never been a model there are no subjects, and the page is
+/// the front page. Section 14 asks for the path without the model to be
+/// entire, and a front page is entire : the pills are a way of narrowing it,
+/// never the only way in.
 nonisolated struct TopicNamer: Sendable {
     /// How many headlines the model is shown.
     ///
@@ -78,12 +79,20 @@ nonisolated struct TopicNamer: Sendable {
         """
     }
 
-    /// The subject of each story, for the stories the model put under one.
+    /// The subject of each story, for the stories the model put under one, or
+    /// `nil` when the model said nothing at all.
     ///
-    /// Stories it leaves out keep no topic, which is right : they are still on
-    /// the front page, they are simply on no pill.
-    func topics(of stories: [(id: UUID, title: String)]) async -> [UUID: String] {
-        guard OnDeviceModel.isAvailable, stories.count >= Self.minimumStories else { return [:] }
+    /// The difference matters. An empty answer is the model saying these
+    /// stories fall under no common subject, and the pills go. No answer is
+    /// the model being unavailable, or refusing, or the page being too long to
+    /// show it, and the subjects already on the page are the best reading
+    /// anyone has : blanking them because Apple Intelligence was switched off
+    /// for an afternoon would be losing work to a transient.
+    ///
+    /// Stories the model leaves out keep no subject, which is right : they are
+    /// still on the front page, they are simply on no pill.
+    func topics(of stories: [(id: UUID, title: String)]) async -> [UUID: String]? {
+        guard OnDeviceModel.isAvailable, stories.count >= Self.minimumStories else { return nil }
 
         let shown = Array(stories.prefix(Self.headlinesShown))
         do {
@@ -96,7 +105,7 @@ nonisolated struct TopicNamer: Sendable {
 
                 guard cost + Self.reservedTokens < model.contextSize else {
                     Log.enrich.notice("The page was too long to sort into subjects")
-                    return [:]
+                    return nil
                 }
             }
 
@@ -105,7 +114,7 @@ nonisolated struct TopicNamer: Sendable {
             return Self.assign(response.content, to: shown)
         } catch {
             OnDeviceModel.refused(error)
-            return [:]
+            return nil
         }
     }
 

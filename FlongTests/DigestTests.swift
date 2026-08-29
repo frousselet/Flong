@@ -256,7 +256,119 @@ struct DigestTests {
         #expect(page.stories.contains { $0.title.localizedCaseInsensitiveContains("macros") })
     }
 
+    // MARK: - The language of a brief
+
+    @Test("A brief written in a language the reader no longer reads is written again")
+    func briefLanguage() async throws {
+        try await StoryBuilder(database).build(now: now)
+
+        // Every story has a brief already, one of them written in French and
+        // the rest in English, as they would be by a reader who has just
+        // changed the language of their device.
+        try await database.writer.write { db in
+            for (index, story) in try Story.fetchAll(db).enumerated() {
+                var story = story
+                story.summary = "Ce qui est arrivé."
+                story.isGenerated = true
+                story.briefLocale = index == 0 ? "fr_FR" : "en_GB"
+                try story.update(db)
+            }
+        }
+
+        let work = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true)
+        let waiting = try await database.writer.read { db in
+            try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM story WHERE \(work.sql)",
+                arguments: work.arguments
+            ) ?? 0
+        }
+
+        // The French one is left alone, the English ones are asked for again.
+        #expect(waiting == 2)
+    }
+
+    @Test("A headline the reader settled themselves is never written again")
+    func lockedBriefs() async throws {
+        try await StoryBuilder(database).build(now: now)
+
+        try await database.writer.write { db in
+            for story in try Story.fetchAll(db) {
+                var story = story
+                story.summary = "Written in English."
+                story.isGenerated = true
+                story.briefLocale = "en_GB"
+                story.briefLocked = true
+                try story.update(db)
+            }
+        }
+
+        let work = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true)
+        let waiting = try await database.writer.read { db in
+            try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM story WHERE \(work.sql)",
+                arguments: work.arguments
+            ) ?? 0
+        }
+
+        #expect(waiting == 0)
+    }
+
+    @Test("Throwing away what the model wrote spares what the reader settled")
+    func rewriting() async throws {
+        try await StoryBuilder(database).build(now: now)
+
+        try await database.writer.write { db in
+            for (index, story) in try Story.fetchAll(db).enumerated() {
+                var story = story
+                story.summary = "Written by the model."
+                story.isGenerated = true
+                story.briefLocale = "en_GB"
+                story.topic = "Software"
+                story.briefLocked = index == 0
+                try story.update(db)
+            }
+        }
+
+        // The clearing on its own : what follows it is a rebuild, which on a
+        // machine that has a model writes the page again straight away.
+        await service.discardWhatTheModelWrote()
+
+        let stories = try await database.writer.read { db in try Story.fetchAll(db) }
+        let settled = try #require(stories.first { $0.briefLocked })
+        let rest = stories.filter { !$0.briefLocked }
+
+        // What the reader settled stays settled, subject included.
+        #expect(settled.summary == "Written by the model.")
+        #expect(settled.topic == "Software")
+
+        #expect(rest.count == 2)
+        #expect(rest.allSatisfy { $0.summary == nil })
+        #expect(rest.allSatisfy { !$0.isGenerated })
+        #expect(rest.allSatisfy { $0.briefLocale == nil })
+        #expect(rest.allSatisfy { $0.topic == nil })
+    }
+
     // MARK: - Subjects
+
+    @Test("A page the model cannot read keeps the subjects it already had")
+    func modelSilence() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await put(["calendrier": "Éducation", "macros": "Logiciel", "grotesques": "Logiciel"])
+
+        // What the naming job does when the model says nothing : on a machine
+        // with no Apple Intelligence, that is every run.
+        let silent = await TopicNamer().topics(of: [])
+        #expect(silent == nil)
+
+        await service.nameTopics(now: now)
+
+        // Blanking a good page because the model was switched off for an
+        // afternoon would be losing work to a transient.
+        let page = try await service.digest(now: now)
+        #expect(!page.topics.isEmpty)
+    }
 
     @Test("The pills are the subjects on the page, most covered first")
     func topics() async throws {

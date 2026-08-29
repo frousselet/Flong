@@ -30,16 +30,23 @@ nonisolated struct BriefStoriesJob: ResumableJob {
     }
 
     func remaining() async throws -> Int {
-        try await database.writer.read { db in
-            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM story WHERE \(Self.condition)") ?? 0
+        let work = self.work
+        return try await database.writer.read { db in
+            try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM story WHERE \(work.sql)",
+                arguments: work.arguments
+            ) ?? 0
         }
     }
 
     func step() async throws -> Int {
+        let work = self.work
         let stories = try await database.writer.read { db in
             try Story.fetchAll(
                 db,
-                sql: "SELECT * FROM story WHERE \(Self.condition) ORDER BY last_at DESC LIMIT \(Self.batchSize)"
+                sql: "SELECT * FROM story WHERE \(work.sql) ORDER BY last_at DESC LIMIT \(Self.batchSize)",
+                arguments: work.arguments
             )
         }
         guard !stories.isEmpty else { return 0 }
@@ -62,15 +69,32 @@ nonisolated struct BriefStoriesJob: ResumableJob {
         return changed
     }
 
-    /// A story wants a brief when it has none, and again when a model turns up
-    /// after one was written without one.
+    /// Which stories want a brief.
+    ///
+    /// One that has none ; one written without a model, when a model turns up
+    /// afterwards ; and one written in a language that is no longer the
+    /// reader's, since a brief is written in their language and nothing else
+    /// about the story would ever ask for it to be written again.
     ///
     /// Without a model the summary is filled from the article's own standfirst,
     /// so the count reaches zero and the job stops rather than asking for ever.
-    private static var condition: String {
-        OnDeviceModel.isAvailable
-            ? "brief_locked = 0 AND (summary IS NULL OR is_generated = 0)"
-            : "brief_locked = 0 AND summary IS NULL"
+    private var work: (sql: String, arguments: StatementArguments) {
+        Self.work(locale: summarizer.locale, hasModel: OnDeviceModel.isAvailable)
+    }
+
+    static func work(locale: Locale, hasModel: Bool) -> (sql: String, arguments: StatementArguments) {
+        guard hasModel else {
+            return ("brief_locked = 0 AND summary IS NULL", [])
+        }
+        return (
+            """
+            brief_locked = 0 AND (
+                summary IS NULL OR is_generated = 0
+                OR brief_locale IS NULL OR brief_locale <> ?
+            )
+            """,
+            [locale.identifier]
+        )
     }
 
     private func articles(of storyID: UUID) async throws -> [(title: String, excerpt: String?)] {
@@ -96,6 +120,7 @@ nonisolated struct BriefStoriesJob: ResumableJob {
             story.title = brief.title.isEmpty ? story.title : brief.title
             story.summary = brief.summary
             story.isGenerated = brief.isGenerated
+            story.briefLocale = brief.isGenerated ? summarizer.locale.identifier : nil
             story.updatedAt = Date()
             try story.update(db)
         }
@@ -159,7 +184,8 @@ nonisolated struct DigestService: Sendable {
         }
         guard let stories, !stories.isEmpty else { return }
 
-        let assigned = await TopicNamer(locale: locale).topics(of: stories)
+        // No answer leaves the page as it is : see `TopicNamer.topics(of:)`.
+        guard let assigned = await TopicNamer(locale: locale).topics(of: stories) else { return }
 
         try? await database.writer.write { db in
             for (id, _) in stories {
@@ -176,6 +202,35 @@ nonisolated struct DigestService: Sendable {
     }
 
     /// Gives a story back the headline of its own most central article.
+    /// Throws away what the model wrote and asks it again.
+    ///
+    /// Nothing normally needs this : a brief is rewritten when a model turns
+    /// up, and again when the reader's language changes. It is here for the
+    /// case neither covers, which is a reader who simply wants a fresh reading
+    /// of the page, and it forgets the refusals on the way so a model that
+    /// failed earlier in the run is asked once more.
+    ///
+    /// A story whose headline the reader settled themselves is left alone.
+    func rewrite(now: Date = Date()) async {
+        OnDeviceModel.reconsider()
+        await discardWhatTheModelWrote()
+        await rebuild(now: now)
+    }
+
+    /// Clears the headlines, the summaries and the subjects the model wrote,
+    /// leaving alone the stories whose headline the reader settled.
+    func discardWhatTheModelWrote() async {
+        try? await database.writer.write { db in
+            try db.execute(
+                sql: """
+                    UPDATE story
+                    SET summary = NULL, is_generated = 0, brief_locale = NULL, topic = NULL
+                    WHERE brief_locked = 0
+                    """
+            )
+        }
+    }
+
     func dropBrief(of storyID: UUID) async {
         let articles = try? await database.writer.read { db in
             try Row.fetchAll(
