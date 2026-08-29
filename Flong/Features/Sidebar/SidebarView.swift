@@ -82,6 +82,7 @@ struct SidebarView: View {
         switch item.kind {
         case .unread: Text("Unread")
         case .today: Text("Today")
+        case .library: Text("Library")
         case .starred: Text("Starred")
         case .all: Text("All articles")
         case .folder, .feed: Text(verbatim: item.title ?? "")
@@ -92,6 +93,7 @@ struct SidebarView: View {
         switch kind {
         case .unread: "circle.inset.filled"
         case .today: "sun.max"
+        case .library: "books.vertical"
         case .starred: "star"
         case .all: "tray.full"
         case .folder: "folder"

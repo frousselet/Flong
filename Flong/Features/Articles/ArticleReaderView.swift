@@ -42,21 +42,23 @@ struct ArticleReaderView: View {
                 Task { await model.toggleStarredCurrent() }
             } label: {
                 Label(
-                    article.entry.isStarred ? "Remove from favourites" : "Add to favourites",
-                    systemImage: article.entry.isStarred ? "star.fill" : "star"
+                    article.isStarred ? "Remove from favourites" : "Add to favourites",
+                    systemImage: article.isStarred ? "star.fill" : "star"
                 )
             }
         }
 
-        ToolbarItem {
-            Button {
-                Task { await model.markCurrentUnread() }
-            } label: {
-                Label("Mark as unread", systemImage: "circle")
+        if article.origin == .stream {
+            ToolbarItem {
+                Button {
+                    Task { await model.markCurrentUnread() }
+                } label: {
+                    Label("Mark as unread", systemImage: "circle")
+                }
             }
         }
 
-        if let url = article.entry.url {
+        if let url = article.url {
             ToolbarItem {
                 ShareLink(item: url) {
                     Label("Share", systemImage: "square.and.arrow.up")
@@ -79,12 +81,11 @@ struct ArticleReaderView: View {
 /// `prefers-color-scheme` block are exactly what does.
 nonisolated enum ArticleDocument {
     static func html(for article: Article) -> String {
-        let entry = article.entry
         let byline = byline(of: article)
 
         return """
             <!doctype html>
-            <html lang="\(entry.language ?? "en")">
+            <html lang="\(article.language ?? "en")">
             <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -92,7 +93,7 @@ nonisolated enum ArticleDocument {
             </head>
             <body>
             <header>
-            <h1>\(HTMLEntities.escape(entry.title))</h1>
+            <h1>\(HTMLEntities.escape(article.title))</h1>
             <p class="byline">\(HTMLEntities.escape(byline))</p>
             </header>
             <article>\(article.bodyHTML ?? "")</article>
@@ -102,11 +103,11 @@ nonisolated enum ArticleDocument {
     }
 
     private static func byline(of article: Article) -> String {
-        var parts = [article.feedTitle]
-        if let author = article.entry.author, !author.isEmpty {
+        var parts = article.feedTitle.isEmpty ? [] : [article.feedTitle]
+        if let author = article.author, !author.isEmpty {
             parts.append(String(localized: "By \(author)"))
         }
-        if let date = article.entry.publishedAt {
+        if let date = article.publishedAt {
             parts.append(date.formatted(date: .long, time: .shortened))
         }
         return parts.joined(separator: " · ")

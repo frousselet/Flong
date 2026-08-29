@@ -12,13 +12,24 @@
 import Foundation
 import GRDB
 
+/// Where a row in a list comes from.
+nonisolated enum ArticleOrigin: String, Hashable, Sendable {
+    /// The stream, which is a cache and will be purged.
+    case stream
+    /// The library, which is a copy and never will be.
+    case library
+}
+
 /// What a list shows about an article.
 ///
 /// The body is deliberately absent : it is what weighs in the store, and a list
 /// of five hundred rows must not carry five hundred articles' worth of markup.
 nonisolated struct ArticleSummary: Identifiable, Hashable, Sendable, FetchableRecord {
     let id: UUID
-    let feedID: UUID
+    let origin: ArticleOrigin
+    /// The feed a stream article came from. A kept article has the name of its
+    /// feed and not a row to point at, the feed itself being unsubscribable.
+    let feedID: UUID?
     let feedTitle: String
     let title: String
     let excerpt: String?
@@ -31,26 +42,62 @@ nonisolated struct ArticleSummary: Identifiable, Hashable, Sendable, FetchableRe
 
     init(row: Row) {
         id = row["id"]
+        origin = ArticleOrigin(rawValue: row["origin"] ?? "") ?? .stream
         feedID = row["feed_id"]
-        feedTitle = row["feed_title"]
+        feedTitle = row["feed_title"] ?? ""
         title = row["title"]
         excerpt = row["excerpt"]
         author = row["author"]
         date = row["date"]
-        isRead = row["is_read"]
-        isStarred = row["is_starred"]
-        hasMedia = row["has_media"]
+        isRead = row["is_read"] ?? true
+        isStarred = row["is_starred"] ?? true
+        hasMedia = row["has_media"] ?? false
         url = (row["url"] as String?).flatMap(URL.init(string:))
     }
 }
 
-/// An article as the reader sees it.
+/// An article as the reader sees it, wherever it was read from.
 nonisolated struct Article: Identifiable, Hashable, Sendable {
-    let entry: Entry
+    let id: UUID
+    let origin: ArticleOrigin
+    let title: String
     let feedTitle: String
+    let author: String?
+    let url: URL?
+    let publishedAt: Date?
+    let language: String?
+    var isRead: Bool
+    var isStarred: Bool
     let bodyHTML: String?
+    let annotation: String?
 
-    var id: UUID { entry.id }
+    init(
+        id: UUID,
+        origin: ArticleOrigin,
+        title: String,
+        feedTitle: String,
+        author: String? = nil,
+        url: URL? = nil,
+        publishedAt: Date? = nil,
+        language: String? = nil,
+        isRead: Bool = true,
+        isStarred: Bool = false,
+        bodyHTML: String? = nil,
+        annotation: String? = nil
+    ) {
+        self.id = id
+        self.origin = origin
+        self.title = title
+        self.feedTitle = feedTitle
+        self.author = author
+        self.url = url
+        self.publishedAt = publishedAt
+        self.language = language
+        self.isRead = isRead
+        self.isStarred = isStarred
+        self.bodyHTML = bodyHTML
+        self.annotation = annotation
+    }
 }
 
 /// Which articles a view is about.
@@ -96,8 +143,8 @@ nonisolated struct ArticleStore: Sendable {
     // MARK: - Reading
 
     /// The columns a list needs, whichever way the rows were found.
-    private static let columns = """
-        SELECT e.id, e.feed_id, e.title, e.excerpt, e.author, e.url,
+    static let columns = """
+        SELECT e.id, 'stream' AS origin, e.feed_id, e.title, e.excerpt, e.author, e.url,
                e.is_read, e.is_starred, e.has_media,
                COALESCE(e.published_at, e.received_at) AS date,
                f.title AS feed_title
@@ -170,7 +217,7 @@ nonisolated struct ArticleStore: Sendable {
         return ("(\(condition)) AND (\(compiled.condition))", arguments + compiled.arguments)
     }
 
-    /// One article, with its body and the feed it came from.
+    /// One article of the stream, with its body and the feed it came from.
     func article(id: UUID) async throws -> Article? {
         try await database.writer.read { db in
             guard let entry = try Entry.fetchOne(db, key: id),
@@ -178,7 +225,19 @@ nonisolated struct ArticleStore: Sendable {
             else { return nil }
 
             let body = try EntryBody.fetchOne(db, key: id)
-            return Article(entry: entry, feedTitle: feed.title, bodyHTML: body?.sanitizedHTML)
+            return Article(
+                id: entry.id,
+                origin: .stream,
+                title: entry.title,
+                feedTitle: feed.title,
+                author: entry.author,
+                url: entry.url,
+                publishedAt: entry.publishedAt,
+                language: entry.language,
+                isRead: entry.isRead,
+                isStarred: entry.isStarred,
+                bodyHTML: body?.sanitizedHTML
+            )
         }
     }
 
