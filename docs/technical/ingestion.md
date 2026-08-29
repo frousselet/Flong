@@ -56,3 +56,15 @@ The body is read **after** sanitizing, never before : the sanitizer has already 
 Only the address is stored, never the file. It travels to the library with the rest of a kept article, so a picture can go dead on the publisher's side while the text stays : that is the deal, and it is why the text is copied and the picture is not.
 
 A publisher who illustrates an article after publishing it is improving it, so a refresh takes the new picture ; one who drops it has usually just reworded the feed, and the picture already shown stays.
+
+## The same article twice
+
+A paper that publishes a feed per desk puts the same piece in several of them, and a reader following two desks was reading it twice : the same headline three minutes apart, filed under one story that then claimed three articles when it had two.
+
+Two articles are the same article when their **canonical key** matches. The key is the address, reduced to what identifies the page : the host without its `www`, the path without a trailing slash, and what is left of the query once the tracking parameters are gone, in a fixed order. The fragment goes, since `#comments` is a place on a page rather than another page. A parameter that says *what* to read is kept : `?p=1234` is where the article is, `?utm_source` is who sent the reader.
+
+Where a feed gives no address at all, the key is the headline, folded to its letters, **scoped to the newsroom and to the day**. That scope is not a detail : two papers covering one event write two articles, and collapsing those would destroy the one thing the digest is for, which is that several rooms saying the same thing is the story.
+
+The second copy **keeps its row** and points at the first. It belongs to a feed the reader follows, and unsubscribing from that feed must take its own article away rather than someone else's. It is shown nowhere : not in a list, not in a count of unread, not in the stories, not in the tail. `ON DELETE SET NULL` on the pointer means that when the first copy is purged by age, the second stops being a duplicate of anything and becomes the article.
+
+A duplicate is only ever found in **another** feed. One feed listing the same article twice is caught by its GUID long before this, and a third copy points at the original rather than at the second.

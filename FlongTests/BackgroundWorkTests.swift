@@ -151,7 +151,15 @@ struct FirstFetchJobTests {
         }
 
         #expect(try await job.remaining() == 0)
-        #expect(try await ArticleStore(database).count(.all) == 40)
+
+        // Every feed was fetched and every row is there : twenty feeds, two
+        // articles each.
+        let rows = try await database.writer.read { db in try Entry.fetchCount(db) }
+        #expect(rows == 40)
+
+        // The reader sees two. All twenty feeds are one host serving one pair
+        // of articles, which is one newsroom publishing them once.
+        #expect(try await ArticleStore(database).count(.all) == 2)
     }
 
     @Test("A feed that refuses to be fetched does not hold the queue for ever")

@@ -50,7 +50,7 @@ struct StoreTests {
             applied == [
                 "v1.model", "v2.search", "v3.readStates", "v4.stories", "v5.covers", "v6.topics",
                 "v7.briefLanguage", "v8.recordTags", "v9.askAgain", "v10.topicPreferences",
-                "v11.severalTopics",
+                "v11.severalTopics", "v12.duplicates",
             ]
         )
     }
@@ -100,7 +100,8 @@ struct StoreTests {
             isStarred: true,
             isHidden: true,
             enclosures: [Enclosure(url: URL(string: "https://example.com/1.mp3")!, type: "audio/mpeg", length: 42)],
-            imageURL: URL(string: "https://example.com/1.jpg")
+            imageURL: URL(string: "https://example.com/1.jpg"),
+            canonicalKey: "example.com/1"
         )
         let body = EntryBody(
             entryID: entry.id,
@@ -128,6 +129,7 @@ struct StoreTests {
         #expect(read.body == body)
         #expect(read.entry?.hasMedia == true)
         #expect(read.entry?.imageURL?.absoluteString == "https://example.com/1.jpg")
+        #expect(read.entry?.canonicalKey == "example.com/1")
         #expect(read.feed?.notModifiedRate == 0.75)
     }
 

@@ -83,7 +83,29 @@ nonisolated extension AppDatabase {
             try createStoryTopics(db)
         }
 
+        migrator.registerMigration("v12.duplicates") { db in
+            try addDuplicates(db)
+        }
+
         return migrator
+    }
+
+    /// The same article, arriving twice.
+    ///
+    /// A paper that publishes a feed per desk puts the same piece in several
+    /// of them, and a reader following two desks read it twice. The second
+    /// copy keeps its row, because it belongs to a feed the reader follows and
+    /// unsubscribing from that feed must take it away, but it points at the
+    /// first and is shown nowhere.
+    ///
+    /// `ON DELETE SET NULL` : when the first copy is purged by age, the second
+    /// stops being a duplicate of anything and becomes the article.
+    private static func addDuplicates(_ db: Database) throws {
+        try db.alter(table: "entry") { table in
+            table.add(column: "canonical_key", .text)
+            table.add(column: "duplicate_of", .blob).references("entry", onDelete: .setNull)
+        }
+        try db.create(index: "entry_on_canonical_key", on: "entry", columns: ["canonical_key"])
     }
 
     /// The subjects a story falls under, which are more than one.

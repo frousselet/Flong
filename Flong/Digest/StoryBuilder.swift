@@ -187,7 +187,7 @@ nonisolated struct StoryBuilder: Sendable {
                            COALESCE(e.published_at, e.received_at) AS date
                     FROM entry e
                     LEFT JOIN story_member m ON m.entry_id = e.id
-                    WHERE m.entry_id IS NULL AND e.is_hidden = 0
+                    WHERE m.entry_id IS NULL AND e.is_hidden = 0 AND e.duplicate_of IS NULL
                       AND COALESCE(e.published_at, e.received_at) >= ?
                     ORDER BY date ASC
                     """,

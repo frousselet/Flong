@@ -300,7 +300,7 @@ nonisolated struct DigestService: Sendable {
                     FROM entry e
                     JOIN feed f ON f.id = e.feed_id
                     LEFT JOIN story_member m ON m.entry_id = e.id
-                    WHERE m.entry_id IS NULL AND e.is_hidden = 0
+                    WHERE m.entry_id IS NULL AND e.is_hidden = 0 AND e.duplicate_of IS NULL
                       AND COALESCE(e.published_at, e.received_at) >= ?
                     ORDER BY date DESC
                     LIMIT \(limit)

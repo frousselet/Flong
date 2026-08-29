@@ -61,6 +61,48 @@ struct FeedRefreshTests {
 
     // MARK: - Storing
 
+    @Test("The same article from two feeds of one newsroom is read once")
+    func duplicates() async throws {
+        // Two desks of one paper, both running the piece.
+        var feeds: [Feed] = []
+        for desk in ["societe", "politique"] {
+            let url = server.url.appending(path: "\(desk).xml")
+            feeds.append(try await subscriptions.subscribe(to: Subscription(url: url, title: desk)).feed)
+        }
+
+        let body = Data(
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0"><channel>
+              <title>Le Quotidien</title><link>https://refresh.example.com/</link><description>d</description>
+              <item>
+                <title>L'interdiction des téléphones au lycée</title>
+                <link>https://refresh.example.com/2026/telephones.php?utm_source=rss</link>
+                <guid>urn:example:desk:1</guid>
+                <description>Le gouvernement annonce la mesure.</description>
+              </item>
+            </channel></rss>
+            """.utf8
+        )
+        server.install { _ in
+            StubResponse(statusCode: 200, headers: ["Content-Type": "application/rss+xml"], body: body)
+        }
+        defer { server.reset() }
+
+        for feed in feeds { _ = await refresh.refresh(feed) }
+
+        let stored = try await database.writer.read { db in try Entry.fetchAll(db) }
+        let summaries = try await articles.summaries(.all)
+
+        // Both rows are kept : each belongs to a feed the reader follows, and
+        // unsubscribing from one must take its own row away.
+        #expect(stored.count == 2)
+        #expect(stored.filter { $0.duplicateOf != nil }.count == 1)
+        // The reader sees it once.
+        #expect(summaries.count == 1)
+        #expect(try await articles.count(.unread) == 1)
+    }
+
     @Test("An article arrives with the picture that stands for it")
     func covers() async throws {
         let feed = try await subscribe()
