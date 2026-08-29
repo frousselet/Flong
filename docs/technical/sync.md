@@ -69,3 +69,13 @@ CloudKit refuses a record carrying no change tag when it already holds one under
 The tag travels inside the system fields of the record the server hands back. Those are kept in `sync_record`, written whenever the server says anything about a record : when it hands one over, when it confirms one saved, and when it refuses one and hands back its own copy. A save starts from them and copies the values over.
 
 It is a cache, not a source of truth. Losing it costs one refused save per record, after which the server hands the record back and the tag is learned again. A zone that has gone takes every tag with it.
+
+## Being told rather than asking
+
+`CKSyncEngine` learns of another device's changes through a silent push, not by polling, which is what keeps a second device up to date without draining anything. Two things have to be true for that push to arrive.
+
+**The background mode.** `remote-notification` in `UIBackgroundModes`, beside `fetch` and `processing`. Without it CloudKit refuses to set the subscription up at all and says so : `BUG IN CLIENT OF CLOUDKIT: CloudKit push notifications require the 'remote-notification' background mode in your info plist`. It costs nothing and is declared in `Config/Info.plist`.
+
+**The Push Notifications capability**, which is an `aps-environment` entitlement and, behind it, a capability on the App ID. That one is not in the repository : adding the entitlement without the capability on the App ID fails to sign, and enabling the capability is an action on a developer account rather than a change to a file. It is added in Xcode, once, under Signing and Capabilities.
+
+Without the push the application still synchronizes : the engine sends what is pending and fetches what is waiting whenever it runs, which is at every launch, on returning to the foreground, and on a pull. What is lost is promptness, not correctness.
