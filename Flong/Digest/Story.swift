@@ -28,6 +28,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         case isGenerated = "is_generated"
         case briefLocked = "brief_locked"
         case briefLocale = "brief_locale"
+        case topicsAskedAt = "topics_asked_at"
         case signature
         case articleCount = "article_count"
         case feedCount = "feed_count"
@@ -50,6 +51,14 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
     /// The language the brief was written in, when a model wrote it.
     var briefLocale: String?
 
+    /// When the model was last asked what this story is about.
+    ///
+    /// Asked once, whatever came of it. A story the model cannot file would
+    /// otherwise be asked about at every opening, and, since the unfiled are
+    /// taken newest first, it would sit at the head of the queue for ever and
+    /// stop everything behind it from being asked at all.
+    var topicsAskedAt: Date?
+
     /// The vocabulary its articles share, which is what a new article is
     /// compared against.
     var signature: TextSignature?
@@ -67,6 +76,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         isGenerated: Bool = false,
         briefLocked: Bool = false,
         briefLocale: String? = nil,
+        topicsAskedAt: Date? = nil,
         signature: TextSignature? = nil,
         articleCount: Int = 0,
         feedCount: Int = 0,
@@ -80,6 +90,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         self.isGenerated = isGenerated
         self.briefLocked = briefLocked
         self.briefLocale = briefLocale
+        self.topicsAskedAt = topicsAskedAt
         self.signature = signature
         self.articleCount = articleCount
         self.feedCount = feedCount
