@@ -29,7 +29,6 @@ struct DigestScreen: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                masthead
                 topics
                 stories
             }
@@ -38,13 +37,18 @@ struct DigestScreen: View {
             .padding(.bottom, 90)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
-        // No title and no refresh button. The tab bar already says which section
-        // this is, and a headline is a poor thing to put under a label ; the
-        // page refreshes itself on returning to the foreground and on a pull,
-        // which is every way a reader would ask on a touch screen.
-        #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-        #else
+        // The date is the title of the page, where a newspaper puts it. Not the
+        // name of the section : the tab bar says that already, and a page that
+        // repeats its own label has spent a line saying nothing. A dateline says
+        // what the label did not, which is how old what follows is allowed to be.
+        //
+        // A large title like every other section's, so it shrinks into the bar
+        // as the reader scrolls into the page.
+        .navigationTitle(Text(verbatim: Self.today()))
+        // No refresh button : the page refreshes itself on returning to the
+        // foreground and on a pull, which is every way a reader asks on a touch
+        // screen.
+        #if !os(iOS)
             // A Mac has no pull, so it keeps the command, in the place a Mac
             // keeps commands.
             .toolbar {
@@ -136,23 +140,16 @@ struct DigestScreen: View {
         model.digest.live.first?.id ?? model.digest.stories.first?.id
     }
 
-    /// The date, where a newspaper puts it.
+    /// Today, spelled the way the reader's language spells it.
     ///
-    /// It replaces the name of the section, which the tab bar already carries
-    /// and which a page has no business repeating. A dateline says something the
-    /// label did not : how old what follows is allowed to be.
-    ///
-    /// In the page rather than in the navigation bar, because on iPad the tab
-    /// bar occupies that row and a title never appears there at all.
-    private var masthead: some View {
-        Text(Date.now, format: .dateTime.weekday(.wide).day().month(.wide))
-            .font(.system(.footnote, weight: .semibold))
-            .textCase(.uppercase)
-            .kerning(0.8)
-            .foregroundStyle(.tertiary)
-            .padding(.top, 4)
-            .padding(.bottom, Editorial.tightRhythm)
-            .frame(maxWidth: .infinity, alignment: .leading)
+    /// Read at each render rather than held : the page is rebuilt on returning
+    /// to the foreground, which is when a date left open overnight would
+    /// otherwise be yesterday's.
+    private static func today(_ date: Date = .now) -> String {
+        let spelled = date.formatted(.dateTime.weekday(.wide).day().month(.wide))
+        // Only the first letter : French writes `samedi 29 août`, and
+        // capitalizing every word would give `Samedi 29 Août`.
+        return spelled.prefix(1).localizedUppercase + spelled.dropFirst()
     }
 
     /// The subjects the model found, as pills that scroll.

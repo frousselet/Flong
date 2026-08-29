@@ -61,11 +61,11 @@ Nothing else animates.
 
 ## The dateline
 
-The page carries no title and no refresh button.
+**The title of the page is the date.** Not the name of the section : the tab bar says that already, and a page that repeats its own label has spent a line saying nothing. A dateline says what the label did not, which is how old what follows is allowed to be, and it is where a newspaper puts it.
 
-The tab bar already says which section this is, and a page that repeats its own label under it has spent a line saying nothing. In its place is the date, uppercase and kerned like the section headers, where a newspaper puts it : it says something the label did not, which is how old what follows is allowed to be. It sits in the page rather than in the navigation bar, since on iPad the tab bar occupies that row and a title never appears there at all.
+It is a large title like every other section's, so it shrinks into the bar as the reader scrolls into the page. It is spelled the way the reader's language spells it, with only its first letter raised : French writes `samedi 29 août`, and capitalizing every word would give `Samedi 29 Août`. It is read at each render rather than held, so a page left open overnight is not still yesterday's.
 
-The refresh button goes for the same reason. The page refreshes itself on returning to the foreground and on a pull, which is every way a reader asks on a touch screen. A Mac has no pull, so it keeps the command in the toolbar, on the key a Mac expects.
+There is no refresh button. The page refreshes itself on returning to the foreground and on a pull, which is every way a reader asks on a touch screen. A Mac has no pull, so it keeps the command in the toolbar, on the key a Mac expects.
 
 ## Subjects, not periods
 
