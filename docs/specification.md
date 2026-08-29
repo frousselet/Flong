@@ -380,7 +380,8 @@ Background refresh is opportunistic by nature, the system alone deciding when ac
 Not a list of articles : a list of **stories**, each one several articles from several rooms about one thing. An aggregator shows what arrived and leaves the reader to work out what matters ; this shows what is happening, how many rooms are saying it, and whether it is still moving.
 
 - **Happening now** : the stories with at least three articles from two rooms in the last six hours. Ten articles from one room is not an event.
-- **Today, this week, this month**, chosen by a selector, ranked by weight.
+- **The subjects**, as pills that scroll : the front page first, then the subjects the model found across the stories, most covered first. **Amended** : this section asked for a day, week and month selector. A period is a question about the calendar, and nobody watching a subject asks it. The front page looks back three days, which is a story still worth a headline, and everything older stays reachable through unread, the library and search.
+- A story is under exactly one subject, and a subject covering a single story is dropped : a pill covering one story says what the story underneath already says. Without a model there are no subjects and no pills, and the front page is entire.
 - **The tail** : what grouped with nothing, still there as the ordinary articles it is.
 
 The first story on the page runs its picture across the column, above a larger headline ; the others keep theirs to a square at the side. A page where every story is the same size is a list, and a list makes the reader do the ranking the digest exists to do.

@@ -13,7 +13,6 @@ import Foundation
 import FoundationModels
 import GRDB
 import OSLog
-import Synchronization
 
 /// What a story is called, and what it says in one line.
 nonisolated struct StoryBrief: Hashable, Sendable {
@@ -74,63 +73,16 @@ nonisolated struct StorySummarizer: Sendable {
     private var instructions: String {
         """
         You name and summarize groups of news articles about the same event.
-        \(Self.languageInstruction(for: locale))
+        \(OnDeviceModel.languageInstruction(for: locale))
         Be factual and plain. Never add an opinion, a judgement or a call to action.
         Never mention that you are a model or that you were asked anything.
         """
     }
 
-    /// What to tell the model about the language to answer in.
-    ///
-    /// A model asked for a language it does not speak answers in a mixture of
-    /// that language and the one it was given, which is worse than either. So a
-    /// locale the model does not support falls back to the articles' own
-    /// language, and the reader gets a headline in the language they were going
-    /// to read anyway.
-    static func languageInstruction(
-        for locale: Locale,
-        supports isSupported: (Locale) -> Bool = { SystemLanguageModel.default.supportsLocale($0) }
-    ) -> String {
-        let articles = "Answer in the language the articles are written in."
-        guard let name = Self.englishName(of: locale), isSupported(locale) else { return articles }
-        return "Answer in \(name), whatever language the articles are written in."
-    }
-
-    /// The language named in English, since the instructions are in English.
-    private static func englishName(of locale: Locale) -> String? {
-        guard let code = locale.language.languageCode?.identifier else { return nil }
-        return Locale(identifier: "en").localizedString(forLanguageCode: code)
-    }
-
-    /// How many refusals in a row before the model is left alone.
-    ///
-    /// It answers `available` and then fails on every call, which happens on a
-    /// simulator and on a device where the assets are not there yet. Asking a
-    /// fourth time costs a quarter of a second to learn what the third already
-    /// said, and the digest is perfectly good without it.
-    static let refusalsBeforeGivingUp = 3
-    private static let refusals = Mutex(0)
-
-    static var isAvailable: Bool {
-        guard refusals.withLock({ $0 }) < refusalsBeforeGivingUp else { return false }
-        return SystemLanguageModel.default.availability == .available
-    }
-
-    /// Forgets the refusals, for the next launch or a deliberate retry.
-    static func reconsider() {
-        refusals.withLock { $0 = 0 }
-    }
-
-    /// Why the model cannot be used, when it cannot, in the system's own terms.
-    static var unavailableReason: String? {
-        guard case .unavailable(let reason) = SystemLanguageModel.default.availability else { return nil }
-        return String(describing: reason)
-    }
-
     /// The brief for a story, from the model when there is one.
     func brief(forArticles articles: [(title: String, excerpt: String?)]) async -> StoryBrief {
         let fallback = Self.fallback(for: articles)
-        guard Self.isAvailable, !articles.isEmpty else { return fallback }
+        guard OnDeviceModel.isAvailable, !articles.isEmpty else { return fallback }
 
         do {
             let session = LanguageModelSession(instructions: instructions)
@@ -162,19 +114,10 @@ nonisolated struct StorySummarizer: Sendable {
             let summary = generated.summary.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !title.isEmpty else { return fallback }
 
-            Self.refusals.withLock { $0 = 0 }
+            OnDeviceModel.succeeded()
             return StoryBrief(title: title, summary: summary.isEmpty ? fallback.summary : summary, isGenerated: true)
         } catch {
-            let refusals = Self.refusals.withLock { count -> Int in
-                count += 1
-                return count
-            }
-            // Said once, not once per story.
-            if refusals == Self.refusalsBeforeGivingUp {
-                Log.enrich.notice(
-                    "The model refused \(refusals) times and will not be asked again this run : \(error.localizedDescription, privacy: .public)"
-                )
-            }
+            OnDeviceModel.refused(error)
             return fallback
         }
     }

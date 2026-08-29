@@ -8,7 +8,7 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 ## Ideas
 
-**The main screen is a digest, not a list.** Its unit is the story : several articles, from several rooms, about one thing. What several rooms are covering right now is shown as it arrives, and what grouped with nothing is still there underneath. An aggregator shows what arrived and leaves you to work out what matters.
+**The main screen is a digest, not a list.** Its unit is the story : several articles, from several rooms, about one thing. What several rooms are covering right now is shown as it arrives, and what grouped with nothing is still there underneath. The system model sorts the page into subjects you can narrow it to. An aggregator shows what arrived and leaves you to work out what matters.
 
 **Stream and library are two different things.** The stream is a disposable cache, rebuildable at any time from the sources, purged by age and volume. The library is what you chose to keep : its content is frozen at that moment, so it survives the article disappearing from its feed, and it is never purged.
 
@@ -20,11 +20,17 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 ## Screenshots
 
-| The digest | A story | An article |
-| ---------- | ------- | ---------- |
-| ![The digest on iPad](docs/images/digest-ipad.png) | ![A story on iPad](docs/images/story-ipad.png) | ![An article on iPad](docs/images/reader-ipad-light.png) |
+| The digest | A subject | A story |
+| ---------- | --------- | ------- |
+| ![The digest on iPad](docs/images/digest-ipad.png) | ![The page narrowed to one subject](docs/images/topic-ipad.png) | ![A story on iPad](docs/images/story-ipad.png) |
 
-The same three on iPhone, where the sections sit in the system tab bar and search has its own place in it :
+The pills are the subjects the system model found across the page. Tapping one narrows the page to it ; the others stay, so there is always a way back.
+
+| An article | Unread | Sources |
+| ---------- | ------ | ------- |
+| ![An article on iPad](docs/images/reader-ipad-light.png) | ![The unread articles on iPad](docs/images/unread-ipad.png) | ![The sources on iPad](docs/images/sources-ipad.png) |
+
+The same page on iPhone, where the sections sit in the system tab bar and search has its own place in it :
 
 | The digest | A story | Search |
 | ---------- | ------- | ------ |
@@ -33,10 +39,6 @@ The same three on iPhone, where the sections sit in the system tab bar and searc
 Rendered articles follow the system appearance, light and dark :
 
 ![The same article in dark mode](docs/images/reader-ipad-dark.png)
-
-| Unread | Sources |
-| ------ | ------- |
-| ![The unread articles on iPad](docs/images/unread-ipad.png) | ![The sources on iPad](docs/images/sources-ipad.png) |
 
 The feeds shown are made up, every address in them points at `example.com`, and the pictures are generated : nothing here belongs to anybody.
 

@@ -68,7 +68,7 @@ nonisolated struct BriefStoriesJob: ResumableJob {
     /// Without a model the summary is filled from the article's own standfirst,
     /// so the count reaches zero and the job stops rather than asking for ever.
     private static var condition: String {
-        StorySummarizer.isAvailable
+        OnDeviceModel.isAvailable
             ? "brief_locked = 0 AND (summary IS NULL OR is_generated = 0)"
             : "brief_locked = 0 AND summary IS NULL"
     }
@@ -105,9 +105,12 @@ nonisolated struct BriefStoriesJob: ResumableJob {
 /// Puts the digest together : vectors, then stories, then briefs.
 nonisolated struct DigestService: Sendable {
     private let database: AppDatabase
+    /// The language the model writes the headlines and the subjects in.
+    private let locale: Locale
 
-    init(_ database: AppDatabase) {
+    init(_ database: AppDatabase, locale: Locale = .current) {
         self.database = database
+        self.locale = locale
     }
 
     /// Brings the digest up to date, within the time it is given.
@@ -130,11 +133,46 @@ nonisolated struct DigestService: Sendable {
     func rebuild(until deadline: Date? = nil, now: Date = Date()) async -> StoryBuilder.Summary {
         let summary = await buildStories(now: now)
         await brief(until: deadline)
+        await nameTopics(now: now)
         return summary
     }
 
-    func digest(_ period: DigestPeriod, now: Date = Date()) async throws -> Digest {
-        try await DigestStore(database).digest(period, now: now)
+    /// Sorts the page into subjects, in one call for the whole page.
+    ///
+    /// After the briefs rather than before : the model groups what it is shown,
+    /// and a written headline says what a story is about far better than the
+    /// title of whichever article happened to be nearest its middle.
+    ///
+    /// The whole set is rewritten each time. A subject is a reading of the page
+    /// as it stands, and a page that has changed deserves a fresh one rather
+    /// than yesterday's with today's stories bolted on.
+    func nameTopics(now: Date = Date()) async {
+        let since = now.addingTimeInterval(-DigestStore.window)
+
+        let stories = try? await database.writer.read { db in
+            try Story
+                .filter(Story.Columns.lastAt >= since)
+                .order(Story.Columns.lastAt.desc)
+                .limit(TopicNamer.headlinesShown)
+                .fetchAll(db)
+                .map { (id: $0.id, title: $0.title) }
+        }
+        guard let stories, !stories.isEmpty else { return }
+
+        let assigned = await TopicNamer(locale: locale).topics(of: stories)
+
+        try? await database.writer.write { db in
+            for (id, _) in stories {
+                try db.execute(
+                    sql: "UPDATE story SET topic = ? WHERE id = ?",
+                    arguments: [assigned[id], id]
+                )
+            }
+        }
+    }
+
+    func digest(_ topic: DigestTopic = .frontPage, now: Date = Date()) async throws -> Digest {
+        try await DigestStore(database).digest(topic, now: now)
     }
 
     /// Gives a story back the headline of its own most central article.
@@ -183,9 +221,9 @@ nonisolated struct DigestService: Sendable {
         }
     }
 
-    /// The articles of the period that made no story.
-    func looseArticles(_ period: DigestPeriod, now: Date = Date(), limit: Int = 200) async throws -> [ArticleSummary] {
-        let since = now.addingTimeInterval(-period.duration)
+    /// The articles of the window that made no story.
+    func looseArticles(now: Date = Date(), limit: Int = 200) async throws -> [ArticleSummary] {
+        let since = now.addingTimeInterval(-DigestStore.window)
 
         return try await database.writer.read { db in
             try ArticleSummary.fetchAll(

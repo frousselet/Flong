@@ -13,18 +13,28 @@ import Foundation
 import GRDB
 
 /// How far back the digest looks.
-nonisolated enum DigestPeriod: String, Hashable, Sendable, CaseIterable, Identifiable {
-    case day
-    case week
-    case month
+/// What the front page is showing.
+///
+/// It replaces the day, week and month selector. A period is a question about
+/// the calendar, and nobody watching a subject asks it : they ask what is
+/// happening, and then what is happening about one thing in particular.
+nonisolated enum DigestTopic: Hashable, Sendable, Identifiable {
+    /// Everything, which is what the page opens on.
+    case frontPage
+    /// One subject, as the model named it.
+    case named(String)
 
     var id: Self { self }
 
-    var duration: TimeInterval {
+    var name: String? {
+        guard case .named(let name) = self else { return nil }
+        return name
+    }
+
+    func holds(_ topic: String?) -> Bool {
         switch self {
-        case .day: 24 * 60 * 60
-        case .week: 7 * 24 * 60 * 60
-        case .month: 30 * 24 * 60 * 60
+        case .frontPage: true
+        case .named(let name): topic == name
         }
     }
 }
@@ -50,6 +60,8 @@ nonisolated struct DigestStory: Identifiable, Hashable, Sendable {
     let isLive: Bool
     /// The picture of the most recent article that has one.
     let imageURL: URL?
+    /// The subject the model put it under, when it put it under one.
+    let topic: String?
 }
 
 /// What the main screen shows.
@@ -58,6 +70,11 @@ nonisolated struct Digest: Hashable, Sendable {
     var stories: [DigestStory] = []
     /// Articles that made no story, which the tail shows as themselves.
     var looseCount = 0
+
+    /// The subjects on the page, most covered first, whichever one is being
+    /// shown : narrowing to one must not take the others off the page, or the
+    /// only way back would be a button that is no longer there.
+    var topics: [String] = []
 
     var isEmpty: Bool { live.isEmpty && stories.isEmpty && looseCount == 0 }
 }
@@ -77,6 +94,14 @@ nonisolated struct DigestStore: Sendable {
     static let liveArticles = 3
     static let liveFeeds = 2
 
+    /// How far back the front page looks.
+    ///
+    /// Not a day : a reader opening Flong on Monday morning would find a page
+    /// emptied by the weekend. Not a month either, since a front page is about
+    /// what is current, and everything older is still reachable through unread,
+    /// the library and search. Three days is a story still worth a headline.
+    static let window: TimeInterval = 3 * 24 * 60 * 60
+
     /// How many rooms a card names before it counts the rest.
     static let namedFeeds = 3
     /// How many buckets the sparkline has.
@@ -88,8 +113,8 @@ nonisolated struct DigestStore: Sendable {
         self.database = database
     }
 
-    func digest(_ period: DigestPeriod, now: Date = Date(), limit: Int = 60) async throws -> Digest {
-        let since = now.addingTimeInterval(-period.duration)
+    func digest(_ topic: DigestTopic = .frontPage, now: Date = Date(), limit: Int = 60) async throws -> Digest {
+        let since = now.addingTimeInterval(-Self.window)
 
         let (stories, members, loose) = try await database.writer.read { db in
             let stories =
@@ -138,16 +163,25 @@ nonisolated struct DigestStore: Sendable {
         let grouped = Dictionary(grouping: members, by: \.storyID)
         let live = now.addingTimeInterval(-Self.liveWindow)
 
-        let built = stories.compactMap { story -> DigestStory? in
+        let all = stories.compactMap { story -> DigestStory? in
             let members = grouped[story.id] ?? []
             guard members.count > 1 else { return nil }
             return Self.story(story, members: members, liveSince: live)
         }
 
-        var digest = Digest(looseCount: loose)
+        // The pills are read from the whole page, then the page is narrowed :
+        // the other subjects have to stay on screen, or the way back would be a
+        // button that is no longer there.
+        var digest = Digest(topics: Self.topics(of: all))
+        let built = all.filter { topic.holds($0.topic) }
+
         digest.live = built.filter(\.isLive).sorted { $0.lastAt > $1.lastAt }
         digest.stories = built.filter { !$0.isLive }
             .sorted { ($0.articleCount, $0.lastAt) > ($1.articleCount, $1.lastAt) }
+
+        // The tail is what fell under no story at all, so it belongs to no
+        // subject either, and it is shown on the front page only.
+        digest.looseCount = topic == .frontPage ? loose : 0
 
         return digest
     }
@@ -183,8 +217,27 @@ nonisolated struct DigestStore: Sendable {
             isLive: isLive,
             // The latest article to carry a picture, since a story is shown for
             // where it has got to rather than for where it started.
-            imageURL: members.sorted { $0.date > $1.date }.lazy.compactMap(\.imageURL).first
+            imageURL: members.sorted { $0.date > $1.date }.lazy.compactMap(\.imageURL).first,
+            topic: story.topic
         )
+    }
+
+    /// The subjects on a page, the one covering the most stories first.
+    ///
+    /// Ties are broken by what moved last, so a page whose subjects are evenly
+    /// matched still puts the live one first.
+    static func topics(of stories: [DigestStory]) -> [String] {
+        var counts: [String: (stories: Int, lastAt: Date)] = [:]
+        for story in stories {
+            guard let topic = story.topic else { continue }
+            let seen = counts[topic] ?? (stories: 0, lastAt: .distantPast)
+            counts[topic] = (stories: seen.stories + 1, lastAt: max(seen.lastAt, story.lastAt))
+        }
+
+        return
+            counts
+            .sorted { ($0.value.stories, $0.value.lastAt) > ($1.value.stories, $1.value.lastAt) }
+            .map(\.key)
     }
 
     /// The shape of a story's arrival, in a handful of buckets.

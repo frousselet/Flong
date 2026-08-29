@@ -31,7 +31,9 @@ Apple's guidance for the 2026 material is explicit : glass is the layer that flo
 
 Flong broke it once. A hand-rolled floating bar in `safeAreaBar(edge: .bottom)`, drawn with `glassEffect`, collided on iPhone with the system search field, which is also glass : two blurred capsules overlapping, each refracting the other. The fix was not to tune the material but to delete the bar. The sections are a system `TabView`, the search tab carries `role: .search` so the system puts search where the system puts search, and `tabBarMinimizeBehavior(.onScrollDown)` gets the bar out of the way when the reader scrolls into something.
 
-The result is that the application contains **no** `glassEffect` call of its own. The only glass on screen is the system's, in the layer it belongs to.
+The application draws glass in exactly one place of its own : the subject pills at the top of the digest. That is the same rule, not an exception to it. A pill is a control floating over the page, which is the layer the material is for, and the row sits in the content and scrolls away with it rather than pinning itself under the tab bar, where it would be glass directly under glass.
+
+Everywhere else the glass on screen is the system's.
 
 On macOS the same five sections become a sidebar, through `tabViewStyle(.sidebarAdaptable)` : there is no bar to minimize on a Mac, and a window is already out of its own way.
 
@@ -57,9 +59,23 @@ Motion is either information or decoration, and decoration on a screen read ever
 
 Nothing else animates.
 
-## The period is type, not a control
+## The dateline
 
-A segmented picker across the measure is a grey slab speaking a different language from everything under it, and on iPad it put a second capsule directly below the floating tab bar. Three words, in the same kerned uppercase as the section headers, with an accent rule under the one in force, say exactly as much and belong to the page.
+The page carries no title and no refresh button.
+
+The tab bar already says which section this is, and a page that repeats its own label under it has spent a line saying nothing. In its place is the date, uppercase and kerned like the section headers, where a newspaper puts it : it says something the label did not, which is how old what follows is allowed to be. It sits in the page rather than in the navigation bar, since on iPad the tab bar occupies that row and a title never appears there at all.
+
+The refresh button goes for the same reason. The page refreshes itself on returning to the foreground and on a pull, which is every way a reader asks on a touch screen. A Mac has no pull, so it keeps the command in the toolbar, on the key a Mac expects.
+
+## Subjects, not periods
+
+The page opened on a day, week and month selector. A period is a question about the calendar, and nobody watching a subject asks it : they ask what is happening, and then what is happening about one thing. So the selector is gone and the pills are the subjects the model found across the page, the first of them being the front page itself.
+
+They are pills rather than type because they are a filter that changes what is below, which type would understate, and because there may be six of them and they have to scroll. The row scrolls horizontally, hides its indicator, and disables scroll clipping so a pill's glass is not shaved at the edge of the column.
+
+The section under the pills is called `Stories`, never `Front page` : that is what the pill already says, and a page does not need to name itself twice. Narrowing to a subject renames the section to the subject, and leaves the other pills on screen : take them away and the way back is a button that is no longer there.
+
+Where there is no model there are no subjects, and no pills at all. The front page is entire on its own, which is what section 14 asks of every path that touches the model.
 
 ## What the model wrote, and how to refuse it
 
