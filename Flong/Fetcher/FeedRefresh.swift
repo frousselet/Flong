@@ -210,6 +210,12 @@ nonisolated struct FeedRefresh: Sendable {
         let plainText = sanitized.map(HTMLSanitizer.plainText)
         let excerpt = Self.excerpt(of: item)
         let cover = CoverImage.of(item, sanitizedHTML: sanitized)
+        let key = ArticleKey.of(
+            url: item.url,
+            title: item.title ?? "",
+            publishedAt: item.publishedAt,
+            room: FeedURL.room(of: feed.siteURL ?? feed.url)
+        )
 
         // Detected once, at ingestion, since the index and the stemmer both
         // want to know and neither may guess again later.
@@ -242,6 +248,7 @@ nonisolated struct FeedRefresh: Sendable {
             // improving it ; one who drops the picture has usually just
             // reworded the feed, and the picture already shown stays.
             entry.imageURL = cover ?? entry.imageURL
+            entry.canonicalKey = key ?? entry.canonicalKey
             try entry.update(db)
 
             if let sanitized {
@@ -268,15 +275,38 @@ nonisolated struct FeedRefresh: Sendable {
             receivedAt: now,
             isRead: read.contains(fingerprint),
             enclosures: item.enclosures.isEmpty ? nil : item.enclosures,
-            imageURL: cover
+            imageURL: cover,
+            canonicalKey: key
         )
         entry.hasMedia = !item.enclosures.isEmpty
+
+        // The same article reaching the reader through a second feed of the
+        // same newsroom. It keeps its row, since it belongs to a feed they
+        // follow, and points at the copy that arrived first.
+        entry.duplicateOf = key.flatMap { try? Self.original(of: $0, besides: feed.id, in: db) }
         try entry.insert(db)
 
         if let sanitized {
             try EntryBody(entryID: entry.id, sanitizedHTML: sanitized, plainText: plainText).insert(db)
         }
         return true
+    }
+
+    /// The first copy of an article, when another feed already brought it in.
+    ///
+    /// Another feed, never this one : one feed listing the same article twice
+    /// is the same feed, and its second listing is caught by the GUID long
+    /// before this. And never a duplicate itself, so a third copy points at
+    /// the original rather than at the second.
+    private static func original(of key: String, besides feedID: UUID, in db: Database) throws -> UUID? {
+        try Entry
+            .filter(
+                Column("canonical_key") == key && Column("feed_id") != feedID
+                    && Column("duplicate_of") == nil
+            )
+            .order(Column("received_at"))
+            .fetchOne(db)?
+            .id
     }
 
     private static func excerpt(of item: ParsedItem) -> String? {

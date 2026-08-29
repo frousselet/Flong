@@ -191,7 +191,8 @@ nonisolated struct ArticleStore: Sendable {
                         FROM entry_fts
                         JOIN entry e ON e.rowid = entry_fts.rowid
                         JOIN feed f ON f.id = e.feed_id
-                        WHERE entry_fts MATCH ? AND e.is_hidden = 0 AND \(filterCondition)
+                        WHERE entry_fts MATCH ? AND e.is_hidden = 0 AND e.duplicate_of IS NULL
+                          AND \(filterCondition)
                         ORDER BY \(QueryCompiler.ranking)
                         LIMIT \(limit)
                         """,
@@ -207,7 +208,7 @@ nonisolated struct ArticleStore: Sendable {
                     \(Self.columns)
                     FROM entry e
                     JOIN feed f ON f.id = e.feed_id
-                    WHERE e.is_hidden = 0 AND \(condition)
+                    WHERE e.is_hidden = 0 AND e.duplicate_of IS NULL AND \(condition)
                     ORDER BY date DESC
                     LIMIT \(limit)
                     """,
@@ -260,7 +261,7 @@ nonisolated struct ArticleStore: Sendable {
                 db,
                 sql: """
                     SELECT feed_id, COUNT(*) AS count FROM entry
-                    WHERE is_read = 0 AND is_hidden = 0 GROUP BY feed_id
+                    WHERE is_read = 0 AND is_hidden = 0 AND duplicate_of IS NULL GROUP BY feed_id
                     """
             )
             return Dictionary(uniqueKeysWithValues: rows.map { ($0["feed_id"] as UUID, $0["count"] as Int) })
@@ -275,7 +276,7 @@ nonisolated struct ArticleStore: Sendable {
                 db,
                 sql: """
                     SELECT COUNT(*) FROM entry e JOIN feed f ON f.id = e.feed_id
-                    WHERE e.is_hidden = 0 AND \(condition)
+                    WHERE e.is_hidden = 0 AND e.duplicate_of IS NULL AND \(condition)
                     """,
                 arguments: arguments
             ) ?? 0

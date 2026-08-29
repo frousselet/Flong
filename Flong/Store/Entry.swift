@@ -45,6 +45,8 @@ nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
         case enclosures
         case hasMedia = "has_media"
         case imageURL = "image_url"
+        case canonicalKey = "canonical_key"
+        case duplicateOf = "duplicate_of"
     }
 
     var id: UUID
@@ -76,6 +78,14 @@ nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
     /// asked for when a screen actually shows it.
     var imageURL: URL?
 
+    /// What makes this the same article as another : see ``ArticleKey``.
+    var canonicalKey: String?
+
+    /// The copy that arrived first, when this one is the same article reaching
+    /// the reader through a second feed of the same newsroom. A duplicate is
+    /// kept and shown nowhere.
+    var duplicateOf: UUID?
+
     init(
         id: UUID = .v7(),
         feedID: UUID,
@@ -93,7 +103,9 @@ nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
         isStarred: Bool = false,
         isHidden: Bool = false,
         enclosures: [Enclosure]? = nil,
-        imageURL: URL? = nil
+        imageURL: URL? = nil,
+        canonicalKey: String? = nil,
+        duplicateOf: UUID? = nil
     ) {
         self.id = id
         self.feedID = feedID
@@ -113,6 +125,8 @@ nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
         self.enclosures = enclosures
         self.hasMedia = !(enclosures ?? []).isEmpty
         self.imageURL = imageURL
+        self.canonicalKey = canonicalKey
+        self.duplicateOf = duplicateOf
     }
 
     /// The date the article is sorted on : when it was published, or when it
