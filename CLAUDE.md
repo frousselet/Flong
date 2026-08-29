@@ -64,6 +64,7 @@ The app target uses an Xcode synchronized file group, so a new file placed in `F
 | `Flong/Extractor/` | Full-text extraction, reader mode |
 | `Flong/Store/` | Database setup, migrations, records, queries, purge |
 | `Flong/Indexer/` | FTS5 for the stream, Core Spotlight for the library |
+| `Flong/Search/` | The query language : lexer, parser, and the compiler that turns a tree into SQL |
 | `Flong/Enricher/` | Vectors, classification, rule execution |
 | `Flong/Sync/` | `CKSyncEngine` on the private database |
 | `Flong/Automation/` | App Intents, widgets, local MCP server |
