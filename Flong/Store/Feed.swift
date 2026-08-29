@@ -122,3 +122,19 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
         return Double(notModifiedCount) / Double(fetchCount)
     }
 }
+
+nonisolated extension Feed {
+    enum Columns {
+        static let id = Column(CodingKeys.id)
+        static let url = Column(CodingKeys.url)
+        static let title = Column(CodingKeys.title)
+        static let folder = Column(CodingKeys.folder)
+    }
+}
+
+nonisolated extension DerivableRequest<Feed> {
+    /// Feeds in the order a list shows them, sorted the way the reader's locale sorts.
+    func orderedByTitle() -> Self {
+        order(Feed.Columns.title.collating(.localizedStandardCompare))
+    }
+}
