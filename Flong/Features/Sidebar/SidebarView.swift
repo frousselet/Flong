@@ -95,6 +95,7 @@ struct SidebarView: View {
     @ViewBuilder
     private func title(of item: SidebarItem) -> some View {
         switch item.kind {
+        case .digest: Text("Digest")
         case .unread: Text("Unread")
         case .today: Text("Today")
         case .library: Text("Library")
@@ -106,6 +107,7 @@ struct SidebarView: View {
 
     private static func icon(of kind: SidebarItem.Kind) -> String {
         switch kind {
+        case .digest: "sparkles.rectangle.stack"
         case .unread: "circle.inset.filled"
         case .today: "sun.max"
         case .library: "books.vertical"

@@ -259,7 +259,7 @@ The Spotlight index is local and private, and is never shared between the device
 
 Over the library only, through Core Spotlight semantic search, falling back on vectors computed by the application and cosine similarity, which needs no particular index structure at this scale.
 
-The stream is not vectorized by default. A configurable recent window can be, so that reprints of one wire story can be grouped.
+The stream is not vectorized. Grouping the reprints of one wire story was implemented that way, measured, and abandoned : the system's sentence embeddings scored two unrelated French articles at 0.93 and two about the same event at 0.92. The digest groups on shared vocabulary instead, weighted by rarity, which separates them cleanly and needs no model at all. `docs/technical/digest.md` carries the measurement.
 
 ### Targets
 
@@ -373,11 +373,23 @@ Background refresh is opportunistic by nature, the system alone deciding when ac
 
 ## 16. Interface
 
+### The digest, which is the main screen
+
+Not a list of articles : a list of **stories**, each one several articles from several rooms about one thing. An aggregator shows what arrived and leaves the reader to work out what matters ; this shows what is happening, how many rooms are saying it, and whether it is still moving.
+
+- **Happening now** : the stories with at least three articles from two rooms in the last six hours. Ten articles from one room is not an event.
+- **Today, this week, this month**, chosen by a selector, ranked by weight.
+- **The tail** : what grouped with nothing, still there as the ordinary articles it is.
+
+Each card carries the story's name, one line saying what happened, the rooms talking about it, the number of articles and the shape of their arrival. Opening a card lists its articles ; opening an article reads it.
+
+The model names and summarizes ; without one, a story takes the title and standfirst of its most central article, and the card says which of the two it is. `docs/technical/digest.md` records how stories are grouped, and why it is not by the vectors of section 11.
+
 ### Common structure
 
 Three levels : sidebar, list, article. On iPhone, navigation stacks ; on iPad and Mac, three columns.
 
-Sidebar : unread, today, library, starred, tags, folders, saved queries, feeds.
+Sidebar : the digest, unread, today, library, starred, tags, folders, saved queries, feeds.
 
 ### List
 

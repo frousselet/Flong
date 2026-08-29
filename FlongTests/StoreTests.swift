@@ -33,7 +33,7 @@ struct StoreTests {
 
         let expected: Set<String> = [
             "feed", "entry", "entry_body", "library_item", "tag", "tag_binding",
-            "rule", "saved_query", "read_state_block", "sync_state", "entry_fts",
+            "rule", "saved_query", "read_state_block", "sync_state", "entry_fts", "story", "story_member",
         ]
         #expect(expected.isSubset(of: tables))
     }
@@ -45,7 +45,7 @@ struct StoreTests {
         _ = try AppDatabase(queue)
 
         let applied = try queue.read { db in try AppDatabase.migrator.appliedIdentifiers(db) }
-        #expect(applied == ["v1.model", "v2.search", "v3.readStates"])
+        #expect(applied == ["v1.model", "v2.search", "v3.readStates", "v4.stories"])
     }
 
     @Test("A feed, an article and its body round trip with every column filled")

@@ -22,6 +22,14 @@ nonisolated struct VectorStore: Sendable {
     /// How many are computed in one go, which is what makes the work resumable.
     static let batchSize = 50
 
+    /// Written where a model name should be when the system has none for that
+    /// language.
+    ///
+    /// Without it the article has no vector, the queue offers it again, and the
+    /// job asks the same impossible question for ever. This says the question
+    /// was asked and answered.
+    static let noModel = "none"
+
     private let database: AppDatabase
     private let embedder: Embedder
 
@@ -44,6 +52,10 @@ nonisolated struct VectorStore: Sendable {
         return
             candidates
             .filter { item in
+                // Already answered, even when the answer was that there is no
+                // model for this language.
+                guard item.vectorModel != Self.noModel else { return false }
+
                 guard let model = item.vectorModel, let revision = item.vectorRevision.flatMap(Int.init),
                     item.vector != nil
                 else { return true }
@@ -102,12 +114,22 @@ nonisolated struct VectorStore: Sendable {
 
     // MARK: - Searching
 
+    /// How far above the crowd a similarity has to stand, in standard
+    /// deviations.
+    ///
+    /// A fixed threshold does not work here, and measuring said so : the
+    /// system's sentence embeddings put two unrelated French articles at 0.93
+    /// and two about the same event at 0.92. What separates them is not the
+    /// value but the **distance from the rest** : the article a question is
+    /// about stands above its neighbours even when everything scores high.
+    static let standardDeviations: Float = 1.5
+
     /// The kept articles closest in meaning to a phrase.
     ///
     /// Cosine similarity over the whole library, which needs no index structure
     /// at this scale : a few thousand vectors against one is a few million
     /// multiplications.
-    func semanticMatches(for text: String, limit: Int = 50, threshold: Float = 0.35) async throws -> [UUID] {
+    func semanticMatches(for text: String, limit: Int = 50) async throws -> [UUID] {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return [] }
 
@@ -124,17 +146,24 @@ nonisolated struct VectorStore: Sendable {
             queries[model] = embedder.vector(text: text, model: model)
         }
 
-        return
-            items
-            .compactMap { item -> (UUID, Float)? in
-                guard let vector = Self.vector(of: item),
-                    let query = queries[vector.model],
-                    vector.isComparable(to: query)
-                else { return nil }
+        let scored = items.compactMap { item -> (UUID, Float)? in
+            guard let vector = Self.vector(of: item),
+                let query = queries[vector.model],
+                vector.isComparable(to: query)
+            else { return nil }
 
-                let similarity = vector.similarity(to: query)
-                return similarity >= threshold ? (item.id, similarity) : nil
-            }
+            return (item.id, vector.similarity(to: query))
+        }
+        guard scored.count > 2 else { return scored.map(\.0) }
+
+        let similarities = scored.map(\.1)
+        let mean = similarities.reduce(0, +) / Float(similarities.count)
+        let variance = similarities.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Float(similarities.count)
+        let bar = mean + Self.standardDeviations * sqrt(variance)
+
+        return
+            scored
+            .filter { $0.1 >= bar }
             .sorted { $0.1 > $1.1 }
             .prefix(limit)
             .map(\.0)

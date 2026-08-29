@@ -4,9 +4,11 @@ A feed reader for iOS, iPadOS and macOS, written in Swift with SwiftUI and SQLit
 
 No server, no account, no hosting. Every device collects the feeds itself and keeps them in a local database ; what you choose to keep propagates through your own private CloudKit database.
 
-> Status : early. Flong follows feeds, fetches them, lets you read and search them by words or by meaning, keeps what you star, and carries subscriptions, kept articles and read states between your own devices through iCloud.
+> Status : early. Flong opens on a digest of what is happening rather than a list of what arrived, follows and fetches feeds, lets you read and search them by words or by meaning, keeps what you star, and carries your subscriptions, kept articles and read states between your own devices through iCloud.
 
 ## Ideas
+
+**The main screen is a digest, not a list.** Its unit is the story : several articles, from several rooms, about one thing. What several rooms are covering right now is shown as it arrives, and what grouped with nothing is still there underneath. An aggregator shows what arrived and leaves you to work out what matters.
 
 **Stream and library are two different things.** The stream is a disposable cache, rebuildable at any time from the sources, purged by age and volume. The library is what you chose to keep : its content is frozen at that moment, so it survives the article disappearing from its feed, and it is never purged.
 
@@ -16,9 +18,9 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 ## Screenshots
 
-| Sources | Articles | Reader |
+| Digest | Articles | Reader |
 | ------- | -------- | ------ |
-| ![The sidebar on iPhone](docs/images/sources-iphone.png) | ![The article list on iPhone](docs/images/articles-iphone.png) | ![An article on iPad](docs/images/reader-ipad-light.png) |
+| ![The digest on iPad](docs/images/digest-ipad.png) | ![The article list on iPhone](docs/images/articles-iphone.png) | ![An article on iPad](docs/images/reader-ipad-light.png) |
 
 Rendered articles follow the system appearance, light and dark :
 
@@ -90,6 +92,7 @@ The interface is authored in English and translated to French. All strings live 
 | [`docs/technical/library.md`](docs/technical/library.md) | What promotion copies, what keeps an article, and what Spotlight is told |
 | [`docs/technical/sync.md`](docs/technical/sync.md) | What travels between devices, what never does, and why the record budget shapes it |
 | [`docs/technical/background.md`](docs/technical/background.md) | How long work survives being interrupted, and how the library is searched by meaning |
+| [`docs/technical/digest.md`](docs/technical/digest.md) | How articles become stories, and why not with the vectors |
 | [`docs/technical/freshrss-api.md`](docs/technical/freshrss-api.md) | The Google Reader API surface, kept for the FreshRSS import |
 
 ## License

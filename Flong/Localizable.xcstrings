@@ -61,6 +61,86 @@
         }
       }
     },
+    "%lld articles": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld article"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld articles"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld article"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld articles"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld articles made no story": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld article made no story"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld articles made no story"
+                }
+              }
+            }
+          }
+        },
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld article isolé"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld articles isolés"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld feeds added": {
       "localizations": {
         "en": {
@@ -311,6 +391,26 @@
         }
       }
     },
+    "Day": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jour"
+          }
+        }
+      }
+    },
+    "Digest": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Veille"
+          }
+        }
+      }
+    },
     "Everything here has been read.": {
       "localizations": {
         "fr": {
@@ -381,6 +481,16 @@
         }
       }
     },
+    "Flong groups your articles into stories as they arrive.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flong regroupe vos articles en sujets à mesure qu'ils arrivent."
+          }
+        }
+      }
+    },
     "Flong reads the page to find its feed when the address is not one already.": {
       "localizations": {
         "fr": {
@@ -397,6 +507,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Libérer de l'espace"
+          }
+        }
+      }
+    },
+    "Group now": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Regrouper maintenant"
+          }
+        }
+      }
+    },
+    "Happening now": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En cours"
           }
         }
       }
@@ -471,6 +601,16 @@
         }
       }
     },
+    "Month": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mois"
+          }
+        }
+      }
+    },
     "No article selected": {
       "localizations": {
         "fr": {
@@ -497,6 +637,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aucun flux"
+          }
+        }
+      }
+    },
+    "Nothing has come in yet": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien n'est encore arrivé"
           }
         }
       }
@@ -631,6 +781,16 @@
         }
       }
     },
+    "The rest": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le reste"
+          }
+        }
+      }
+    },
     "The subscriptions could not be saved.": {
       "localizations": {
         "fr": {
@@ -681,6 +841,26 @@
         }
       }
     },
+    "This month": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce mois-ci"
+          }
+        }
+      }
+    },
+    "This week": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette semaine"
+          }
+        }
+      }
+    },
     "Today": {
       "localizations": {
         "fr": {
@@ -717,6 +897,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "En attente d'iCloud"
+          }
+        }
+      }
+    },
+    "Week": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Semaine"
+          }
+        }
+      }
+    },
+    "Written by the model": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Écrit par le modèle"
           }
         }
       }
