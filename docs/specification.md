@@ -202,7 +202,7 @@ Every device collects on its own behalf.
 
 **Out of scope** : cookie sessions, form authentication, OAuth, extraction behind a paywall. These break constantly and do not deliver enough to justify their cost.
 
-**Secret storage** : the keychain exclusively, with the appropriate protection class, propagated between devices by iCloud Keychain. Never in the database, never in CloudKit, never in a log.
+**Secret storage** : the keychain exclusively, with the appropriate protection class, propagated between devices by iCloud Keychain. Never in the database, never in CloudKit, never in a log. `docs/technical/credentials.md` records how a secret address is identified without being written down.
 
 A secret URL is treated as a secret in its own right : masked in the interface, redacted from exports by default, absent from error messages.
 

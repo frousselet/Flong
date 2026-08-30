@@ -17,6 +17,10 @@ nonisolated struct FetchRequest: Hashable, Sendable {
     let url: URL
     var etag: String?
     var lastModified: String?
+    /// What proves the reader is entitled to it, for a feed that asks.
+    /// Section 9 keeps it in the keychain ; it reaches a request and goes no
+    /// further.
+    var credential: FeedCredential?
 }
 
 /// A feed as the server just served it.
@@ -193,6 +197,12 @@ actor FeedFetcher {
         // URLSession asks for gzip and brotli by itself, and decodes them before
         // handing anything over. Setting Accept-Encoding here would only turn
         // that off.
+        // A secret address carries no header : the secret was the address, and
+        // has already been spent by the time there is a request.
+        if let header = request.credential?.header {
+            urlRequest.setValue(header.value, forHTTPHeaderField: header.name)
+        }
+
         if let etag = request.etag { urlRequest.setValue(etag, forHTTPHeaderField: "If-None-Match") }
         if let lastModified = request.lastModified {
             urlRequest.setValue(lastModified, forHTTPHeaderField: "If-Modified-Since")

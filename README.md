@@ -102,6 +102,7 @@ The interface is authored in English and translated to French. All strings live 
 | [`docs/technical/opml.md`](docs/technical/opml.md) | What the OPML import reads, and how it copes with a malformed file |
 | [`docs/technical/html.md`](docs/technical/html.md) | How feed HTML is parsed, and the whitelist it is reduced to |
 | [`docs/technical/extraction.md`](docs/technical/extraction.md) | How the rest of a truncated article is fetched from its page |
+| [`docs/technical/credentials.md`](docs/technical/credentials.md) | How a feed you pay for proves you are entitled to it |
 | [`docs/technical/feed-formats.md`](docs/technical/feed-formats.md) | The formats Flong reads, and what it does with a broken one |
 | [`docs/technical/fetching.md`](docs/technical/fetching.md) | How feeds are asked for, and how publishers are treated |
 | [`docs/technical/ingestion.md`](docs/technical/ingestion.md) | What happens between a fetched feed and the store, and what bounds it |

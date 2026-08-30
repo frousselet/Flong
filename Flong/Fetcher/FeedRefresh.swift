@@ -55,11 +55,17 @@ nonisolated struct FeedRefresh: Sendable {
     private let database: AppDatabase
     private let fetcher: FeedFetcher
     private let readStates: ReadStateStore
+    private let credentials: CredentialStoring
 
-    init(database: AppDatabase, fetcher: FeedFetcher = FeedFetcher()) {
+    init(
+        database: AppDatabase,
+        fetcher: FeedFetcher = FeedFetcher(),
+        credentials: CredentialStoring = KeychainCredentials()
+    ) {
         self.database = database
         self.fetcher = fetcher
         self.readStates = ReadStateStore(database)
+        self.credentials = credentials
     }
 
     // MARK: - Refreshing
@@ -110,7 +116,22 @@ nonisolated struct FeedRefresh: Sendable {
     /// Refreshes one feed, and writes down what happened either way.
     @discardableResult
     func refresh(_ feed: Feed) async -> RefreshResult {
-        let request = FetchRequest(url: feed.url, etag: feed.etag, lastModified: feed.lastModified)
+        // A feed the reader pays for is fetched with what proves they do. A
+        // keychain that will not answer is a feed fetched without, which the
+        // server answers 401 to and section 9 quarantines : that is a better
+        // outcome than refusing to try.
+        let credential = try? credentials.credential(for: feed.id)
+
+        // The secret is the address itself, and the address in the database is
+        // a masked one that no server has ever heard of.
+        let url = credential.flatMap { if case .secretURL(let url) = $0 { url } else { nil } } ?? feed.url
+
+        let request = FetchRequest(
+            url: url,
+            etag: feed.etag,
+            lastModified: feed.lastModified,
+            credential: credential
+        )
 
         switch await fetcher.fetch(request) {
         case .notModified:
