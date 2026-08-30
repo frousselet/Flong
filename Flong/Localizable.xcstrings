@@ -640,6 +640,16 @@
         }
       }
     },
+    "Dynamic collections" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collections dynamiques"
+          }
+        }
+      }
+    },
     "Everything here has been read." : {
       "localizations" : {
         "fr" : {
@@ -860,6 +870,16 @@
         }
       }
     },
+    "It fills itself with whatever matches, and goes on filling itself. Try `title:Swift` or `is:unread`." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle se remplit de tout ce qui correspond, et continue de se remplir. Essayez `title:Swift` ou `is:unread`."
+          }
+        }
+      }
+    },
     "Kept on your own devices, through your iCloud. Flong has no account and nowhere to send them." : {
       "localizations" : {
         "fr" : {
@@ -947,6 +967,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouvelle collection"
+          }
+        }
+      }
+    },
+    "New dynamic collection" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle collection dynamique"
           }
         }
       }
@@ -1690,6 +1720,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En attente d'iCloud"
+          }
+        }
+      }
+    },
+    "What it is looking for" : {
+      "comment" : "The placeholder for a dynamic collection's query",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qu'elle cherche"
           }
         }
       }

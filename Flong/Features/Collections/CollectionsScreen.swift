@@ -33,19 +33,21 @@ import SwiftUI
 struct CollectionsScreen: View {
     let model: AppModel
     let menu: (Route) -> Void
-    let open: (LibraryCollection.Kind) -> Void
+    let open: (ArticleCollection.Kind) -> Void
 
     private static let square = GridItem(.adaptive(minimum: 150), spacing: 16)
 
     @State private var isNaming = false
+    @State private var isDescribing = false
     @State private var named = ""
+    @State private var described = ""
 
     var body: some View {
         ScrollView {
             LazyVGrid(columns: [Self.square], spacing: 18) {
-                section(nil, of: marked)
+                section(nil, of: builtIn)
                 section("My collections", of: mine)
-                section("By month", of: months)
+                section("Dynamic collections", of: dynamic)
             }
             .editorialColumn()
             .padding(.horizontal, 22)
@@ -60,10 +62,24 @@ struct CollectionsScreen: View {
             // Beside the sources rather than opposite them : the leading corner
             // is where this page is acted on, and the trailing one belongs to
             // the reader's own menu in every section.
+            // Two kinds to make, so a menu rather than a button : one the
+            // reader fills article by article, one that fills itself from a
+            // description.
             ToolbarItem(placement: .sectionLeading) {
-                Button {
-                    named = ""
-                    isNaming = true
+                Menu {
+                    Button {
+                        named = ""
+                        isNaming = true
+                    } label: {
+                        Label("New collection", systemImage: "folder")
+                    }
+                    Button {
+                        named = ""
+                        described = ""
+                        isDescribing = true
+                    } label: {
+                        Label("New dynamic collection", systemImage: "line.3.horizontal.decrease.circle")
+                    }
                 } label: {
                     Label("New collection", systemImage: "plus")
                 }
@@ -91,6 +107,18 @@ struct CollectionsScreen: View {
         } message: {
             Text("Collections are yours to fill. An article joins one from its own menu.")
         }
+        .alert(Text("New dynamic collection"), isPresented: $isDescribing) {
+            TextField("Name", text: $named)
+            TextField("What it is looking for", text: $described)
+            Button("Cancel", role: .cancel) {}
+            Button("Create") {
+                let name = named
+                let query = described
+                Task { await model.makeDynamicCollection(named: name, matching: query) }
+            }
+        } message: {
+            Text("It fills itself with whatever matches, and goes on filling itself. Try `title:Swift` or `is:unread`.")
+        }
         .task { await model.loadCollections() }
     }
 
@@ -99,7 +127,7 @@ struct CollectionsScreen: View {
     /// A band with no title draws no heading either, which is what puts the
     /// favourites at the top of the page rather than inside something.
     @ViewBuilder
-    private func section(_ title: LocalizedStringKey?, of collections: [LibraryCollection]) -> some View {
+    private func section(_ title: LocalizedStringKey?, of collections: [ArticleCollection]) -> some View {
         if !collections.isEmpty {
             Section {
                 ForEach(collections) { collection in
@@ -127,18 +155,19 @@ struct CollectionsScreen: View {
             .padding(.bottom, 2)
     }
 
-    /// What the reader marked, which every reader has and nobody made.
-    private var marked: [LibraryCollection] {
-        model.collections.filter { $0.kind == .starred || $0.kind == .annotated }
+    /// The ones every reader has, which nobody made and nobody can unmake.
+    private var builtIn: [ArticleCollection] {
+        model.collections.filter { if case .builtIn = $0.kind { true } else { false } }
     }
 
-    /// What the reader made.
-    private var mine: [LibraryCollection] {
+    /// The ones the reader filled article by article.
+    private var mine: [ArticleCollection] {
         model.collections.filter { if case .made = $0.kind { true } else { false } }
     }
 
-    private var months: [LibraryCollection] {
-        model.collections.filter { if case .month = $0.kind { true } else { false } }
+    /// The ones the reader described and never has to fill.
+    private var dynamic: [ArticleCollection] {
+        model.collections.filter { if case .dynamic = $0.kind { true } else { false } }
     }
 }
 
@@ -148,7 +177,7 @@ struct CollectionsScreen: View {
 /// photograph has to be given a scrim to stay readable, and a scrim is a thing
 /// between the reader and the picture they came to recognize.
 struct CollectionSquare: View {
-    let collection: LibraryCollection
+    let collection: ArticleCollection
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -193,21 +222,22 @@ struct CollectionSquare: View {
             .clipShape(.rect(cornerRadius: 12))
     }
 
-    static func name(of kind: LibraryCollection.Kind) -> Text {
+    static func name(of kind: ArticleCollection.Kind) -> Text {
         switch kind {
-        case .starred: Text("Starred")
-        case .annotated: Text("Notes")
-        case .made(let name): Text(verbatim: name)
-        case .month(let month): Text(month, format: .dateTime.month(.wide).year())
+        case .builtIn(.starred): Text("Starred")
+        case .builtIn(.annotated): Text("Notes")
+        case .made(let name), .dynamic(let name): Text(verbatim: name)
         }
     }
 
-    private static func mark(of kind: LibraryCollection.Kind) -> String {
+    private static func mark(of kind: ArticleCollection.Kind) -> String {
         switch kind {
-        case .starred: "star"
-        case .annotated: "text.quote"
+        case .builtIn(.starred): "star"
+        case .builtIn(.annotated): "text.quote"
         case .made: "folder"
-        case .month: "calendar"
+        // Described rather than filled, and the mark says which : a reader who
+        // wonders why articles appear in one they never touched has been told.
+        case .dynamic: "line.3.horizontal.decrease.circle"
         }
     }
 }

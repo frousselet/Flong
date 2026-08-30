@@ -1,5 +1,5 @@
 //
-//  LibraryCollectionTests.swift
+//  ArticleCollectionTests.swift
 //  FlongTests
 //
 //  Created by François Rousselet on 30/08/2026.
@@ -16,7 +16,7 @@ import Testing
 @testable import Flong
 
 @Suite("The squares on the collections page")
-struct LibraryCollectionTests {
+struct ArticleCollectionTests {
     private let database: AppDatabase
     private let subscriptions: SubscriptionStore
     private let library: LibraryStore
@@ -60,9 +60,9 @@ struct LibraryCollectionTests {
         try await library.setStarred([starred], to: true, at: now)
         _ = try await library.annotate(noted, with: "Worth coming back to", at: now)
 
-        let collections = try await library.collections()
-        let favourites = try #require(collections.first { $0.kind == .starred })
-        let notes = try #require(collections.first { $0.kind == .annotated })
+        let collections = try await library.builtInCollections()
+        let favourites = try #require(collections.first { $0.kind == ArticleCollection.Kind.builtIn(.starred) })
+        let notes = try #require(collections.first { $0.kind == ArticleCollection.Kind.builtIn(.annotated) })
 
         #expect(favourites.count == 1)
         #expect(favourites.cover?.absoluteString == "https://example.com/a.jpg")
@@ -80,9 +80,9 @@ struct LibraryCollectionTests {
         _ = try await library.annotate(both, with: "A note", at: now)
         try await library.setStarred([both], to: false, at: now)
 
-        let collections = try await library.collections()
-        #expect(collections.first { $0.kind == .starred } == nil)
-        #expect(collections.first { $0.kind == .annotated }?.count == 1)
+        let collections = try await library.builtInCollections()
+        #expect(collections.first { $0.kind == ArticleCollection.Kind.builtIn(.starred) } == nil)
+        #expect(collections.first { $0.kind == ArticleCollection.Kind.builtIn(.annotated) }?.count == 1)
         // The copy stays, because the note is a reason of its own.
         #expect(try await library.count() == 1)
     }
@@ -98,37 +98,62 @@ struct LibraryCollectionTests {
         // favourites empty themselves the first time a purge runs.
         try await database.writer.write { db in _ = try Entry.deleteAll(db) }
 
-        #expect(try await library.collections().first { $0.kind == .starred }?.count == 1)
-        #expect(try await library.summaries(in: .starred).count == 1)
-    }
-
-    // MARK: - What falls out of the copy
-
-    @Test("Each month of keeping is a square, newest first")
-    func months() async throws {
-        let paper = try await feed("https://a.example.com/f.xml", title: "Le Quotidien")
-        let calendar = Calendar.current
-        let thisMonth = calendar.startOfDay(for: now)
-        let older = try #require(calendar.date(byAdding: .month, value: -2, to: thisMonth))
-
-        try await library.promote([try await article("recent", in: paper)], at: thisMonth)
-        try await library.promote([try await article("old", in: paper)], at: older)
-
-        let months = try await library.collections().compactMap { collection -> Date? in
-            if case .month(let month) = collection.kind { return month } else { return nil }
-        }
-
-        #expect(months.count == 2)
-        #expect(months[0] > months[1])
-        // Named by the first of the month it stands for, in the reader's own
-        // calendar rather than in a slice of UTC.
-        #expect(calendar.component(.day, from: months[0]) == 1)
-        #expect(calendar.isDate(months[0], equalTo: thisMonth, toGranularity: .month))
-        #expect(try await library.summaries(in: .month(months[1])).count == 1)
+        #expect(
+            try await library.builtInCollections().first { $0.kind == ArticleCollection.Kind.builtIn(.starred) }?.count
+                == 1)
+        #expect(try await library.summaries(in: .builtIn(.starred)).count == 1)
     }
 
     @Test("An empty library shows no squares at all")
     func empty() async throws {
-        #expect(try await library.collections().isEmpty)
+        #expect(try await library.builtInCollections().isEmpty)
+    }
+
+    // MARK: - Described rather than filled
+
+    @Test("A dynamic collection holds whatever answers it, and holds no list")
+    func dynamic() async throws {
+        let paper = try await feed("https://a.example.com/f.xml", title: "Le Quotidien")
+        try await article("Une réforme du calendrier", in: paper)
+        try await article("Les macros Swift", in: paper)
+
+        let collections = CollectionStore(database)
+        #expect(try await collections.createDynamic("Calendrier", matching: "title:calendrier") == "Calendrier")
+
+        let made = try #require(await collections.dynamic(now: now).first)
+        #expect(made.kind == .dynamic("Calendrier"))
+        // Counted by asking the articles, since a dynamic collection keeps no
+        // list : a number written down would go stale the next time anything
+        // arrived.
+        #expect(made.count == 1)
+
+        // And it follows what arrives, with nobody filing anything.
+        try await article("Le calendrier scolaire", in: paper)
+        #expect(try await collections.dynamic(now: now).first?.count == 2)
+    }
+
+    @Test("A description nothing can be made of is refused where it was written")
+    func unusableDescription() async throws {
+        let collections = CollectionStore(database)
+
+        #expect(try await collections.createDynamic("Vide", matching: "   ") == nil)
+        #expect(try await collections.dynamic(now: now).isEmpty)
+    }
+
+    @Test("What a dynamic collection keeps is the description, and only that")
+    func onlyTheDescription() async throws {
+        let paper = try await feed("https://a.example.com/f.xml", title: "Le Quotidien")
+        try await article("Une réforme", in: paper)
+
+        let collections = CollectionStore(database)
+        _ = try await collections.createDynamic("Tout", matching: "title:réforme")
+
+        // Nothing was bound to anything : this is the whole reason a dynamic
+        // collection costs one small record however many articles answer it.
+        let bindings = try await database.writer.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM tag_binding") ?? 0
+        }
+        #expect(bindings == 0)
+        #expect(try await collections.query(of: "Tout") == "title:réforme")
     }
 }

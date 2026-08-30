@@ -342,11 +342,19 @@ Explicit evaluation order, individual enabling, and a consultable local log of t
 
 ### Collections
 
-The collections a reader makes are tags under a `collection/` root, bound to library items through `tag_binding`. Nothing new in the store : this is the mechanism section 4 already described, and folders, rules and saved queries inherit it when their turn comes.
+Three natures, and what travels is different for each. That is not an implementation detail : it is the whole of what tells them apart, and getting it wrong is how a budget of three thousand records becomes a hundred thousand.
 
-They travel between devices without a record of their own. A membership is a fact about one article, so it rides on that article's record as a list of names : one more field, not one more record. The single `Collections` record exists for the empty one, which nothing else would carry, and it is sent only when there is at least one collection to name.
+| Nature | What it is | What travels |
+| ------ | ---------- | ------------ |
+| **Built-in** | A question every reader's articles answer about themselves : favourites, notes | The state of one article, yes or no, on that article's own record |
+| **Made** | Filled article by article | The pair, this article in that collection, as a field on the article's record |
+| **Dynamic** | Described rather than filled | The description, and never what answers it |
 
-**Made, never unmade.** A name arriving from another device is created ; a name absent from what arrived is not deleted. Deleting a collection is therefore local until every device has been told by other means, which is the price of not carrying a tombstone for every name ever used. Membership is the other way round : what arrives about one article is the whole truth about it, so a collection missing from its list is one it was taken out of.
+Nothing new was needed in the store for any of it. A built-in one is a column ; a made one is a tag under a `collection/` root bound through `tag_binding`, which section 4 already described ; a dynamic one is the `saved_query` of section 5 holding a name and an expression of the query language of section 12. All three had been in the schema since v1.
+
+**The dynamic one is the reason to have three.** It costs one small record whether it holds nothing or ten thousand articles, because a description is a description. It also has no membership to keep in step : it answers itself, at the moment it is asked, from whatever the reader has.
+
+**Made, never unmade.** A name arriving from another device is created ; a name absent from what arrived is not deleted. Deleting is therefore local until every device has been told by other means, which is the price of not carrying a tombstone for every name ever used. Membership is the other way round : what arrives about one article is the whole truth about it, so a collection missing from its list is one it was taken out of.
 
 ### Retention
 

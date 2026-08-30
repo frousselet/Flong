@@ -106,25 +106,22 @@ nonisolated struct LibraryStore: Sendable {
 
     /// Every square the collections page shows, in the order it shows them.
     ///
-    /// Favourites first, being the one the reader made deliberately, then
-    /// notes, then the months newest first. One statement per group rather than
-    /// one clever one : three small queries over a few thousand rows read
-    /// plainly, and the page asks for them once when it appears.
+    /// Favourites, then notes. Neither is a list of anything : each is a
+    /// question the kept articles answer about themselves, so what is counted
+    /// is the answers.
     ///
     /// Each square wears the picture of the newest article in it that has one,
     /// which is what makes a square look like the things inside it. The
     /// subquery is correlated on the group and skips the articles with no
     /// picture : taking the newest row's image outright would leave a square
     /// blank whenever that one article happened to have none.
-    func collections() async throws -> [LibraryCollection] {
+    func builtInCollections() async throws -> [ArticleCollection] {
         let counted: [Counted] = try await database.writer.read { db in
-            var found: [Counted] = []
-
             let deliberate = [
-                ("starred", Self.isStarred, "i.starred_at IS NOT NULL"),
-                ("annotated", Self.hasNote, "COALESCE(i.annotation, '') <> ''"),
+                (ArticleCollection.BuiltIn.starred, Self.isStarred, "i.starred_at IS NOT NULL"),
+                (.annotated, Self.hasNote, "COALESCE(i.annotation, '') <> ''"),
             ]
-            for (group, condition, ofTheCover) in deliberate {
+            return try deliberate.compactMap { kind, condition, ofTheCover in
                 let row = try Row.fetchOne(
                     db,
                     sql: """
@@ -135,38 +132,25 @@ nonisolated struct LibraryStore: Sendable {
                         FROM library_item WHERE \(condition)
                         """
                 )
-                if let row, row["count"] as Int > 0 {
-                    found.append(Counted(group: group, name: group, count: row["count"], cover: row["cover"]))
-                }
+                guard let row, row["count"] as Int > 0 else { return nil }
+                return Counted(kind: kind, count: row["count"], cover: row["cover"])
             }
-
-            let months = try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT strftime('%Y-%m', l.promoted_at, 'localtime') AS name, COUNT(*) AS count,
-                           (SELECT i.image_url FROM library_item i
-                            WHERE strftime('%Y-%m', i.promoted_at, 'localtime')
-                                  = strftime('%Y-%m', l.promoted_at, 'localtime')
-                              AND i.image_url IS NOT NULL
-                            ORDER BY COALESCE(i.published_at, i.promoted_at) DESC LIMIT 1) AS cover
-                    FROM library_item l
-                    GROUP BY name
-                    ORDER BY name DESC
-                    """
-            )
-            found += months.compactMap { row in
-                (row["name"] as String?).map {
-                    Counted(group: "month", name: $0, count: row["count"], cover: row["cover"])
-                }
-            }
-            return found
         }
 
-        return counted.compactMap(Self.collection(from:))
+        return counted.map {
+            ArticleCollection(kind: .builtIn($0.kind), count: $0.count, cover: $0.cover)
+        }
+    }
+
+    /// A row that has crossed out of the database, which a `Row` may not.
+    private struct Counted: Sendable {
+        var kind: ArticleCollection.BuiltIn
+        var count: Int
+        var cover: URL?
     }
 
     /// What is in one square, newest first.
-    func summaries(in collection: LibraryCollection.Kind, limit: Int = 500) async throws -> [ArticleSummary] {
+    func summaries(in collection: ArticleCollection.Kind, limit: Int = 500) async throws -> [ArticleSummary] {
         let (condition, arguments) = Self.condition(for: collection)
 
         return try await database.writer.read { db in
@@ -178,43 +162,13 @@ nonisolated struct LibraryStore: Sendable {
         }
     }
 
-    /// A row that has crossed out of the database, which a `Row` may not.
-    private struct Counted: Sendable {
-        var group: String
-        var name: String
-        var count: Int
-        var cover: URL?
-    }
-
     private static let isStarred = "library_item.starred_at IS NOT NULL"
     private static let hasNote = "COALESCE(library_item.annotation, '') <> ''"
 
-    private static func collection(from counted: Counted) -> LibraryCollection? {
-        let kind: LibraryCollection.Kind
-        switch counted.group {
-        case "starred": kind = .starred
-        case "annotated": kind = .annotated
-        case "month":
-            guard let month = monthFormatter.date(from: counted.name) else { return nil }
-            kind = .month(month)
-        default: return nil
-        }
-        return LibraryCollection(kind: kind, count: counted.count, cover: counted.cover)
-    }
-
-    private static var monthFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = .current
-        formatter.dateFormat = "yyyy-MM"
-        return formatter
-    }
-
-    private static func condition(for kind: LibraryCollection.Kind) -> (String, StatementArguments) {
+    private static func condition(for kind: ArticleCollection.Kind) -> (String, StatementArguments) {
         switch kind {
-        case .starred: (isStarred, [])
-        case .annotated: (hasNote, [])
+        case .builtIn(.starred): (isStarred, [])
+        case .builtIn(.annotated): (hasNote, [])
         case .made(let name):
             (
                 """
@@ -225,12 +179,14 @@ nonisolated struct LibraryStore: Sendable {
                 """,
                 [CollectionStore.path(of: name)]
             )
-        case .month(let month):
-            ("strftime('%Y-%m', promoted_at, 'localtime') = ?", [monthFormatter.string(from: month)])
+        // A dynamic collection is not a list of kept articles : it is a
+        // description answered by the whole stream, so it is asked of the
+        // articles and never of the library.
+        case .dynamic: ("0", [])
         }
     }
 
-    // MARK: - Keeping
+    // MARK: - Keeping    // MARK: - Keeping
 
     /// Stars articles, and keeps them.
     ///
