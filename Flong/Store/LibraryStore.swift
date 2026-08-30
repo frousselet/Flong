@@ -185,6 +185,16 @@ nonisolated struct LibraryStore: Sendable {
             return twin
         }
 
+        // The fullest version there is. Freezing the feed's two sentences when
+        // the article's own page has already been fetched would keep the
+        // summary of something the reader read whole, and the library exists
+        // precisely so that what was kept survives its source.
+        //
+        // The plain text is taken from whichever was frozen rather than from
+        // the row, or the library would be searched by words the kept copy
+        // does not contain.
+        let content = body?.extractedHTML ?? body?.sanitizedHTML
+
         let item = LibraryItem(
             entryID: entry.id,
             feedURL: feed?.url,
@@ -196,8 +206,8 @@ nonisolated struct LibraryStore: Sendable {
             language: entry.language,
             publishedAt: entry.publishedAt,
             promotedAt: date,
-            contentHTML: body?.sanitizedHTML,
-            plainText: body?.plainText,
+            contentHTML: content,
+            plainText: content.map(HTMLSanitizer.plainText) ?? body?.plainText,
             imageURL: entry.imageURL
         )
         try item.insert(db)

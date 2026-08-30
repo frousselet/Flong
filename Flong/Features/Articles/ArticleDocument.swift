@@ -18,8 +18,20 @@ import Foundation
 /// for rendered HTML to follow light and dark mode, which `color-scheme` and a
 /// `prefers-color-scheme` block are exactly what does.
 nonisolated enum ArticleDocument {
-    static func html(for article: Article) -> String {
+    /// Which of the two bodies a page is built from.
+    ///
+    /// The feed gave one and, when the feed was short, the article's own page
+    /// gave another. Both are kept, and the reader may read either : an
+    /// extraction is a guess about somebody else's markup, and a guess the
+    /// reader cannot get out of is a guess imposed on them.
+    nonisolated enum Body: Hashable, Sendable {
+        case feed
+        case page
+    }
+
+    static func html(for article: Article, showing body: Body = .page) -> String {
         let byline = byline(of: article)
+        let markup = (body == .page ? article.extractedHTML : nil) ?? article.bodyHTML ?? ""
 
         return """
             <!doctype html>
@@ -34,7 +46,7 @@ nonisolated enum ArticleDocument {
             <h1>\(HTMLEntities.escape(article.title))</h1>
             <p class="byline">\(HTMLEntities.escape(byline))</p>
             </header>
-            <article>\(article.bodyHTML ?? "")</article>
+            <article>\(markup)</article>
             </body>
             </html>
             """

@@ -96,6 +96,9 @@ final class AppModel {
     private(set) var sidebar: [SidebarItem] = []
     private(set) var summaries: [ArticleSummary] = []
     private(set) var article: Article?
+    /// Whether the page an article lives at is being fetched, so the reader is
+    /// told rather than left wondering why the text is short.
+    private(set) var isFetchingFullText = false
     private(set) var isRefreshing = false
     private(set) var feedCount = 0
 
@@ -645,10 +648,39 @@ final class AppModel {
                 // anything : the row changes now.
                 try await articles.setRead([selectedArticle], to: true)
                 await refreshCounts(markingRead: selectedArticle)
+                await fetchFullText(of: selectedArticle)
             }
         } catch {
             Log.store.error("The article could not be opened : \(error, privacy: .public)")
         }
+    }
+
+    /// Goes to the page for an article whose feed gave a summary.
+    ///
+    /// Only for the article being read, and only once for its life : see
+    /// ``FullText``. The reader has the feed's version on screen the whole
+    /// time, so a page that never answers costs them nothing but the wait they
+    /// were not made to sit through.
+    private func fetchFullText(of id: UUID) async {
+        guard let opened = article, opened.id == id, !opened.hasFullText,
+            FullText.isWorthFetching(url: opened.url, feedHTML: opened.bodyHTML, extractedHTML: nil)
+        else { return }
+
+        isFetchingFullText = true
+        defer { isFetchingFullText = false }
+
+        guard await FullText(database).extract(id) != nil else { return }
+
+        // The reader may have moved on while the page was being fetched, and
+        // an article arriving under a different one is worse than none.
+        guard selectedArticle == id else { return }
+        article = try? await articles.article(id: id)
+    }
+
+    /// Fetches the page for an article the reader asked for by hand.
+    func fetchFullText() async {
+        guard let id = selectedArticle else { return }
+        await fetchFullText(of: id)
     }
 
     /// Updates what is on screen after a read state changed, without refetching

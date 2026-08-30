@@ -79,8 +79,15 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
     let language: String?
     var isRead: Bool
     var isStarred: Bool
+    /// What the feed gave.
     let bodyHTML: String?
+    /// What the page gave, when it has been fetched. A kept article never
+    /// has one : it was frozen the day it was kept, and that is the point.
+    let extractedHTML: String?
     let annotation: String?
+
+    /// Whether there is a fuller version than the feed's to show.
+    var hasFullText: Bool { extractedHTML?.isEmpty == false }
 
     init(
         id: UUID,
@@ -94,6 +101,7 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
         isRead: Bool = true,
         isStarred: Bool = false,
         bodyHTML: String? = nil,
+        extractedHTML: String? = nil,
         annotation: String? = nil
     ) {
         self.id = id
@@ -107,6 +115,7 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
         self.isRead = isRead
         self.isStarred = isStarred
         self.bodyHTML = bodyHTML
+        self.extractedHTML = extractedHTML
         self.annotation = annotation
     }
 }
@@ -249,7 +258,8 @@ nonisolated struct ArticleStore: Sendable {
                 language: entry.language,
                 isRead: entry.isRead,
                 isStarred: entry.isStarred,
-                bodyHTML: body?.sanitizedHTML
+                bodyHTML: body?.sanitizedHTML,
+                extractedHTML: body?.extractedHTML
             )
         }
     }

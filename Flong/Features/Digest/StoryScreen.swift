@@ -168,21 +168,51 @@ struct ArticleScreen: View {
     let model: AppModel
     let articleID: UUID
 
+    /// Which body is being read.
+    ///
+    /// The page when there is one, since that is the whole article and the
+    /// reason it was fetched. The reader may go back to what the feed sent,
+    /// which is what an extraction that guessed wrong needs.
+    @State private var showing = ArticleDocument.Body.page
+
     var body: some View {
         Group {
             if let article = model.article, article.id == articleID {
-                ArticleWebView(html: ArticleDocument.html(for: article))
+                ArticleWebView(html: ArticleDocument.html(for: article, showing: showing))
                     .ignoresSafeArea(edges: .bottom)
                     .toolbar { toolbar(for: article) }
                     .navigationTitle(Text(verbatim: article.feedTitle))
                     #if os(iOS)
                         .navigationBarTitleDisplayMode(.inline)
                     #endif
+                    .overlay(alignment: .bottom) {
+                        if model.isFetchingFullText {
+                            fetching
+                        }
+                    }
             } else {
                 ProgressView()
             }
         }
         .task { await model.open(article: articleID) }
+    }
+
+    /// Said while the page is being fetched, and only then.
+    ///
+    /// The feed's version is on screen the whole time, so this is not a wait :
+    /// it is the reason the text is about to get longer, which a reader would
+    /// otherwise watch happen without explanation.
+    private var fetching: some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text("Fetching the full article")
+        }
+        .font(Editorial.metadata)
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .glassEffect(.regular, in: .capsule)
+        .padding(.bottom, 24)
     }
 
     @ToolbarContentBuilder
@@ -204,6 +234,20 @@ struct ArticleScreen: View {
                     Task { await model.markCurrentUnread() }
                 } label: {
                     Label("Mark as unread", systemImage: "circle")
+                }
+            }
+        }
+
+        // Only where there are two to choose between.
+        if article.hasFullText {
+            ToolbarItem {
+                Button {
+                    showing = showing == .page ? .feed : .page
+                } label: {
+                    Label(
+                        showing == .page ? "Show what the feed sent" : "Show the full article",
+                        systemImage: showing == .page ? "doc.plaintext" : "doc.richtext"
+                    )
                 }
             }
         }
