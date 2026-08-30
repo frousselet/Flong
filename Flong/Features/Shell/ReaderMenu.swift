@@ -67,6 +67,19 @@ struct ReaderMenu: View {
 
             Divider()
 
+            // The only way to ask for a refresh, and deliberately a deliberate
+            // one. There is no pull anywhere : a gesture that is always under
+            // the thumb invites being used, and a reader refreshing a wire
+            // every few seconds is a reader their own reader has made anxious.
+            // The page keeps itself up to date without being asked.
+            Button {
+                Task { await model.refreshAll() }
+            } label: {
+                Label("Refresh", systemImage: "arrow.clockwise")
+            }
+            .keyboardShortcut("r", modifiers: .command)
+            .disabled(model.isRefreshing)
+
             Button {
                 Task { await model.rewriteDigest() }
             } label: {

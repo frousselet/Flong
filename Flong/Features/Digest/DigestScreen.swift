@@ -64,26 +64,15 @@ struct DigestScreen: View {
                 ReaderMenu(model: model, open: open)
             }
         }
-        // No refresh button : the page refreshes itself on returning to the
-        // foreground and on a pull, which is every way a reader asks on a touch
-        // screen. The wire has no pull of its own : the page keeps itself up to
-        // date now, and one place to say `now` is enough.
-        #if !os(iOS)
-            // A Mac has no pull, so it keeps the command, in the place a Mac
-            // keeps commands.
-            .toolbar {
-                ToolbarItem {
-                    Button {
-                        Task { await model.refreshAll() }
-                    } label: {
-                        Label("Refresh", systemImage: "arrow.clockwise")
-                    }
-                    .keyboardShortcut("r", modifiers: .command)
-                    .disabled(model.isRefreshing)
-                }
-            }
-        #endif
-        .refreshable { await model.refreshAll() }
+        // **No pull, on any page.** The page keeps itself up to date : it
+        // follows the store, so anything that arrives reaches it, and a clock
+        // asks the publishers what politeness allows. A pull on top of that
+        // buys nothing and costs something, because a gesture that is always
+        // there invites being used, and a reader pulling a wire every few
+        // seconds is a reader made anxious by their own reader.
+        //
+        // Asking is still possible and now takes a deliberate act, in the
+        // reader's own menu, where the other things they ask for live.
         .overlay {
             if model.digest.isEmpty {
                 empty
