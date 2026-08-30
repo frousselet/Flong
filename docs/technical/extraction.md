@@ -58,4 +58,8 @@ The list of honoured encodings is short on purpose, and every entry is the encod
 
 ## When the page gives nothing
 
-A page that answers with a teaser is usually a page that did not recognize the reader as a subscriber. **Signing in is offered there**, in the article's own menu, rather than four screens away in the settings : that is the moment the reader can do something about it, and a remedy nobody can find is a remedy nobody uses. `docs/technical/credentials.md` records what a session is and what it is not.
+A page that answers with a teaser is usually a page that did not recognize the reader as a subscriber. **Signing in is offered in the article's own menu**, always, rather than four screens away in the settings and rather than behind a failure the reader has to trigger first : a reader knows they subscribe to a paper long before Flong finds out.
+
+That menu is one item and holds everything. Every action put in a toolbar separately is one the system may fold into an overflow of its own, and an action inside an overflow inside a menu is an action nobody finds. That is not hypothetical : it is what happened, and the reader who asked for the feature could not find it.
+
+`docs/technical/credentials.md` records what a session is and what it is not.

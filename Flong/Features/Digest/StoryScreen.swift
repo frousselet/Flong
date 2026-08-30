@@ -251,6 +251,12 @@ struct ArticleScreen: View {
         .padding(.bottom, 24)
     }
 
+    /// Two controls : the star, and everything else.
+    ///
+    /// Every item put here separately is an item iOS may decide to fold into an
+    /// overflow of its own, and an action inside an overflow inside a menu is an
+    /// action nobody finds. That is not a hypothetical : signing in to a site
+    /// was in one, and the reader who asked for the feature could not find it.
     @ToolbarContentBuilder
     private func toolbar(for article: Article) -> some ToolbarContent {
         ToolbarItem {
@@ -264,67 +270,63 @@ struct ArticleScreen: View {
             }
         }
 
-        if article.origin == .stream {
-            ToolbarItem {
-                Button {
-                    Task { await model.markCurrentUnread() }
-                } label: {
-                    Label("Mark as unread", systemImage: "circle")
+        ToolbarItem {
+            Menu {
+                if article.url != nil {
+                    reading(article)
+                    Divider()
                 }
+
+                if article.origin == .stream {
+                    Button {
+                        Task { await model.markCurrentUnread() }
+                    } label: {
+                        Label("Mark as unread", systemImage: "circle")
+                    }
+                }
+
+                if let url = article.url {
+                    ShareLink(item: url) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                    Link(destination: url) {
+                        Label("Open in browser", systemImage: "safari")
+                    }
+                }
+            } label: {
+                Label("Actions", systemImage: "ellipsis")
             }
         }
+    }
 
-        if article.url != nil {
-            ToolbarItem {
-                Menu {
-                    if showing == .page {
-                        Button {
-                            showing = .feed
-                        } label: {
-                            Label("Show what the feed sent", systemImage: "doc.plaintext")
-                        }
-                    } else {
-                        Button {
-                            Task { await showFullArticle() }
-                        } label: {
-                            Label("Show the full article", systemImage: "doc.richtext")
-                        }
-                        .disabled(model.isFetchingFullText)
-                    }
-
-                    // Offered where the problem appears rather than four screens
-                    // away : a page that gave nothing is usually a page that did
-                    // not recognize the reader as a subscriber, and this is the
-                    // moment they can do something about it.
-                    if pageGaveNothing || model.hasSession(for: article.url) {
-                        Divider()
-                        Button {
-                            signingIn = true
-                        } label: {
-                            Label(
-                                model.hasSession(for: article.url) ? "Sign in again" : "Sign in to this site",
-                                systemImage: "key"
-                            )
-                        }
-                    }
-                } label: {
-                    Label("Article", systemImage: "doc.richtext")
-                }
+    /// What there is to read, and how to get the rest of it.
+    @ViewBuilder
+    private func reading(_ article: Article) -> some View {
+        if showing == .page {
+            Button {
+                showing = .feed
+            } label: {
+                Label("Show what the feed sent", systemImage: "doc.plaintext")
             }
+        } else {
+            Button {
+                Task { await showFullArticle() }
+            } label: {
+                Label("Show the full article", systemImage: "doc.richtext")
+            }
+            .disabled(model.isFetchingFullText)
         }
 
-        if let url = article.url {
-            ToolbarSpacer(.fixed)
-            ToolbarItem {
-                ShareLink(item: url) {
-                    Label("Share", systemImage: "square.and.arrow.up")
-                }
-            }
-            ToolbarItem {
-                Link(destination: url) {
-                    Label("Open in browser", systemImage: "safari")
-                }
-            }
+        // Always offered, never behind a failure the reader has to trigger
+        // first. A site whose articles are behind a wall is one a reader knows
+        // they subscribe to long before Flong finds out.
+        Button {
+            signingIn = true
+        } label: {
+            Label(
+                model.hasSession(for: article.url) ? "Sign in again" : "Sign in to this site",
+                systemImage: "key"
+            )
         }
     }
 }

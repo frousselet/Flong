@@ -70,16 +70,21 @@ nonisolated struct FullText: Sendable {
 
     /// The session that covers an address, if the reader has one.
     ///
-    /// Matched on the site rather than the exact host, since a session signed
-    /// in on `lemonde.fr` is the same session `www.lemonde.fr` needs.
+    /// Matched on the site rather than the exact host : a session signed in on
+    /// `lemonde.fr` is the one every feed and article of the site needs,
+    /// whichever subdomain they sit on.
     static func session(for url: URL, in sessions: SessionStoring) -> SiteSession? {
         guard let host = FeedURL.room(of: url) else { return nil }
 
-        // The host itself, then the site above it, which is where a session
-        // signed in on the front page lives.
+        // The host itself, then every site above it down to two labels : a
+        // session signed in on `lemonde.fr` is the one `abonnes.lemonde.fr`
+        // wants, however many levels apart they are.
         var candidates = [host]
-        let parts = host.split(separator: ".")
-        if parts.count > 2 { candidates.append(parts.dropFirst().joined(separator: ".")) }
+        var parts = host.split(separator: ".")
+        while parts.count > 2 {
+            parts.removeFirst()
+            candidates.append(parts.joined(separator: "."))
+        }
 
         for candidate in candidates {
             guard let session = try? sessions.session(for: candidate), session.covers(url), session.isUsable()
