@@ -111,7 +111,10 @@ struct AppShell: View {
             .tabViewStyle(.sidebarAdaptable)
         #endif
         .sheet(isPresented: $isAddingFeed) {
-            AddFeedView { address in await model.addFeed(at: address) }
+            AddFeedView(
+                add: { address in await model.addFeed(at: address) },
+                addPrivate: { address in await model.addPrivateFeed(at: address) }
+            )
         }
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: Self.opmlTypes) { result in
             guard case .success(let url) = result else { return }

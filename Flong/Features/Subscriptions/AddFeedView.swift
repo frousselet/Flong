@@ -18,8 +18,12 @@ import SwiftUI
 /// that, so a reader never has to go looking for the exact URL themselves.
 struct AddFeedView: View {
     let add: (String) async -> Void
+    /// Follows an address that is itself a secret, which is how most
+    /// subscription platforms hand a paying reader their feed.
+    var addPrivate: ((String) async -> Void)?
 
     @State private var address = ""
+    @State private var isPrivate = false
     @State private var isWorking = false
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isFocused: Bool
@@ -42,6 +46,19 @@ struct AddFeedView: View {
                     .onSubmit(submit)
                 } footer: {
                     Text("Flong reads the page to find its feed when the address is not one already.")
+                }
+
+                if addPrivate != nil {
+                    Section {
+                        Toggle(isOn: $isPrivate) {
+                            Text("This address is a secret")
+                        }
+                        .disabled(isWorking)
+                    } footer: {
+                        Text(
+                            "A subscription platform gives each subscriber an address nobody else has. Kept in the keychain, never in the database, and never in an export."
+                        )
+                    }
                 }
             }
             .formStyle(.grouped)
@@ -74,7 +91,11 @@ struct AddFeedView: View {
         isWorking = true
 
         Task {
-            await add(address)
+            if isPrivate, let addPrivate {
+                await addPrivate(address)
+            } else {
+                await add(address)
+            }
             isWorking = false
             dismiss()
         }

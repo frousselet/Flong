@@ -92,6 +92,7 @@ final class AppModel {
     private let retention: Retention
     private let finder: FeedFinder
     private let opml: OPMLImport
+    private let credentials: CredentialStoring
 
     private(set) var sidebar: [SidebarItem] = []
     private(set) var summaries: [ArticleSummary] = []
@@ -99,6 +100,8 @@ final class AppModel {
     /// Whether the page an article lives at is being fetched, so the reader is
     /// told rather than left wondering why the text is short.
     private(set) var isFetchingFullText = false
+    /// Which feeds have a credential. The identifiers, never the secrets.
+    private(set) var authenticatedFeeds: Set<UUID> = []
     private(set) var isRefreshing = false
     private(set) var feedCount = 0
 
@@ -197,8 +200,13 @@ final class AppModel {
         }
     }
 
-    init(database: AppDatabase, fetcher: FeedFetcher = FeedFetcher()) {
+    init(
+        database: AppDatabase,
+        fetcher: FeedFetcher = FeedFetcher(),
+        credentials: CredentialStoring = KeychainCredentials()
+    ) {
         self.database = database
+        self.credentials = credentials
         let subscriptions = SubscriptionStore(database)
         self.subscriptions = subscriptions
         self.articles = ArticleStore(database)
@@ -206,7 +214,7 @@ final class AppModel {
         self.library = library
         self.spotlight = SpotlightIndex(library)
         self.digestService = DigestService(database)
-        self.refresher = FeedRefresh(database: database, fetcher: fetcher)
+        self.refresher = FeedRefresh(database: database, fetcher: fetcher, credentials: credentials)
         self.retention = Retention(database)
         self.finder = FeedFinder(fetcher: fetcher)
         self.opml = OPMLImport(subscriptions)
@@ -245,6 +253,7 @@ final class AppModel {
     func load() async {
         await loadSidebar()
         await loadArticles()
+        await loadCredentials()
         await countOutstandingWork()
     }
 
@@ -823,6 +832,68 @@ final class AppModel {
     }
 
     // MARK: - Subscribing
+
+    /// Follows a feed whose address is itself the secret.
+    ///
+    /// The address is spent once, here, to find out what the feed is called and
+    /// where its site is. What the database keeps is a masked form : the origin
+    /// the reader recognizes, and a digest in place of the part that must never
+    /// be written down. The real address goes to the keychain, and every
+    /// refresh asks for it back.
+    func addPrivateFeed(at address: String) async {
+        do {
+            let url = try FeedURL.canonical(address)
+            guard let masked = MaskedURL.mask(url) else {
+                failure = .invalidAddress
+                return
+            }
+
+            let found = try await finder.find(at: url.absoluteString)
+            let subscription = try Subscription(
+                url: masked,
+                title: found.title ?? "",
+                siteURL: found.siteURL,
+                iconURL: found.iconURL
+            )
+
+            let result = try await subscriptions.subscribe(to: subscription)
+            try credentials.setCredential(.secretURL(url), for: result.feed.id)
+
+            await cloud?.enqueue(recordNames: [SyncRecords.name(forFeed: result.feed.url)])
+            _ = await refresher.refresh(result.feed)
+            selection = .feed(result.feed.id)
+            await load()
+        } catch let error as FeedFinderError {
+            switch error {
+            case .invalidAddress: failure = .invalidAddress
+            case .unreachable: failure = .unreachableFeed
+            case .noFeedFound: failure = .noFeedFound
+            }
+        } catch {
+            // Never the address : an error message is one of the places section 9
+            // says a secret must not appear.
+            failure = .notSaved
+        }
+    }
+
+    /// Keeps what a feed needs to prove the reader is entitled to it.
+    func setCredential(_ credential: FeedCredential?, for feedID: UUID) async {
+        do {
+            try credentials.setCredential(credential, for: feedID)
+            await loadSidebar()
+        } catch {
+            failure = .notSaved
+        }
+    }
+
+    /// Whether a feed has a credential, which is not the same as holding it.
+    func hasCredential(_ feedID: UUID) -> Bool {
+        authenticatedFeeds.contains(feedID)
+    }
+
+    func loadCredentials() async {
+        authenticatedFeeds = (try? credentials.identifiers()) ?? []
+    }
 
     func addFeed(at address: String) async {
         do {

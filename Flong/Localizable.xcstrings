@@ -341,6 +341,16 @@
         }
       }
     },
+    "A subscription platform gives each subscriber an address nobody else has. Kept in the keychain, never in the database, and never in an export.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une plateforme d'abonnement donne à chaque abonné une adresse que personne d'autre n'a. Conservée dans le trousseau, jamais en base, jamais dans un export."
+          }
+        }
+      }
+    },
     "Add": {
       "localizations": {
         "fr": {
@@ -468,6 +478,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Les articles apparaissent à mesure qu'ils arrivent."
+          }
+        }
+      }
+    },
+    "Bearer token": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jeton porteur"
           }
         }
       }
@@ -658,6 +678,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "En cours"
+          }
+        }
+      }
+    },
+    "Header %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En-tête %@"
           }
         }
       }
@@ -873,6 +903,16 @@
         }
       }
     },
+    "Secret address": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adresse secrète"
+          }
+        }
+      }
+    },
     "See less of this": {
       "localizations": {
         "fr": {
@@ -949,6 +989,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Afficher ce qu'a envoyé le flux"
+          }
+        }
+      }
+    },
+    "Signed in as %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecté en tant que %@"
           }
         }
       }
@@ -1119,6 +1169,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cette adresse n'a pas pu être atteinte."
+          }
+        }
+      }
+    },
+    "This address is a secret": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette adresse est un secret"
           }
         }
       }
