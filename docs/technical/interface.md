@@ -135,6 +135,22 @@ Notes and the months are in neither menu. An article joins notes by being writte
 
 **A heading takes the colour of the mark beside it.** The live band is the one place on the page with a colour of its own, and the dot and the word are one mark : the word is set in the dot's colour at the quiet end of its pulse, so the dot stays the loud half and the pair reads as one thing. Both come from `LiveDot`, named rather than written twice, since two literals that happen to agree today are two literals that stop agreeing the first time one of them is changed.
 
+## The page keeps itself up to date
+
+**The window follows the store.** Every list used to be loaded by an explicit call after an action the window itself had taken, which works perfectly for what the window does and not at all for what it does not : a background refresh, a change arriving from another device through `CKSyncEngine`, an archive read in, a job finishing. All of those wrote to the store and nothing told the reader, so a window left open showed this morning's page until it was pulled down, or left and come back to.
+
+`DatabaseRegionObservation` over the tables the interface is drawn from is what tells it now. This is the reason GRDB is here at all : `CLAUDE.md` says the package earns its place by replacing the connection pool, the migrator, the typed row decoding and the change observation the store would otherwise have to own, and the observation was the one of the four never used.
+
+A region rather than a value : what is wanted is the news that something moved, after which the window reads back what it happens to be showing. The machinery's own tables are not watched, `sync_state` and `archive_ingest` being where the synchronization writes down where it got to, and a window that reloaded every time a change token moved would reload constantly and show the same page.
+
+**A burst settles before anything is read back.** Three hundred feeds refreshing is three hundred transactions and the window needs one reload. The stream keeps only the most recent tick, so everything arriving during the four hundred milliseconds of settling, and during the reload itself, collapses into the single tick that follows.
+
+**Not the article list, while an article is open.** Opening one marks it read, and a list reloaded under it would drop that article out of the unread view the reader is about to come back to. The digest, the sidebar and the collections are read back either way ; the list waits until they are looking at it.
+
+**And a clock, for what the store cannot know.** Following the store shows what has arrived ; nothing in it asks the publishers. A window open all day asked nobody anything, the only foreground refresh being the return to the front, and a Mac window that never leaves the front never returns to it. Every ten minutes it asks, which the politeness of `docs/technical/fetching.md` then decides per feed : most of those ticks find nothing due and cost one query.
+
+**Pull to refresh stays.** It is no longer the way the page keeps up, and it is still the way a reader says now rather than soon. Every application worth using has one.
+
 ## The reader's menu
 
 One button in the same corner of every section, holding what the reader has decided. It sat in the digest alone at first, which made it the digest's menu rather than the reader's : what it holds belongs to the person and not to the page, and a thing that belongs to the person is in the same place wherever they are.
