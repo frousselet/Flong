@@ -167,7 +167,7 @@ The mechanics were bad too. SwiftUI holds the refresh control out until the work
 
 The separator's own colour rather than a white highlight. White is the glass idiom and it disappears on the picture that most needs an edge, which is the one ending in white on a white page ; the separator holds against both and turns with the appearance.
 
-A point wide and half of the separator's opacity. Half a point is one device pixel on a two times screen and holds only where the picture behind it is dark ; a point is a line on every screen. The separator's own colour is drawn to be read as a rule between two things and this is not that, it is the last pixel of the picture : half of it says where the edge is without ever being the thing one looks at. Measured across a thumbnail's edge, the page goes 255, 197, 68, and then the picture.
+Half a point wide, at half the separator's opacity. A point was tried and read as too much : on a two times screen half a point is a single device pixel, which is exactly what an edge is. The separator's own colour is drawn to be read as a rule between two things and this is not that, it is the last pixel of the picture, so half of it says where the edge is without ever being the thing one looks at.
 
 **A source's mark is round**, with the same hairline inside it. A favicon arrives as whatever square its publisher drew, dark on dark as often as not, and a round crop is what makes a column of them read as one column rather than as a row of unrelated stamps. The generic mark, for a source that serves none, keeps its bare glyph : an edge around it would make an absence look like a mark.
 
@@ -218,6 +218,10 @@ The picture is scaled on the way in and never after. What comes out of a photo l
 A month is a picture of a whole month and reads better for having the whole width ; a piece of glass is a thing on the page and belongs within the measure like everything else on it. Uncovered, the chart steps out of the page's gutter with a negative inset of exactly its width, which is why that gutter is a named constant rather than a number written twice.
 
 The offset is what is asked, not the rows : a row is a landmark and this is a question about a single point, the top of the content against the top of what is shown. Against a hair rather than against nought, since a scroll view rests at a fractional offset often enough and a glass flickering on and off under a still thumb would be worse than one that never left.
+
+**The bars are held back from the full ink.** Thirty of them at the weight of a headline read as loudly as the headlines under them, and the chart is a picture of the page rather than a part of it. Measured on a screenshot, a bar that was pure black comes out at a mid grey.
+
+**The hour turning over is felt as well as seen.** The buzz followed the day while the chart counted days ; it follows the hour now that the mark does, since a reader scrolling through a whole day of a busy wire without feeling anything is the chart moving under them in silence.
 
 **An hour with nothing in it is grey, not absent.** Whether it has been and gone or has not happened yet, it keeps its place at the height of the shortest bar there is. The row stays a row, with a level floor an eye can run along, and the ink is kept for the hours something actually arrived in.
 

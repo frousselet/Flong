@@ -190,11 +190,12 @@ struct RemoteImage: View {
     /// against a white page. What is wanted here is an edge, and an edge is a
     /// line. It is also hundreds fewer glass effects in a list somebody is
     /// scrolling.
-    /// A point, and faint. Half a point is a single device pixel on a two
-    /// times screen and holds only where the picture behind it is dark ; a
-    /// point is a line on every screen, and at this opacity it is still a line
-    /// rather than a band.
-    static let ring: CGFloat = 1
+    /// Half a point, and half of the separator's colour with it.
+    ///
+    /// A point was tried and read as too much : on a two times screen half a
+    /// point is a single device pixel, which is exactly what an edge is. It
+    /// says where the picture stops and is never the thing one looks at.
+    static let ring: CGFloat = 0.5
 
     /// How much of the separator the edge keeps.
     ///

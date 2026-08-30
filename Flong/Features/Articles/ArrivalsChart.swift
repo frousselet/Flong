@@ -187,8 +187,12 @@ struct ArrivalsChart: View {
                 Capsule()
                     // The page's own ink, which inverts with the page and so
                     // with the glass under it : dark bars on the light
-                    // material, light ones on the dark.
-                    .fill(isCurrent ? Color.accentColor : Color.primary)
+                    // material, light ones on the dark. Held back from the
+                    // full ink : a row of thirty bars at the weight of a
+                    // headline is a row that reads as loudly as the headlines
+                    // under it, and this is a picture of the page rather than
+                    // part of it.
+                    .fill(isCurrent ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Self.ink))
                     .frame(height: height(of: count, peak: peak))
             } else {
                 // An hour nothing came in on keeps its place, in grey, at the
@@ -222,6 +226,13 @@ struct ArrivalsChart: View {
         .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
         .help(isAhead ? Text("Still to come") : Text("\(count) articles"))
     }
+
+    /// How dark an hour that had something is drawn.
+    ///
+    /// Not the full ink. Thirty bars at the weight of a headline read as
+    /// loudly as the headlines under them, and the chart is a picture of the
+    /// page rather than a part of it.
+    static let ink = Color.primary.opacity(0.55)
 
     /// The shortest a bar is ever drawn.
     ///

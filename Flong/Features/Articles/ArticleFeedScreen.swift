@@ -42,6 +42,12 @@ struct ArticleFeedScreen: View {
     /// is for. At rest there is nothing behind it and it wears none.
     @State private var isCovered = false
 
+    /// The hour the chart has its mark on, which is what a reader feels turn
+    /// over as they scroll.
+    private var markedHour: Date? {
+        moment.map { Hours.hour(of: $0) }
+    }
+
     /// How far the page stands in from the edges of the screen.
     ///
     /// Named because the chart has to undo it : uncovered it runs the whole
@@ -113,10 +119,15 @@ struct ArticleFeedScreen: View {
             isCovered = covered
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
-        // The day turning over is felt as well as seen. Only once the reader
-        // has actually moved : the first day the list settles on is not a
-        // change, and a buzz on opening a screen is a buzz nobody asked for.
-        .sensoryFeedback(trigger: day) { previous, current in
+        // The bar moving is felt as well as seen, and the bar is an hour now :
+        // triggering on the day meant scrolling through a whole day of a busy
+        // wire without feeling anything, which is the chart moving under the
+        // reader in silence.
+        //
+        // Only once they have actually moved : the first hour the list settles
+        // on is not a change, and a buzz on opening a screen is a buzz nobody
+        // asked for.
+        .sensoryFeedback(trigger: markedHour) { previous, current in
             showsArrivals && previous != nil && current != nil ? .selection : nil
         }
         // A large title, like the front page's dateline and the sources list :
