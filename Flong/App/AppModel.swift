@@ -993,9 +993,13 @@ final class AppModel {
                 await loadSidebar()
 
             case .library:
-                // The same sentence as the star in an article's own bar, and
-                // not `remove` : a copy kept by a note or a collection stays.
-                await apply(try await library.unstar([summary.id]))
+                // The same sentence as the star in an article's own bar, and a
+                // toggle for the same reason.
+                await apply(
+                    summary.isStarred
+                        ? try await library.unstar([summary.id])
+                        : try await library.star([summary.id])
+                )
                 await load()
             }
         } catch {
@@ -1020,11 +1024,17 @@ final class AppModel {
                 await loadSidebar()
 
             case .library:
-                // Not `remove` : that throws the kept copy away, and taking a
-                // star off is not that sentence. The copy goes only if nothing
-                // else keeps it, and a note or a collection is something else.
-                await apply(try await library.unstar([article.id]))
-                self.article?.isStarred = false
+                // A toggle, both ways. It only ever unstarred, so the star did
+                // nothing at all on an article kept for a note or a collection,
+                // which is every article that is filed and not a favourite.
+                let isStarred = !article.isStarred
+                let change =
+                    isStarred
+                    ? try await library.star([article.id])
+                    : try await library.unstar([article.id])
+                await apply(change)
+
+                self.article?.isStarred = isStarred
                 await loadArticleCollections()
                 await load()
             }

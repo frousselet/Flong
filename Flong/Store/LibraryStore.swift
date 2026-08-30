@@ -260,6 +260,33 @@ nonisolated struct LibraryStore: Sendable {
         }
     }
 
+    /// Puts the star on a kept copy, by the copy's own identity.
+    ///
+    /// The other half of ``unstar``, and the half that was missing : a copy is
+    /// addressed by its own identity when the article is read from the library,
+    /// and `setStarred` cannot be used on it. Without this the star in an
+    /// article's bar could take a favourite away and never make one, so tapping
+    /// it on an article kept for a note or a collection did nothing at all.
+    @discardableResult
+    func star(_ itemIDs: [UUID], at date: Date = Date()) async throws -> LibraryChange {
+        guard !itemIDs.isEmpty else { return LibraryChange() }
+
+        return try await database.writer.write { db in
+            var change = LibraryChange()
+            for id in itemIDs {
+                guard var item = try LibraryItem.fetchOne(db, key: id), item.starredAt == nil else { continue }
+
+                item.starredAt = date
+                try item.update(db)
+                if let entryID = item.entryID {
+                    _ = try Entry.filter(key: entryID).updateAll(db, Column("is_starred").set(to: true))
+                }
+                change.kept.append(item)
+            }
+            return change
+        }
+    }
+
     /// Keeps articles, whatever their starred state.
     ///
     /// This is the path a rule takes at M5, and the one an annotation takes.

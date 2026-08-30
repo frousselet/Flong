@@ -189,6 +189,23 @@ struct CollectionStoreTests {
         #expect(try await library.count() == 0)
     }
 
+    @Test("The star on an article read from the library goes both ways")
+    func starringFromTheLibrary() async throws {
+        // Kept for a collection and never starred, which is what the star in
+        // its own bar could not do anything about.
+        let article = try await kept("un")
+        try await collections.add([article.id], to: "Thèse", at: now)
+        #expect(try await library.summaries(in: .builtIn(.starred)).isEmpty)
+
+        _ = try await library.star([article.id], at: now)
+        #expect(try await library.summaries(in: .builtIn(.starred)).count == 1)
+
+        _ = try await library.unstar([article.id], at: now)
+        #expect(try await library.summaries(in: .builtIn(.starred)).isEmpty)
+        // And it is still filed, through both.
+        #expect(try await collections.collections(of: article.id) == ["Thèse"])
+    }
+
     @Test("An article thrown out of the library leaves no phantom behind")
     func removingClearsTheBindings() async throws {
         let article = try await kept("un")
