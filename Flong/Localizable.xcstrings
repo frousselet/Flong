@@ -549,6 +549,7 @@
       }
     },
     "By source" : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {

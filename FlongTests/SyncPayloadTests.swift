@@ -127,6 +127,7 @@ struct SyncRecordsTests {
             language: "fr",
             publishedAt: now,
             promotedAt: now,
+            starredAt: now,
             contentHTML: String(repeating: "<p>Le corps de l'article.</p>", count: 200),
             plainText: String(repeating: "Le corps de l'article. ", count: 200),
             annotation: "À relire"
@@ -139,12 +140,23 @@ struct SyncRecordsTests {
         #expect(restored.guid == item.guid)
         #expect(restored.author == item.author)
         #expect(restored.annotation == "À relire")
+        // Why it was kept travels with it : a favourite that arrived merely
+        // kept would be a favourite to make again on every other device.
+        #expect(restored.starredAt == item.starredAt)
         #expect(restored.contentHTML == item.contentHTML)
         #expect(restored.plainText == item.plainText)
 
         // Compressed, because an article is markup and markup compresses.
         let content = try #require(record["contentHTML"] as? Data)
         #expect(content.count < Data(item.contentHTML!.utf8).count / 2)
+    }
+
+    @Test("A kept article that is not a favourite does not become one")
+    func keptWithoutTheStar() throws {
+        let item = LibraryItem(guid: "urn:example:2", title: "Gardé sans étoile", promotedAt: now)
+
+        let restored = try #require(SyncRecords.libraryItem(from: SyncRecords.record(for: item, in: zone)))
+        #expect(restored.starredAt == nil)
     }
 
     @Test("A block of read states survives the wire")

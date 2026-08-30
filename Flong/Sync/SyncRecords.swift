@@ -137,6 +137,10 @@ nonisolated enum SyncRecords {
         record["language"] = item.language
         record["publishedAt"] = item.publishedAt
         record["promotedAt"] = item.promotedAt
+        // Why it was kept travels with it. A favourite that arrived on another
+        // device as merely kept would be a favourite the reader has to make
+        // again, on every device but the one they made it on.
+        record["starredAt"] = item.starredAt
         record["annotation"] = item.annotation
         record["contentHTML"] = compressed(item.contentHTML)
         record["plainText"] = compressed(item.plainText)
@@ -168,6 +172,7 @@ nonisolated enum SyncRecords {
             annotation: record["annotation"] as? String
         )
 
+        item.starredAt = record["starredAt"] as? Date
         item.vector = record["vector"] as? Data
         item.vectorModel = record["vectorModel"] as? String
         item.vectorRevision = record["vectorRevision"] as? String
