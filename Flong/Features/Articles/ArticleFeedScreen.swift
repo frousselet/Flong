@@ -192,7 +192,7 @@ struct ArticleFeedScreen: View {
             }
         } else {
             ContentUnavailableView {
-                Label("Nothing here yet", systemImage: "dot.radiowaves.left.and.right")
+                Label("Nothing here yet", systemImage: "tray")
             } description: {
                 Text("Articles appear as they arrive.")
             }

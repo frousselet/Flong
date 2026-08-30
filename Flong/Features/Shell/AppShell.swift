@@ -80,11 +80,16 @@ struct AppShell: View {
             // debt, and nobody owes their feeds anything. Unread on its own is
             // still a view, in the sources list, for whoever does want it.
             //
+            // A full tray, which is the mark the same view already wears in the
+            // sources list, and which the bar can fill : the two beside it fill
+            // themselves, and a row of waves that cannot was the one thing in
+            // the bar drawn in outline.
+            //
             // Four sections and not five : the sources are not a place a reader
             // is, they are a thing a reader keeps, so they live in the menu with
             // the rest of what has been decided rather than in the bar beside
             // the places there are to read.
-            Tab("Stream", systemImage: "dot.radiowaves.left.and.right", value: AppSection.stream) {
+            Tab("Stream", systemImage: "tray.full", value: AppSection.stream) {
                 stack($streamPath) {
                     ArticleFeedScreen(
                         model: model,
