@@ -184,7 +184,7 @@ struct DigestScreen: View {
             }
         } else {
             ContentUnavailableView {
-                Label("Nothing has come in yet", systemImage: "sparkles.rectangle.stack")
+                Label("Nothing has come in yet", systemImage: "tray")
             } description: {
                 Text("Flong groups your articles into stories as they arrive.")
             } actions: {
@@ -489,7 +489,7 @@ struct StoryRow: View {
             Spacer(minLength: 4)
 
             if story.isGenerated {
-                Image(systemName: "sparkles")
+                Image(systemName: "apple.intelligence")
                     .accessibilityLabel(Text("Written by the model"))
                     .help(Text("Written by the model"))
             }
