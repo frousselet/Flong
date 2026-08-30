@@ -96,7 +96,7 @@ struct AppShell: View {
                 }
             }
 
-            Tab("Library", systemImage: "books.vertical", value: AppSection.library) {
+            Tab("Collections", systemImage: "bookmark", value: AppSection.library) {
                 stack($libraryPath) {
                     ArticleFeedScreen(model: model, kind: .library, menu: { libraryPath.append($0) }) {
                         libraryPath.append(.article($0))

@@ -558,6 +558,17 @@
         }
       }
     },
+    "Collections" : {
+      "comment" : "The section holding what the reader chose to keep. Not `Library` : that is the specification's word for the half of the store that is never purged, and a shelf of books is not what this is.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collections"
+          }
+        }
+      }
+    },
     "Delete" : {
       "localizations" : {
         "fr" : {
@@ -824,16 +835,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "A fonctionné %@"
-          }
-        }
-      }
-    },
-    "Library" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Bibliothèque"
           }
         }
       }

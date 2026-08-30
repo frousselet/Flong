@@ -195,7 +195,7 @@ struct SourcesScreen: View {
         case .digest: Text("Digest")
         case .unread: Text("Unread")
         case .today: Text("Today")
-        case .library: Text("Library")
+        case .library: Text("Collections")
         case .starred: Text("Starred")
         case .all: Text("All articles")
         case .folder, .feed: Text(verbatim: item.title ?? "")
@@ -207,7 +207,7 @@ struct SourcesScreen: View {
         case .digest: "sparkles.rectangle.stack"
         case .unread: "circle.inset.filled"
         case .today: "sun.max"
-        case .library: "books.vertical"
+        case .library: "bookmark"
         case .starred: "star"
         case .all: "tray.full"
         case .folder: "folder"

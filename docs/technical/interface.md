@@ -117,6 +117,8 @@ It is still not an account. There is no account and nothing to sign in to, and t
 
 It holds the subjects, the sites the reader is signed in to, and the command to write the digest again, which had been buried at the foot of the sources list where it never belonged : the sources list is for the state of the machinery, and asking the model to write again is the reader's own decision.
 
+**The kept articles are called `Collections`, not `Bibliothèque`.** The specification's word for them is the library, and it stays the word everywhere the code and the documentation talk about the half of the store that is never purged : the split it names, stream against library, is the shape of the whole product. It is a poor label though. A library is a shelf of books, and what this section holds is articles somebody put aside ; `Bibliothèque` was also the longest of the four names in a bar that has to fit four. `Collections` is what Photos calls the same idea for the same reason, which means a reader has met it before. The icon follows the name off the shelf : a bookmark rather than a row of books.
+
 **The sources came off the tab bar, which is now four sections and not five.** A tab names a place there is to read, and a folder tree is not one : it is something a reader touches when they are organizing, which is rarely, and the bar is better spent on reading.
 
 They are not in the menu either, though they passed through it. They were the one thing in it a reader opens often, and a thing opened often is a button rather than a line in a menu : they sit in the leading corner, opposite the reader's own face, in each of the three sections a reader reads in. Search does not carry it, its bar belonging to the field, and a reader who is searching is not organizing.
