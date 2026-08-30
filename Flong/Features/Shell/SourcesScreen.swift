@@ -41,7 +41,7 @@ struct SourcesScreen: View {
                             }
                         }
                     } header: {
-                        Text("Feeds")
+                        Text("Subscriptions")
                     }
                 }
 

@@ -293,6 +293,63 @@ nonisolated struct ArticleStore: Sendable {
         }
     }
 
+    /// How many articles arrived on each day of a view, keyed by the day.
+    ///
+    /// **A local day, not a slice of UTC.** A reader in Paris opening this at one
+    /// in the morning is still looking at yesterday's wire, and a chart that
+    /// disagrees is a chart about a timezone rather than about them. SQLite is
+    /// handed the reader's own offset, which is what `localtime` is, and the day
+    /// it answers with is read back in the same offset.
+    ///
+    /// **Grouped by the database rather than in Swift.** A month of a busy
+    /// corpus is tens of thousands of rows and all that is wanted from them is
+    /// one number per day : fetching the dates to count them here would carry
+    /// the whole stream across for the sake of thirty integers.
+    func dailyCounts(
+        _ filter: ArticleFilter,
+        matching query: QueryNode? = nil,
+        now: Date = Date()
+    ) async throws -> [Date: Int] {
+        let (condition, arguments) = self.condition(filter, query: query, now: now)
+
+        // The rows are turned into something `Sendable` inside the block, which
+        // is what picks GRDB's asynchronous read : a block that hands a `Row`
+        // back picks the synchronous one instead and reads the database on
+        // whichever thread asked, and here that is the one drawing the screen.
+        let counted: [String: Int] = try await database.writer.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT date(COALESCE(e.published_at, e.received_at), 'localtime') AS day,
+                           COUNT(*) AS count
+                    FROM entry e JOIN feed f ON f.id = e.feed_id
+                    WHERE e.is_hidden = 0 AND e.duplicate_of IS NULL AND \(condition)
+                    GROUP BY day
+                    """,
+                arguments: arguments
+            )
+            return Dictionary(
+                uniqueKeysWithValues: rows.compactMap { row in
+                    (row["day"] as String?).map { ($0, row["count"] as Int) }
+                })
+        }
+
+        // Built here rather than held as a static : a formatter is not `Sendable`,
+        // and this is asked for once when a view loads, not once per row.
+        let midnight = DateFormatter()
+        midnight.locale = Locale(identifier: "en_US_POSIX")
+        midnight.calendar = Calendar(identifier: .gregorian)
+        midnight.timeZone = .current
+        midnight.dateFormat = "yyyy-MM-dd"
+
+        var counts: [Date: Int] = [:]
+        for (day, count) in counted {
+            guard let start = midnight.date(from: day) else { continue }
+            counts[start] = count
+        }
+        return counts
+    }
+
     // MARK: - Writing
 
     /// Marks articles read or unread.

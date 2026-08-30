@@ -507,6 +507,17 @@
         }
       }
     },
+    "Articles per day" : {
+      "comment" : "The heading of the bar chart above the stream",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Articles par jour"
+          }
+        }
+      }
+    },
     "Bearer token" : {
       "localizations" : {
         "fr" : {
@@ -563,16 +574,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tout a été lu ici."
-          }
-        }
-      }
-    },
-    "Feeds" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Flux"
           }
         }
       }
@@ -793,17 +794,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bibliothèque"
-          }
-        }
-      }
-    },
-    "Live" : {
-      "comment" : "The section showing every article as it arrives, newest first",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En direct"
           }
         }
       }
@@ -1238,6 +1228,17 @@
         }
       }
     },
+    "Stream" : {
+      "comment" : "The section showing every article as it arrives, newest first",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flux"
+          }
+        }
+      }
+    },
     "Subject" : {
       "localizations" : {
         "fr" : {
@@ -1274,6 +1275,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sites abonnés"
+          }
+        }
+      }
+    },
+    "Subscriptions" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abonnements"
           }
         }
       }

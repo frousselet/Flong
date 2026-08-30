@@ -71,7 +71,7 @@ Motion is either information or decoration, and decoration on a screen read ever
 
 Nothing else animates.
 
-## The wire
+## The stream
 
 The section beside the digest shows everything, newest first, read or not. A queue is a thing to get to the end of, and a reader watching a subject is not trying to finish anything : what they want is to see what came in, and where they left off.
 
@@ -80,6 +80,30 @@ The section beside the digest shows everything, newest first, read or not. A que
 It is broken by day, in the same kerned uppercase as the front page's sections. A long scroll with no landmarks is one a reader loses their place in, and the day is the landmark.
 
 Unread on its own is still a view, in the sources list, for whoever wants a queue.
+
+**It is called `Flux` in French, and the subscriptions are no longer.** `Flux` is what a French reader calls the river of everything, and it was already the heading over the list of feeds in the sources screen. Two sections cannot share a name, and the list of feeds is a list of subscriptions, which is what it is now called. In English the section is `Stream`, the specification's own word for the disposable cache of everything, which is exactly what it shows.
+
+Its title is a large one, like the front page's dateline and the sources list, so it stands at the head of the page and shrinks into the bar as the reader scrolls into it. An inline title is already shrunk : it says where you are without ever saying it was worth a line.
+
+## Thirty days over the stream
+
+A row of bars is pinned at the head of the stream, one per day, the last thirty of them. It answers the question a reader has when they open a wire after two days away and cannot answer from a list : was this month steady, or did it have a Thursday in it.
+
+**No axis and no legend.** Thirty numbers down the side and thirty dates along the bottom would take more room than the chart and say less than its shape does, and the dateline of whatever is on screen is one line below anyway.
+
+**It follows the reading rather than leading it.** The strip scrolls itself to whichever thirty days the reader has scrolled the list into, so the bars are always about what is on screen. It can be pushed by hand too, and it moves a stretch at a time : half of one month beside half of the next is a comparison nobody asked for.
+
+**The day at the top of the list is the coloured bar.** A dot over it, a panel behind it, a width of its own : each of those would add a thing to a chart that is already thirty things, and colour adds nothing. Every bar keeps its width and its place, so nothing moves and nothing changes shape as the reader crosses from one day into the next. The turn is felt as well as seen, once the reader has actually moved : the first day a list settles on is not a change, and a buzz on opening a screen is a buzz nobody asked for.
+
+**The scale is the busiest day of every stretch offered, not of the stretch on screen.** Scaling each month on its own would draw a dead fortnight in August exactly as tall as a general election, and a chart whose scale moves under the reader lies for free. A day nothing arrived on draws nothing at all : with no axis to stand on there is no line for it to hide in, and a gap in the row is the honest picture of a gap in the month.
+
+**A day is a local day.** A reader in Paris opening this at one in the morning is still looking at yesterday's wire, and a chart that disagrees is a chart about a timezone rather than about them. SQLite is handed the reader's own offset and does the grouping ; a month of a busy corpus is tens of thousands of rows and all that is wanted from them is thirty integers.
+
+**The glass is the ground, not the bars, and finding that out took measuring rather than reasoning.** Thirty bars each made of glass does not work at this size. Glass shows what is behind it, and at the head of a page that is white paper, so an untinted bar and a white bar alike read as nothing at all : counted, not one pixel of a bar differed from pure white. Tinting them fixed that and brought its own trouble, `.regular` glass carrying a shadow apiece that pooled into a grey wash across the strip, forty thousand grey pixels taking the paper down to two hundred and thirty-six. `.clear` glass, the variant meant to be laid over content rather than to float above it, left fifty, but nothing else touched the wash : a `GlassEffectContainer` only softened it, and a `shadow` of one's own added after the effect did not draw at all.
+
+So the strip stands on one piece of glass, shaped like the pills the front page pins its subjects on, and the bars are plain shapes drawn on it in the page's own ink, which inverts with the page : dark on the light material, light on the dark. The glass goes behind them rather than around them, since it lends its vibrancy to whatever it holds, which is right for the label on a pill and wrong here : held, the ink came back a light grey. With no shadow left to merge there is no container, and so no `glassEffectID` : a container hands its tints out by position unless every shape carries an identity, which drew the coloured bar five columns from the day it belonged to.
+
+**Pinned is not the same as in front.** A section header pinned in a lazy stack is drawn under the rows unless it is lifted, and a headline crossing the chart was drawn on top of it.
 
 ## The reader's menu
 

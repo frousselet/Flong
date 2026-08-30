@@ -27,7 +27,7 @@ nonisolated enum Route: Hashable {
 /// has and which every screen here uses.
 nonisolated enum AppSection: Hashable {
     case digest
-    case live
+    case stream
     case library
     case sources
     case search
@@ -46,7 +46,7 @@ struct AppShell: View {
     @State private var model: AppModel
     @State private var section = AppSection.digest
     @State private var digestPath: [Route] = []
-    @State private var livePath: [Route] = []
+    @State private var streamPath: [Route] = []
     @State private var libraryPath: [Route] = []
     @State private var sourcesPath: [Route] = []
     @State private var searchPath: [Route] = []
@@ -74,10 +74,10 @@ struct AppShell: View {
             // either, for the same reason : a number that only ever grows is a
             // debt, and nobody owes their feeds anything. Unread on its own is
             // still a view, in the sources list, for whoever does want it.
-            Tab("Live", systemImage: "dot.radiowaves.left.and.right", value: AppSection.live) {
-                stack($livePath) {
-                    ArticleFeedScreen(model: model, kind: .all, named: "Live") {
-                        livePath.append(.article($0))
+            Tab("Stream", systemImage: "dot.radiowaves.left.and.right", value: AppSection.stream) {
+                stack($streamPath) {
+                    ArticleFeedScreen(model: model, kind: .all, named: "Stream", showsArrivals: true) {
+                        streamPath.append(.article($0))
                     }
                 }
             }

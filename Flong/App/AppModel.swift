@@ -100,6 +100,10 @@ final class AppModel {
 
     private(set) var sidebar: [SidebarItem] = []
     private(set) var summaries: [ArticleSummary] = []
+
+    /// How many articles arrived on each day of the view being shown, keyed by
+    /// the local day. What the chart above the stream is drawn from.
+    private(set) var dailyCounts: [Date: Int] = [:]
     private(set) var article: Article?
     /// Whether the page an article lives at is being fetched, so the reader is
     /// told rather than left wondering why the text is short.
@@ -647,6 +651,7 @@ final class AppModel {
                 isShowingLibrary
                 ? try await library.summaries(matching: searchText)
                 : try await articles.summaries(filter, matching: query)
+            dailyCounts = isShowingLibrary ? [:] : try await articles.dailyCounts(filter, matching: query)
             if let selectedArticle, !summaries.contains(where: { $0.id == selectedArticle }) {
                 self.selectedArticle = nil
             }

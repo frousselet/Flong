@@ -21,40 +21,70 @@ struct ArticleFeedScreen: View {
     /// What the screen is called, when the section it sits in calls it
     /// something other than the view it shows.
     var named: LocalizedStringResource?
+    /// Whether the last thirty days of arrivals are drawn over the list.
+    var showsArrivals = false
     let open: (UUID) -> Void
 
     @Namespace private var zoom
 
-    var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(days, id: \.day) { day in
-                    header(day.day)
+    /// The day the reader has scrolled to, which is what the chart is about.
+    @State private var day: Date?
 
-                    ForEach(day.articles) { article in
-                        ArticleRow(article: article, zoom: zoom) { open(article.id) }
-                            .swipeActions(edge: .leading) {
-                                Button {
-                                    Task { await model.toggleRead(article) }
-                                } label: {
-                                    Label(
-                                        article.isRead ? "Mark as unread" : "Mark as read",
-                                        systemImage: article.isRead ? "circle" : "checkmark.circle"
-                                    )
+    var body: some View {
+        let rows = self.rows
+
+        return ScrollView {
+            // A pinned section header, exactly as the front page pins its
+            // subjects : the bar in the safe area lays itself out in the middle
+            // of the screen here, and a header is where this one belongs
+            // anyway, at the head of what it describes.
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                Section {
+                    ForEach(rows) { row in
+                        if let article = row.article {
+                            ArticleRow(article: article, zoom: zoom) { open(article.id) }
+                                .swipeActions(edge: .leading) {
+                                    Button {
+                                        Task { await model.toggleRead(article) }
+                                    } label: {
+                                        Label(
+                                            article.isRead ? "Mark as unread" : "Mark as read",
+                                            systemImage: article.isRead ? "circle" : "checkmark.circle"
+                                        )
+                                    }
                                 }
-                            }
+                        } else {
+                            header(row.id.day)
+                        }
                     }
+                } header: {
+                    arrivals(rows)
                 }
             }
+            .scrollTargetLayout()
             .editorialColumn()
             .padding(.horizontal, 22)
             .padding(.bottom, 90)
         }
+        // Which day the reader is in, asked of the rows themselves. The list
+        // runs newest first, so the newest day with a row still on screen is
+        // the day at the top of it.
+        .onScrollTargetVisibilityChange(idType: WireRow.Key.self) { visible in
+            guard let top = visible.map(\.day).max(), top != day else { return }
+            day = top
+        }
         .scrollEdgeEffectStyle(.soft, for: .top)
+        // The day turning over is felt as well as seen. Only once the reader
+        // has actually moved : the first day the list settles on is not a
+        // change, and a buzz on opening a screen is a buzz nobody asked for.
+        .sensoryFeedback(trigger: day) { previous, current in
+            showsArrivals && previous != nil && current != nil ? .selection : nil
+        }
+        // A large title, like the front page's dateline and the sources list :
+        // it stands at the head of the page and shrinks into the bar as the
+        // reader scrolls into it. An inline title is already shrunk and says
+        // where you are without ever saying it was worth a line.
         .navigationTitle(title)
-        #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-        #endif
         .toolbar {
             ToolbarItem {
                 Button {
@@ -73,9 +103,30 @@ struct ArticleFeedScreen: View {
         }
         .task {
             model.selection = kind
+            day = nil
             await model.loadArticles()
         }
     }
+
+    // MARK: - The thirty days over the list
+
+    @ViewBuilder
+    private func arrivals(_ rows: [WireRow]) -> some View {
+        if showsArrivals, let newest = rows.first?.id.day, let oldest = rows.last?.id.day {
+            ArrivalsChart(
+                counts: model.dailyCounts,
+                windows: DayWindow.spanning(oldest, to: newest),
+                current: day ?? newest
+            )
+            .padding(.vertical, 9)
+            // Pinned is not the same as in front : without this the rows pass
+            // over the bars rather than under them, and a headline crossing the
+            // chart is drawn on top of it.
+            .zIndex(1)
+        }
+    }
+
+    // MARK: - The list
 
     /// The articles of a day, in the order they came.
     ///
@@ -93,6 +144,14 @@ struct ArticleFeedScreen: View {
             grouped[day, default: []].append(article)
         }
         return order.map { (day: $0, articles: grouped[$0] ?? []) }
+    }
+
+    /// The days and their articles as one flat list of rows.
+    private var rows: [WireRow] {
+        days.flatMap { day in
+            [WireRow(id: WireRow.Key(day: day.day, article: nil), article: nil)]
+                + day.articles.map { WireRow(id: WireRow.Key(day: day.day, article: $0.id), article: $0) }
+        }
     }
 
     private func header(_ day: Date) -> some View {
@@ -138,4 +197,23 @@ struct ArticleFeedScreen: View {
         case .feed: Text(verbatim: model.title(of: kind) ?? "")
         }
     }
+}
+
+/// One line of the wire : the dateline that opens a day, or an article under it.
+///
+/// Flat, rather than a group per day, and deliberately. A day of eighty
+/// articles wrapped in a stack of its own is eighty rows built at once, and
+/// eighty pictures asked for at once, the moment that day comes near the
+/// screen : the enclosing stack is lazy and a stack inside it is not. A flat
+/// list stays lazy, and the day rides along in each row's own identity, which
+/// is how the chart above still knows which day is on screen.
+private struct WireRow: Identifiable {
+    struct Key: Hashable {
+        let day: Date
+        /// Nothing at all, for the dateline that opens the day.
+        let article: UUID?
+    }
+
+    let id: Key
+    let article: ArticleSummary?
 }

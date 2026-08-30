@@ -30,9 +30,11 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 The pills are the subjects the system model found across the page, pinned at its head. Tapping one narrows the page to it ; the others stay, so there is always a way back. A long press says more of this, or less of this, and the page reorders itself.
 
-| An article | Live | Sources |
+| An article | Stream | Sources |
 | ---------- | ---- | ------- |
 | ![An article on iPad](docs/images/reader-ipad-light.png) | ![Everything as it arrives, on iPad](docs/images/live-ipad.png) | ![The sources on iPad](docs/images/sources-ipad.png) |
+
+The stream carries a bar per day over the last thirty, pinned at its head. It scrolls itself to whichever stretch the reader has scrolled the list into, and the day at the top of the list is the wide bar.
 
 The same page on iPhone, where the sections sit in the system tab bar and search has its own place in it :
 
