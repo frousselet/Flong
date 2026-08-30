@@ -159,11 +159,15 @@ The mechanics were bad too. SwiftUI holds the refresh control out until the work
 
 ## Pictures, and the marks beside them
 
-**A hairline of glass around every picture.** A publisher's picture arrives at whatever contrast it was shot at, and one that ends in white sits on a white page with no edge at all : the ring is what says where the picture stops. Glass rather than a grey rule, because it takes its light from the picture it holds and from the page around it, and so reads on a photograph of a night sky as well as on one of a beach.
+**A hairline inside every picture's own edge.** A publisher's picture arrives at whatever contrast it was shot at, and one that ends in white sits on a white page with no edge at all : the line is what says where the picture stops.
 
-Behind the picture rather than over it. A material lends its vibrancy to whatever it holds, which would wash a photograph exactly as it washed the bars of the arrivals chart ; behind, it is a frame the picture sits in. The outer corner is the inner one plus the ring, so the two curves are concentric : equal radii leave a frame looking thicker at the corners than along the sides.
+**Inside, and not a ring around.** A ring outside is a mount, and a mount is a frame doing more than saying where the picture ends. Inside, the line is part of the picture's own edge and takes no room : nothing moves to make space for it. `strokeBorder` rather than `stroke`, since a stroke straddles the path and half of it would fall outside the clip, which is a line drawn at half its width and softer on one side than the other.
 
-**A source's mark is round.** A favicon arrives as whatever square its publisher drew, dark on dark as often as not, and a round crop in the same ring is what makes a column of them read as one column rather than as a row of unrelated stamps. The generic mark, for a source that serves none, keeps its bare glyph : a ring around it would make an absence look like a mark.
+**A line, and not a material.** Glass was tried and taken out. At a point and a half it read as a band ; taken down to a hairline the regular material is a pale smear and the clear one is nothing whatever, measured at pure white against a white page. What is wanted is an edge, and an edge is a line. It is also hundreds fewer glass effects in a list somebody is scrolling, which are real resources and not free.
+
+The separator's own colour rather than a white highlight. White is the glass idiom and it disappears on the picture that most needs an edge, which is the one ending in white on a white page ; the separator holds against both and turns with the appearance.
+
+**A source's mark is round**, with the same hairline inside it. A favicon arrives as whatever square its publisher drew, dark on dark as often as not, and a round crop is what makes a column of them read as one column rather than as a row of unrelated stamps. The generic mark, for a source that serves none, keeps its bare glyph : an edge around it would make an absence look like a mark.
 
 **A picture meets the line that says what happened.** Above a story's summary sit the subjects it is filed under and its headline, and a picture set level with a one-word rubric leaves the column ragged. It is aligned on the summary instead, through a `VerticalAlignment` of its own, so the text reads as one block with a picture beside it. A story with no summary has no such line, and the guide falls back to the top, which is where a picture belongs when there is nothing to meet.
 
