@@ -60,6 +60,30 @@ The prompt is bounded before it is sent : six articles and two hundred and forty
 
 A story is one event ; a subject is the field several events belong to. The difference is the whole reason the pills are worth having : filtering by `Éducation` says something the list of stories underneath does not already say, whereas a pill per story would be the same page twice.
 
+## What the model is asked with
+
+Everything the framework offers is used, and one thing it offers was measured and rejected. All of it is set in one place, `OnDeviceModel`, rather than at each call site.
+
+**The permissive guardrails.** `SystemLanguageModel.Guardrails.permissiveContentTransformations` exists for an application that transforms content its reader already has, rather than one that generates content, and that is exactly this : a headline and one line about articles a publisher published and a reader subscribed to. The default set refuses a great deal of ordinary news, a court report, a war, a drug seizure, an epidemic, and every refusal arrives as a `guardrailViolation` and leaves a story wearing its own article's headline for no reason the reader can see.
+
+**Greedy sampling, and a cap on the answer.** A headline is not a place for invention : the same story asked twice should come back the same, or a rebuild rewrites a page the reader was reading. Greedy is what makes it deterministic and it is free. The cap is generous rather than tight, since a structured answer cut off in the middle comes back as a `decodingFailure`, which reads as a refusal and is a worse outcome than a long answer.
+
+**`prewarm`, in the one place it buys anything.** The summarizer measures its prompt against the context window before it asks, which is a real `await` ; the assets load during it. Everywhere else there is nothing to overlap with, and a prewarm invented a wait to have something to overlap with would cost what it saves.
+
+**`supportsLocale`, and what it does not gate.** A language the model does not write is one it is not asked for : the instruction asks for the articles' own language instead, and the reader still gets a written headline over an article in the language they were going to read anyway. What the check gates is the test on the answer. Demanding the reader's language of an answer that was never asked in it rejected every brief and left the whole page wearing its articles' headlines, which is the one outcome both halves of this were written to avoid.
+
+**`contentTagging` was measured and is not used.** Filing one headline under a list of labels looks like exactly what that tuned model is for. Against the three headlines the live tests have always used :
+
+| Headline | `general` | `contentTagging` |
+| -------- | --------- | ---------------- |
+| `Une réforme du calendrier scolaire à l'étude` | `Éducation` | nothing |
+| `Les macros Swift, deux ans après` | `Logiciel` | `Sport · Cybersécurité` |
+| shown only `Jardinage` and `Cuisine` | nothing | `Cuisine · Jardinage` |
+
+It extracts tags from a text rather than choosing among labels, so it answers with something whatever it is shown and never takes the way out. `Sport` is the same wrong answer the one-story-per-call design was written to stop. The live suite is what caught it, which is what that suite is for.
+
+**Private Cloud Compute is not on the list, because there is no list to be on.** The framework gives third-party applications the on-device model and nothing else : there is no cloud, server or remote option anywhere in its interface. Apple's own features route to Private Cloud Compute ; an application's own prompts cannot. Section 3 would not have it anyway.
+
 **A subject is a thing, not a reading.** The model used to name the subjects of the whole page on every rebuild, so they drifted : `Sécurité informatique` one run and `Cybersécurité` the next, and the preference the reader had attached to the first was left hanging off a name nothing used any more. There is a vocabulary now. It is written once, it stays, and a story is filed into it once and keeps it.
 
 **Filing is a resumable job**, like the briefs and the vectors. **A story is asked about once, and answered about once**, which is not the same thing : the first version stamped a story as asked whatever had happened, so one guardrail refusal, one rate limit or one moment with the assets unloaded left a fil with no thématique for good, never asked again and with no way for the reader to give it one. That was the reader's report, and it was right.
@@ -70,7 +94,7 @@ The three answers are told apart now. The model choosing subjects, and the model
 
 Two subjects at most. Given more it uses more, and the page that prompted this carried four on one story, of which one was right.
 
-The list carries one way out, `None of these`, which is the only time the model is asked to name anything. What it names is checked before it is kept : one to three words, and nothing lifted out of the headline. Asked for a field and shown one headline, it answers with that headline about half the time — `Les macros Swift` where `Logiciel` was wanted — and a vocabulary of headlines is a vocabulary with one story in each. Told so, it answers `Technologie`. Twice wrong and the story is left unfiled, to be asked about again when the vocabulary has grown.
+The list carries one way out, `None of these`, which is the only time the model is asked to name anything. What it names is checked before it is kept : one to three words, and nothing lifted out of the headline. Asked for a field and shown one headline, it answers with that headline about half the time, `Les macros Swift` where `Logiciel` was wanted, and a vocabulary of headlines is a vocabulary with one story in each. Told so, it answers `Technologie`. Twice wrong and the story is left unfiled, to be asked about again when the vocabulary has grown.
 
 What comes back is folded against the vocabulary, case and accents ignored, so `cybersecurite` is filed under `Cybersécurité` rather than beside it.
 

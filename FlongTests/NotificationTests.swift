@@ -173,7 +173,12 @@ struct OpenedStoryTests {
         try await story("Une réforme", at: now.addingTimeInterval(60), rooms: ["lemonde.fr", "liberation.fr"])
 
         let opened = try #require(await digest.opened(since: now).first)
-        #expect(opened.rooms == ["lemonde.fr", "liberation.fr"])
+        // A set, not a list : the rooms come back in the order they picked the
+        // story up, and this fixture gives both articles the same moment, so
+        // asserting an order would be asserting whatever the database happened
+        // to return.
+        #expect(Set(opened.rooms) == ["lemonde.fr", "liberation.fr"])
+        #expect(opened.rooms.count == 2)
     }
 }
 

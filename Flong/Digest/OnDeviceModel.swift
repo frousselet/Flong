@@ -30,9 +30,80 @@ nonisolated enum OnDeviceModel {
     static let refusalsBeforeGivingUp = 3
     private static let refusals = Mutex(0)
 
+    // MARK: - The model, as a news reader needs it
+
+    /// The model, configured once here rather than at each call site.
+    ///
+    /// **The guardrails are the permissive ones.** The default set is built for
+    /// an application that generates content ; this one transforms content the
+    /// reader already chose to receive, which is the case Apple provides
+    /// ``SystemLanguageModel/Guardrails/permissiveContentTransformations`` for.
+    /// The default set refuses a great deal of ordinary news : a court report,
+    /// a war, a drug seizure, an epidemic. Every one of those refusals arrived
+    /// as a `guardrailViolation`, and every one left a story wearing its own
+    /// article's headline for no reason the reader could see.
+    ///
+    /// It is not a way round anything. What is asked of the model is a headline
+    /// and one line about articles a publisher has already published and a
+    /// reader has already subscribed to ; nothing is invented and nothing is
+    /// sought out.
+    ///
+    /// **The use case stays `general`, and `contentTagging` was measured.**
+    /// Filing one headline under a list of labels looks like exactly what
+    /// `contentTagging` is tuned for, and it is worse at it. Against the same
+    /// three headlines the live tests have always used :
+    ///
+    /// | Headline | `general` | `contentTagging` |
+    /// | -------- | --------- | ---------------- |
+    /// | `Une réforme du calendrier scolaire` | `Éducation` | nothing |
+    /// | `Les macros Swift, deux ans après` | `Logiciel` | `Sport · Cybersécurité` |
+    /// | shown only `Jardinage` and `Cuisine` | nothing | `Cuisine · Jardinage` |
+    ///
+    /// It extracts tags from a text rather than choosing among labels, so it
+    /// answers with something whatever it is shown and never takes the way out.
+    /// `Sport` is the same wrong answer the one-story-per-call design was
+    /// written to stop. The parameter stays so the choice is visible and
+    /// re-measurable, but nothing passes anything but the default.
+    static func model(for useCase: SystemLanguageModel.UseCase = .general) -> SystemLanguageModel {
+        SystemLanguageModel(useCase: useCase, guardrails: .permissiveContentTransformations)
+    }
+
+    /// How the model is asked to answer.
+    ///
+    /// **Greedy, and bounded.** A headline is not a place for invention : the
+    /// same story asked twice should come back the same, or a rebuild rewrites
+    /// a page the reader was reading. Greedy sampling is what makes it
+    /// deterministic, and it is free.
+    ///
+    /// The cap is the answer's share of the window, which the prompt is already
+    /// measured against. It is generous rather than tight : a structured answer
+    /// cut off in the middle comes back as a `decodingFailure`, which is a
+    /// worse outcome than a long one.
+    static func options(maximumTokens: Int) -> GenerationOptions {
+        GenerationOptions(sampling: .greedy, maximumResponseTokens: maximumTokens)
+    }
+
+    // MARK: - Whether to ask at all
+
     static var isAvailable: Bool {
         guard refusals.withLock({ $0 }) < refusalsBeforeGivingUp else { return false }
         return SystemLanguageModel.default.availability == .available
+    }
+
+    /// Whether the model writes the language the reader reads in.
+    ///
+    /// **Not a reason to stop asking.** A language the model does not write is
+    /// one it is not asked for : ``languageInstruction(for:supports:)`` asks
+    /// for the articles' own language instead, and the reader gets a written
+    /// headline over an article in the language they were going to read anyway.
+    /// That is worth having and is not what this gates.
+    ///
+    /// What it gates is the check on the answer. Demanding the reader's
+    /// language of an answer that was never asked in it rejects every brief and
+    /// leaves the whole page wearing its articles' own headlines, which is the
+    /// one outcome both halves of this were written to avoid.
+    static func writes(_ locale: Locale) -> Bool {
+        SystemLanguageModel.default.supportsLocale(locale)
     }
 
     /// Why the model cannot be used, when it cannot, in the system's own terms.
