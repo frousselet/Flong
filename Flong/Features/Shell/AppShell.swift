@@ -166,6 +166,7 @@ struct AppShell: View {
             // anywhere reaches the window without the reader pulling anything.
             model.keepUp()
 
+            await model.seedStandardTopics()
             await model.load()
             await model.rebuildDigest()
             await model.startSync()

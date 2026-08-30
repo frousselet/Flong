@@ -84,6 +84,26 @@ It extracts tags from a text rather than choosing among labels, so it answers wi
 
 **Private Cloud Compute is not on the list, because there is no list to be on.** The framework gives third-party applications the on-device model and nothing else : there is no cloud, server or remote option anywhere in its interface. Apple's own features route to Private Cloud Compute ; an application's own prompts cannot. Section 3 would not have it anyway.
 
+## Three natures of subject
+
+| Nature | Who decided | May the reader delete it | Is the model shown it |
+| ------ | ----------- | ------------------------ | --------------------- |
+| **standard** | a century of newspapers | no, it was not made | yes, to choose from |
+| **own** | the reader | yes | yes, to choose from, and first |
+| **smart** | the model, for one story | no | **no** |
+
+**The standard sections are seeded at the first launch.** The model used to start with nothing and name every subject itself, so the first weeks of a library were a drift of near synonyms and the reader had nothing to hold an opinion about until it settled. `Politique`, `International`, `Économie`, `Société`, `Écologie`, `Sciences`, `Technologie`, `Santé`, `Culture`, `Sport`, `Éducation`, `Justice`, `Médias` are there from the first page. Folded on the way in, so a reader who had already written `Écologie` keeps theirs and does not get a second.
+
+They are stored in the reader's language, like everything else the model writes, and seeded at launch rather than in a migration : a migration runs before anything has asked what that language is. The cost is the one the model's own subjects already carry, which is that a reader who changes language keeps the names they had.
+
+**The model is never shown its own subjects.** Offering them back turns a page into a drift of near synonyms : it reaches for whatever is nearest, and what is nearest is whatever it said last. It chooses from the settled ones, the reader's own first.
+
+**Filing is two passes, and they ask different questions.** The first files the story under something a reader recognizes and **has no way out** : the list is the sections every newspaper has plus whatever the reader wrote, and a headline belonging under none of those is rare enough that an escape costs more than it saves. Measured before this, the model took the escape constantly, and a page where half the stories are filed under nothing is a page whose pills say nothing. It cannot invent here either, the schema being an enumeration of the names it was given.
+
+The second lets it name what the story is actually about, which every story gets and not only the ones that fit nothing. `Politique` and `Réforme des retraites` are both true of one story : the first says what kind of news it is, the second says what it is, and a page wants both. What comes back is folded against the whole vocabulary before it is kept.
+
+**The model's own wear its mark.** A `sparkles` before the name, on the pills, in the rubric above a headline, and in the list of subjects, which is the mark the model wears everywhere else in the application. A standard section and one the reader wrote are things they decided ; a smart one is the model's reading of their page, and a reader is owed the difference before they form an opinion about it.
+
 **A subject is a thing, not a reading.** The model used to name the subjects of the whole page on every rebuild, so they drifted : `Sécurité informatique` one run and `Cybersécurité` the next, and the preference the reader had attached to the first was left hanging off a name nothing used any more. There is a vocabulary now. It is written once, it stays, and a story is filed into it once and keeps it.
 
 **Filing is a resumable job**, like the briefs and the vectors. **A story is asked about once, and answered about once**, which is not the same thing : the first version stamped a story as asked whatever had happened, so one guardrail refusal, one rate limit or one moment with the assets unloaded left a fil with no thématique for good, never asked again and with no way for the reader to give it one. That was the reader's report, and it was right.

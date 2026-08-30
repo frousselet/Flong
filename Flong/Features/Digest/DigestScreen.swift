@@ -134,7 +134,9 @@ struct DigestScreen: View {
     }
 
     private func row(_ story: DigestStory) -> some View {
-        StoryRow(story: story, isLead: story.id == leadID, zoom: zoom) { open(.story(story.id)) }
+        StoryRow(story: story, isLead: story.id == leadID, smart: model.digest.smart, zoom: zoom) {
+            open(.story(story.id))
+        }
     }
 
     /// The first story on the page runs its picture across the column.
@@ -274,6 +276,17 @@ struct DigestScreen: View {
         let score = topic.name.map { model.digest.scores[$0] ?? 0 } ?? 0
 
         return HStack(spacing: 4) {
+            // A subject the model named itself wears the mark the model wears
+            // everywhere else in the application. A standard section and one
+            // the reader wrote are things they decided ; this is the model's
+            // own reading of their page, and they are owed the difference
+            // before they form an opinion about it.
+            if let name = topic.name, model.digest.smart.contains(name) {
+                Image(systemName: "sparkles")
+                    .font(.system(.caption2, weight: .semibold))
+                    .accessibilityLabel(Text("Found by the model"))
+            }
+
             // Only when there is something to say : a row of arrows on every
             // pill would be a row of arrows nobody reads.
             if score != 0 {
@@ -341,6 +354,8 @@ struct DigestScreen: View {
 struct StoryRow: View {
     let story: DigestStory
     var isLead = false
+    /// The subjects the model named itself, which wear its mark.
+    var smart: Set<String> = []
     let zoom: Namespace.ID
     let open: () -> Void
 
@@ -413,7 +428,7 @@ struct StoryRow: View {
             // it before the headline, the way a rubric is read before the piece
             // under it.
             if !story.topics.isEmpty {
-                Text(verbatim: story.topics.joined(separator: " · "))
+                rubric
                     .font(.system(.caption2, weight: .semibold))
                     .textCase(.uppercase)
                     .kerning(0.5)
@@ -428,6 +443,20 @@ struct StoryRow: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The subjects a story is filed under, the model's own marked as its own.
+    ///
+    /// Built as one `Text` rather than a row of views, so it stays a line of
+    /// type : it is set above a headline like a rubric above a piece, and a
+    /// stack of labels there would read as a control.
+    private var rubric: Text {
+        story.topics.reduce(Text(verbatim: "")) { line, topic in
+            let separator = line == Text(verbatim: "") ? Text(verbatim: "") : Text(verbatim: " · ")
+            let mark =
+                smart.contains(topic) ? Text(Image(systemName: "sparkles")) + Text(verbatim: " ") : Text(verbatim: "")
+            return line + separator + mark + Text(verbatim: topic)
+        }
     }
 
     /// What happened and who is saying it, which is what a picture sits beside.
