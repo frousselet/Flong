@@ -157,6 +157,16 @@ The mechanics were bad too. SwiftUI holds the refresh control out until the work
 
 **Asking is still possible, and now takes a deliberate act.** `Actualiser` sits in the reader's own menu, beside the other things they ask for, and keeps its `⌘R` on a Mac. It fetches every feed and groups what arrived ; the model's work carries on behind it, since those are resumable jobs and each headline appears as it is written.
 
+## Pictures, and the marks beside them
+
+**A hairline of glass around every picture.** A publisher's picture arrives at whatever contrast it was shot at, and one that ends in white sits on a white page with no edge at all : the ring is what says where the picture stops. Glass rather than a grey rule, because it takes its light from the picture it holds and from the page around it, and so reads on a photograph of a night sky as well as on one of a beach.
+
+Behind the picture rather than over it. A material lends its vibrancy to whatever it holds, which would wash a photograph exactly as it washed the bars of the arrivals chart ; behind, it is a frame the picture sits in. The outer corner is the inner one plus the ring, so the two curves are concentric : equal radii leave a frame looking thicker at the corners than along the sides.
+
+**A source's mark is round.** A favicon arrives as whatever square its publisher drew, dark on dark as often as not, and a round crop in the same ring is what makes a column of them read as one column rather than as a row of unrelated stamps. The generic mark, for a source that serves none, keeps its bare glyph : a ring around it would make an absence look like a mark.
+
+**A picture meets the line that says what happened.** Above a story's summary sit the subjects it is filed under and its headline, and a picture set level with a one-word rubric leaves the column ragged. It is aligned on the summary instead, through a `VerticalAlignment` of its own, so the text reads as one block with a picture beside it. A story with no summary has no such line, and the guide falls back to the top, which is where a picture belongs when there is nothing to meet.
+
 ## The reader's menu
 
 One button in the same corner of every section, holding what the reader has decided. It sat in the digest alone at first, which made it the digest's menu rather than the reader's : what it holds belongs to the person and not to the page, and a thing that belongs to the person is in the same place wherever they are.

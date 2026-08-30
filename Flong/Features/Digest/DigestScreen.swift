@@ -378,11 +378,17 @@ struct StoryRow: View {
     }
 
     private var standard: some View {
-        HStack(alignment: .top, spacing: 14) {
+        // The picture meets the line that says what happened, not the top of
+        // the row. Above the summary sit the subjects and the headline, and a
+        // picture starting level with a one-word rubric leaves the column
+        // ragged : level with the summary, the two blocks read as one thing
+        // with a picture beside it.
+        HStack(alignment: .summary, spacing: 14) {
             text(headline: .title3)
 
             if story.imageURL != nil {
                 RemoteImage(url: story.imageURL, width: Self.thumbnailWidth)
+                    .alignmentGuide(.summary) { $0[.top] }
             }
         }
     }
@@ -414,6 +420,7 @@ struct StoryRow: View {
                     .multilineTextAlignment(.leading)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
+                    .alignmentGuide(.summary) { $0[.top] }
             }
 
             facts
