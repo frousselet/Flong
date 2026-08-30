@@ -89,6 +89,46 @@ nonisolated enum SyncRecords {
         SHA256.hash(data: Data(text.utf8)).prefix(16).map { String(format: "%02x", $0) }.joined()
     }
 
+    // MARK: - A list that may be empty
+
+    /// A list of names, written as data rather than as a list of strings.
+    ///
+    /// **CloudKit cannot create a field from an empty list.** It infers a
+    /// field's type from the first record that carries it, and an empty list
+    /// says nothing about what it would hold : the server answers `cannot use
+    /// an empty list to initialize a new field` and refuses the whole batch,
+    /// not just that record.
+    ///
+    /// This is the ordinary case, not an edge one. Starring an article files
+    /// it in nothing, so the first mark a reader ever makes carries an empty
+    /// list, and the first save of their life fails.
+    ///
+    /// **Leaving the field out is worse.** A field absent from a save keeps
+    /// whatever the server already holds, so unfiling the last collection off
+    /// an article would never travel : the other device would go on showing
+    /// a filing the reader removed.
+    ///
+    /// Data has neither problem. It says `[]` in two bytes, its type is the
+    /// same whatever it holds, and emptying it is a change like any other.
+    static func data(for names: [String]) -> Data {
+        (try? JSONEncoder().encode(names)) ?? Data("[]".utf8)
+    }
+
+    /// The names back out, taking what an earlier version left if that is all
+    /// there is.
+    ///
+    /// A record written before this change carries the list and not the data.
+    /// It is still on the server and it is still the reader's, so it is read
+    /// rather than dropped ; the next write of that record moves it over.
+    static func names(from record: CKRecord, _ key: String, orList list: String) -> [String] {
+        if let payload = record[key] as? Data,
+            let names = try? JSONDecoder().decode([String].self, from: payload)
+        {
+            return names
+        }
+        return record[list] as? [String] ?? []
+    }
+
     // MARK: - Feeds
 
     /// What a subscription looks like on the wire.
@@ -146,7 +186,7 @@ nonisolated enum SyncRecords {
         record["guid"] = mark.guid
         record["isStarred"] = mark.isStarred ? 1 : 0
         record["annotation"] = mark.annotation
-        record["collections"] = mark.collections
+        record["filedIn"] = data(for: mark.collections)
         record["vector"] = mark.vector
         record["vectorModel"] = mark.vectorModel
         record["vectorRevision"] = mark.vectorRevision
@@ -164,7 +204,7 @@ nonisolated enum SyncRecords {
             guid: guid,
             isStarred: (record["isStarred"] as? Int ?? 0) == 1,
             annotation: record["annotation"] as? String,
-            collections: record["collections"] as? [String] ?? [],
+            collections: names(from: record, "filedIn", orList: "collections"),
             vector: record["vector"] as? Data,
             vectorModel: record["vectorModel"] as? String,
             vectorRevision: record["vectorRevision"] as? String
@@ -189,14 +229,14 @@ nonisolated enum SyncRecords {
             recordType: RecordType.collections,
             recordID: CKRecord.ID(recordName: "collections", zoneID: zone)
         )
-        record["names"] = names
+        record["made"] = data(for: names)
         record["dynamic"] = try? JSONEncoder().encode(dynamic)
         return record
     }
 
     static func collectionNames(from record: CKRecord) -> [String]? {
         guard record.recordType == RecordType.collections else { return nil }
-        return record["names"] as? [String] ?? []
+        return names(from: record, "made", orList: "names")
     }
 
     static func dynamicCollections(from record: CKRecord) -> [String: String] {

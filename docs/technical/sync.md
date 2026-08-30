@@ -21,6 +21,16 @@ One record per article would be more than a hundred thousand over the same perio
 
 Every record is named after **what it is about** : a digest of the feed address, or of the feed address and the article's identity. Two devices that star the same article compute the same name and write the same record, so CloudKit sees one row and not two. A name derived from a local identifier would give every device its own copy of everything.
 
+## A list that may be empty is written as data
+
+CloudKit works the type of a field out from the first record that carries it, and an empty list says nothing about what it would hold. The server refuses it outright, `cannot use an empty list to initialize a new field`, and refuses the whole batch with it, not just that record.
+
+An empty list is the ordinary case here : starring an article files it in nothing, so the first mark a reader ever makes is the one that fails.
+
+Leaving the field out instead is worse. A field absent from a save keeps whatever the server already holds, so unfiling the last collection off an article would never travel and the other device would go on showing a filing the reader removed.
+
+So a list of names travels as JSON data : `[]` is two bytes, the type is the same whatever it holds, and emptying it is a change like any other. The fields are `Mark.filedIn` and `Collections.made` ; a record written before this change carries the older `collections` and `names` lists, which are still read, and move over on the next write of that record.
+
 ## Read states
 
 The whole budget rests on this. Read states travel as one record per month, holding the fingerprints of everything read in it.

@@ -159,6 +159,50 @@ struct SyncRecordsTests {
         #expect(!restored.isEmpty)
     }
 
+    @Test("A mark filed nowhere carries something CloudKit can make a field of")
+    func filedNowhere() throws {
+        let mark = Mark(
+            feedURL: "https://feeds.example.com/f.xml",
+            guid: "urn:example:3",
+            isStarred: true,
+            annotation: nil,
+            collections: []
+        )
+        let record = SyncRecords.record(for: mark, in: zone)
+
+        // The server infers a field's type from the first record carrying it,
+        // and refuses an empty list outright : `cannot use an empty list to
+        // initialize a new field`. Starring without filing is the ordinary
+        // case, so this is the first record most readers ever send.
+        #expect(record["filedIn"] is Data)
+        #expect(!(record["filedIn"] is [String]))
+
+        #expect(try #require(SyncRecords.mark(from: record)).collections.isEmpty)
+    }
+
+    @Test("A reader with no collections at all still has a record to send")
+    func noCollectionsAtAll() throws {
+        let record = SyncRecords.record(forCollections: [], in: zone)
+
+        #expect(record["made"] is Data)
+        #expect(SyncRecords.collectionNames(from: record) == [])
+    }
+
+    @Test("What an earlier version wrote as a list is still the reader's")
+    func theOldShape() throws {
+        // Written before the field moved to data, still on the server, and
+        // still a filing the reader made.
+        let record = CKRecord(
+            recordType: SyncRecords.RecordType.mark,
+            recordID: CKRecord.ID(recordName: "mark-old", zoneID: zone)
+        )
+        record["feedURL"] = "https://feeds.example.com/f.xml"
+        record["guid"] = "urn:example:4"
+        record["collections"] = ["Thèse"]
+
+        #expect(try #require(SyncRecords.mark(from: record)).collections == ["Thèse"])
+    }
+
     @Test("A block of read states survives the wire")
     func readStateRoundTrip() throws {
         let fingerprints = Set((0..<400).map { ArticleFingerprint(value: UInt64($0) &* 2_654_435_761) })
