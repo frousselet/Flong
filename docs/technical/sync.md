@@ -76,6 +76,12 @@ It is a cache, not a source of truth. Losing it costs one refused save per recor
 
 **The background mode.** `remote-notification` in `UIBackgroundModes`, beside `fetch` and `processing`. Without it CloudKit refuses to set the subscription up at all and says so : `BUG IN CLIENT OF CLOUDKIT: CloudKit push notifications require the 'remote-notification' background mode in your info plist`. It costs nothing and is declared in `Config/Info.plist`.
 
-**The Push Notifications capability**, which is an `aps-environment` entitlement and, behind it, a capability on the App ID. That one is not in the repository : adding the entitlement without the capability on the App ID fails to sign, and enabling the capability is an action on a developer account rather than a change to a file. It is added in Xcode, once, under Signing and Capabilities.
+**The Push Notifications capability**, which is an `aps-environment` entitlement and, behind it, a capability on the App ID. It is there now, in both spellings the two platforms want : `aps-environment` for iOS and `com.apple.developer.aps-environment` for the Mac.
+
+It is worth writing down how it got there, since the order matters and the wrong order looks like a broken project. Adding the entitlement to the file first fails to sign, with a provisioning error that names the profile rather than the cause : an App ID that does not carry the capability cannot be granted it by a file asking nicely. Enabling it under Signing and Capabilities in Xcode does both halves at once, the App ID on the account and the entitlement in the file, which is why that is the way in.
+
+The same is true of iCloud. The target carries `com.apple.developer.icloud-container-identifiers`, `com.apple.developer.ubiquity-container-identifiers` and `com.apple.developer.ubiquity-kvstore-identifier`, with `CloudKit` and `CloudDocuments` among the services : records for what must merge, documents for the stream archives, and the key-value store for what the reader has chosen. All against one container.
+
+A build for a real device is what proves any of this. The simulator does not check the App ID, so a missing capability signs happily there and fails the moment it meets hardware : `xcodebuild build -destination 'generic/platform=iOS'` is the check worth running.
 
 Without the push the application still synchronizes : the engine sends what is pending and fetches what is waiting whenever it runs, which is at every launch, on returning to the foreground, and on a pull. What is lost is promptness, not correctness.
