@@ -99,6 +99,7 @@ nonisolated struct StorySummarizer: Sendable {
         You name and summarize groups of news articles about the same event.
         \(OnDeviceModel.languageInstruction(for: locale))
         Be factual and plain. Never add an opinion, a judgement or a call to action.
+        Never write a date, a year or a day of the week. Say what happened, not when.
         Never mention that you are a model or that you were asked anything.
         """
     }
@@ -150,12 +151,29 @@ nonisolated struct StorySummarizer: Sendable {
             // Asked again in the same language it would answer the same way, so
             // the fallback is kept and the story is not asked about again until
             // the reader changes language.
+            // A year the articles never mention is a year the model made up.
+            // It has nothing to date anything by : what it is shown is
+            // headlines and standfirsts, and a model of this size fills the
+            // gap rather than leaving it.
+            if let invented = Self.inventedYear(title: title, summary: summary, from: articles) {
+                Log.enrich.notice("A brief carried a year nothing said : \(invented, privacy: .public)")
+                return await retry(
+                    in: session,
+                    saying: "That answer gave a date. Write it again with no date, no year and no day.",
+                    fallback: fallback
+                )
+            }
+
             guard Self.isWritten(in: locale, title: title, summary: summary) else {
                 // Asked once more, in the same session so the model can see what
                 // it just wrote. Measured : the first answer comes back in the
                 // language of the articles about half the time whatever the
                 // prompt says, and being told so fixes most of those.
-                return await retry(in: session, fallback: fallback)
+                return await retry(
+                    in: session,
+                    saying: "That answer was not in the right language. \(OnDeviceModel.languageReminder(for: locale))",
+                    fallback: fallback
+                )
             }
 
             return StoryBrief(
@@ -197,19 +215,16 @@ nonisolated struct StorySummarizer: Sendable {
     /// twice is a model that will not answer in that language today, and the
     /// article's own headline is a better use of the next second than a third
     /// try. It is at least in a language somebody chose.
-    private func retry(in session: LanguageModelSession, fallback: StoryBrief) async -> StoryBrief {
-        let demand = OnDeviceModel.languageReminder(for: locale)
-
+    private func retry(in session: LanguageModelSession, saying complaint: String, fallback: StoryBrief) async
+        -> StoryBrief
+    {
         do {
-            let response = try await session.respond(
-                to: "That answer was not in the right language. \(demand)",
-                generating: GeneratedBrief.self
-            )
+            let response = try await session.respond(to: complaint, generating: GeneratedBrief.self)
             let title = response.content.title.trimmingCharacters(in: .whitespacesAndNewlines)
             let summary = response.content.summary.trimmingCharacters(in: .whitespacesAndNewlines)
 
             guard !title.isEmpty, Self.isWritten(in: locale, title: title, summary: summary) else {
-                Log.enrich.notice("A brief came back in the wrong language twice and was left to its article")
+                Log.enrich.notice("A brief came back wrong twice and was left to its article")
                 return fallback.asked(in: locale)
             }
 
@@ -223,6 +238,53 @@ nonisolated struct StorySummarizer: Sendable {
             OnDeviceModel.refused(error)
             return fallback.asked(in: locale)
         }
+    }
+
+    /// A four-digit year the articles never mention.
+    ///
+    /// **The model is shown no dates at all**, only headlines and standfirsts,
+    /// so it has nothing to date anything by. Asked what happened, a model of
+    /// this size fills that gap rather than leaving it, and the year it fills
+    /// it with is one it read in some other article or simply invented. The
+    /// instructions forbid dates ; this is what checks.
+    ///
+    /// Only a year that appears nowhere in the sources counts. One the articles
+    /// themselves carry is one the model copied rather than made up, and a
+    /// story genuinely about a year should be allowed to say it.
+    ///
+    /// The page already says when a story arrived, to the minute, so nothing is
+    /// lost by the line above it not saying so too.
+    static func inventedYear(
+        title: String,
+        summary: String,
+        from articles: [(title: String, excerpt: String?)]
+    ) -> String? {
+        let written = years(in: [title, summary].joined(separator: " "))
+        guard !written.isEmpty else { return nil }
+
+        let sources = years(in: articles.map { "\($0.title) \($0.excerpt ?? "")" }.joined(separator: " "))
+        return written.subtracting(sources).sorted().first
+    }
+
+    /// The four-digit years in a piece of text, as a set.
+    ///
+    /// Bounded to the years a news article plausibly names, so a page number, a
+    /// price or a count of casualties is not mistaken for a date.
+    private static func years(in text: String) -> Set<String> {
+        var found: Set<String> = []
+        var digits = ""
+
+        for character in text + " " {
+            if character.isNumber {
+                digits.append(character)
+                continue
+            }
+            if digits.count == 4, let value = Int(digits), (1000...2999).contains(value) {
+                found.insert(digits)
+            }
+            digits = ""
+        }
+        return found
     }
 
     /// Whether what came back is in the language it was asked for.

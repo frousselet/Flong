@@ -93,7 +93,10 @@ struct TopicNamerLiveTests {
         ]
 
         for (headline, subject) in expected {
-            let filed = try #require(await namer.file(headline, summary: nil, into: vocabulary))
+            guard case .chosen(let filed) = await namer.file(headline, summary: nil, into: vocabulary) else {
+                Issue.record("The model would not file \(headline)")
+                continue
+            }
             print("=== \(headline) -> \(filed)")
 
             #expect(filed.contains(subject))
@@ -109,13 +112,16 @@ struct TopicNamerLiveTests {
     func nothingFits() async throws {
         let namer = TopicNamer(locale: Locale(identifier: "fr_FR"))
 
-        let filed = try #require(
-            await namer.file(
+        guard
+            case .chosen(let filed) = await namer.file(
                 "Les macros Swift, deux ans après",
                 summary: "Ce que les macros ont changé au code que nous écrivons.",
                 into: ["Jardinage", "Cuisine"]
             )
-        )
+        else {
+            Issue.record("The model would not file the headline")
+            return
+        }
         print("=== nothing fits -> \(filed)")
         #expect(filed.isEmpty)
 

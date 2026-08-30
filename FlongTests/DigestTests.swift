@@ -992,3 +992,87 @@ struct DigestShapeTests {
         #expect(StorySummarizer().locale == Locale.current)
     }
 }
+
+/// The two ways the model was quietly losing work.
+///
+/// Both were reported by the reader, and both are the same shape : a failure
+/// the code could not tell from an answer. One left a fil with no thématique
+/// for good ; the other let a made-up year through into the line above a story.
+@Suite("What the model gets wrong, and what is done about it")
+struct ModelFailureTests {
+    private let articles: [(title: String, excerpt: String?)] = [
+        ("Une réforme du calendrier scolaire", "Le ministère envisage un décalage de la rentrée."),
+        ("La rentrée décalée à la mi-août", "Les fédérations de parents sont consultées."),
+    ]
+
+    // MARK: - A year nothing said
+
+    @Test("A year the articles never mention is one the model made up")
+    func inventedYear() {
+        // The model is shown headlines and standfirsts and no dates at all, so
+        // it has nothing to date anything by and fills the gap rather than
+        // leaving it.
+        #expect(
+            StorySummarizer.inventedYear(
+                title: "Réforme du calendrier",
+                summary: "Le ministère a décidé en 2019 de décaler la rentrée.",
+                from: articles
+            ) == "2019"
+        )
+    }
+
+    @Test("A year the articles do carry is one the model copied")
+    func copiedYear() {
+        let dated: [(title: String, excerpt: String?)] = [
+            ("La réforme de 2019 revient", "Le texte de 2019 est rouvert."),
+            ("Calendrier scolaire", "Une consultation s'ouvre."),
+        ]
+
+        // Copied, not invented, and a story genuinely about a year should be
+        // allowed to say it.
+        #expect(StorySummarizer.inventedYear(title: "La réforme de 2019", summary: "", from: dated) == nil)
+    }
+
+    @Test("A line with no year at all is left alone")
+    func noYear() {
+        #expect(
+            StorySummarizer.inventedYear(
+                title: "Réforme du calendrier",
+                summary: "Le ministère envisage de décaler la rentrée.",
+                from: articles
+            ) == nil
+        )
+    }
+
+    @Test("A number that is not a year is not mistaken for one")
+    func notAYear() {
+        // A count, a price, a page number. Only what a news article plausibly
+        // names as a date counts.
+        #expect(
+            StorySummarizer.inventedYear(
+                title: "12000 personnes attendues",
+                summary: "Le billet coûte 45 euros, et 300 places restent.",
+                from: articles
+            ) == nil
+        )
+        // And one that looks like a year is caught even glued to punctuation.
+        #expect(
+            StorySummarizer.inventedYear(title: "Depuis (2018),", summary: "", from: articles) == "2018"
+        )
+    }
+
+    // MARK: - A filing that never happened
+
+    @Test("A vocabulary with nothing in it is an answer, not a failure")
+    func emptyVocabulary() async {
+        let namer = TopicNamer(locale: Locale(identifier: "fr_FR"))
+
+        // Nothing to choose from is the same answer as nothing fits, reached
+        // without asking : the caller goes on to have a subject named.
+        guard case .chosen(let chosen) = await namer.file("Une réforme", summary: nil, into: []) else {
+            Issue.record("An empty vocabulary should be an answer")
+            return
+        }
+        #expect(chosen.isEmpty)
+    }
+}
