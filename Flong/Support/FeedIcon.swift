@@ -38,7 +38,9 @@ nonisolated enum FeedIcon {
     /// The addresses worth trying for a source, best first.
     static func candidates(stated: URL?, site: URL?) -> [URL] {
         var addresses: [URL] = []
-        if let stated { addresses.append(stated) }
+        // Resolved against the site, since a feed states its icon relatively
+        // as often as not, and dropped when it is not an address to ask for.
+        if let stated, let usable = HTTPURL.resolved(stated, against: site) { addresses.append(usable) }
 
         // The well-known paths hang off the root of the site, never off the page
         // the feed happens to point at.

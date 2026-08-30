@@ -66,6 +66,12 @@ nonisolated final class XMLFeedParser: NSObject, XMLParserDelegate {
         guard parsed || !feed.items.isEmpty else { throw FeedParserError.unreadable }
 
         feed.siteURL = feed.siteURL ?? url
+
+        // A feed states its icon as often relatively as absolutely, and a
+        // relative address handed to a network is an address nothing can
+        // fetch. Resolved against the feed, and dropped when it is not
+        // something to ask a server for.
+        feed.iconURL = feed.iconURL.flatMap { HTTPURL.resolved($0, against: url) }
         return feed
     }
 
@@ -282,6 +288,8 @@ nonisolated final class XMLFeedParser: NSObject, XMLParserDelegate {
             feed?.language = value
 
         case ("url", _) where isImage, ("icon", Namespace.atom), ("logo", Namespace.atom):
+            // Kept as stated : `run` resolves it against the feed, which is
+            // the only place that knows where the feed was.
             feed?.iconURL = URL(string: value)
 
         case ("updated", _), ("lastbuilddate", _), ("pubdate", _):
