@@ -194,6 +194,7 @@ struct ArrivalsChart: View {
                     // part of it.
                     .fill(isCurrent ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Self.ink))
                     .frame(height: height(of: count, peak: peak))
+                    .opacity(Self.barOpacity)
             } else {
                 // An hour nothing came in on keeps its place, in grey, at the
                 // height of the shortest bar there is. Whether it has been and
@@ -229,15 +230,21 @@ struct ArrivalsChart: View {
 
     /// How dark an hour that had something is drawn.
     ///
-    /// The page's ink, less a little.
+    /// The page's own ink, at full strength.
     ///
-    /// The bar wants the weight of the ink : anything much lighter and it stops
-    /// being something to count by. What it does not want is to be the hardest
-    /// thing on the page, and a tenth of transparency is the whole of the
-    /// difference. Measured against a white page : the full ink lands at
-    /// nought, half of it at a mid grey too faint to read, and this a shade off
-    /// black.
-    static let ink = Color.primary.opacity(0.9)
+    /// A bar wants the weight of the ink or it stops being something to count
+    /// by. Held back to half, it measured a mid grey too faint to read a day
+    /// by ; held back a tenth, a shade off black and still not quite the thing.
+    /// So it is the ink, and the softening is the transparency below rather
+    /// than a paler colour.
+    static let ink = Color.primary
+
+    /// How much of what is behind a bar comes through it.
+    ///
+    /// Barely any, and that is the point. It keeps a bar from being the hardest
+    /// edge on the page, and it lets the glass under the strip, and whatever
+    /// headline is passing beneath that, show through by a hair.
+    static let barOpacity: Double = 0.95
 
     /// The shortest a bar is ever drawn.
     ///
