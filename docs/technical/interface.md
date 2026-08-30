@@ -167,6 +167,8 @@ The mechanics were bad too. SwiftUI holds the refresh control out until the work
 
 The separator's own colour rather than a white highlight. White is the glass idiom and it disappears on the picture that most needs an edge, which is the one ending in white on a white page ; the separator holds against both and turns with the appearance.
 
+A point wide and half of the separator's opacity. Half a point is one device pixel on a two times screen and holds only where the picture behind it is dark ; a point is a line on every screen. The separator's own colour is drawn to be read as a rule between two things and this is not that, it is the last pixel of the picture : half of it says where the edge is without ever being the thing one looks at. Measured across a thumbnail's edge, the page goes 255, 197, 68, and then the picture.
+
 **A source's mark is round**, with the same hairline inside it. A favicon arrives as whatever square its publisher drew, dark on dark as often as not, and a round crop is what makes a column of them read as one column rather than as a row of unrelated stamps. The generic mark, for a source that serves none, keeps its bare glyph : an edge around it would make an absence look like a mark.
 
 **A picture meets the line that says what happened.** Above a story's summary sit the subjects it is filed under and its headline, and a picture set level with a one-word rubric leaves the column ragged. It is aligned on the summary instead, through a `VerticalAlignment` of its own, so the text reads as one block with a picture beside it. A story with no summary has no such line, and the guide falls back to the top, which is where a picture belongs when there is nothing to meet.

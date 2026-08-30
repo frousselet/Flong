@@ -190,7 +190,19 @@ struct RemoteImage: View {
     /// against a white page. What is wanted here is an edge, and an edge is a
     /// line. It is also hundreds fewer glass effects in a list somebody is
     /// scrolling.
-    static let ring: CGFloat = 0.5
+    /// A point, and faint. Half a point is a single device pixel on a two
+    /// times screen and holds only where the picture behind it is dark ; a
+    /// point is a line on every screen, and at this opacity it is still a line
+    /// rather than a band.
+    static let ring: CGFloat = 1
+
+    /// How much of the separator the edge keeps.
+    ///
+    /// The separator's own colour is drawn to be read as a rule between two
+    /// things, and this is not that : it is the last pixel of the picture
+    /// rather than something between the picture and the page. Half of it says
+    /// where the edge is without ever being the thing one looks at.
+    static let ringOpacity: Double = 0.5
 
     @State private var image: CGImage?
     @State private var isLoading = true
@@ -238,7 +250,7 @@ struct RemoteImage: View {
             .clipShape(.rect(cornerRadius: corner))
             .overlay {
                 RoundedRectangle(cornerRadius: corner, style: .continuous)
-                    .strokeBorder(.separator, lineWidth: Self.ring)
+                    .strokeBorder(.separator.opacity(Self.ringOpacity), lineWidth: Self.ring)
             }
     }
 
