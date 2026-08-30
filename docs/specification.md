@@ -421,7 +421,7 @@ The picture an article carries is taken from the feed, or failing that from the 
 
 ### Article
 
-Reader mode by default when extraction succeeded, a switch to the feed content or the web view, keyboard navigation on Mac and iPad, a constant action bar : read, star, tag, share, open in the browser.
+Reader mode when the reader has chosen it, a switch to the feed content or the web view, the choice remembered and carried between devices by the iCloud key-value store rather than by a CloudKit record, keyboard navigation on Mac and iPad, a constant action bar : read, star, tag, share, open in the browser.
 
 ### Search
 
