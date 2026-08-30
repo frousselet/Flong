@@ -277,19 +277,19 @@ nonisolated struct ArticleStore: Sendable {
         }
     }
 
-    /// How many articles arrived on each day of a view, keyed by the day.
+    /// How many articles arrived in each hour of a view, keyed by the hour.
     ///
-    /// **A local day, not a slice of UTC.** A reader in Paris opening this at one
-    /// in the morning is still looking at yesterday's wire, and a chart that
-    /// disagrees is a chart about a timezone rather than about them. SQLite is
-    /// handed the reader's own offset, which is what `localtime` is, and the day
-    /// it answers with is read back in the same offset.
+    /// **A local hour, not a slice of UTC.** A reader in Paris opening this at
+    /// one in the morning is still looking at last night's wire, and a chart
+    /// that disagrees is a chart about a timezone rather than about them.
+    /// SQLite is handed the reader's own offset, which is what `localtime` is,
+    /// and the hour it answers with is read back in the same offset.
     ///
-    /// **Grouped by the database rather than in Swift.** A month of a busy
+    /// **Grouped by the database rather than in Swift.** A season of a busy
     /// corpus is tens of thousands of rows and all that is wanted from them is
-    /// one number per day : fetching the dates to count them here would carry
-    /// the whole stream across for the sake of thirty integers.
-    func dailyCounts(
+    /// one number per hour : fetching the dates to count them here would carry
+    /// the whole stream across for the sake of a few dozen integers.
+    func hourlyCounts(
         _ filter: ArticleFilter,
         matching query: QueryNode? = nil,
         now: Date = Date()
@@ -304,7 +304,7 @@ nonisolated struct ArticleStore: Sendable {
             let rows = try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT date(COALESCE(e.published_at, e.received_at), 'localtime') AS day,
+                    SELECT strftime('%Y-%m-%d %H', COALESCE(e.published_at, e.received_at), 'localtime') AS day,
                            COUNT(*) AS count
                     FROM entry e JOIN feed f ON f.id = e.feed_id
                     WHERE e.is_hidden = 0 AND e.duplicate_of IS NULL AND \(condition)
@@ -324,7 +324,7 @@ nonisolated struct ArticleStore: Sendable {
         midnight.locale = Locale(identifier: "en_US_POSIX")
         midnight.calendar = Calendar(identifier: .gregorian)
         midnight.timeZone = .current
-        midnight.dateFormat = "yyyy-MM-dd"
+        midnight.dateFormat = "yyyy-MM-dd HH"
 
         var counts: [Date: Int] = [:]
         for (day, count) in counted {

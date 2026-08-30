@@ -36,6 +36,8 @@ struct ArticleFeedScreen: View {
 
     /// The day the reader has scrolled to, which is what the chart is about.
     @State private var day: Date?
+    /// The moment at the top of the list, which is the hour the chart marks.
+    @State private var moment: Date?
     /// Whether anything has scrolled under the chart, which is what its glass
     /// is for. At rest there is nothing behind it and it wears none.
     @State private var isCovered = false
@@ -87,6 +89,13 @@ struct ArticleFeedScreen: View {
         // runs newest first, so the newest day with a row still on screen is
         // the day at the top of it.
         .onScrollTargetVisibilityChange(idType: WireRow.Key.self) { visible in
+            // The newest moment still on screen : the list runs newest first,
+            // so that is what the reader has reached.
+            if let top = visible.map(\.moment).max(), top != moment { moment = top }
+
+            // The day is kept apart from it. It is what the haptic answers to,
+            // and a buzz at every row rather than at every dateline would be a
+            // buzz nobody asked for.
             guard let top = visible.map(\.day).max(), top != day else { return }
             day = top
         }
@@ -152,17 +161,12 @@ struct ArticleFeedScreen: View {
     private func arrivals(_ rows: [WireRow]) -> some View {
         if showsArrivals, let newest = rows.first?.id.day, let oldest = rows.last?.id.day {
             ArrivalsChart(
-                counts: model.dailyCounts,
-                months: Month.spanning(oldest, to: newest),
-                current: day ?? newest,
+                counts: model.hourlyCounts,
+                days: Hours.spanning(oldest, to: newest),
+                current: moment ?? day ?? newest,
                 isCovered: isCovered
             )
             .padding(.vertical, 9)
-            // Out of the column at rest, and back into it once there is glass
-            // to sit in. A month is a picture of a whole month and reads better
-            // for having the whole width ; the glass is a thing on the page and
-            // belongs within the measure like everything else on it.
-            .padding(.horizontal, isCovered ? 0 : -Self.gutter)
             // Pinned is not the same as in front : without this the rows pass
             // over the bars rather than under them, and a headline crossing the
             // chart is drawn on top of it.
@@ -193,8 +197,10 @@ struct ArticleFeedScreen: View {
     /// The days and their articles as one flat list of rows.
     private var rows: [WireRow] {
         days.flatMap { day in
-            [WireRow(id: WireRow.Key(day: day.day, article: nil), article: nil)]
-                + day.articles.map { WireRow(id: WireRow.Key(day: day.day, article: $0.id), article: $0) }
+            [WireRow(id: WireRow.Key(day: day.day, moment: day.day, article: nil), article: nil)]
+                + day.articles.map {
+                    WireRow(id: WireRow.Key(day: day.day, moment: $0.date, article: $0.id), article: $0)
+                }
         }
     }
 
@@ -253,6 +259,10 @@ struct ArticleFeedScreen: View {
 private struct WireRow: Identifiable {
     struct Key: Hashable {
         let day: Date
+        /// When the article arrived, which the chart marks to the hour. The
+        /// day alone would put the mark on midnight of a day the reader is
+        /// reading the evening of.
+        let moment: Date
         /// Nothing at all, for the dateline that opens the day.
         let article: UUID?
     }

@@ -191,7 +191,7 @@ The picture is scaled on the way in and never after. What comes out of a photo l
 
 `Fil` says what a story is, several articles following one thing, and `thématique` is unambiguous where `thème` was merely unclaimed. The cost is that the stream section is called `Flux`, so `Fil` and `Flux` sit near each other ; they are different words for different things and the sections they name are never side by side.
 
-## The month over the wire
+## The day over the wire
 
 **The glass arrives with the scroll, and the month narrows into it.** At rest the chart runs the whole width of the screen and wears no material at all : glass over nothing is glass doing nothing, a material's whole job being to say that something passes behind it. The first row to go under the bars brings it, and the month steps back into the column the rest of the page is set in as it comes. The two are one movement, driven by the reader's own scroll, and both go again when the page returns to the top.
 
@@ -199,7 +199,11 @@ A month is a picture of a whole month and reads better for having the whole widt
 
 The offset is what is asked, not the rows : a row is a landmark and this is a question about a single point, the top of the content against the top of what is shown. Against a hair rather than against nought, since a scroll view rests at a fractional offset often enough and a glass flickering on and off under a still thumb would be worse than one that never left.
 
-**A day with nothing in it is grey, not absent.** Whether it has been and gone or has not happened yet, it keeps its place at the height of the shortest bar there is. The row stays a row, with a level floor an eye can run along, and the ink is kept for the days something actually arrived on.
+**An hour with nothing in it is grey, not absent.** Whether it has been and gone or has not happened yet, it keeps its place at the height of the shortest bar there is. The row stays a row, with a level floor an eye can run along, and the ink is kept for the hours something actually arrived in.
+
+**It counts hours over a day, and not days over a month.** A month of thirty-odd bars says which weeks were busy, which is a fact about the press rather than about the reading : somebody looking at a wire wants to know what has come in since they last looked, and that is a question about this morning and last night. Exactly the hours the day has, which is twenty-three, twenty-four or twenty-five, since the day the clocks go back is twenty-five hours long and a chart that always drew twenty-four would put an hour's arrivals somewhere they did not happen.
+
+**It is followed, never dragged.** The day it shows is the day the reader is in and the coloured bar is the hour they have reached, both read off the list as they scroll it. A second scroll of its own, on the same screen and at right angles to the first, would be two ways of moving through one page and a way of putting the two out of step ; the strip moves by being followed.
 
 ## The dateline
 

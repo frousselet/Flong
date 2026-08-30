@@ -64,10 +64,10 @@ import SwiftUI
 ///
 struct ArrivalsChart: View {
 
-    /// How many articles arrived on each day, keyed by the local day.
+    /// How many articles arrived in each hour, keyed by the local hour.
     let counts: [Date: Int]
-    /// The months worth offering, newest first, each named by its first day.
-    let months: [Date]
+    /// The days worth offering, newest first, each named by its first moment.
+    let days: [Date]
     /// The day the reader has the list scrolled to.
     let current: Date?
 
@@ -76,24 +76,24 @@ struct ArrivalsChart: View {
     /// At rest the chart sits on the page, and glass over nothing is glass
     /// doing nothing : a material's whole job is to say that something passes
     /// behind it. The bars are legible on the page's own ground, so at the top
-    /// the strip is simply bars, the full width of the screen, and it narrows
-    /// into its glass as the first row goes under it.
+    /// the strip is simply bars, the full width of the column the page is set
+    /// in, and it narrows into its glass as the first row goes under it.
     var isCovered = false
 
-    /// How tall the busiest day of the chart stands.
+    /// How tall the busiest hour of the chart stands.
     private static let height: CGFloat = 26
 
-    /// How much each day is drawn in from the edges of its column.
+    /// How much each hour is drawn in from the edges of its column.
     private static let inset: CGFloat = 1.5
 
-    /// The space between one day and the next.
+    /// The space between one hour and the next.
     private static let gap: CGFloat = 2
 
     /// How far the first and last bars stand from the ends of the glass.
     ///
-    /// Only once there is glass. Uncovered the chart runs the whole width of
-    /// the screen, and a bar standing in from an edge that is not there would
-    /// be standing in from nothing.
+    /// Only once there is glass. Uncovered the chart runs the full width of
+    /// the column the page is set in, and a bar standing in from an edge that
+    /// is not there would be standing in from nothing.
     ///
     /// Enough that neither is cut by the curve of the capsule, which turns
     /// through half the height of the strip at either end.
@@ -105,15 +105,15 @@ struct ArrivalsChart: View {
 
     var body: some View {
         let peak = peak
-        let month = current.map { Month.containing($0, calendar: calendar) }
-        let today = calendar.startOfDay(for: .now)
+        let day = current.map { Hours.containing($0, calendar: calendar) }
+        let thisHour = Hours.hour(of: .now, calendar: calendar)
 
         ScrollView(.horizontal) {
             LazyHStack(spacing: 0) {
-                ForEach(months, id: \.self) { month in
+                ForEach(days, id: \.self) { day in
                     HStack(alignment: .bottom, spacing: Self.gap) {
-                        ForEach(Month.days(of: month, calendar: calendar), id: \.self) { day in
-                            bar(day, peak: peak, today: today)
+                        ForEach(Hours.of(day, calendar: calendar), id: \.self) { hour in
+                            bar(hour, peak: peak, now: thisHour)
                         }
                     }
                     .containerRelativeFrame(.horizontal)
@@ -121,11 +121,18 @@ struct ArrivalsChart: View {
             }
             .scrollTargetLayout()
         }
-        // A month at a time : half of one and half of the next is a comparison
+        // A day at a time : half of one and half of the next is a comparison
         // nobody asked for.
         .scrollTargetBehavior(.viewAligned)
         .scrollPosition($shown, anchor: .center)
         .scrollIndicators(.hidden)
+        // Not a thing to drag. The month it shows is the month the reader is
+        // in, and it follows their scroll down the list : a second scroll, of
+        // its own, on the same screen and at right angles to the first, is two
+        // ways of moving through one page and a way of putting the two out of
+        // step with each other. It moves by being followed, never by being
+        // pushed.
+        .scrollDisabled(true)
         // No edge effect of its own. A strip of thirty bars is not a page
         // being read into, and the softening a scroll view puts at its edges
         // belongs to the list underneath rather than to this.
@@ -157,21 +164,23 @@ struct ArrivalsChart: View {
         // narrowed : the width and the material are one movement, and the
         // reader's own scroll is what drives it.
         .animation(reduceMotion ? nil : .snappy(duration: 0.28), value: isCovered)
-        .onChange(of: month, initial: true) { _, month in
-            guard let month else { return }
+        .onChange(of: day, initial: true) { _, day in
+            guard let day else { return }
             withAnimation(reduceMotion ? nil : .snappy(duration: 0.3)) {
-                shown.scrollTo(id: month, anchor: .center)
+                shown.scrollTo(id: day, anchor: .center)
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text("Articles per day"))
+        .accessibilityLabel(Text("Articles per hour"))
     }
 
-    /// One day.
-    private func bar(_ day: Date, peak: Int, today: Date) -> some View {
-        let count = counts[day] ?? 0
-        let isCurrent = current.map { calendar.isDate($0, inSameDayAs: day) } ?? false
-        let isAhead = day > today
+    /// One hour.
+    private func bar(_ hour: Date, peak: Int, now: Date) -> some View {
+        let count = counts[hour] ?? 0
+        // The hour being read, which is the hour of the article at the top of
+        // the list rather than the hour it happens to be.
+        let isCurrent = current.map { Hours.hour(of: $0, calendar: calendar) == hour } ?? false
+        let isAhead = hour > now
 
         return VStack {
             if !isAhead, count > 0 {
@@ -182,12 +191,12 @@ struct ArrivalsChart: View {
                     .fill(isCurrent ? Color.accentColor : Color.primary)
                     .frame(height: height(of: count, peak: peak))
             } else {
-                // A day nothing came in on keeps its place, in grey, at the
+                // An hour nothing came in on keeps its place, in grey, at the
                 // height of the shortest bar there is. Whether it has been and
-                // gone or has not happened yet, it is a day with nothing in it
-                // and it is drawn the same way : the row stays a row, with a
-                // even floor a reader's eye can run along, and the ink is
-                // reserved for the days something did arrive on.
+                // gone or has not happened yet, it is an hour with nothing in
+                // it and it is drawn the same way : the row stays a row, with a
+                // level floor a reader's eye can run along, and the ink is
+                // reserved for the hours something did arrive in.
                 Capsule()
                     .fill(.quaternary)
                     .frame(height: Self.floor)
@@ -199,16 +208,16 @@ struct ArrivalsChart: View {
         //
         // The day being read is the coloured one, and nothing else about it
         // changes : no bar moves and none of them changes shape as the reader
-        // scrolls from one day into the next.
+        // scrolls from one hour into the next.
         .padding(.horizontal, Self.inset)
         .frame(maxWidth: .infinity, alignment: .bottom)
         .frame(height: Self.height, alignment: .bottom)
         .animation(reduceMotion ? nil : .snappy(duration: 0.28), value: isCurrent)
         // A bar holds no text of its own, so it is not an element anybody can
         // reach until it is told to be one. A reader listening to the page gets
-        // the same month as a reader looking at it.
+        // the same day as a reader looking at it.
         .accessibilityElement()
-        .accessibilityLabel(Text(day, format: .dateTime.weekday(.wide).day().month(.wide)))
+        .accessibilityLabel(Text(hour, format: .dateTime.weekday(.wide).day().month(.wide).hour()))
         .accessibilityValue(isAhead ? Text("Still to come") : Text("\(count) articles"))
         .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
         .help(isAhead ? Text("Still to come") : Text("\(count) articles"))
@@ -216,21 +225,21 @@ struct ArrivalsChart: View {
 
     /// The shortest a bar is ever drawn.
     ///
-    /// A day that had one article is a day something happened on, and a bar too
-    /// short to see says it did not. It is also the height of every day with
-    /// nothing in it, so those read as a level grey run along the foot of the
-    /// month rather than as gaps in it.
+    /// An hour that had one article is an hour something happened in, and a bar
+    /// too short to see says it did not. It is also the height of every hour
+    /// with nothing in it, so those read as a level grey run along the foot of
+    /// the day rather than as gaps in it.
     private static let floor: CGFloat = 4
 
     private func height(of count: Int, peak: Int) -> CGFloat {
         max(Self.height * CGFloat(count) / CGFloat(peak), Self.floor)
     }
 
-    /// The busiest day of every month on offer.
+    /// The busiest hour of every day on offer.
     private var peak: Int {
         let busiest =
-            months
-            .flatMap { Month.days(of: $0, calendar: calendar) }
+            days
+            .flatMap { Hours.of($0, calendar: calendar) }
             .compactMap { counts[$0] }
             .max()
         return max(busiest ?? 1, 1)

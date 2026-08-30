@@ -108,9 +108,9 @@ final class AppModel {
     private(set) var sidebar: [SidebarItem] = []
     private(set) var summaries: [ArticleSummary] = []
 
-    /// How many articles arrived on each day of the view being shown, keyed by
-    /// the local day. What the chart above the stream is drawn from.
-    private(set) var dailyCounts: [Date: Int] = [:]
+    /// How many articles arrived in each hour of the view being shown, keyed by
+    /// the local hour. What the chart above the stream is drawn from.
+    private(set) var hourlyCounts: [Date: Int] = [:]
 
     /// The squares on the collections page.
     private(set) var collections: [ArticleCollection] = []
@@ -986,7 +986,7 @@ final class AppModel {
     func loadArticles() async {
         do {
             summaries = try await articles.summaries(filter, matching: query)
-            dailyCounts = try await articles.dailyCounts(filter, matching: query)
+            hourlyCounts = try await articles.hourlyCounts(filter, matching: query)
             if let selectedArticle, !summaries.contains(where: { $0.id == selectedArticle }) {
                 self.selectedArticle = nil
             }

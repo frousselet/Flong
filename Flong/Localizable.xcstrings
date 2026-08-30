@@ -557,13 +557,12 @@
         }
       }
     },
-    "Articles per day" : {
-      "comment" : "The heading of the bar chart above the stream",
+    "Articles per hour" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Articles par jour"
+            "value" : "Articles par heure"
           }
         }
       }
