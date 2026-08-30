@@ -447,9 +447,13 @@ Two workloads of different natures. Lexical indexing is negligible, on the order
 | API | Use |
 | --- | --- |
 | `BGAppRefreshTask` | opportunistic feed refresh, never critical, about thirty seconds |
-| `BGProcessingTask` | vectorization, deferred full-text extraction, purge, compaction, with `requiresExternalPower` |
+| `BGProcessingTask` | the full pass, with `requiresExternalPower` and `requiresNetworkConnectivity` |
 | `BGContinuedProcessingTask` | first import and full reindex, triggered by the user |
 | `NSBackgroundActivityScheduler` | the macOS equivalent |
+
+**The full pass is what a device at rest on the mains does.** Every feed a reader follows, and not only the ones politeness says are due, then the enrichment, the purge, the index and the exchange with iCloud, in that order so everything downstream works on what has just arrived. The half-hourly refresh is what a phone in a pocket gets and is deliberately small.
+
+Its shape is read off Photos, whose `photoanalysisd` does the same kind of thing for the same reason : the mains, a six-hour interval, a hundred-minute floor between two runs, up to forty-five minutes of jitter, and one heavy pass at a time. The jitter matters more here than there, a reader's devices otherwise waking together to ask three hundred publishers the same question at the same second, which is what the per-device stagger of section 8 exists to prevent. Photos' `PreventsDeviceSleep` is deliberately not taken : a feed reader holding a Mac awake is one nobody keeps, and what a pass misses tonight it does tomorrow. `docs/technical/background.md` sets out what else was taken and what was left.
 
 `BGContinuedProcessingTask` inverts the usual model : the task starts on an explicit action, a button press or a gesture, and the system then commits to letting it finish, showing its own progress interface which the user can follow and cancel. A dedicated entitlement allows background GPU access, subject to checking `BGTaskScheduler.supportedResources`.
 
