@@ -71,7 +71,10 @@ nonisolated struct SyncPayload: Sendable {
         // Only when there are any. A reader who has made none has nothing to
         // say about them, and an empty record is a record spent on silence.
         let names = try await collections.names()
-        if !names.isEmpty { records.append(SyncRecords.record(forCollections: names, in: zone)) }
+        let described = try await collections.descriptions()
+        if !names.isEmpty || !described.isEmpty {
+            records.append(SyncRecords.record(forCollections: names, dynamic: described, in: zone))
+        }
         records += try await CatchUpHeaders.records(in: database, zone: zone)
 
         return records
@@ -100,7 +103,10 @@ nonisolated struct SyncPayload: Sendable {
         }
         if names.contains("collections") {
             let made = try await collections.names()
-            if !made.isEmpty { records["collections"] = SyncRecords.record(forCollections: made, in: zone) }
+            let described = try await collections.descriptions()
+            if !made.isEmpty || !described.isEmpty {
+                records["collections"] = SyncRecords.record(forCollections: made, dynamic: described, in: zone)
+            }
         }
         for block in try await readStates.blocks() {
             let name = SyncRecords.name(forReadStatePeriod: block.period, kind: block.kind)
@@ -203,6 +209,9 @@ nonisolated struct SyncPayload: Sendable {
                 // not here is one this device made and has not sent yet, and
                 // deleting it would be losing a decision to a race.
                 for name in names { _ = try await collections.create(name) }
+                for (name, query) in SyncRecords.dynamicCollections(from: record) {
+                    _ = try await collections.createDynamic(name, matching: query)
+                }
 
             case SyncRecords.RecordType.readState:
                 guard let block = SyncRecords.readStateBlock(from: record) else { continue }

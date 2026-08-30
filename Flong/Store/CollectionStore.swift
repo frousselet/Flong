@@ -13,33 +13,37 @@ import Foundation
 import GRDB
 import OSLog
 
-/// The collections a reader made, which are albums by another name.
+/// Every collection there is, of all three natures.
 ///
-/// **They are tags, and that was already the plan.** Section 4 says a tag
-/// applies to an article, a feed or a library item, and section 5 put `tag` and
-/// `tag_binding` in the schema at v1 for it. A collection is a tag under one
-/// root and a membership is a binding : nothing new in the store, and folders,
-/// rules and saved queries all inherit the same mechanism when their turn
-/// comes.
+/// **One place that answers what the collections are**, because the answer
+/// comes from three different tables and a page should not have to know that.
+/// The built-in ones are columns on the kept articles, the made ones are tags
+/// under a `collection/` root, and the dynamic ones are the saved queries
+/// section 12 described and v1 put in the schema.
 ///
-/// **The root is what keeps them apart.** Tags will be used for other things,
-/// and a collection called `ios` and a tag called `ios` are not the same thing.
-/// Everything here lives under `collection/`, which is the namespacing the
-/// specification already describes, and a name with a slash in it is refused
-/// rather than allowed to invent a level nobody asked for.
+/// **Nothing new was needed in the store for any of it.** A tag applies to a
+/// library item by section 4, and a saved query is a name and a query by
+/// section 5. Both had been sitting there unused.
 nonisolated struct CollectionStore: Sendable {
+    /// The root every made collection's tag hangs off.
+    ///
+    /// Tags will be used for other things, and a tag `Typographie` and a
+    /// collection of that name are not the same thing. A name carrying the
+    /// separator is refused rather than allowed to invent a level.
     static let root = "collection"
 
     private let database: AppDatabase
+    private let articles: ArticleStore
+    private let library: LibraryStore
 
     init(_ database: AppDatabase) {
         self.database = database
+        self.articles = ArticleStore(database)
+        self.library = LibraryStore(database)
     }
 
-    /// What the reader may not call a collection.
-    ///
-    /// A name is trimmed, and it may not be empty and may not carry the
-    /// separator the namespace is built on.
+    // MARK: - Names
+
     static func name(from raw: String) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !trimmed.contains("/") else { return nil }
@@ -54,12 +58,29 @@ nonisolated struct CollectionStore: Sendable {
         return name.isEmpty ? nil : name
     }
 
-    // MARK: - Making and unmaking
-
-    /// Makes a collection, or gives back the one already called that.
+    /// The order a reader expects their own names in.
     ///
-    /// Idempotent on purpose : two devices making the same collection have made
-    /// one collection, which is what a name being the identity means.
+    /// Not the order SQLite puts them in : `ORDER BY` is byte order, where
+    /// `Thèse` comes before `À lire` because a capital A with a grave accent
+    /// starts with a higher byte than a T.
+    static func before(_ first: String, _ second: String) -> Bool {
+        first.localizedStandardCompare(second) == .orderedAscending
+    }
+
+    // MARK: - Every collection there is
+
+    /// All three natures, in the order the page shows them.
+    func all() async throws -> [ArticleCollection] {
+        try await builtIn() + made() + dynamic()
+    }
+
+    /// The ones every reader has, which are the state of their own articles.
+    func builtIn() async throws -> [ArticleCollection] {
+        try await library.builtInCollections()
+    }
+
+    // MARK: - Made, article by article
+
     @discardableResult
     func create(_ raw: String, at date: Date = Date()) async throws -> String? {
         guard let name = Self.name(from: raw) else { return nil }
@@ -85,7 +106,7 @@ nonisolated struct CollectionStore: Sendable {
         return renamed
     }
 
-    /// Takes a collection away, and its memberships with it.
+    /// Takes a made collection away, and its memberships with it.
     ///
     /// The articles stay. A collection is a way of looking at what was kept,
     /// and putting a way of looking away is not throwing anything out.
@@ -94,8 +115,6 @@ nonisolated struct CollectionStore: Sendable {
             try db.execute(sql: "DELETE FROM tag WHERE path = ?", arguments: [Self.path(of: name)])
         }
     }
-
-    // MARK: - Filling
 
     func add(_ itemIDs: [UUID], to name: String, at date: Date = Date()) async throws {
         guard !itemIDs.isEmpty else { return }
@@ -141,7 +160,7 @@ nonisolated struct CollectionStore: Sendable {
         }
     }
 
-    /// Which collections one kept article is in.
+    /// Which made collections one kept article is in.
     func collections(of itemID: UUID) async throws -> [String] {
         try await database.writer.read { db in
             try String.fetchAll(
@@ -161,8 +180,8 @@ nonisolated struct CollectionStore: Sendable {
     /// Says which collections a kept article belongs to, and only those.
     ///
     /// What arrives from another device is the whole truth about that article :
-    /// a collection missing from the list is a collection it was taken out of,
-    /// so the difference is applied rather than the additions alone.
+    /// a collection missing from the list is one it was taken out of, so the
+    /// difference is applied rather than the additions alone.
     func set(_ names: [String], of itemID: UUID, at date: Date = Date()) async throws {
         let wanted = Set(names.compactMap { Self.name(from: $0) })
         let current = Set(try await collections(of: itemID))
@@ -171,9 +190,7 @@ nonisolated struct CollectionStore: Sendable {
         for name in current.subtracting(wanted) { try await remove([itemID], from: name) }
     }
 
-    // MARK: - Reading
-
-    /// Which collections every kept article is in, keyed by the article.
+    /// Which made collections every kept article is in, keyed by the article.
     ///
     /// One pass rather than one query per article : synchronizing walks the
     /// whole library, and a few thousand items asked one at a time is a few
@@ -200,7 +217,48 @@ nonisolated struct CollectionStore: Sendable {
         return rows.reduce(into: [:]) { all, pair in all[pair.item, default: []].append(pair.name) }
     }
 
-    /// Every name there is, empty collections included.
+    /// Every made collection, with what is in it, the empty ones included.
+    ///
+    /// An empty one is still a collection : the reader made it, and a page that
+    /// hid it until something was put in it would lose the one they made a
+    /// moment ago for exactly that purpose.
+    func made() async throws -> [ArticleCollection] {
+        let counted: [Counted] = try await database.writer.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT t.path AS path, COUNT(i.id) AS count,
+                           (SELECT i2.image_url FROM library_item i2
+                            JOIN tag_binding c ON c.target_id = i2.id AND c.target_kind = ?
+                            WHERE c.tag_id = t.id AND i2.image_url IS NOT NULL
+                            ORDER BY COALESCE(i2.published_at, i2.promoted_at) DESC LIMIT 1) AS cover
+                    FROM tag t
+                    LEFT JOIN tag_binding b ON b.tag_id = t.id AND b.target_kind = ?
+                    -- Counting the articles and not the bindings. A binding
+                    -- carries no foreign key, since it points at one of three
+                    -- tables, so nothing removes it when what it names goes.
+                    LEFT JOIN library_item i ON i.id = b.target_id
+                    WHERE t.path LIKE ?
+                    GROUP BY t.path
+                    """,
+                arguments: [Self.kind, Self.kind, Self.root + "/%"]
+            )
+            .compactMap { row in
+                (row["path"] as String?).map { Counted(name: $0, count: row["count"], cover: row["cover"]) }
+            }
+        }
+
+        return
+            counted
+            .compactMap { counted in
+                Self.name(ofPath: counted.name).map {
+                    ArticleCollection(kind: .made($0), count: counted.count, cover: counted.cover)
+                }
+            }
+            .sorted { Self.before($0.name ?? "", $1.name ?? "") }
+    }
+
+    /// Every made collection's name, empty ones included.
     func names() async throws -> [String] {
         try await database.writer.read { db in
             try String.fetchAll(
@@ -213,71 +271,104 @@ nonisolated struct CollectionStore: Sendable {
         }
     }
 
+    // MARK: - Dynamic, described rather than filled
+
+    /// Makes a collection out of a description.
+    ///
+    /// The description is the query language of section 12, so everything a
+    /// reader can search for is something they can keep a collection of. It is
+    /// parsed before it is stored : a description nothing can be made of is
+    /// refused where the reader wrote it, rather than accepted and found to be
+    /// empty for ever.
+    @discardableResult
+    func createDynamic(_ raw: String, matching query: String, at date: Date = Date()) async throws -> String? {
+        guard let name = Self.name(from: raw), Self.isUsable(query) else { return nil }
+
+        try await database.writer.write { db in
+            try db.execute(
+                sql: """
+                    INSERT INTO saved_query (id, name, query, position, created_at) VALUES (?, ?, ?, 0, ?)
+                    ON CONFLICT(name) DO UPDATE SET query = excluded.query
+                    """,
+                arguments: [UUID.v7(), name, query, date]
+            )
+        }
+        return name
+    }
+
+    func deleteDynamic(_ name: String) async throws {
+        try await database.writer.write { db in
+            try db.execute(sql: "DELETE FROM saved_query WHERE name = ?", arguments: [name])
+        }
+    }
+
+    /// Every description the reader has written, by the name they gave it.
+    ///
+    /// What synchronizing sends. The articles are never in it.
+    func descriptions() async throws -> [String: String] {
+        try await database.writer.read { db in
+            try Row.fetchAll(db, sql: "SELECT name, query FROM saved_query")
+                .reduce(into: [:]) { all, row in
+                    if let name = row["name"] as String? { all[name] = row["query"] as String }
+                }
+        }
+    }
+
+    /// What one dynamic collection is looking for.
+    func query(of name: String) async throws -> String? {
+        try await database.writer.read { db in
+            try String.fetchOne(db, sql: "SELECT query FROM saved_query WHERE name = ?", arguments: [name])
+        }
+    }
+
+    /// Every description the reader has written, and how many articles answer
+    /// it at this moment.
+    ///
+    /// The count is asked of the articles rather than kept anywhere : a dynamic
+    /// collection holds no list, and a number written down would be a list of
+    /// one that goes stale the next time anything arrives.
+    func dynamic(now: Date = Date()) async throws -> [ArticleCollection] {
+        let described: [Described] = try await database.writer.read { db in
+            try Row.fetchAll(db, sql: "SELECT name, query FROM saved_query")
+                .compactMap { row in
+                    (row["name"] as String?).map { Described(name: $0, query: row["query"]) }
+                }
+        }
+
+        var found: [ArticleCollection] = []
+        for one in described {
+            let node = QueryParser.parse(one.query, now: now)
+            let count = (try? await articles.count(.all, matching: node, now: now)) ?? 0
+            // The newest few, for a picture : the first of them with one is the
+            // face of the collection, and asking for all of them to find it
+            // would be reading a collection to draw a square.
+            let cover = (try? await articles.summaries(.all, matching: node, limit: 12, now: now))?
+                .compactMap(\.imageURL).first
+
+            found.append(ArticleCollection(kind: .dynamic(one.name), count: count, cover: cover))
+        }
+        return found.sorted { Self.before($0.name ?? "", $1.name ?? "") }
+    }
+
+    /// Whether a description is one the query language can make anything of.
+    static func isUsable(_ query: String) -> Bool {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        return QueryParser.parse(trimmed) != .all
+    }
+
+    private struct Described: Sendable {
+        var name: String
+        var query: String
+    }
+
     private struct Pair: Sendable {
         var item: UUID
         var name: String
     }
 
-    /// Every collection there is, with what is in it, emptiest included.
-    ///
-    /// An empty one is still a collection : the reader made it, and a page that
-    /// hid it until something was put in it would lose the one they made a
-    /// moment ago for exactly that purpose.
-    func made() async throws -> [LibraryCollection] {
-        let counted: [Counted] = try await database.writer.read { db in
-            let rows = try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT t.path AS path, COUNT(i.id) AS count,
-                           (SELECT i.image_url FROM library_item i
-                            JOIN tag_binding c ON c.target_id = i.id AND c.target_kind = ?
-                            WHERE c.tag_id = t.id AND i.image_url IS NOT NULL
-                            ORDER BY COALESCE(i.published_at, i.promoted_at) DESC LIMIT 1) AS cover
-                    FROM tag t
-                    LEFT JOIN tag_binding b ON b.tag_id = t.id AND b.target_kind = ?
-                    -- Counting the articles and not the bindings. A binding
-                    -- carries no foreign key, since it points at one of three
-                    -- tables, so nothing removes it when what it names goes :
-                    -- counting bindings is counting articles that may not be
-                    -- there, and a square that says two over a page showing one
-                    -- has broken the only promise a count makes.
-                    LEFT JOIN library_item i ON i.id = b.target_id
-                    WHERE t.path LIKE ?
-                    GROUP BY t.path
-                    """,
-                arguments: [Self.kind, Self.kind, Self.root + "/%"]
-            )
-            return rows.compactMap { row in
-                (row["path"] as String?).map { Counted(path: $0, count: row["count"], cover: row["cover"]) }
-            }
-        }
-
-        return
-            counted
-            .compactMap { counted in
-                Self.name(ofPath: counted.path).map {
-                    LibraryCollection(kind: .made($0), count: counted.count, cover: counted.cover)
-                }
-            }
-            .sorted { first, second in
-                guard case .made(let a) = first.kind, case .made(let b) = second.kind else { return false }
-                return Self.before(a, b)
-            }
-    }
-
-    /// The order a reader expects their own names in.
-    ///
-    /// Not the order SQLite puts them in : `ORDER BY path` is byte order, where
-    /// `Thèse` comes before `À lire` because a capital A with a grave accent
-    /// starts with a higher byte than a T. A list of the reader's own words is
-    /// sorted the way their language sorts.
-    private static func before(_ first: String, _ second: String) -> Bool {
-        first.localizedStandardCompare(second) == .orderedAscending
-    }
-
-    /// A row that has crossed out of the database, which a `Row` may not.
     private struct Counted: Sendable {
-        var path: String
+        var name: String
         var count: Int
         var cover: URL?
     }

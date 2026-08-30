@@ -135,18 +135,34 @@ nonisolated enum SyncRecords {
     /// something in it would arrive anyway ; a collection made a moment ago and
     /// not yet filled would not, and it is the one the reader is most likely to
     /// be looking at.
-    static func record(forCollections names: [String], in zone: CKRecordZone.ID) -> CKRecord {
+    static func record(
+        forCollections names: [String],
+        dynamic: [String: String] = [:],
+        in zone: CKRecordZone.ID
+    ) -> CKRecord {
         let record = CKRecord(
             recordType: RecordType.collections,
             recordID: CKRecord.ID(recordName: "collections", zoneID: zone)
         )
         record["names"] = names
+        // A dynamic collection travels as its description and never as what
+        // answers it : that is the whole point of it, and it is what makes one
+        // holding ten thousand articles cost the same as one holding none.
+        record["dynamic"] = try? JSONEncoder().encode(dynamic)
         return record
     }
 
     static func collectionNames(from record: CKRecord) -> [String]? {
         guard record.recordType == RecordType.collections else { return nil }
         return record["names"] as? [String] ?? []
+    }
+
+    static func dynamicCollections(from record: CKRecord) -> [String: String] {
+        guard record.recordType == RecordType.collections,
+            let payload = record["dynamic"] as? Data,
+            let described = try? JSONDecoder().decode([String: String].self, from: payload)
+        else { return [:] }
+        return described
     }
 
     static func record(for item: LibraryItem, collections: [String] = [], in zone: CKRecordZone.ID) -> CKRecord {

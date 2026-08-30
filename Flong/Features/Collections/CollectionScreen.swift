@@ -17,7 +17,7 @@ import SwiftUI
 /// different kind of place, it is the library with one question asked of it.
 struct CollectionScreen: View {
     let model: AppModel
-    let kind: LibraryCollection.Kind
+    let kind: ArticleCollection.Kind
     let open: (UUID) -> Void
 
     @Namespace private var zoom
@@ -42,18 +42,20 @@ struct CollectionScreen: View {
         // a question the kept articles answer about themselves, and there is
         // nothing there to rename.
         .toolbar {
-            if case .made(let name) = kind {
+            if kind.isTheReaders {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
-                        Button {
-                            renamed = name
-                            isRenaming = true
-                        } label: {
-                            Label("Rename", systemImage: "pencil")
+                        if case .made(let name) = kind {
+                            Button {
+                                renamed = name
+                                isRenaming = true
+                            } label: {
+                                Label("Rename", systemImage: "pencil")
+                            }
                         }
                         Button(role: .destructive) {
                             Task {
-                                await model.deleteCollection(name)
+                                await model.deleteCollection(kind)
                                 dismiss()
                             }
                         } label: {

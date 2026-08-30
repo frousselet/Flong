@@ -174,7 +174,7 @@ struct CollectionStoreTests {
 
         #expect(try await collections.collections(of: article.id) == ["Presse", "Thèse"])
         #expect(try await library.count() == 1)
-        #expect(try await library.summaries(in: .starred).isEmpty)
+        #expect(try await library.summaries(in: .builtIn(.starred)).isEmpty)
         #expect(try await library.summaries(in: .made("Thèse")).count == 1)
     }
 

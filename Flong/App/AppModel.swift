@@ -114,7 +114,7 @@ final class AppModel {
     private(set) var dailyCounts: [Date: Int] = [:]
 
     /// The squares on the collections page.
-    private(set) var collections: [LibraryCollection] = []
+    private(set) var collections: [ArticleCollection] = []
 
     /// What is in the collection the reader has opened.
     ///
@@ -793,10 +793,7 @@ final class AppModel {
 
     func loadCollections() async {
         do {
-            // What the reader made comes first, then what the kept articles
-            // say about themselves. The page decides the order it shows them
-            // in ; this only has to bring both.
-            collections = try await collectionStore.made() + library.collections()
+            collections = try await collectionStore.all()
         } catch {
             Log.store.error("The collections could not be read : \(error, privacy: .public)")
         }
@@ -808,13 +805,24 @@ final class AppModel {
         await loadCollections()
     }
 
+    /// Makes a collection out of a description, which then fills itself.
+    func makeDynamicCollection(named name: String, matching query: String) async {
+        _ = try? await collectionStore.createDynamic(name, matching: query)
+        await loadCollections()
+    }
+
     func renameCollection(_ name: String, to renamed: String) async {
         _ = try? await collectionStore.rename(name, to: renamed)
         await loadCollections()
     }
 
-    func deleteCollection(_ name: String) async {
-        try? await collectionStore.delete(name)
+    func deleteCollection(_ collection: ArticleCollection.Kind) async {
+        switch collection {
+        case .made(let name): try? await collectionStore.delete(name)
+        case .dynamic(let name): try? await collectionStore.deleteDynamic(name)
+        // Not a thing that was made, so there is nothing there to unmake.
+        case .builtIn: return
+        }
         await loadCollections()
     }
 
@@ -865,9 +873,17 @@ final class AppModel {
         await loadCollections()
     }
 
-    func loadCollection(_ kind: LibraryCollection.Kind) async {
+    func loadCollection(_ kind: ArticleCollection.Kind) async {
         do {
-            collectionArticles = try await library.summaries(in: kind)
+            // A dynamic one is a description answered by every article there
+            // is, so it is asked of the stream. The other two are lists of
+            // kept articles, so they are asked of the library.
+            if case .dynamic(let name) = kind {
+                let query = try await collectionStore.query(of: name) ?? ""
+                collectionArticles = try await articles.summaries(.all, matching: QueryParser.parse(query))
+            } else {
+                collectionArticles = try await library.summaries(in: kind)
+            }
         } catch {
             Log.store.error("A collection could not be read : \(error, privacy: .public)")
         }

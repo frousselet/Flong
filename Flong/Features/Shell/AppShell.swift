@@ -18,7 +18,7 @@ nonisolated enum Route: Hashable {
     case article(UUID)
     case view(SidebarItem.Kind)
     case sources
-    case collection(LibraryCollection.Kind)
+    case collection(ArticleCollection.Kind)
     case profile
     case topics
     case subscribedSites
