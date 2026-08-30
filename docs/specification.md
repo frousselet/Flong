@@ -152,11 +152,27 @@ Merging is a union, so the operation is commutative and idempotent. There is no 
 
 The shape did not change, and that is what makes it possible at all : one record per feed, per day, cut into as many chunks as its bytes need, carrying every article of that day with its text compressed. Never one record per article. A day that has passed never changes again, so a block is written once and not rewritten, which is what change throughput punishes.
 
-**The honest limit of this.** The record count is now feeds multiplied by the days they published on. It is bounded for a reader following a few dozen feeds and it is not bounded for one following three hundred over several years, where it reaches six figures and meets the same rate limiting one record per article would. Unlimited retention and a per-record store are not reconcilable by any choice of record shape : the data grows without bound and CloudKit charges by the record. Carrying the bulk of the stream as append-only files in the iCloud Documents container, one per device and per day, is the design that answers it, and it is the next thing to build.
+**Records carry the near end of the history only.** The record count is feeds multiplied by the days they published on. It is bounded for a reader following a few dozen feeds and it is not bounded for one following three hundred over several years, where it reaches six figures and meets the same rate limiting one record per article would. Unlimited retention and a per-record store are not reconcilable by any choice of record shape : the data grows without bound and CloudKit charges by the record. What records buy is speed, a push arriving in seconds, so they carry the recent days and the archive carries the rest.
+
+### Stream archives
+
+The bulk of the stream travels as files in the iCloud Documents container, where the charge is for bytes and the reader has said the bytes are theirs to spend.
+
+**One writer per file.** File synchronization goes wrong when two devices write one file and somebody has to resolve a conflict nobody can resolve correctly. Each device writes only inside a folder of its own, named by an identifier it keeps locally and never shares, and reads everybody else's. No file is written twice, so there is no conflict to have : it is an append-only log per device, which is the shape that merges by doing nothing.
+
+One file per device and per day, compressed, holding every feed's articles for that day with their text. Three devices over three years is around three thousand files, each sealed by the day ending and never touched again ; the day in progress is the only one rewritten.
+
+Which archives a device has already read is kept locally, in `archive_ingest`. A ledger that travelled would have every device skip what only one of them had read.
+
+**What it costs in return.** A file arrives when it arrives : iCloud Documents downloads on demand and has no push behind it, where a record pushed through `CKSyncEngine` arrives in seconds. That is why both exist, and why read states, which have to be prompt, stay records.
 
 ### What never transits
 
-Indexes, vectors of articles that were not retained, secrets, any log.
+Indexes, vectors of articles that were not retained, secrets, any log. Nor the ledger of which archives a device has read, which is about the device and not about the reading.
+
+### What it takes to work
+
+The archives need the `com.apple.developer.ubiquity-container-identifiers` entitlement, which has to be added to the target in Xcode. Without it, and without an iCloud account, the container is absent : everything to do with archives then does nothing at all rather than failing, and the reader loses the sharing of the stream and nothing else.
 
 ### Quotas and errors
 
