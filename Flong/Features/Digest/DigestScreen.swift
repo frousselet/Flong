@@ -184,7 +184,7 @@ struct DigestScreen: View {
             }
         } else {
             ContentUnavailableView {
-                Label("Nothing has come in yet", systemImage: "tray")
+                Label("Nothing has come in yet", systemImage: "newspaper")
             } description: {
                 Text("Flong groups your articles into stories as they arrive.")
             } actions: {
