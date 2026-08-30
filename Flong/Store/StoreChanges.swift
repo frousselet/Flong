@@ -53,6 +53,15 @@ nonisolated enum StoreChanges {
     /// the reload collapses into the single tick that follows.
     static let settling = Duration.milliseconds(400)
 
+    /// How long after a refresh the reader asked for a tick still counts as
+    /// that refresh's own echo.
+    ///
+    /// The observation cannot tell who wrote. What it can tell is that the
+    /// reader asked a moment ago and that everything has already been read back
+    /// for them, which answers the same question : the page is current, and
+    /// rebuilding it again would only move it under them.
+    static let echo: TimeInterval = 1.5
+
     /// Ticks while anything the interface is drawn from is written to.
     static func ticks(in database: AppDatabase) -> AsyncStream<Void> {
         AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
