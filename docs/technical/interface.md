@@ -219,7 +219,7 @@ A month is a picture of a whole month and reads better for having the whole widt
 
 The offset is what is asked, not the rows : a row is a landmark and this is a question about a single point, the top of the content against the top of what is shown. Against a hair rather than against nought, since a scroll view rests at a fractional offset often enough and a glass flickering on and off under a still thumb would be worse than one that never left.
 
-**The bars are held back from the full ink.** Thirty of them at the weight of a headline read as loudly as the headlines under them, and the chart is a picture of the page rather than a part of it. Measured on a screenshot, a bar that was pure black comes out at a mid grey.
+**The bars carry the page's ink, less a tenth.** A bar wants the weight of the ink or it stops being something to count by ; what it does not want is to be the hardest thing on the page. A tenth of transparency is the whole of the difference. Measured against a white page, the full ink lands at nought, half of it at a mid grey too faint to read, and this a shade off black.
 
 **The hour turning over is felt as well as seen.** The buzz followed the day while the chart counted days ; it follows the hour now that the mark does, since a reader scrolling through a whole day of a busy wire without feeling anything is the chart moving under them in silence.
 
