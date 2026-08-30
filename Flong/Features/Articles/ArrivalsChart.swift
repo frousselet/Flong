@@ -21,15 +21,26 @@ import SwiftUI
 /// a count cannot say, which is whether a month was steady or had a Thursday
 /// in it.
 ///
-/// **It follows the reading rather than leading it.** The strip scrolls itself
-/// to whichever thirty days the reader has scrolled the list into, so the bars
-/// are always about what is on screen, and the day at the top of the list is
-/// the coloured one. It can be pushed by hand too.
+/// **One month at a time, and exactly the days it has.** A rolling stretch of
+/// thirty is a stretch nobody keeps and cannot be compared with the one beside
+/// it ; a month can. February draws twenty-eight bars and August thirty-one,
+/// each a little wider or narrower for it, which is a fact about February
+/// rather than a gap in the drawing.
 ///
-/// **The tallest bar is the busiest day of every window shown, not of the
-/// window being shown.** Scaling each stretch on its own would draw a dead
-/// fortnight in August exactly as tall as a general election, and a chart whose
-/// scale moves under the reader is a chart that lies for free.
+/// **The rest of the month is drawn and greyed.** A day that has not happened
+/// yet is not a quiet day, and a chart that stops at today would have the
+/// current month change width as it goes. The days ahead keep their places and
+/// say they are ahead.
+///
+/// **It follows the reading rather than leading it.** The strip scrolls itself
+/// to whichever month the reader has scrolled the list into, so the bars are
+/// always about what is on screen, and the day at the top of the list is the
+/// coloured one. It can be pushed by hand too.
+///
+/// **The tallest bar is the busiest day of every month shown, not of the month
+/// being shown.** Scaling each month on its own would draw a dead fortnight in
+/// August exactly as tall as a general election, and a chart whose scale moves
+/// under the reader is a chart that lies for free.
 ///
 /// **The glass is the ground, not the bars.** They were tried as thirty pieces
 /// of glass and it does not work at this size, all of it measured on the
@@ -54,8 +65,8 @@ import SwiftUI
 struct ArrivalsChart: View {
     /// How many articles arrived on each day, keyed by the local day.
     let counts: [Date: Int]
-    /// The windows worth offering, newest first, each named by its last day.
-    let windows: [Date]
+    /// The months worth offering, newest first, each named by its first day.
+    let months: [Date]
     /// The day the reader has the list scrolled to.
     let current: Date?
 
@@ -80,16 +91,15 @@ struct ArrivalsChart: View {
 
     var body: some View {
         let peak = peak
-        let window = current.flatMap { day in
-            windows.first.map { DayWindow.containing(day, newest: $0, calendar: calendar) }
-        }
+        let month = current.map { Month.containing($0, calendar: calendar) }
+        let today = calendar.startOfDay(for: .now)
 
         ScrollView(.horizontal) {
             LazyHStack(spacing: 0) {
-                ForEach(windows, id: \.self) { window in
+                ForEach(months, id: \.self) { month in
                     HStack(alignment: .bottom, spacing: Self.gap) {
-                        ForEach(DayWindow.days(endingAt: window, calendar: calendar), id: \.self) { day in
-                            bar(day, peak: peak)
+                        ForEach(Month.days(of: month, calendar: calendar), id: \.self) { day in
+                            bar(day, peak: peak, today: today)
                         }
                     }
                     .containerRelativeFrame(.horizontal)
@@ -97,8 +107,8 @@ struct ArrivalsChart: View {
             }
             .scrollTargetLayout()
         }
-        // A stretch at a time : half of one month and half of the next is a
-        // comparison nobody asked for.
+        // A month at a time : half of one and half of the next is a comparison
+        // nobody asked for.
         .scrollTargetBehavior(.viewAligned)
         .scrollPosition($shown, anchor: .center)
         .scrollIndicators(.hidden)
@@ -124,10 +134,10 @@ struct ArrivalsChart: View {
         .background {
             Color.clear.glassEffect(.regular, in: .capsule)
         }
-        .onChange(of: window, initial: true) { _, window in
-            guard let window else { return }
+        .onChange(of: month, initial: true) { _, month in
+            guard let month else { return }
             withAnimation(reduceMotion ? nil : .snappy(duration: 0.3)) {
-                shown.scrollTo(id: window, anchor: .center)
+                shown.scrollTo(id: month, anchor: .center)
             }
         }
         .accessibilityElement(children: .contain)
@@ -135,52 +145,69 @@ struct ArrivalsChart: View {
     }
 
     /// One day.
-    private func bar(_ day: Date, peak: Int) -> some View {
+    private func bar(_ day: Date, peak: Int, today: Date) -> some View {
         let count = counts[day] ?? 0
         let isCurrent = current.map { calendar.isDate($0, inSameDayAs: day) } ?? false
+        let isAhead = day > today
 
         return VStack {
-            // A day nothing came in on draws nothing at all. With no axis to
-            // stand on there is no line for it to hide in, and a gap in the row
-            // is the honest picture of a gap in the month.
-            if count > 0 {
+            if isAhead {
+                // A day that has not happened yet is not a quiet day. It keeps
+                // its place at the height a day with nothing in it would have,
+                // and says in grey that there is nothing there to have.
+                Capsule()
+                    .fill(.quaternary)
+                    .frame(height: Self.floor)
+            } else if count > 0 {
                 Capsule()
                     // The page's own ink, which inverts with the page and so
                     // with the glass under it : dark bars on the light
                     // material, light ones on the dark.
                     .fill(isCurrent ? Color.accentColor : Color.primary)
                     .frame(height: height(of: count, peak: peak))
-                    // The day being read is the coloured one, and every bar is
-                    // the same width : the mark is colour and nothing else, so
-                    // that no bar moves and none of them changes shape as the
-                    // reader scrolls from one day into the next.
-                    .padding(.horizontal, Self.inset)
             }
+            // A day gone by that nothing came in on draws nothing at all. With
+            // no axis to stand on there is no line for it to hide in, and a gap
+            // in the row is the honest picture of a gap in the month.
         }
+        // Outside the branches, so that every bar is the same width whichever
+        // one drew it. Held inside one of them, the grey of a day still to come
+        // came out three points wider than the ink beside it.
+        //
+        // The day being read is the coloured one, and nothing else about it
+        // changes : no bar moves and none of them changes shape as the reader
+        // scrolls from one day into the next.
+        .padding(.horizontal, Self.inset)
         .frame(maxWidth: .infinity, alignment: .bottom)
         .frame(height: Self.height, alignment: .bottom)
         .animation(reduceMotion ? nil : .snappy(duration: 0.28), value: isCurrent)
         // A bar holds no text of its own, so it is not an element anybody can
         // reach until it is told to be one. A reader listening to the page gets
-        // the same thirty days as a reader looking at them.
+        // the same month as a reader looking at it.
         .accessibilityElement()
         .accessibilityLabel(Text(day, format: .dateTime.weekday(.wide).day().month(.wide)))
-        .accessibilityValue(Text("\(count) articles"))
+        .accessibilityValue(isAhead ? Text("Still to come") : Text("\(count) articles"))
         .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
-        .help(Text("\(count) articles"))
+        .help(isAhead ? Text("Still to come") : Text("\(count) articles"))
     }
 
-    /// A bar never falls below four points : a day that had one article is a
-    /// day something happened on, and a bar too short to see says it did not.
+    /// The shortest a bar is ever drawn.
+    ///
+    /// A day that had one article is a day something happened on, and a bar too
+    /// short to see says it did not. It is also the height of a day still to
+    /// come, so that the days ahead read as a level grey run rather than as a
+    /// story about nothing.
+    private static let floor: CGFloat = 4
+
     private func height(of count: Int, peak: Int) -> CGFloat {
-        max(Self.height * CGFloat(count) / CGFloat(peak), 4)
+        max(Self.height * CGFloat(count) / CGFloat(peak), Self.floor)
     }
 
-    /// The busiest day of every window on offer.
+    /// The busiest day of every month on offer.
     private var peak: Int {
         let busiest =
-            windows
-            .flatMap { DayWindow.days(endingAt: $0, calendar: calendar) }
+            months
+            .flatMap { Month.days(of: $0, calendar: calendar) }
             .compactMap { counts[$0] }
             .max()
         return max(busiest ?? 1, 1)

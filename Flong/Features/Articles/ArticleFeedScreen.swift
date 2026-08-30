@@ -21,7 +21,7 @@ struct ArticleFeedScreen: View {
     /// What the screen is called, when the section it sits in calls it
     /// something other than the view it shows.
     var named: LocalizedStringResource?
-    /// Whether the last thirty days of arrivals are drawn over the list.
+    /// Whether the month's arrivals are drawn over the list.
     var showsArrivals = false
     /// Where the reader's menu goes, when this screen is one a section opens on.
     ///
@@ -119,14 +119,14 @@ struct ArticleFeedScreen: View {
         }
     }
 
-    // MARK: - The thirty days over the list
+    // MARK: - The month over the list
 
     @ViewBuilder
     private func arrivals(_ rows: [WireRow]) -> some View {
         if showsArrivals, let newest = rows.first?.id.day, let oldest = rows.last?.id.day {
             ArrivalsChart(
                 counts: model.dailyCounts,
-                windows: DayWindow.spanning(oldest, to: newest),
+                months: Month.spanning(oldest, to: newest),
                 current: day ?? newest
             )
             .padding(.vertical, 9)
