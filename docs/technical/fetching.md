@@ -29,6 +29,24 @@ The rate of 304 answers is kept per feed, `not_modified_count` over `fetch_count
 
 Cookies are refused outright, and the URL cache is bypassed : the store already holds the conditional state, and a second cache in front of it would only answer with what it already knows.
 
+## Which feeds a short budget goes to
+
+A background refresh is given about twenty-five seconds and is cancelled when they are up, so the order the due feeds are taken in decides which ones are ever refreshed at all.
+
+They used to be taken in the order the database returned them, which for UUIDv7 keys is the order they were subscribed to. A reader following three hundred feeds whose budget ran out at the eightieth had the next two hundred and twenty never refreshed in the background : the following pass started from the same end and was cut off in the same place. Their oldest subscriptions were always fresh and their newest never were.
+
+They are sorted by how overdue each one is **against its own rhythm**. A daily feed an hour late and an hourly feed an hour late are both an hour late, and only one of them has anything new : measured relatively, the hourly one is a whole interval overdue and the daily one a twenty-fourth of one. A feed nobody has ever fetched is the most overdue thing there is. A feed that has been failing is not made more urgent by failing, its backoff having already pushed its next fetch out, or one broken feed would crowd out three hundred working ones.
+
+## What a background pass will not spend
+
+**Nothing runs in Low Power Mode.** The reader has told the system to stop doing things they did not ask for, and a feed reader waking the radio every half hour is exactly such a thing. What they did ask for still works : opening Flong refreshes, and pulling the list down refreshes.
+
+**A background refresh does not go over an expensive network.** `allowsExpensiveNetworkAccess` is false for a pass nobody is waiting for, so a reader on cellular data or tethering from their phone is not spending it on feeds they have not asked to see. `URLSession` refuses such a request rather than falling back, which is the right answer : the feed is asked again on the next pass, over the Wi-Fi they will be on by then.
+
+A refresh the reader asked for is a different matter, and is allowed whatever network there is. They pulled the list down and they are looking at it, and second-guessing them about their own data plan would be the application deciding something that is theirs to decide.
+
+**Asking more often would not help.** `BGAppRefreshTask` is granted on the system's own budget, worked out from how often the reader opens the application ; a request for fifteen minutes rather than thirty does not buy more runs, only more refused requests. The levers that do anything are which feeds the granted time is spent on and what it is not spent on, which is what this page describes.
+
 ## When a feed is asked again
 
 The interval comes from the feed's own history : the **median** gap between publications, never the mean, since one burst of ten posts in an afternoon would otherwise convince the reader that the feed publishes every four minutes for ever. It is bounded between fifteen minutes and twenty four hours, and a per-feed setting outranks it.

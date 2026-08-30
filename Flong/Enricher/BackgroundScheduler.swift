@@ -123,7 +123,17 @@ nonisolated enum BackgroundScheduler {
     }
 
     /// The same group of one, for the half-hourly refresh.
+    ///
+    /// **Nothing runs in Low Power Mode.** The reader has told the system, in
+    /// so many words, to stop doing things they did not ask for, and a feed
+    /// reader waking the radio every half hour is exactly such a thing. What
+    /// they did ask for still works : opening Flong refreshes, and pulling the
+    /// list down refreshes.
     static func runRefresh(_ work: () async -> Void) async {
+        guard !ProcessInfo.processInfo.isLowPowerModeEnabled else {
+            Log.enrich.info("A refresh stood aside for Low Power Mode")
+            return
+        }
         guard !isPassing.withLock({ $0 }) else {
             Log.enrich.info("A refresh stood aside for the full pass")
             return

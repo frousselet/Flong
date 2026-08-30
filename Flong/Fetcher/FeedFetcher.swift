@@ -24,6 +24,21 @@ nonisolated struct FetchRequest: Hashable, Sendable {
     /// The cookies of a session the reader signed in for, when the request is
     /// to a site they subscribe to. Only ever that site's own.
     var cookies: [SessionCookie] = []
+
+    /// Whether the reader is waiting for this.
+    ///
+    /// Nobody is waiting for a background refresh, so it does not go over a
+    /// network the reader pays for by the megabyte or is tethering from their
+    /// phone. `URLSession` refuses such a request with
+    /// `networkUnavailableReason` rather than falling back, which is the right
+    /// answer : the feed is asked again on the next pass, over the Wi-Fi the
+    /// reader will be on by then.
+    ///
+    /// A refresh the reader asked for is a different matter. They pulled the
+    /// list down, they are looking at it, and second-guessing them about their
+    /// own data plan would be the application deciding something that is theirs
+    /// to decide.
+    var isExpensiveNetworkAllowed = true
 }
 
 /// A feed as the server just served it.
@@ -195,6 +210,7 @@ actor FeedFetcher {
         // one it was subscribed at, so what changes is the request and never
         // the identity.
         var urlRequest = URLRequest(url: HTTPURL.secured(request.url), timeoutInterval: limits.timeout)
+        urlRequest.allowsExpensiveNetworkAccess = request.isExpensiveNetworkAllowed
         urlRequest.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         urlRequest.setValue(
             "application/atom+xml, application/rss+xml, application/feed+json, application/xml;q=0.9, */*;q=0.8",

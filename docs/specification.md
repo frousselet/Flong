@@ -446,7 +446,7 @@ Two workloads of different natures. Lexical indexing is negligible, on the order
 
 | API | Use |
 | --- | --- |
-| `BGAppRefreshTask` | opportunistic feed refresh, never critical, about thirty seconds |
+| `BGAppRefreshTask` | opportunistic feed refresh, never critical, about thirty seconds, spent on the most overdue feeds first |
 | `BGProcessingTask` | the full pass, with `requiresExternalPower` and `requiresNetworkConnectivity` |
 | `BGContinuedProcessingTask` | first import and full reindex, triggered by the user |
 | `NSBackgroundActivityScheduler` | the macOS equivalent |

@@ -659,9 +659,14 @@ final class AppModel {
     }
 
     /// What a background refresh does with the half minute it is given.
+    ///
+    /// Sparingly : nobody is waiting for it, so it is not worth a megabyte of
+    /// the reader's data plan. The feeds come back in the order of how overdue
+    /// each is against its own rhythm, so the budget goes to what is most
+    /// likely to have something and nothing is left permanently at the back.
     func backgroundRefresh() async {
         let deadline = Date().addingTimeInterval(BackgroundScheduler.refreshBudget)
-        _ = await refresher.refreshDue()
+        _ = await refresher.refreshDue(sparingly: true)
         await JobRunner(FirstFetchJob(database)).run(until: deadline)
         await cloud?.enqueueReadStates()
     }
