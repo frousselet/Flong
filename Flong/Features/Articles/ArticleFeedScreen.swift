@@ -40,6 +40,13 @@ struct ArticleFeedScreen: View {
     /// is for. At rest there is nothing behind it and it wears none.
     @State private var isCovered = false
 
+    /// How far the page stands in from the edges of the screen.
+    ///
+    /// Named because the chart has to undo it : uncovered it runs the whole
+    /// width, which means stepping back out of the column the rest of the page
+    /// is set in.
+    private static let gutter: CGFloat = 22
+
     var body: some View {
         let rows = self.rows
 
@@ -73,7 +80,7 @@ struct ArticleFeedScreen: View {
             }
             .scrollTargetLayout()
             .editorialColumn()
-            .padding(.horizontal, 22)
+            .padding(.horizontal, Self.gutter)
             .padding(.bottom, 90)
         }
         // Which day the reader is in, asked of the rows themselves. The list
@@ -151,6 +158,11 @@ struct ArticleFeedScreen: View {
                 isCovered: isCovered
             )
             .padding(.vertical, 9)
+            // Out of the column at rest, and back into it once there is glass
+            // to sit in. A month is a picture of a whole month and reads better
+            // for having the whole width ; the glass is a thing on the page and
+            // belongs within the measure like everything else on it.
+            .padding(.horizontal, isCovered ? 0 : -Self.gutter)
             // Pinned is not the same as in front : without this the rows pass
             // over the bars rather than under them, and a headline crossing the
             // chart is drawn on top of it.
