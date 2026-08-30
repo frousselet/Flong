@@ -68,11 +68,18 @@ struct FeedIconView: View {
     var body: some View {
         Group {
             if let image {
+                // Round, and set in the same hairline of glass the pictures
+                // wear. A favicon arrives as whatever square its publisher
+                // drew, dark on dark as often as not, and a round crop in a
+                // ring is what makes a column of them read as one column
+                // rather than as a row of unrelated stamps.
                 Image(decorative: image, scale: displayScale)
                     .resizable()
                     .scaledToFill()
                     .frame(width: side, height: side)
-                    .clipShape(.rect(cornerRadius: side / 4.5))
+                    .clipShape(.circle)
+                    .padding(RemoteImage.ring)
+                    .background { Color.clear.glassEffect(.regular, in: .circle) }
             } else {
                 // Not a blank : a list of feeds must keep its column of marks
                 // whether a publisher serves one or not.

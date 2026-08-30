@@ -158,6 +158,16 @@ struct RemoteImage: View {
     var aspect: CGFloat = Editorial.pictureAspect
     var corner: CGFloat = 8
 
+    /// How wide the ring of glass around a picture is drawn.
+    ///
+    /// A hairline. A publisher's picture arrives at whatever contrast it was
+    /// shot at, and one that ends in white sits on a white page with no edge at
+    /// all : the ring is what says where the picture stops. Glass rather than a
+    /// grey rule, since it takes its light from the picture it holds and from
+    /// the page around it, and so reads on a photograph of a night sky as well
+    /// as on one of a beach.
+    static let ring: CGFloat = 1.5
+
     @State private var image: CGImage?
     @State private var isLoading = true
     @Environment(\.displayScale) private var displayScale
@@ -177,19 +187,34 @@ struct RemoteImage: View {
     @ViewBuilder
     private func framed(_ content: some View) -> some View {
         if let side {
-            content
-                .frame(width: side, height: side)
-                .clipShape(.rect(cornerRadius: corner))
+            ringed(content.frame(width: side, height: side))
         } else if let width {
-            content
-                .frame(width: width, height: (width / aspect).rounded())
-                .clipShape(.rect(cornerRadius: corner))
+            ringed(content.frame(width: width, height: (width / aspect).rounded()))
         } else {
-            Color.clear
-                .aspectRatio(aspect, contentMode: .fit)
-                .overlay { content }
-                .clipShape(.rect(cornerRadius: corner))
+            ringed(
+                Color.clear
+                    .aspectRatio(aspect, contentMode: .fit)
+                    .overlay { content }
+            )
         }
+    }
+
+    /// The picture, cut to its corner and set in a ring of glass.
+    ///
+    /// The glass is behind rather than over : a material lends its vibrancy to
+    /// whatever it holds, which would wash a photograph the way it washed the
+    /// bars of the arrivals chart. Behind, it is a frame the picture sits in.
+    ///
+    /// The outer corner is the inner one plus the ring, so the two curves are
+    /// concentric. Equal radii would leave the frame looking thicker at the
+    /// corners than along the sides.
+    private func ringed(_ content: some View) -> some View {
+        content
+            .clipShape(.rect(cornerRadius: corner))
+            .padding(Self.ring)
+            .background {
+                Color.clear.glassEffect(.regular, in: .rect(cornerRadius: corner + Self.ring))
+            }
     }
 
     private func load() async {
