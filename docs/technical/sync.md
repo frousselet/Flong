@@ -85,3 +85,13 @@ The same is true of iCloud. The target carries `com.apple.developer.icloud-conta
 A build for a real device is what proves any of this. The simulator does not check the App ID, so a missing capability signs happily there and fails the moment it meets hardware : `xcodebuild build -destination 'generic/platform=iOS'` is the check worth running.
 
 Without the push the application still synchronizes : the engine sends what is pending and fetches what is waiting whenever it runs, which is at every launch, on returning to the foreground, and on a pull. What is lost is promptness, not correctness.
+
+## The schema, and the day it stops being automatic
+
+The development environment invents the schema as it goes : the first save of a record type creates it, and the first save carrying a new field adds it. Nothing has to be declared, which is why none of this has needed a thought so far.
+
+Production does not. It takes the schema it was given, and a save carrying a field it has never heard of is refused. **TestFlight and the App Store use production**, so the schema has to be deployed from the CloudKit console before the first build that leaves this machine, not after.
+
+The part that catches people is the second time. Adding a field later is invisible in development and fatal in production until it is deployed again : the console's *Deploy Schema Changes* is not a one-off. Anything that changes what `SyncRecords` writes, or adds a record type, is a change to redeploy. `starredAt` on `LibraryItem` is the most recent of those.
+
+`SyncRecords` is the only description of the schema there is. There is no separate declaration to keep in step, deliberately, since two descriptions of one thing are one description and one lie.
