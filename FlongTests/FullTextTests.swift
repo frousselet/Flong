@@ -177,6 +177,100 @@ struct FullTextTests {
         #expect(try await articles.article(id: entry.id)?.bodyHTML?.isEmpty == false)
     }
 
+    // MARK: - A site the reader pays for
+
+    @Test("A subscribed site is asked as the reader, and nobody else is")
+    func sessionIsSent() async throws {
+        let entry = try await add(summary: "Le ministère envisage de décaler la rentrée.")
+
+        let sessions = MemorySessions()
+        try sessions.setSession(
+            SiteSession(
+                host: "lequotidien.example.com",
+                cookies: [SessionCookie(named: "sub", value: "abc", domain: ".lequotidien.example.com")]
+            ),
+            for: "lequotidien.example.com"
+        )
+
+        let body = try Fixtures.data("Pages/article.html")
+        let sent = Mutex<String?>(nil)
+        server.install { request in
+            sent.withLock { $0 = request.headers["Cookie"] }
+            return StubResponse(statusCode: 200, headers: ["Content-Type": "text/html"], body: body)
+        }
+        defer { server.reset() }
+
+        let service = FullText(
+            database,
+            fetcher: FeedFetcher(
+                session: server.makeSession(),
+                throttle: HostThrottle(interval: 0, burst: 100),
+                userAgent: "Flong/test"
+            ),
+            sessions: sessions
+        )
+        _ = await service.extract(entry.id)
+
+        #expect(sent.withLock { $0 }?.contains("sub=abc") == true)
+
+        // A page that came back whole is the only honest proof a session works.
+        let after = try #require(try sessions.session(for: "lequotidien.example.com"))
+        #expect(after.lastWorkedAt != nil)
+    }
+
+    @Test("One site's session never reaches another site")
+    func sessionsDoNotTravel() throws {
+        let session = SiteSession(
+            host: "lemonde.fr",
+            cookies: [SessionCookie(named: "sub", value: "abc", domain: ".lemonde.fr")]
+        )
+
+        #expect(session.covers(URL(string: "https://www.lemonde.fr/a")!))
+        #expect(session.covers(URL(string: "https://lemonde.fr/a")!))
+        // The dot is what separates a subdomain from a different site
+        // altogether, and getting it wrong sends a subscription's cookies to
+        // whoever registered the lookalike.
+        #expect(!session.covers(URL(string: "https://notlemonde.fr/a")!))
+        #expect(!session.covers(URL(string: "https://lemonde.fr.example.com/a")!))
+    }
+
+    @Test("A session whose cookies have all expired is not a session")
+    func expiry() {
+        let dead = SiteSession(
+            host: "lemonde.fr",
+            cookies: [
+                SessionCookie(named: "sub", value: "abc", domain: ".lemonde.fr", expiresAt: .distantPast)
+            ]
+        )
+        let alive = SiteSession(
+            host: "lemonde.fr",
+            cookies: [
+                SessionCookie(named: "sub", value: "abc", domain: ".lemonde.fr", expiresAt: .distantPast),
+                SessionCookie(named: "id", value: "def", domain: ".lemonde.fr"),
+            ]
+        )
+
+        #expect(!dead.isUsable())
+        #expect(alive.isUsable())
+        #expect(alive.valid().map(\.name) == ["id"])
+    }
+
+    @Test("A site with no session is asked as anybody")
+    func noSession() async throws {
+        let entry = try await add(summary: "Le ministère envisage de décaler la rentrée.")
+
+        let body = try Fixtures.data("Pages/article.html")
+        let sent = Mutex<String?>(nil)
+        server.install { request in
+            sent.withLock { $0 = request.headers["Cookie"] }
+            return StubResponse(statusCode: 200, headers: ["Content-Type": "text/html"], body: body)
+        }
+        defer { server.reset() }
+
+        _ = await fullText.extract(entry.id)
+        #expect(sent.withLock { $0 } == nil)
+    }
+
     // MARK: - The rule itself
 
     @Test("What is worth fetching, and what is not")

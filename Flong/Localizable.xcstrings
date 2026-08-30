@@ -381,6 +381,16 @@
         }
       }
     },
+    "Add a site": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter un site"
+          }
+        }
+      }
+    },
     "Add a subject": {
       "localizations": {
         "fr": {
@@ -702,6 +712,16 @@
         }
       }
     },
+    "I am signed in": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Je suis connecté"
+          }
+        }
+      }
+    },
     "Import an OPML file": {
       "localizations": {
         "fr": {
@@ -718,6 +738,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Import terminé"
+          }
+        }
+      }
+    },
+    "Last worked %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A fonctionné %@"
           }
         }
       }
@@ -809,6 +839,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aucun thème pour l'instant"
+          }
+        }
+      }
+    },
+    "No subscribed sites": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun site abonné"
           }
         }
       }
@@ -993,12 +1033,102 @@
         }
       }
     },
+    "Sign in": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se connecter"
+          }
+        }
+      }
+    },
+    "Sign in again": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se reconnecter"
+          }
+        }
+      }
+    },
+    "Sign in on the site as you normally would, then say so. Flong keeps the session, never a password.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connectez-vous sur le site comme vous le feriez d'habitude, puis dites-le. Flong garde la session, jamais un mot de passe."
+          }
+        }
+      }
+    },
+    "Sign in on the site's own page. Flong keeps the session in the keychain, never a password, and uses it only to fetch the articles of that site.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connectez-vous sur la page du site lui-même. Flong garde la session dans le trousseau, jamais un mot de passe, et ne s'en sert que pour récupérer les articles de ce site."
+          }
+        }
+      }
+    },
+    "Sign in to a site you pay for, and Flong will fetch its articles whole.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connectez-vous à un site auquel vous êtes abonné, et Flong récupérera ses articles en entier."
+          }
+        }
+      }
+    },
+    "Sign out": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se déconnecter"
+          }
+        }
+      }
+    },
+    "Signed in %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecté %@"
+          }
+        }
+      }
+    },
     "Signed in as %@": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Connecté en tant que %@"
+          }
+        }
+      }
+    },
+    "Signed out by the site": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Déconnecté par le site"
+          }
+        }
+      }
+    },
+    "Sites": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sites"
           }
         }
       }
@@ -1093,6 +1223,16 @@
         }
       }
     },
+    "Subscribed sites": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sites abonnés"
+          }
+        }
+      }
+    },
     "Synchronized %@": {
       "localizations": {
         "fr": {
@@ -1109,6 +1249,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Synchronisation en cours"
+          }
+        }
+      }
+    },
+    "The address of a site you subscribe to, such as lemonde.fr.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'adresse d'un site auquel vous êtes abonné, par exemple lemonde.fr."
           }
         }
       }
@@ -1209,6 +1359,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ce fichier n'a pas pu être lu comme un OPML."
+          }
+        }
+      }
+    },
+    "This site left no session. Sign in on its page, then say so.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce site n'a laissé aucune session. Connectez-vous sur sa page, puis dites-le."
           }
         }
       }
