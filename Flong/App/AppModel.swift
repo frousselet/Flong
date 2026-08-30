@@ -99,6 +99,12 @@ final class AppModel {
     private let sessions: SessionStoring
     private let preferences: Preferences
 
+    /// The whole stream, as files in the reader's own iCloud.
+    ///
+    /// Built once and held : finding the container asks the file coordinator,
+    /// which is not a question to ask on every refresh.
+    private var archive: StreamArchive?
+
     private(set) var sidebar: [SidebarItem] = []
     private(set) var summaries: [ArticleSummary] = []
 
@@ -595,6 +601,7 @@ final class AppModel {
         _ = try? await Retention(database).purge()
         try? await SearchIndex(database).optimize()
         await cloud?.enqueueCatchUp()
+        await exchangeArchives()
     }
 
     /// Starts synchronizing with the reader's own iCloud.
@@ -618,6 +625,39 @@ final class AppModel {
         await cloud.enqueueReadStates()
         await cloud.synchronize()
         await load()
+    }
+
+    /// Opens the shared archive, if this device has one to open.
+    ///
+    /// Absent until the container is there, which is a question of an
+    /// entitlement and of an iCloud account rather than of anything the
+    /// application decides. Everything that uses it does nothing when it is
+    /// absent, so a reader with no iCloud loses only the sharing.
+    private func openArchive() async {
+        guard archive == nil else { return }
+        let device = preferences.device
+        let root = await Task.detached(priority: .utility) { StreamArchive.ubiquityRoot() }.value
+        guard let root else { return }
+
+        archive = StreamArchive(database, root: root, device: device)
+        Log.sync.notice("The shared archive is open")
+    }
+
+    /// Writes this device's days out, and takes in what the others wrote.
+    ///
+    /// Both directions in one place, since neither is worth waking up for on
+    /// its own : it runs after a refresh and with the background work.
+    func exchangeArchives() async {
+        await openArchive()
+        guard let archive else { return }
+
+        do {
+            let read = try await ReadStateStore(database).fingerprints()
+            _ = try await archive.ingest(read: read)
+            try await archive.write()
+        } catch {
+            Log.sync.error("The shared archive could not be exchanged : \(error, privacy: .public)")
+        }
     }
 
     /// Frees what the stream is holding, which is what a full iCloud calls for.
@@ -946,6 +986,7 @@ final class AppModel {
         await digestService.rebuild()
         await cloud?.enqueueReadStates()
         await cloud?.enqueueCatchUp()
+        await exchangeArchives()
         await load()
 
         // The rebuild wrote new stories, briefs and subjects. Reading the

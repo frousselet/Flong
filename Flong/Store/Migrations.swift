@@ -124,6 +124,19 @@ nonisolated extension AppDatabase {
             )
         }
 
+        // Which archives of another device this one has already read.
+        //
+        // Local, and deliberately : what this device has taken from a file is
+        // nobody else's business, and a ledger that travelled would have every
+        // device skip what only one of them had read.
+        migrator.registerMigration("v17.archiveLedger") { db in
+            try db.create(table: "archive_ingest") { table in
+                table.primaryKey("name", .text)
+                table.column("modified_at", .datetime).notNull()
+                table.column("ingested_at", .datetime).notNull()
+            }
+        }
+
         return migrator
     }
 

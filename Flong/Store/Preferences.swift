@@ -48,6 +48,7 @@ nonisolated final class Preferences: @unchecked Sendable {
         static let firstName = "reader.first-name"
         static let lastName = "reader.last-name"
         static let picture = "reader.picture"
+        static let device = "device.identifier"
     }
 
     /// The largest picture that may be kept.
@@ -115,6 +116,19 @@ nonisolated final class Preferences: @unchecked Sendable {
             cloud?.set(newValue, forKey: Key.picture)
             cloud?.synchronize()
         }
+    }
+
+    /// What this device calls itself in the shared archive.
+    ///
+    /// Local and never carried to iCloud, which is the point of it : every
+    /// device needs a different one, and a value that travelled would give them
+    /// all the same name and have each of them write over the others' files.
+    var device: String {
+        if let existing = local.string(forKey: Key.device) { return existing }
+
+        let made = UUID().uuidString
+        local.set(made, forKey: Key.device)
+        return made
     }
 
     // MARK: - Both stores
