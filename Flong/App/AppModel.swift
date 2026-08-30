@@ -88,6 +88,7 @@ final class AppModel {
     private let subscriptions: SubscriptionStore
     private let articles: ArticleStore
     private let library: LibraryStore
+    private let collectionStore: CollectionStore
     private let spotlight: SpotlightIndex
     private let digestService: DigestService
     private var cloud: CloudSync?
@@ -328,6 +329,7 @@ final class AppModel {
         self.articles = ArticleStore(database)
         let library = LibraryStore(database)
         self.library = library
+        self.collectionStore = CollectionStore(database)
         self.spotlight = SpotlightIndex(library)
         self.digestService = DigestService(database)
         self.refresher = FeedRefresh(database: database, fetcher: fetcher, credentials: credentials)
@@ -791,10 +793,76 @@ final class AppModel {
 
     func loadCollections() async {
         do {
-            collections = try await library.collections()
+            // What the reader made comes first, then what the kept articles
+            // say about themselves. The page decides the order it shows them
+            // in ; this only has to bring both.
+            collections = try await collectionStore.made() + library.collections()
         } catch {
             Log.store.error("The collections could not be read : \(error, privacy: .public)")
         }
+    }
+
+    /// Makes a collection and shows it, empty, where the reader will look.
+    func makeCollection(named name: String) async {
+        _ = try? await collectionStore.create(name)
+        await loadCollections()
+    }
+
+    func renameCollection(_ name: String, to renamed: String) async {
+        _ = try? await collectionStore.rename(name, to: renamed)
+        await loadCollections()
+    }
+
+    func deleteCollection(_ name: String) async {
+        try? await collectionStore.delete(name)
+        await loadCollections()
+    }
+
+    /// Every collection the reader has made, by name, in the order the page
+    /// shows them.
+    var collectionNames: [String] {
+        collections.compactMap { if case .made(let name) = $0.kind { name } else { nil } }
+    }
+
+    /// Which collections the article being read is in.
+    private(set) var articleCollections: [String] = []
+
+    func loadArticleCollections() async {
+        guard let id = article?.id, article?.origin == .library else {
+            articleCollections = []
+            return
+        }
+        articleCollections = (try? await collectionStore.collections(of: id)) ?? []
+    }
+
+    /// Puts the article being read into a collection, keeping it in the
+    /// process : an article has to be kept before it can be filed.
+    func fileArticle(in name: String) async {
+        guard let opened = article else { return }
+
+        do {
+            let item: LibraryItem?
+            if opened.origin == .library {
+                item = try await library.item(id: opened.id)
+            } else {
+                item = try await library.promote([opened.id]).kept.first
+            }
+            guard let item else { return }
+
+            try await collectionStore.add([item.id], to: name)
+            await loadArticleCollections()
+            await loadCollections()
+            await refreshCounts(markingRead: nil)
+        } catch {
+            Log.store.error("The article could not be filed : \(error, privacy: .public)")
+        }
+    }
+
+    func unfileArticle(from name: String) async {
+        guard let opened = article, opened.origin == .library else { return }
+        try? await collectionStore.remove([opened.id], from: name)
+        await loadArticleCollections()
+        await loadCollections()
     }
 
     func loadCollection(_ kind: LibraryCollection.Kind) async {

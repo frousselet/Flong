@@ -30,6 +30,7 @@ nonisolated enum SyncRecords {
         static let libraryItem = "LibraryItem"
         static let readState = "ReadState"
         static let catchUp = "CatchUp"
+        static let collections = "Collections"
     }
 
     // MARK: - Names
@@ -126,7 +127,29 @@ nonisolated enum SyncRecords {
     /// and compresses to a fifth of that, which keeps a record well inside what
     /// CloudKit accepts and a first synchronization well inside what a phone
     /// wants to upload.
-    static func record(for item: LibraryItem, in zone: CKRecordZone.ID) -> CKRecord {
+    /// The one record naming every collection the reader has made.
+    ///
+    /// One record for the lot, and not one apiece : a collection is a name, and
+    /// a few dozen names are a field rather than a table. What it exists for is
+    /// the empty one. Membership travels on the articles, so a collection with
+    /// something in it would arrive anyway ; a collection made a moment ago and
+    /// not yet filled would not, and it is the one the reader is most likely to
+    /// be looking at.
+    static func record(forCollections names: [String], in zone: CKRecordZone.ID) -> CKRecord {
+        let record = CKRecord(
+            recordType: RecordType.collections,
+            recordID: CKRecord.ID(recordName: "collections", zoneID: zone)
+        )
+        record["names"] = names
+        return record
+    }
+
+    static func collectionNames(from record: CKRecord) -> [String]? {
+        guard record.recordType == RecordType.collections else { return nil }
+        return record["names"] as? [String] ?? []
+    }
+
+    static func record(for item: LibraryItem, collections: [String] = [], in zone: CKRecordZone.ID) -> CKRecord {
         let record = CKRecord(
             recordType: RecordType.libraryItem,
             recordID: CKRecord.ID(
@@ -148,6 +171,10 @@ nonisolated enum SyncRecords {
         // again, on every device but the one they made it on.
         record["starredAt"] = item.starredAt
         record["annotation"] = item.annotation
+        // Which collections it is in, on the article itself : a membership is
+        // a fact about one article, and a record apiece would be one record per
+        // filing in a budget that has none to spare.
+        record["collections"] = collections
         record["contentHTML"] = compressed(item.contentHTML)
         record["plainText"] = compressed(item.plainText)
 
@@ -158,6 +185,11 @@ nonisolated enum SyncRecords {
         record["vectorModel"] = item.vectorModel
         record["vectorRevision"] = item.vectorRevision
         return record
+    }
+
+    /// Which collections a kept article says it is in.
+    static func collections(from record: CKRecord) -> [String] {
+        record["collections"] as? [String] ?? []
     }
 
     static func libraryItem(from record: CKRecord) -> LibraryItem? {

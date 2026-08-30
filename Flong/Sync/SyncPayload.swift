@@ -28,6 +28,7 @@ nonisolated struct SyncPayload: Sendable {
     private let database: AppDatabase
     private let subscriptions: SubscriptionStore
     private let library: LibraryStore
+    private let collections: CollectionStore
     private let readStates: ReadStateStore
     private let embedder: Embedder
     private let state: SyncState
@@ -37,6 +38,7 @@ nonisolated struct SyncPayload: Sendable {
         self.database = database
         self.subscriptions = SubscriptionStore(database)
         self.library = LibraryStore(database)
+        self.collections = CollectionStore(database)
         self.readStates = ReadStateStore(database)
         self.embedder = Embedder()
         self.state = SyncState(database)
@@ -59,12 +61,17 @@ nonisolated struct SyncPayload: Sendable {
         for feed in try await subscriptions.feeds() {
             records.append(SyncRecords.record(for: feed, in: zone))
         }
+        let memberships = try await collections.memberships()
         for item in try await library.allItems() {
-            records.append(SyncRecords.record(for: item, in: zone))
+            records.append(SyncRecords.record(for: item, collections: memberships[item.id] ?? [], in: zone))
         }
         for block in try await readStates.blocks() {
             records.append(SyncRecords.record(for: block, in: zone))
         }
+        // Only when there are any. A reader who has made none has nothing to
+        // say about them, and an empty record is a record spent on silence.
+        let names = try await collections.names()
+        if !names.isEmpty { records.append(SyncRecords.record(forCollections: names, in: zone)) }
         records += try await CatchUpHeaders.records(in: database, zone: zone)
 
         return records
@@ -84,9 +91,16 @@ nonisolated struct SyncPayload: Sendable {
             let name = SyncRecords.name(forFeed: feed.url)
             if names.contains(name) { records[name] = SyncRecords.record(for: feed, in: zone) }
         }
+        let memberships = try await collections.memberships()
         for item in try await library.allItems() {
             let name = SyncRecords.name(forLibraryItemWithGUID: item.guid, feedURL: item.feedURL)
-            if names.contains(name) { records[name] = SyncRecords.record(for: item, in: zone) }
+            if names.contains(name) {
+                records[name] = SyncRecords.record(for: item, collections: memberships[item.id] ?? [], in: zone)
+            }
+        }
+        if names.contains("collections") {
+            let made = try await collections.names()
+            if !made.isEmpty { records["collections"] = SyncRecords.record(forCollections: made, in: zone) }
         }
         for block in try await readStates.blocks() {
             let name = SyncRecords.name(forReadStatePeriod: block.period, kind: block.kind)
@@ -175,6 +189,20 @@ nonisolated struct SyncPayload: Sendable {
             case SyncRecords.RecordType.libraryItem:
                 guard let item = SyncRecords.libraryItem(from: record) else { continue }
                 if try await keep(item) { applied.libraryItems += 1 }
+                if let kept = try await library.item(guid: item.guid, feedURL: item.feedURL) {
+                    // What arrived is the whole truth about that article : a
+                    // collection missing from the list is one it was taken out
+                    // of, so the difference is applied and not the additions.
+                    try await collections.set(SyncRecords.collections(from: record), of: kept.id)
+                }
+
+            case SyncRecords.RecordType.collections:
+                guard let names = SyncRecords.collectionNames(from: record) else { continue }
+                // Made, never unmade. A name here and not on this device is a
+                // collection another device made ; a name on this device and
+                // not here is one this device made and has not sent yet, and
+                // deleting it would be losing a decision to a race.
+                for name in names { _ = try await collections.create(name) }
 
             case SyncRecords.RecordType.readState:
                 guard let block = SyncRecords.readStateBlock(from: record) else { continue }

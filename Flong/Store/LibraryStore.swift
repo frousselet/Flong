@@ -84,6 +84,15 @@ nonisolated struct LibraryStore: Sendable {
         }
     }
 
+    /// The copy of an article, by the identity the wire uses for it.
+    func item(guid: String, feedURL: URL?) async throws -> LibraryItem? {
+        try await database.writer.read { db in
+            try LibraryItem
+                .filter(LibraryItem.Columns.guid == guid && LibraryItem.Columns.feedURL == feedURL)
+                .fetchOne(db)
+        }
+    }
+
     func item(id: UUID) async throws -> LibraryItem? {
         try await database.writer.read { db in try LibraryItem.fetchOne(db, key: id) }
     }
@@ -206,6 +215,16 @@ nonisolated struct LibraryStore: Sendable {
         switch kind {
         case .starred: (isStarred, [])
         case .annotated: (hasNote, [])
+        case .made(let name):
+            (
+                """
+                library_item.id IN (
+                    SELECT b.target_id FROM tag_binding b JOIN tag t ON t.id = b.tag_id
+                    WHERE b.target_kind = 'library_item' AND t.path = ?
+                )
+                """,
+                [CollectionStore.path(of: name)]
+            )
         case .month(let month):
             ("strftime('%Y-%m', promoted_at, 'localtime') = ?", [monthFormatter.string(from: month)])
         }

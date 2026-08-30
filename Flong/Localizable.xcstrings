@@ -590,12 +590,42 @@
         }
       }
     },
+    "Collections are yours to fill. An article joins one from its own menu." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les collections sont à vous de remplir. Un article y entre depuis son propre menu."
+          }
+        }
+      }
+    },
+    "Create" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer"
+          }
+        }
+      }
+    },
     "Delete" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Supprimer"
+          }
+        }
+      }
+    },
+    "Delete the collection" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer la collection"
           }
         }
       }
@@ -901,6 +931,26 @@
         }
       }
     },
+    "Name" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom"
+          }
+        }
+      }
+    },
+    "New collection" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle collection"
+          }
+        }
+      }
+    },
     "No feed was found at this address." : {
       "localizations" : {
         "fr" : {
@@ -1068,6 +1118,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirer la photo"
+          }
+        }
+      }
+    },
+    "Rename" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer"
           }
         }
       }
@@ -1460,6 +1520,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L'adresse d'un site auquel vous êtes abonné, par exemple lemonde.fr."
+          }
+        }
+      }
+    },
+    "The articles stay where they are." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les articles restent où ils sont."
           }
         }
       }

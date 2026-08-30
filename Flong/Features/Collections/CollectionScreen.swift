@@ -21,6 +21,9 @@ struct CollectionScreen: View {
     let open: (UUID) -> Void
 
     @Namespace private var zoom
+    @State private var isRenaming = false
+    @State private var renamed = ""
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
@@ -35,6 +38,50 @@ struct CollectionScreen: View {
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         .navigationTitle(CollectionSquare.name(of: kind))
+        // Only what the reader made can be renamed or thrown away. The rest is
+        // a question the kept articles answer about themselves, and there is
+        // nothing there to rename.
+        .toolbar {
+            if case .made(let name) = kind {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button {
+                            renamed = name
+                            isRenaming = true
+                        } label: {
+                            Label("Rename", systemImage: "pencil")
+                        }
+                        Button(role: .destructive) {
+                            Task {
+                                await model.deleteCollection(name)
+                                dismiss()
+                            }
+                        } label: {
+                            Label("Delete the collection", systemImage: "trash")
+                        }
+                    } label: {
+                        Label("Actions", systemImage: "ellipsis")
+                    }
+                }
+            }
+        }
+        .alert(Text("Rename"), isPresented: $isRenaming) {
+            TextField("Name", text: $renamed)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") {
+                guard case .made(let name) = kind else { return }
+                let renamed = renamed
+                Task {
+                    await model.renameCollection(name, to: renamed)
+                    dismiss()
+                }
+            }
+        } message: {
+            // The page is named after the collection, so the page goes with the
+            // name : coming back to a title that is no longer true would be
+            // stranger than coming back to the grid.
+            Text("The articles stay where they are.")
+        }
         .task { await model.loadCollection(kind) }
     }
 }

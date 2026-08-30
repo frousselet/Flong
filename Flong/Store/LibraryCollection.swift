@@ -13,10 +13,14 @@ import Foundation
 
 /// One square on the collections page.
 ///
-/// **Every one of these is a question the kept articles can answer about
-/// themselves**, and none of them is a folder the reader has to keep tidy.
-/// Favourites is what they starred, notes is what they wrote on, and the months
-/// fall out of when a copy was kept.
+/// **Most of these are a question the kept articles answer about themselves**,
+/// and those need no tidying : favourites is what the reader starred, notes is
+/// what they wrote on, and the months fall out of when a copy was kept.
+///
+/// One of them is not. A collection the reader made is a decision they took and
+/// nothing else, which is why it is the only one that can be empty, renamed or
+/// thrown away, and the only one that has to be carried between their devices
+/// rather than worked out again on each.
 ///
 /// **All of it reads the copy and none of it reads the stream.** A kept article
 /// points at the article it came from with `ON DELETE SET NULL`, so anything
@@ -29,6 +33,8 @@ nonisolated struct LibraryCollection: Identifiable, Hashable, Sendable {
         case starred
         /// What the reader wrote something on.
         case annotated
+        /// One the reader made, by its name.
+        case made(String)
         /// One month of keeping, named by its first day.
         case month(Date)
     }

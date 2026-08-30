@@ -32,11 +32,38 @@ struct CollectionsScreen: View {
 
     private static let square = GridItem(.adaptive(minimum: 150), spacing: 16)
 
+    @State private var isNaming = false
+    @State private var named = ""
+
     var body: some View {
         ScrollView {
             LazyVGrid(columns: [Self.square], spacing: 18) {
                 section(nil, of: marked)
-                section("My collections", of: mine)
+
+                // The band the reader made, and the way to add to it. The
+                // heading is drawn whether or not there is anything under it,
+                // unlike the others : a reader with no collections is exactly
+                // the reader who needs to be shown where they are made.
+                Section {
+                    ForEach(mine) { collection in
+                        Button {
+                            open(collection.kind)
+                        } label: {
+                            CollectionSquare(collection: collection)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    Button {
+                        named = ""
+                        isNaming = true
+                    } label: {
+                        NewCollectionSquare()
+                    }
+                    .buttonStyle(.plain)
+                } header: {
+                    heading("My collections")
+                }
+
                 section("By month", of: months)
             }
             .editorialColumn()
@@ -62,6 +89,16 @@ struct CollectionsScreen: View {
                 }
             }
         }
+        .alert(Text("New collection"), isPresented: $isNaming) {
+            TextField("Name", text: $named)
+            Button("Cancel", role: .cancel) {}
+            Button("Create") {
+                let name = named
+                Task { await model.makeCollection(named: name) }
+            }
+        } message: {
+            Text("Collections are yours to fill. An article joins one from its own menu.")
+        }
         .task { await model.loadCollections() }
     }
 
@@ -82,18 +119,20 @@ struct CollectionsScreen: View {
                     .buttonStyle(.plain)
                 }
             } header: {
-                if let title {
-                    Text(title)
-                        .font(.system(.footnote, weight: .semibold))
-                        .textCase(.uppercase)
-                        .kerning(0.6)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, Editorial.rhythm)
-                        .padding(.bottom, 2)
-                }
+                if let title { heading(title) }
             }
         }
+    }
+
+    private func heading(_ title: LocalizedStringKey) -> some View {
+        Text(title)
+            .font(.system(.footnote, weight: .semibold))
+            .textCase(.uppercase)
+            .kerning(0.6)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, Editorial.rhythm)
+            .padding(.bottom, 2)
     }
 
     /// What the reader marked, which every reader has and nobody made.
@@ -101,9 +140,10 @@ struct CollectionsScreen: View {
         model.collections.filter { $0.kind == .starred || $0.kind == .annotated }
     }
 
-    /// What the reader made. Nothing yet : this is where collections of their
-    /// own will go, and it draws no heading until there is one.
-    private var mine: [LibraryCollection] { [] }
+    /// What the reader made.
+    private var mine: [LibraryCollection] {
+        model.collections.filter { if case .made = $0.kind { true } else { false } }
+    }
 
     private var months: [LibraryCollection] {
         model.collections.filter { if case .month = $0.kind { true } else { false } }
@@ -165,6 +205,7 @@ struct CollectionSquare: View {
         switch kind {
         case .starred: Text("Starred")
         case .annotated: Text("Notes")
+        case .made(let name): Text(verbatim: name)
         case .month(let month): Text(month, format: .dateTime.month(.wide).year())
         }
     }
@@ -173,7 +214,37 @@ struct CollectionSquare: View {
         switch kind {
         case .starred: "star"
         case .annotated: "text.quote"
+        case .made: "folder"
         case .month: "calendar"
         }
+    }
+}
+
+/// The square that makes a new collection.
+///
+/// It sits at the end of the reader's own band rather than in a toolbar, the
+/// way an album is added in Photos : the place a thing is made is the place
+/// the things of that kind already are.
+struct NewCollectionSquare: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Color.clear
+                .aspectRatio(1, contentMode: .fit)
+                .overlay {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(.quaternary, style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
+                        Image(systemName: "plus")
+                            .font(.system(size: 26, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+            Text("New collection")
+                .font(.system(.subheadline, weight: .medium))
+                .lineLimit(1)
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
