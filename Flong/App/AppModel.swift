@@ -411,6 +411,16 @@ final class AppModel {
                 // Let a burst settle. Everything that arrives during the wait
                 // and during the reload collapses into one further tick.
                 try? await Task.sleep(for: StoreChanges.settling)
+
+                // A refresh the reader asked for writes throughout, so the tick
+                // that outlives it is the one it caused itself. Waiting for the
+                // gesture to finish and then dropping that tick is what keeps
+                // the page from being rebuilt the moment it settles.
+                while await self?.isRefreshing == true {
+                    try? await Task.sleep(for: StoreChanges.settling)
+                }
+                guard await self?.hasJustRefreshed == false else { continue }
+
                 await self?.reloadWhatIsShown()
             }
         }
@@ -430,6 +440,18 @@ final class AppModel {
         ticking?.cancel()
     }
 
+    /// When the reader's own refresh last finished reading everything back.
+    private var refreshedAt = Date.distantPast
+
+    /// Whether that was recent enough that a tick is the refresh's own echo.
+    ///
+    /// The observation cannot tell who wrote. What it can tell is that the
+    /// reader asked for a refresh a moment ago and that everything has already
+    /// been read back for them, which is the same answer.
+    private var hasJustRefreshed: Bool {
+        Date().timeIntervalSince(refreshedAt) < StoreChanges.echo
+    }
+
     /// How often an open window asks the publishers.
     ///
     /// A window open all day asked nobody anything : the only foreground
@@ -446,6 +468,13 @@ final class AppModel {
     /// reader is about to come back to. The list is read again the moment they
     /// are looking at it.
     private func reloadWhatIsShown() async {
+        // Not while the reader is pulling. A refresh they asked for writes a
+        // great deal, so it ticks repeatedly, and every tick replaced the page
+        // under the refresh control : the scroll never settled back to where it
+        // started. `refreshAll` reads everything back itself when it is done,
+        // which is the one reload that gesture needs.
+        guard !isRefreshing else { return }
+
         await loadSidebar()
         await loadDigest()
         await loadCollections()
@@ -494,7 +523,12 @@ final class AppModel {
                 fetched = try await digestService.digest(.frontPage)
                 digestTopic = .frontPage
             }
-            digest = fetched
+            // Only when it differs. `@Observable` notifies on the assignment
+            // and not on the value, so writing back an identical page rebuilds
+            // the list under a reader who is scrolled into it, and a pinned
+            // header rebuilt mid-gesture is a page that does not settle back
+            // where it was.
+            if fetched != digest { digest = fetched }
         } catch {
             Log.enrich.error("The digest could not be read : \(error, privacy: .public)")
         }
@@ -1237,6 +1271,7 @@ final class AppModel {
         await load()
         await loadDigest()
         await loadLooseArticles()
+        refreshedAt = Date()
     }
 
     /// Refreshes the feeds that are due, on returning to the foreground.
