@@ -394,9 +394,9 @@ Everything Flong may interrupt the reader for is a switch in the reader's own me
 
 What the reader wants travels between their devices, through the key-value store of section 7 ; whether a given device may interrupt them is the system's answer on that device and never travels. The two are different questions and it is right that they disagree.
 
-**The first of them : a new subject.** The model files each story under the subjects the reader has, and names one when nothing fits. A subject it has never used before is usually one the press has just started covering. A subject the reader wrote themselves is not announced, nor is a second spelling of one that exists, nor anything that existed before the switch was turned on.
+**The first of them : a new story.** A story is several articles, from several newsrooms, about one thing, and one opening is the moment the press starts covering something. A cluster of one is not a story, so this is not a notice per article. Nothing that was already open when the switch was turned on is announced.
 
-**Nothing interrupts a reader who is looking at the page it would be about.** A new subject appears as a pill on the front page, so a reader with Flong open has already seen it. The watermark moves anyway : what it records is that the subject reached them, not that a notification was posted.
+**Nothing interrupts a reader who is looking at the page it would be about.** A story that opens appears on the front page, so a reader with Flong open has already seen it. The watermark moves anyway : what it records is that the story reached them, not that a notification was posted.
 
 `docs/technical/notifications.md` carries the rules and what each is for.
 

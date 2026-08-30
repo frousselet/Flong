@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import GRDB
 import Testing
 import UserNotifications
 
@@ -24,107 +25,155 @@ import UserNotifications
 /// and where a tap lands.
 @Suite("What Flong tells the reader")
 struct AnnouncementTests {
-    @Test("A pass that found no new subject says nothing")
-    func silence() {
-        // The ordinary case, by far : most passes file every story under a
-        // subject the reader already has.
-        #expect(Announcement.newSubjects([]) == nil)
+    private func opened(_ title: String, summary: String? = nil, rooms: [String] = ["lemonde.fr"])
+        -> DigestStore
+        .Opened
+    {
+        DigestStore.Opened(id: .v7(), title: title, summary: summary, rooms: rooms)
     }
 
-    @Test("One subject is named, and a tap opens it")
-    func one() throws {
-        let announcement = try #require(Announcement.newSubjects(["Typographie"]))
+    @Test("A pass that opened no story says nothing")
+    func silence() {
+        // The ordinary case, by far : most passes have articles join a story
+        // that already exists, and a cluster of one is not a story at all.
+        #expect(Announcement.newStories([]) == nil)
+    }
 
-        #expect(announcement.title == String(localized: "New subject"))
-        #expect(announcement.body == "Typographie")
-        // One subject is a place to go.
-        #expect(announcement.subject == "Typographie")
+    @Test("One story leads with its own headline, and a tap opens it")
+    func one() throws {
+        let story = opened("Une réforme du calendrier scolaire", rooms: ["lemonde.fr", "liberation.fr"])
+        let announcement = try #require(Announcement.newStories([story]))
+
+        // The headline is the news. A notification titled `New story` with the
+        // headline underneath buries the thing the reader is being told.
+        #expect(announcement.title == "Une réforme du calendrier scolaire")
+        #expect(announcement.body.contains("lemonde.fr"))
+        #expect(announcement.body.contains("liberation.fr"))
+        #expect(announcement.story == story.id)
+    }
+
+    @Test("A written line says more than a list of newsrooms, and takes its place")
+    func summaryWins() throws {
+        let story = opened("Une réforme", summary: "Le ministère décale la rentrée à la mi-août.")
+        let announcement = try #require(Announcement.newStories([story]))
+
+        #expect(announcement.body == "Le ministère décale la rentrée à la mi-août.")
+    }
+
+    @Test("A story with no written line falls back on who is covering it")
+    func roomsOtherwise() throws {
+        let announcement = try #require(Announcement.newStories([opened("Une réforme", summary: "")]))
+        #expect(announcement.body == "lemonde.fr")
     }
 
     @Test("Several are counted in the title and listed in the body")
     func several() throws {
-        let names = ["Typographie", "Cybersécurité", "Élections"]
-        let announcement = try #require(Announcement.newSubjects(names))
+        let stories = [opened("Une réforme"), opened("Les macros Swift"), opened("Le procès")]
+        let announcement = try #require(Announcement.newStories(stories))
 
         #expect(announcement.title.contains("3"))
-        for name in names {
-            #expect(announcement.body.contains(name))
+        for story in stories {
+            #expect(announcement.body.contains(story.title))
         }
         // A tap that had to choose one of three would choose wrongly twice out
         // of three times, so it chooses none.
-        #expect(announcement.subject == nil)
+        #expect(announcement.story == nil)
     }
 
-    @Test("The count in the title is the number of names in the body")
+    @Test("Headlines are not run together as one sentence")
+    func headlinesAreSeparated() throws {
+        let announcement = try #require(
+            Announcement.newStories([opened("Réforme, acte II"), opened("Procès, la suite")])
+        )
+
+        // A headline may hold commas of its own, so a comma list of them reads
+        // as one long broken sentence.
+        #expect(announcement.body == "Réforme, acte II · Procès, la suite")
+    }
+
+    @Test("The count in the title is the number of headlines in the body")
     func theCountIsHonest() throws {
-        // A body showing the first few of a longer list is a small lie, and a
-        // title counting more than the body shows is the same lie twice.
-        let names = (1...12).map { "Sujet \($0)" }
-        let announcement = try #require(Announcement.newSubjects(names))
+        let stories = (1...12).map { opened("Fil \($0)") }
+        let announcement = try #require(Announcement.newStories(stories))
 
         #expect(announcement.title.contains("12"))
-        #expect(names.allSatisfy { announcement.body.contains($0) })
+        #expect(stories.allSatisfy { announcement.body.contains($0.title) })
     }
 
     @Test("Notifications of one kind are grouped under one thread")
     func grouped() throws {
-        let first = try #require(Announcement.newSubjects(["Typographie"]))
-        let second = try #require(Announcement.newSubjects(["Élections"]))
+        let first = try #require(Announcement.newStories([opened("Une réforme")]))
+        let second = try #require(Announcement.newStories([opened("Un procès")]))
 
         // A week of these is one stack in Notification Centre, not a week of
         // rows.
         #expect(first.thread == second.thread)
-        #expect(first.thread == Announcement.Thread.newSubjects)
+        #expect(first.thread == Announcement.Thread.newStories)
     }
 }
 
-@Suite("Which subjects are worth telling the reader about")
-struct NewSubjectTests {
+@Suite("Which stories are worth telling the reader about")
+struct OpenedStoryTests {
     private let database: AppDatabase
-    private let topics: TopicPreferences
+    private let digest: DigestStore
     private let now = Date(timeIntervalSince1970: 1_787_646_600)
 
     init() throws {
         database = try AppDatabase.inMemory()
-        topics = TopicPreferences(database)
+        digest = DigestStore(database)
     }
 
-    @Test("Only what the model wrote after the moment asked about")
+    @discardableResult
+    private func story(_ title: String, at moment: Date, rooms: [String] = ["a.example.com"]) async throws -> UUID {
+        let story = Story(id: .v7(at: moment), title: title, firstAt: moment, lastAt: moment, updatedAt: moment)
+        try await database.writer.write { db in
+            try story.insert(db)
+
+            for (index, room) in rooms.enumerated() {
+                var feed = Feed(url: URL(string: "https://\(room)/\(title).xml")!, title: room)
+                feed.siteURL = URL(string: "https://\(room)")
+                try feed.insert(db)
+
+                var entry = Entry(
+                    feedID: feed.id,
+                    guid: "urn:\(title):\(index)",
+                    title: title,
+                    publishedAt: moment,
+                    receivedAt: moment
+                )
+                entry.hasMedia = false
+                try entry.insert(db)
+                try StoryMember(storyID: story.id, entryID: entry.id, similarity: 1).insert(db)
+            }
+        }
+        return story.id
+    }
+
+    @Test("Only the stories opened after the moment asked about")
     func since() async throws {
-        try await topics.record("Ancien", at: now.addingTimeInterval(-3600))
-        try await topics.record("Nouveau", at: now.addingTimeInterval(3600))
+        try await story("Ancien", at: now.addingTimeInterval(-3600))
+        try await story("Nouveau", at: now.addingTimeInterval(3600))
 
-        #expect(try await topics.made(since: now) == ["Nouveau"])
+        // The identifier carries the moment the story was opened. `first_at`
+        // is the date of its earliest article and may be days older.
+        #expect(try await digest.opened(since: now).map(\.title) == ["Nouveau"])
     }
 
-    @Test("A subject the reader wrote is not news to the reader")
-    func theirOwn() async throws {
-        try await topics.add("Le mien", at: now.addingTimeInterval(3600))
-        try await topics.record("Le sien", at: now.addingTimeInterval(3600))
-
-        // Telling somebody about a word they typed themselves is the
-        // application repeating them back at them.
-        #expect(try await topics.made(since: now) == ["Le sien"])
-    }
-
-    @Test("A second spelling of a subject that exists is not a new subject")
-    func folded() async throws {
-        try await topics.record("Cybersécurité", at: now.addingTimeInterval(-3600))
-        try await topics.record("cybersecurite", at: now.addingTimeInterval(3600))
-
-        // The vocabulary folds it, so nothing was written, so there is nothing
-        // to announce : the reader would have been told about a subject they
-        // already had.
-        #expect(try await topics.made(since: now).isEmpty)
-    }
-
-    @Test("They arrive in the order they were found")
+    @Test("They arrive in the order they opened")
     func ordered() async throws {
-        for (index, name) in ["Premier", "Deuxième", "Troisième"].enumerated() {
-            try await topics.record(name, at: now.addingTimeInterval(Double(index + 1) * 60))
+        for (index, title) in ["Premier", "Deuxième", "Troisième"].enumerated() {
+            try await story(title, at: now.addingTimeInterval(Double(index + 1) * 60))
         }
 
-        #expect(try await topics.made(since: now) == ["Premier", "Deuxième", "Troisième"])
+        #expect(try await digest.opened(since: now).map(\.title) == ["Premier", "Deuxième", "Troisième"])
+    }
+
+    @Test("A story says which newsrooms are covering it, once each")
+    func rooms() async throws {
+        try await story("Une réforme", at: now.addingTimeInterval(60), rooms: ["lemonde.fr", "liberation.fr"])
+
+        let opened = try #require(await digest.opened(since: now).first)
+        #expect(opened.rooms == ["lemonde.fr", "liberation.fr"])
     }
 }
 
@@ -139,32 +188,32 @@ struct NoticePreferenceTests {
         // A switch that starts on is a prompt at first launch about something
         // the reader has not seen yet, which is how an application gets refused
         // permanently.
-        #expect(preferences().wantsNewSubjectNotices == false)
-        #expect(preferences().subjectsAnnouncedAt == nil)
+        #expect(preferences().wantsNewStoryNotices == false)
+        #expect(preferences().storiesAnnouncedAt == nil)
     }
 
     @Test("The answer is remembered")
     func remembered() {
         let store = preferences()
 
-        store.wantsNewSubjectNotices = true
-        #expect(store.wantsNewSubjectNotices)
+        store.wantsNewStoryNotices = true
+        #expect(store.wantsNewStoryNotices)
 
-        store.wantsNewSubjectNotices = false
-        #expect(!store.wantsNewSubjectNotices)
+        store.wantsNewStoryNotices = false
+        #expect(!store.wantsNewStoryNotices)
     }
 
     @Test("A device that has said nothing does not overrule one that has")
     func iCloudSilenceIsNotAnAnswer() {
         let defaults = UserDefaults(suiteName: "com.rslt.Flong.tests.\(UUID().uuidString)")!
-        defaults.set(true, forKey: "notify.new-subjects")
+        defaults.set(true, forKey: "notify.new-stories")
 
         // `bool(forKey:)` answers false for a key nobody ever wrote, so reading
         // the iCloud store directly would have an empty one turn the notices
         // off on a device that had turned them on.
         let cloud = NSUbiquitousKeyValueStore()
-        cloud.removeObject(forKey: "notify.new-subjects")
-        #expect(Preferences(cloud: cloud, local: defaults).wantsNewSubjectNotices)
+        cloud.removeObject(forKey: "notify.new-stories")
+        #expect(Preferences(cloud: cloud, local: defaults).wantsNewStoryNotices)
     }
 
     @Test("The watermark is this device's own")
@@ -172,20 +221,19 @@ struct NoticePreferenceTests {
         let store = preferences()
         let moment = Date(timeIntervalSince1970: 1_787_646_600)
 
-        store.subjectsAnnouncedAt = moment
-        #expect(store.subjectsAnnouncedAt == moment)
+        store.storiesAnnouncedAt = moment
+        #expect(store.storiesAnnouncedAt == moment)
 
-        store.subjectsAnnouncedAt = nil
-        #expect(store.subjectsAnnouncedAt == nil)
+        store.storiesAnnouncedAt = nil
+        #expect(store.storiesAnnouncedAt == nil)
     }
 }
 
 /// When the reader is actually told, and when they are deliberately not.
-@Suite("Telling the reader about a new subject", .serialized)
+@Suite("Telling the reader about a new story", .serialized)
 @MainActor
 struct AnnouncingTests {
     private let database: AppDatabase
-    private let topics: TopicPreferences
     private let preferences: Preferences
     private let announcer = MemoryAnnouncer()
     private let model: AppModel
@@ -193,7 +241,6 @@ struct AnnouncingTests {
 
     init() throws {
         database = try AppDatabase.inMemory()
-        topics = TopicPreferences(database)
         preferences = Preferences(
             cloud: nil,
             local: UserDefaults(suiteName: "com.rslt.Flong.tests.\(UUID().uuidString)")!
@@ -201,33 +248,49 @@ struct AnnouncingTests {
         model = AppModel(database: database, preferences: preferences, announcer: announcer)
     }
 
-    /// The reader has turned the notices on, and the clock started then.
-    private func wanted(from moment: Date) async {
-        await model.setWantsNewSubjectNotices(true)
-        preferences.subjectsAnnouncedAt = moment
+    private func story(_ title: String, at moment: Date) async throws {
+        let story = Story(id: .v7(at: moment), title: title, firstAt: moment, lastAt: moment, updatedAt: moment)
+        try await database.writer.write { db in
+            try story.insert(db)
+
+            var feed = Feed(url: URL(string: "https://a.example.com/\(title).xml")!, title: "A")
+            feed.siteURL = URL(string: "https://a.example.com")
+            try feed.insert(db)
+
+            var entry = Entry(feedID: feed.id, guid: "urn:\(title)", title: title, publishedAt: moment)
+            entry.hasMedia = false
+            try entry.insert(db)
+            try StoryMember(storyID: story.id, entryID: entry.id, similarity: 1).insert(db)
+        }
     }
 
-    @Test("A subject found while the reader was away is announced")
+    /// The reader has turned the notices on, and the clock started then.
+    private func wanted(from moment: Date) async {
+        await model.setWantsNewStoryNotices(true)
+        preferences.storiesAnnouncedAt = moment
+    }
+
+    @Test("A story opened while the reader was away is announced")
     func announced() async throws {
         await wanted(from: now)
         model.isReading = false
-        try await topics.record("Typographie", at: now.addingTimeInterval(60))
+        try await story("Une réforme", at: now.addingTimeInterval(60))
 
-        await model.announceNewSubjects()
+        await model.announceNewStories()
 
         #expect(announcer.posted.count == 1)
-        #expect(announcer.posted.first?.body == "Typographie")
-        #expect(announcer.posted.first?.subject == "Typographie")
+        #expect(announcer.posted.first?.title == "Une réforme")
+        #expect(announcer.posted.first?.story != nil)
     }
 
     @Test("Nothing is said twice")
     func onlyOnce() async throws {
         await wanted(from: now)
         model.isReading = false
-        try await topics.record("Typographie", at: now.addingTimeInterval(60))
+        try await story("Une réforme", at: now.addingTimeInterval(60))
 
-        await model.announceNewSubjects()
-        await model.announceNewSubjects()
+        await model.announceNewStories()
+        await model.announceNewStories()
 
         // The watermark moved past it, so the second pass has nothing to say.
         #expect(announcer.posted.count == 1)
@@ -237,41 +300,41 @@ struct AnnouncingTests {
     func silentWhileReading() async throws {
         await wanted(from: now)
         model.isReading = true
-        try await topics.record("Typographie", at: now.addingTimeInterval(60))
+        try await story("Une réforme", at: now.addingTimeInterval(60))
 
-        await model.announceNewSubjects()
+        await model.announceNewStories()
         #expect(announcer.posted.isEmpty)
 
-        // And it is not saved up for later : the subject appeared as a pill on
-        // the page they had open, so they know about it, and being told
-        // tomorrow about what they saw today is worse than not being told.
+        // And it is not saved up for later : the story appeared on the page
+        // they had open, so they know about it, and being told tomorrow about
+        // what they saw today is worse than not being told.
         model.isReading = false
-        await model.announceNewSubjects()
+        await model.announceNewStories()
         #expect(announcer.posted.isEmpty)
     }
 
     @Test("A reader who asked for nothing hears nothing, and the clock does not run")
     func silentUntilAskedFor() async throws {
         model.isReading = false
-        try await topics.record("Typographie", at: now.addingTimeInterval(60))
+        try await story("Une réforme", at: now.addingTimeInterval(60))
 
-        await model.announceNewSubjects()
+        await model.announceNewStories()
 
         #expect(announcer.posted.isEmpty)
         // Untouched, so that turning the notices on later starts from that
         // moment rather than from whatever a silent pass had stamped.
-        #expect(preferences.subjectsAnnouncedAt == nil)
+        #expect(preferences.storiesAnnouncedAt == nil)
     }
 
-    @Test("Turning the notices on starts the clock, so what already exists is not news")
+    @Test("Turning the notices on starts the clock, so what is already open is not news")
     func startsFromNow() async throws {
-        try await topics.record("Ancien", at: now.addingTimeInterval(-86400))
+        try await story("Ancien", at: now.addingTimeInterval(-86400))
 
-        await model.setWantsNewSubjectNotices(true)
+        await model.setWantsNewStoryNotices(true)
         model.isReading = false
-        await model.announceNewSubjects()
+        await model.announceNewStories()
 
-        #expect(model.wantsNewSubjectNotices)
+        #expect(model.wantsNewStoryNotices)
         #expect(announcer.posted.isEmpty)
     }
 
@@ -279,25 +342,25 @@ struct AnnouncingTests {
     func refused() async throws {
         announcer.granted = false
 
-        await model.setWantsNewSubjectNotices(true)
+        await model.setWantsNewStoryNotices(true)
 
         // The system said no, and no switch in an application may say
         // otherwise.
-        #expect(!model.wantsNewSubjectNotices)
+        #expect(!model.wantsNewStoryNotices)
         #expect(model.notificationStatus == .denied)
-        #expect(preferences.subjectsAnnouncedAt == nil)
+        #expect(preferences.storiesAnnouncedAt == nil)
     }
 
     @Test("Turning them off stops them without asking anything")
     func turnedOff() async throws {
         await wanted(from: now)
-        await model.setWantsNewSubjectNotices(false)
+        await model.setWantsNewStoryNotices(false)
 
         model.isReading = false
-        try await topics.record("Typographie", at: now.addingTimeInterval(60))
-        await model.announceNewSubjects()
+        try await story("Une réforme", at: now.addingTimeInterval(60))
+        await model.announceNewStories()
 
-        #expect(!model.wantsNewSubjectNotices)
+        #expect(!model.wantsNewStoryNotices)
         #expect(announcer.posted.isEmpty)
     }
 }

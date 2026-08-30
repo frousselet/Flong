@@ -24,34 +24,49 @@ nonisolated struct Announcement: Hashable, Sendable {
     /// What the notifications of one kind are grouped under in Notification
     /// Centre, so a week of them is one stack and not a week of rows.
     var thread: String
-    /// The subject a tap opens, when there is exactly one to open.
-    var subject: String?
+    /// The story a tap opens, when there is exactly one to open.
+    var story: UUID?
 
-    /// The model has found subjects it had never used before.
+    /// Stories that have just been opened.
     ///
-    /// Nothing to say about none, which is the ordinary case : most passes file
-    /// every story under a subject the reader already has.
+    /// Nothing to say about none, which is the ordinary case : most passes have
+    /// articles join a story that already exists, and a cluster of one is not a
+    /// story at all.
     ///
-    /// **The body lists every name and the title counts them**, so the two
-    /// always agree. A body showing the first few of a longer list is a small
-    /// lie, and the system truncates a long one anyway, which is the system's
-    /// business rather than a reason to say less than the truth.
-    static func newSubjects(_ names: [String]) -> Announcement? {
-        guard !names.isEmpty else { return nil }
+    /// **One story leads with its own headline.** The headline is the news, and
+    /// a notification titled `New story` with the headline underneath buries
+    /// the thing the reader is being told. The rooms covering it go in the body,
+    /// which is the digest's own signal that something is happening, unless the
+    /// model wrote a line saying what happened, which says more.
+    ///
+    /// **Several are counted in the title and listed in the body**, so the two
+    /// always agree.
+    static func newStories(_ stories: [DigestStore.Opened]) -> Announcement? {
+        guard let first = stories.first else { return nil }
 
+        guard stories.count == 1 else {
+            return Announcement(
+                title: String(localized: "\(stories.count) new stories"),
+                // Not a comma list : a headline may hold commas of its own, and
+                // a list of them read as one sentence is unreadable.
+                body: stories.map(\.title).joined(separator: " · "),
+                thread: Thread.newStories,
+                // Several are not a place to go, and a tap that had to pick one
+                // of them would pick wrongly most of the time.
+                story: nil
+            )
+        }
+
+        let rooms = ListFormatter.localizedString(byJoining: first.rooms)
         return Announcement(
-            title: names.count == 1
-                ? String(localized: "New subject")
-                : String(localized: "\(names.count) new subjects"),
-            body: ListFormatter.localizedString(byJoining: names),
-            thread: Thread.newSubjects,
-            // One subject is a place to go ; several are not, and a tap that
-            // had to pick one of them would pick wrongly most of the time.
-            subject: names.count == 1 ? names[0] : nil
+            title: first.title,
+            body: first.summary?.isEmpty == false ? first.summary! : rooms,
+            thread: Thread.newStories,
+            story: first.id
         )
     }
 
     enum Thread {
-        static let newSubjects = "new-subjects"
+        static let newStories = "new-stories"
     }
 }

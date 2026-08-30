@@ -243,6 +243,67 @@ nonisolated struct DigestStore: Sendable {
         return digest
     }
 
+    /// A story that has just been opened, as a notification needs it.
+    nonisolated struct Opened: Hashable, Sendable, Identifiable {
+        let id: UUID
+        /// What the story is called : written by the model when there is one,
+        /// and otherwise the headline of the article nearest the middle of the
+        /// group.
+        let title: String
+        /// The one line saying what happened, when the model wrote one.
+        let summary: String?
+        /// The newsrooms covering it, in the order they picked it up.
+        let rooms: [String]
+    }
+
+    /// The stories opened since a moment, oldest first.
+    ///
+    /// **Asked of the primary key.** A story identifier is a UUIDv7, so it
+    /// carries the moment the story was opened and sorts by it : the question
+    /// is a range on the key, not a scan with a timestamp unpacked per row.
+    /// Nothing else records when a story was opened, `first_at` being the date
+    /// of its earliest article, which may be days older than the story.
+    func opened(since moment: Date, limit: Int = 20) async throws -> [Opened] {
+        try await database.writer.read { db in
+            let stories =
+                try Story
+                .filter(Column("id") > UUID.v7Floor(at: moment))
+                .order(Column("id"))
+                .limit(limit)
+                .fetchAll(db)
+            guard !stories.isEmpty else { return [] }
+
+            let ids = stories.map(\.id)
+            let members = try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT m.story_id AS story_id, f.title AS feed_title,
+                           COALESCE(f.site_url, f.url) AS site_url,
+                           COALESCE(e.published_at, e.received_at) AS date
+                    FROM story_member m
+                    JOIN entry e ON e.id = m.entry_id
+                    JOIN feed f ON f.id = e.feed_id
+                    WHERE m.story_id IN (\(databaseQuestionMarks(count: ids.count)))
+                    ORDER BY date
+                    """,
+                arguments: StatementArguments(ids)
+            )
+
+            var rooms: [UUID: [String]] = [:]
+            for row in members {
+                let site = (row["site_url"] as String?).flatMap(URL.init(string:))
+                let room = FeedURL.room(of: site) ?? (row["feed_title"] as String)
+                let id = row["story_id"] as UUID
+                guard !(rooms[id] ?? []).contains(room) else { continue }
+                rooms[id, default: []].append(room)
+            }
+
+            return stories.map {
+                Opened(id: $0.id, title: $0.title, summary: $0.summary, rooms: rooms[$0.id] ?? [])
+            }
+        }
+    }
+
     private static func story(
         _ story: Story,
         members: [StoryArticle],

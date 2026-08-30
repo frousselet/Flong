@@ -66,7 +66,7 @@ struct Notifier: Announcing {
         content.title = announcement.title
         content.body = announcement.body
         content.threadIdentifier = announcement.thread
-        if let subject = announcement.subject { content.userInfo = [Key.subject: subject] }
+        if let story = announcement.story { content.userInfo = [Key.story: story.uuidString] }
 
         // No trigger : a trigger of nil is delivered immediately, and there is
         // nothing here worth scheduling for later.
@@ -97,7 +97,7 @@ struct Notifier: Announcing {
     }
 
     enum Key {
-        static let subject = "subject"
+        static let story = "story"
     }
 }
 
@@ -135,13 +135,13 @@ final class MemoryAnnouncer: Announcing {
 final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationRouter()
 
-    /// A subject tapped before anything was listening.
-    private var waiting: String?
-    private var open: ((String) -> Void)?
+    /// A story tapped before anything was listening.
+    private var waiting: UUID?
+    private var open: ((UUID) -> Void)?
 
     /// Starts listening, and takes whatever was tapped before there was a
     /// window.
-    func listen(_ open: @escaping (String) -> Void) {
+    func listen(_ open: @escaping (UUID) -> Void) {
         self.open = open
 
         if let waiting {
@@ -154,14 +154,14 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        guard let subject = response.notification.request.content.userInfo[Notifier.Key.subject] as? String else {
-            return
-        }
+        guard let named = response.notification.request.content.userInfo[Notifier.Key.story] as? String,
+            let story = UUID(uuidString: named)
+        else { return }
 
         guard let open else {
-            waiting = subject
+            waiting = story
             return
         }
-        open(subject)
+        open(story)
     }
 }

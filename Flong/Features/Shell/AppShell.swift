@@ -143,10 +143,9 @@ struct AppShell: View {
             // tapped from a cold start has been waiting since before the
             // window existed, and the reader is looking at the wrong page
             // until it is claimed.
-            NotificationRouter.shared.listen { subject in
+            NotificationRouter.shared.listen { story in
                 section = .digest
-                digestPath = []
-                model.digestTopic = .named(subject)
+                digestPath = [.story(story)]
             }
 
             // The background tasks were registered while the application

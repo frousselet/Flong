@@ -159,7 +159,9 @@ The picture is scaled on the way in and never after. What comes out of a photo l
 
 **Marking everything as read left the sections a reader lands in.** It is a command about a list, and the two sections that had it are not lists of a thing to get to the end of : the stream is a wire and the collections are what was put aside. It stays where it means something, on a feed, a folder or the unread view, each of which is a list with an end. What takes its place in the corner is the reader's own menu, which is now the same one button in all four sections.
 
-**`sujet` is a story in French, so a topic is a `thème`.** The story page is titled `Sujet` and the front page's second section is `SUJETS` ; calling the topics `Sujets` as well would have had `Typographie, 1 sujet` mean two different things in one line.
+**A story is a `fil` in French, and a subject is a `thématique`.** Both English words translate naturally to `sujet`, and only one of them could have it. The first attempt gave it to the story and left the subject as `thème` ; that reads backwards, since `sujet` in ordinary French is exactly what a subject is, and it cost a round of the two being confused for each other in conversation before the naming was settled.
+
+`Fil` says what a story is, several articles following one thing, and `thématique` is unambiguous where `thème` was merely unclaimed. The cost is that the stream section is called `Flux`, so `Fil` and `Flux` sit near each other ; they are different words for different things and the sections they name are never side by side.
 
 ## The dateline
 

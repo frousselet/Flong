@@ -142,11 +142,11 @@ final class AppModel {
     }
     // MARK: - What the reader is told
 
-    /// Whether the reader wants to hear when the model finds a new subject.
+    /// Whether the reader wants to hear when a story opens.
     ///
-    /// Set through ``setWantsNewSubjectNotices(_:)`` rather than written to,
+    /// Set through ``setWantsNewStoryNotices(_:)`` rather than written to,
     /// since turning it on has to ask the system first and may be refused.
-    private(set) var wantsNewSubjectNotices = false
+    private(set) var wantsNewStoryNotices = false
 
     /// What the system last said about this device, for the screen to explain
     /// a switch that will not stay on.
@@ -154,13 +154,10 @@ final class AppModel {
 
     /// Whether the reader is looking at Flong right now.
     ///
-    /// Nothing is announced while they are : a new subject appears as a pill
-    /// on the page they are already reading, and a notice about something they
-    /// watched happen is a notice to dismiss for nothing.
+    /// Nothing is announced while they are : a story appears on the page they
+    /// are already reading, and a notice about something they watched happen
+    /// is a notice to dismiss for nothing.
     var isReading = true
-
-    /// The subject a tapped notification asked for, until a screen takes it.
-    var openedSubject: String?
 
     // MARK: - Who is reading
 
@@ -343,7 +340,7 @@ final class AppModel {
         self.preferences = preferences
         self.announcer = announcer
         self.articleBody = preferences.articleBody
-        self.wantsNewSubjectNotices = preferences.wantsNewSubjectNotices
+        self.wantsNewStoryNotices = preferences.wantsNewStoryNotices
         self.firstName = preferences.firstName
         self.lastName = preferences.lastName
         self.picture = preferences.picture.flatMap(ProfilePicture.image)
@@ -456,7 +453,7 @@ final class AppModel {
         await digestService.brief()
         await digestService.nameTopics()
         await loadDigest()
-        await announceNewSubjects()
+        await announceNewStories()
     }
 
     // MARK: - Telling the reader
@@ -468,45 +465,45 @@ final class AppModel {
     /// level cannot be talked round from here : the switch goes back where it
     /// was and the screen says where the answer lives, which is the only thing
     /// an application may honestly do about a refusal.
-    func setWantsNewSubjectNotices(_ wanted: Bool) async {
+    func setWantsNewStoryNotices(_ wanted: Bool) async {
         guard wanted else {
-            preferences.wantsNewSubjectNotices = false
-            wantsNewSubjectNotices = false
+            preferences.wantsNewStoryNotices = false
+            wantsNewStoryNotices = false
             return
         }
 
         let allowed = await announcer.authorize()
         notificationStatus = await announcer.status()
         guard allowed else {
-            wantsNewSubjectNotices = false
+            wantsNewStoryNotices = false
             return
         }
 
-        // From now, and not from the beginning of time : the subjects that
-        // already exist are not news to a reader who has been reading them.
-        preferences.subjectsAnnouncedAt = Date()
-        preferences.wantsNewSubjectNotices = true
-        wantsNewSubjectNotices = true
+        // From now, and not from the beginning of time : the stories already on
+        // the page are not news to a reader who has been reading them.
+        preferences.storiesAnnouncedAt = Date()
+        preferences.wantsNewStoryNotices = true
+        wantsNewStoryNotices = true
     }
 
     func refreshNotificationStatus() async {
         notificationStatus = await announcer.status()
     }
 
-    /// Tells the reader about the subjects the model has just found.
+    /// Tells the reader about the stories that have just opened.
     ///
-    /// **The watermark moves whether anything was said or not.** A subject the
-    /// reader watched appear, on a page they had open, is a subject they know
+    /// **The watermark moves whether anything was said or not.** A story the
+    /// reader watched arrive, on a page they had open, is a story they know
     /// about ; keeping it for later would mean telling them tomorrow about
-    /// something they saw today. What the watermark records is that the subject
+    /// something they saw today. What the watermark records is that the story
     /// reached them, not that a notification was posted.
-    func announceNewSubjects() async {
-        guard wantsNewSubjectNotices, let since = preferences.subjectsAnnouncedAt else { return }
+    func announceNewStories() async {
+        guard wantsNewStoryNotices, let since = preferences.storiesAnnouncedAt else { return }
 
-        let found = (try? await TopicPreferences(database).made(since: since)) ?? []
-        preferences.subjectsAnnouncedAt = Date()
+        let opened = (try? await DigestStore(database).opened(since: since)) ?? []
+        preferences.storiesAnnouncedAt = Date()
 
-        guard !isReading, let announcement = Announcement.newSubjects(found) else { return }
+        guard !isReading, let announcement = Announcement.newStories(opened) else { return }
         await announcer.post(announcement)
     }
 
@@ -673,7 +670,7 @@ final class AppModel {
     func backgroundProcessing() async {
         await doOutstandingWork()
         await digestService.rebuild()
-        await announceNewSubjects()
+        await announceNewStories()
         _ = try? await Retention(database).purge()
         try? await SearchIndex(database).optimize()
         await cloud?.enqueueCatchUp()
