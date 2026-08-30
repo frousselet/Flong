@@ -78,7 +78,13 @@ struct FeedIconView: View {
                     .scaledToFill()
                     .frame(width: side, height: side)
                     .clipShape(.circle)
-                    .overlay { Circle().strokeBorder(.separator, lineWidth: RemoteImage.ring) }
+                    .overlay {
+                        Circle()
+                            .strokeBorder(
+                                .separator.opacity(RemoteImage.ringOpacity),
+                                lineWidth: RemoteImage.ring
+                            )
+                    }
             } else {
                 // Not a blank : a list of feeds must keep its column of marks
                 // whether a publisher serves one or not.
