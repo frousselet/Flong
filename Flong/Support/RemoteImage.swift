@@ -54,6 +54,11 @@ nonisolated final class ImageStore: Sendable {
 
     init() {
         let configuration = URLSessionConfiguration.default
+        // A list scrolled quickly asks for every picture it passes. The
+        // requests are cancelled as their rows leave, but a burst of hundreds
+        // opening at once is a burst the network stack complains about and the
+        // device pays for : four at a time is enough to keep a screen filled.
+        configuration.httpMaximumConnectionsPerHost = 4
         configuration.urlCache = URLCache(memoryCapacity: 8 << 20, diskCapacity: 192 << 20, directory: nil)
         configuration.requestCachePolicy = .returnCacheDataElseLoad
         configuration.httpAdditionalHeaders = [
@@ -160,13 +165,20 @@ struct RemoteImage: View {
 
     /// How wide the ring of glass around a picture is drawn.
     ///
-    /// A hairline. A publisher's picture arrives at whatever contrast it was
-    /// shot at, and one that ends in white sits on a white page with no edge at
-    /// all : the ring is what says where the picture stops. Glass rather than a
-    /// grey rule, since it takes its light from the picture it holds and from
-    /// the page around it, and so reads on a photograph of a night sky as well
-    /// as on one of a beach.
-    static let ring: CGFloat = 1.5
+    /// A hairline, drawn inside the picture's own edge.
+    ///
+    /// **Inside and not around.** A ring outside is a mount, and a mount is a
+    /// frame doing more than saying where the picture ends. Inside, the line is
+    /// part of the picture's own edge and takes no room at all : nothing moves
+    /// to make space for it.
+    ///
+    /// **A line and not a material.** Glass was tried at a point and a half and
+    /// read as a band ; taken down to a hairline the regular material is a pale
+    /// smear and the clear one is nothing whatever, measured at pure white
+    /// against a white page. What is wanted here is an edge, and an edge is a
+    /// line. It is also hundreds fewer glass effects in a list somebody is
+    /// scrolling.
+    static let ring: CGFloat = 0.5
 
     @State private var image: CGImage?
     @State private var isLoading = true
@@ -199,21 +211,22 @@ struct RemoteImage: View {
         }
     }
 
-    /// The picture, cut to its corner and set in a ring of glass.
+    /// The picture, cut to its corner and edged with a hairline inside it.
     ///
-    /// The glass is behind rather than over : a material lends its vibrancy to
-    /// whatever it holds, which would wash a photograph the way it washed the
-    /// bars of the arrivals chart. Behind, it is a frame the picture sits in.
+    /// `strokeBorder` and not `stroke` : a stroke straddles the path and half
+    /// of it would fall outside the clip, which is a line drawn at half its
+    /// width and softer on one side than the other.
     ///
-    /// The outer corner is the inner one plus the ring, so the two curves are
-    /// concentric. Equal radii would leave the frame looking thicker at the
-    /// corners than along the sides.
+    /// The separator's own colour rather than a white highlight. White is the
+    /// glass idiom and it disappears on the picture that most needs an edge,
+    /// which is the one ending in white on a white page ; the separator is a
+    /// hairline that holds against both, and turns with the appearance.
     private func ringed(_ content: some View) -> some View {
         content
             .clipShape(.rect(cornerRadius: corner))
-            .padding(Self.ring)
-            .background {
-                Color.clear.glassEffect(.regular, in: .rect(cornerRadius: corner + Self.ring))
+            .overlay {
+                RoundedRectangle(cornerRadius: corner, style: .continuous)
+                    .strokeBorder(.separator, lineWidth: Self.ring)
             }
     }
 
