@@ -152,6 +152,11 @@ final class AppModel {
     /// a switch that will not stay on.
     private(set) var notificationStatus = UNAuthorizationStatus.notDetermined
 
+    /// What is following the store, and the periodic refresh, for as long as
+    /// there is a window.
+    private var watching: Task<Void, Never>?
+    private var ticking: Task<Void, Never>?
+
     /// Whether the reader is looking at Flong right now.
     ///
     /// Nothing is announced while they are : a story appears on the page they
@@ -387,6 +392,65 @@ final class AppModel {
     var isEmpty: Bool { feedCount == 0 }
 
     // MARK: - Loading
+
+    // MARK: - Keeping up on its own
+
+    /// Follows the store and the clock, so the reader never has to pull.
+    ///
+    /// Two different things, and both are needed. Following the store is what
+    /// shows a change that arrived from somewhere else : another device through
+    /// iCloud, a background refresh, an archive read in. The clock is what asks
+    /// the publishers, which nothing else does while a window sits open.
+    func keepUp() {
+        guard watching == nil else { return }
+
+        watching = Task { [weak self] in
+            guard let database = self?.database else { return }
+
+            for await _ in StoreChanges.ticks(in: database) {
+                // Let a burst settle. Everything that arrives during the wait
+                // and during the reload collapses into one further tick.
+                try? await Task.sleep(for: StoreChanges.settling)
+                await self?.reloadWhatIsShown()
+            }
+        }
+
+        ticking = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(AppModel.foregroundInterval))
+                guard let self, isReading else { continue }
+                _ = await refresher.refreshDue()
+            }
+        }
+    }
+
+    /// Stops following, when the window that was following is gone.
+    deinit {
+        watching?.cancel()
+        ticking?.cancel()
+    }
+
+    /// How often an open window asks the publishers.
+    ///
+    /// A window open all day asked nobody anything : the only foreground
+    /// refresh was returning to the front, and a Mac window that never leaves
+    /// the front never returns to it. Ten minutes is well inside the politeness
+    /// of section 8, which decides per feed what may actually be asked : most
+    /// ticks find nothing due and cost one query.
+    static let foregroundInterval: TimeInterval = 10 * 60
+
+    /// Reads back what the window is showing, after something changed it.
+    ///
+    /// **Not while an article is open.** Opening one marks it read, and a list
+    /// that reloaded under it would drop the article out of the unread view the
+    /// reader is about to come back to. The list is read again the moment they
+    /// are looking at it.
+    private func reloadWhatIsShown() async {
+        await loadSidebar()
+        await loadDigest()
+        await loadCollections()
+        if selectedArticle == nil { await loadArticles() }
+    }
 
     func load() async {
         await loadSidebar()

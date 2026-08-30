@@ -162,6 +162,10 @@ struct AppShell: View {
             // learn from, and `onChange` only fires on a change.
             model.isReading = scenePhase == .active
 
+            // Follows the store and the clock from here on, so a change from
+            // anywhere reaches the window without the reader pulling anything.
+            model.keepUp()
+
             await model.load()
             await model.rebuildDigest()
             await model.startSync()
