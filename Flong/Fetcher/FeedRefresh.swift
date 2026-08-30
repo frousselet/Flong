@@ -72,18 +72,36 @@ nonisolated struct FeedRefresh: Sendable {
 
     // MARK: - Refreshing
 
-    /// Refreshes every feed that is due.
-    func refreshDue(now: Date = Date()) async -> RefreshSummary {
+    /// Refreshes every feed that is due, the most overdue first.
+    ///
+    /// **The order is what makes a budget survivable.** A background refresh is
+    /// given about twenty-five seconds and is cancelled when they are up. The
+    /// feeds used to be taken in the order the database returned them, which
+    /// for UUIDv7 keys is the order they were subscribed to : a reader with
+    /// three hundred feeds and a budget that ran out at the eightieth had the
+    /// next two hundred and twenty never refreshed in the background at all,
+    /// since the following pass started from the same end and was cut off at
+    /// the same place.
+    ///
+    /// Sorted by how overdue each one is against its own rhythm, the budget
+    /// goes to what is most likely to have something, and a feed that misses
+    /// one pass is nearer the front of the next.
+    func refreshDue(now: Date = Date(), sparingly: Bool = false) async -> RefreshSummary {
         let device = DeviceStagger.deviceIdentifier()
         let feeds = (try? await allFeeds()) ?? []
 
-        let due = feeds.filter { feed in
-            let interval = feed.refreshInterval ?? feed.observedInterval ?? RefreshSchedule.defaultInterval
-            let stagger = DeviceStagger.offset(for: feed.id, interval: interval, device: device)
-            return RefreshSchedule.isDue(feed, now: now, stagger: stagger)
-        }
+        let due =
+            feeds
+            .compactMap { feed -> (Feed, Double)? in
+                let interval = feed.refreshInterval ?? feed.observedInterval ?? RefreshSchedule.defaultInterval
+                let stagger = DeviceStagger.offset(for: feed.id, interval: interval, device: device)
+                guard RefreshSchedule.isDue(feed, now: now, stagger: stagger) else { return nil }
+                return (feed, RefreshSchedule.lateness(feed, now: now, stagger: stagger))
+            }
+            .sorted { $0.1 > $1.1 }
+            .map(\.0)
 
-        return await refresh(due)
+        return await refresh(due, sparingly: sparingly)
     }
 
     /// Refreshes every feed, due or not, which is what a pull to refresh means.
@@ -92,7 +110,7 @@ nonisolated struct FeedRefresh: Sendable {
         return await refresh(feeds.filter { $0.quarantinedAt == nil })
     }
 
-    func refresh(_ feeds: [Feed]) async -> RefreshSummary {
+    func refresh(_ feeds: [Feed], sparingly: Bool = false) async -> RefreshSummary {
         guard !feeds.isEmpty else { return RefreshSummary() }
 
         return await withTaskGroup(of: RefreshResult.self) { group in
@@ -100,7 +118,7 @@ nonisolated struct FeedRefresh: Sendable {
             var running = 0
 
             while running < Self.concurrency, let feed = iterator.next() {
-                group.addTask { await refresh(feed) }
+                group.addTask { await refresh(feed, sparingly: sparingly) }
                 running += 1
             }
 
@@ -108,7 +126,7 @@ nonisolated struct FeedRefresh: Sendable {
             for await result in group {
                 summary.add(result)
                 if let feed = iterator.next() {
-                    group.addTask { await refresh(feed) }
+                    group.addTask { await refresh(feed, sparingly: sparingly) }
                 }
             }
             return summary
@@ -117,7 +135,7 @@ nonisolated struct FeedRefresh: Sendable {
 
     /// Refreshes one feed, and writes down what happened either way.
     @discardableResult
-    func refresh(_ feed: Feed) async -> RefreshResult {
+    func refresh(_ feed: Feed, sparingly: Bool = false) async -> RefreshResult {
         // A feed the reader pays for is fetched with what proves they do. A
         // keychain that will not answer is a feed fetched without, which the
         // server answers 401 to and section 9 quarantines : that is a better
@@ -132,7 +150,8 @@ nonisolated struct FeedRefresh: Sendable {
             url: url,
             etag: feed.etag,
             lastModified: feed.lastModified,
-            credential: credential
+            credential: credential,
+            isExpensiveNetworkAllowed: !sparingly
         )
 
         switch await fetcher.fetch(request) {

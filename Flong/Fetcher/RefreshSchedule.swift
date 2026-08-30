@@ -74,6 +74,28 @@ nonisolated enum RefreshSchedule {
         let interval = feed.refreshInterval ?? feed.observedInterval ?? defaultInterval
         return now >= nextRefresh(after: last, interval: interval, failures: feed.failureCount, stagger: stagger)
     }
+
+    /// How overdue a feed is, as a share of its own interval.
+    ///
+    /// **Relative, and not in seconds.** A daily feed an hour late and an
+    /// hourly feed an hour late are both an hour late, and only one of them has
+    /// anything new. Measured against its own rhythm, the hourly one is a whole
+    /// interval overdue and the daily one a twenty-fourth of one, which is the
+    /// order the two should be asked in.
+    ///
+    /// One means exactly due. Below one is not due at all ; a feed nobody has
+    /// ever fetched is the most overdue thing there is and comes first.
+    static func lateness(_ feed: Feed, now: Date = Date(), stagger: TimeInterval = 0) -> Double {
+        guard let last = feed.lastFetchAt else { return .greatestFiniteMagnitude }
+
+        let interval = feed.refreshInterval ?? feed.observedInterval ?? defaultInterval
+        let due = nextRefresh(after: last, interval: interval, failures: feed.failureCount, stagger: stagger)
+        let waited = now.timeIntervalSince(last)
+        let owed = due.timeIntervalSince(last)
+
+        guard owed > 0 else { return .greatestFiniteMagnitude }
+        return waited / owed
+    }
 }
 
 /// Spreads a reader's devices apart in time.

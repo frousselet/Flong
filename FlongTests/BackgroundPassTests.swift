@@ -87,3 +87,71 @@ struct BackgroundPassTests {
         #expect(BackgroundScheduler.fullPassFloor < BackgroundScheduler.fullPassInterval)
     }
 }
+
+/// The order a budget is spent in, and what a background pass will not spend.
+///
+/// A background refresh is given about twenty-five seconds and is cancelled
+/// when they are up, so the order is not a detail : it decides which feeds are
+/// ever refreshed at all on a large subscription list.
+@Suite("Which feeds a short budget goes to")
+struct RefreshOrderTests {
+    private let now = Date(timeIntervalSince1970: 1_787_646_600)
+
+    private func feed(_ title: String, interval: TimeInterval, fetched ago: TimeInterval?) -> Feed {
+        var feed = Feed(url: URL(string: "https://\(title).example.com/f.xml")!, title: title)
+        feed.refreshInterval = interval
+        feed.lastFetchAt = ago.map { now.addingTimeInterval(-$0) }
+        return feed
+    }
+
+    @Test("Lateness is measured against a feed's own rhythm, not in seconds")
+    func relative() {
+        // Both are an hour past due. The hourly one has waited a whole extra
+        // interval ; the daily one a twenty-fourth of one, and has almost
+        // certainly published nothing.
+        let hourly = feed("hourly", interval: 3600, fetched: 7200)
+        let daily = feed("daily", interval: 86400, fetched: 86400 + 3600)
+
+        #expect(RefreshSchedule.lateness(hourly, now: now) > RefreshSchedule.lateness(daily, now: now))
+    }
+
+    @Test("A feed nobody has ever fetched comes first of all")
+    func neverFetched() {
+        let fresh = feed("new", interval: 3600, fetched: nil)
+        let late = feed("late", interval: 3600, fetched: 100 * 3600)
+
+        #expect(RefreshSchedule.lateness(fresh, now: now) > RefreshSchedule.lateness(late, now: now))
+    }
+
+    @Test("Exactly due is one, and not yet due is less")
+    func theScale() {
+        // One is the boundary the ordering is read against, so it is worth
+        // pinning : below it a feed is not due at all.
+        #expect(abs(RefreshSchedule.lateness(feed("due", interval: 3600, fetched: 3600), now: now) - 1) < 0.001)
+        #expect(RefreshSchedule.lateness(feed("early", interval: 3600, fetched: 1800), now: now) < 1)
+    }
+
+    @Test("A feed that has been failing is not treated as more overdue for it")
+    func backoffCounts() {
+        // The backoff has already pushed its next fetch out. Measuring against
+        // the interval alone would make a broken feed the most overdue thing
+        // on the list and let it crowd out three hundred working ones.
+        var failing = feed("failing", interval: 3600, fetched: 7200)
+        failing.failureCount = 5
+        let working = feed("working", interval: 3600, fetched: 7200)
+
+        #expect(RefreshSchedule.lateness(failing, now: now) < RefreshSchedule.lateness(working, now: now))
+    }
+
+    @Test("A refresh nobody asked for does not go over a network the reader pays for")
+    func sparingly() {
+        let asked = FetchRequest(url: URL(string: "https://feeds.example.com/f.xml")!)
+        #expect(asked.isExpensiveNetworkAllowed)
+
+        let background = FetchRequest(
+            url: URL(string: "https://feeds.example.com/f.xml")!,
+            isExpensiveNetworkAllowed: false
+        )
+        #expect(!background.isExpensiveNetworkAllowed)
+    }
+}
