@@ -2,6 +2,41 @@
 
 Two things in Flong take longer than a moment : fetching a thousand feeds nobody has ever fetched, and computing a vector for every kept article. Both have to survive being interrupted, because both will be.
 
+## Two passes, and what tells them apart
+
+**The half-hourly refresh** asks only the feeds that are due, within the politeness of `docs/technical/fetching.md`. It is what a phone in a pocket gets, and it is deliberately small : twenty-five seconds, a token bucket per host, and no promise that anything finishes.
+
+**The full pass** runs when the device is at rest on the mains. Every feed a reader follows, then the enrichment, the purge, the index, and the exchange with iCloud, in that order so that everything downstream works on what has just arrived rather than on what was there this morning.
+
+It did not refresh at all until it was asked to. It enriched, purged, indexed and exchanged what was already in the store, which is a reasonable thing to do on charge and is not what a reader means by a full refresh.
+
+## What Photos does, and what of it is taken
+
+`photoanalysisd` does the same kind of thing for the same kind of reason and has had years to settle it. What its launch agent declares, per activity :
+
+| Declared | Value | Taken |
+| -------- | ----- | ----- |
+| `RequiresExternalPower` | `true` on every heavy activity | yes, both platforms |
+| `Interval` | 21600, six hours | yes |
+| `MinDurationBetweenInstances` | 6000, a hundred minutes | yes |
+| `RandomInitialDelay` | 2700, forty-five minutes | yes |
+| `GroupConcurrencyLimit` with `GroupName` | 1, over `sequentialProcessing` | yes, as one gate over both passes |
+| `Priority` | `Maintenance` | `qualityOfService = .background`, its public equivalent |
+| `ResourceIntensive`, `PowerNap` | `true` | no equivalent an application can declare |
+| `PreventsDeviceSleep` | `true` | **no** |
+
+**The jitter matters more here than it does there.** Photos is one library on one device. A reader's devices all wake on the same schedule and would otherwise ask three hundred publishers the same question at the same second, which is what section 8's per-device stagger exists to prevent. Forty-five minutes of slack costs the reader nothing at four in the morning.
+
+**The floor is what makes a deferral safe.** A pass that could not run, for want of power or of a network, is rescheduled ; without a floor it would run the moment it was, and a laptop plugged in and unplugged twice in an evening would fetch everything three times.
+
+**`PreventsDeviceSleep` is refused on purpose.** It is right for Photos, which has hours of analysis to get through and no other moment to do it in. A feed reader holding a Mac awake to fetch three hundred feeds is a feed reader nobody keeps, and the activity repeats : what it misses tonight it does tomorrow.
+
+**Photos splits power from network and Flong does not.** `cloudphotod` synchronizes on battery so long as there is a network, `RequiresExternalPower` false and `RequiresNetworkConnectivity` true ; `photoanalysisd` waits for the mains and asks for no network at all. That split is the better design and it is two daemons. What was asked for here is one pass that both fetches and enriches, so it takes the stricter of the two conditions : the mains and a network. The half-hourly refresh is what covers a reader on battery.
+
+**The network condition was wrong and is fixed.** The processing request said `requiresNetworkConnectivity = false`, from when it only vectorized what was already stored. It now fetches every feed, exchanges with iCloud and reads the shared archives, and the system was entitled to run the whole thing with no way to reach anything.
+
+**On macOS the power question is asked by hand.** `NSBackgroundActivityScheduler` finds an idle moment and has no opinion about the power source, so `IOPSGetProvidingPowerSourceType` is consulted and a pass on battery is deferred rather than run. A machine that will not answer counts as on the mains : a desktop has no battery to report, and refusing to work on one for want of an answer would be refusing to work at all.
+
 ## The resume point is the data
 
 Section 15 asks for idempotent batches, a persisted resume point and automatic resumption at the next launch. Flong has the first and the third, and deliberately not the second.

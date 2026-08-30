@@ -666,15 +666,36 @@ final class AppModel {
         await cloud?.enqueueReadStates()
     }
 
-    /// What a processing task does with the time it is given, on power.
+    /// The whole of the work, at rest and on the mains.
+    ///
+    /// **Every feed, not the ones that are due.** The half-hourly refresh asks
+    /// only what the politeness of section 8 says may be asked, which is right
+    /// for a phone in a pocket and leaves a quiet feed unasked for days. This
+    /// runs when nobody is waiting for anything, which is the moment to catch
+    /// the rest.
+    ///
+    /// It did not refresh at all before : it enriched, purged, indexed and
+    /// exchanged what was already here, and the reader who asked for a full
+    /// refresh on charge was asking for the one thing this did not do.
+    ///
+    /// The order is what makes it one pass rather than several. The feeds come
+    /// first, so the digest, the vectors and the index all work on what has
+    /// just arrived rather than on what was here this morning ; iCloud comes
+    /// last, so what goes out is the whole of it.
     func backgroundProcessing() async {
+        let summary = await refresher.refreshAll()
+        Log.fetch.notice("Full pass : \(summary.newArticles) new articles from \(summary.refreshed) feeds")
+
         await doOutstandingWork()
         await digestService.rebuild()
         await announceNewStories()
         _ = try? await Retention(database).purge()
         try? await SearchIndex(database).optimize()
+        await cloud?.enqueueReadStates()
         await cloud?.enqueueCatchUp()
         await exchangeArchives()
+
+        await load()
     }
 
     /// Starts synchronizing with the reader's own iCloud.
