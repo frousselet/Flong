@@ -80,12 +80,19 @@ struct ReaderMenu: View {
             .keyboardShortcut("r", modifiers: .command)
             .disabled(model.isRefreshing)
 
-            Button {
-                Task { await model.rewriteDigest() }
-            } label: {
-                Label("Write the digest again", systemImage: "sparkles")
-            }
-            .disabled(model.isRewriting || OnDeviceModel.absence != nil)
+            #if DEBUG
+                // A development command, and only there. The engine decides
+                // when to send and when to fetch and is right far more often
+                // than a button would be : this is for watching an exchange
+                // happen on demand while something is being built. It queues
+                // every record this device holds, which is the repair path and
+                // is expensive, and that is why it does not ship.
+                Button {
+                    Task { await model.forceSynchronization() }
+                } label: {
+                    Label("Force a synchronization", systemImage: "arrow.trianglehead.2.clockwise")
+                }
+            #endif
         } label: {
             ReaderMark(model: model)
         }

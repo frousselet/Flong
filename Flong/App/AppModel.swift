@@ -491,8 +491,6 @@ final class AppModel {
     }
 
     private(set) var digest = Digest()
-    /// Whether the model is writing the page again, asked for by the reader.
-    private(set) var isRewriting = false
     /// The articles of the story the reader opened, and of that one only : a
     /// digest that loaded every article of every story would be the list it
     /// exists to replace.
@@ -650,17 +648,6 @@ final class AppModel {
         await loadKnownTopics()
     }
 
-    /// Asks the model to write the page again, whatever it wrote before.
-    func rewriteDigest() async {
-        guard !isRewriting else { return }
-        isRewriting = true
-        defer { isRewriting = false }
-
-        await digestService.rewrite()
-        await loadDigest()
-        await loadLooseArticles()
-    }
-
     /// Loads a story's articles for its own page.
     func openStoryPage(_ storyID: UUID) async {
         guard storyArticles[storyID] == nil else { return }
@@ -801,6 +788,30 @@ final class AppModel {
         }
         self.cloud = cloud
         await cloud.start()
+    }
+
+    /// Queues everything and exchanges it, whatever iCloud already has.
+    ///
+    /// **A development command, and only there.** The engine decides for itself
+    /// when to send and when to fetch, and it is right far more often than a
+    /// button would be : what this is for is watching an exchange happen on
+    /// demand while something is being built, not for a reader who thinks
+    /// their iPad is behind.
+    ///
+    /// It queues every record this device holds rather than what changed, which
+    /// is the repair path and is expensive : a few thousand records against a
+    /// budget of three thousand. That is the point of it and the reason it does
+    /// not ship.
+    func forceSynchronization() async {
+        guard let cloud else { return }
+
+        await cloud.enqueueEverything()
+        await cloud.enqueueReadStates()
+        await cloud.enqueueCatchUp()
+        await cloud.synchronize()
+        await exchangeArchives()
+        await load()
+        await loadDigest()
     }
 
     /// Sends and fetches now, and folds in whatever arrived.

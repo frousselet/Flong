@@ -313,21 +313,6 @@ nonisolated struct DigestService: Sendable {
         try await DigestStore(database).digest(topic, now: now)
     }
 
-    /// Throws away what the model wrote and asks it again.
-    ///
-    /// Nothing normally needs this : a brief is rewritten when a model turns
-    /// up, and again when the reader's language changes. It is here for the
-    /// case neither covers, which is a reader who simply wants a fresh reading
-    /// of the page, and it forgets the refusals on the way so a model that
-    /// failed earlier in the run is asked once more.
-    ///
-    /// A story whose headline the reader settled themselves is left alone.
-    func rewrite(now: Date = Date()) async {
-        OnDeviceModel.reconsider()
-        await discardWhatTheModelWrote()
-        await rebuild(now: now)
-    }
-
     /// Clears the headlines, the summaries and the subjects the model wrote,
     /// leaving alone the stories whose headline the reader settled.
     func discardWhatTheModelWrote() async {

@@ -801,6 +801,16 @@
         }
       }
     },
+    "Force a synchronization" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forcer la synchronisation"
+          }
+        }
+      }
+    },
     "Forget every preference" : {
       "localizations" : {
         "fr" : {
@@ -1842,16 +1852,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Des mots, ou une requête : title:, author:, tag:, is:unread, after:2026-01."
-          }
-        }
-      }
-    },
-    "Write the digest again" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Réécrire le digest"
           }
         }
       }
