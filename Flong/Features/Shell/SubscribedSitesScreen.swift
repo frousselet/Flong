@@ -58,7 +58,9 @@ struct SubscribedSitesScreen: View {
             }
         }
         .alert("Add a site", isPresented: $isAdding) {
-            TextField("example.com", text: $host)
+            // Verbatim : an example address is the same address in every
+            // language, and the catalogue is for what a reader reads.
+            TextField(text: $host) { Text(verbatim: "example.com") }
                 #if os(iOS)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)

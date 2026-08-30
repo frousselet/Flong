@@ -170,10 +170,14 @@ struct ArticleScreen: View {
 
     /// Which body is being read.
     ///
-    /// The page when there is one, since that is the whole article and the
-    /// reason it was fetched. The reader may go back to what the feed sent,
-    /// which is what an extraction that guessed wrong needs.
-    @State private var showing = ArticleDocument.Body.page
+    /// What the feed sent, which is what the publisher chose to send and is
+    /// right far more often than a guess about somebody else's markup. The
+    /// full article is one tap away, and asked for rather than assumed.
+    @State private var showing = ArticleDocument.Body.feed
+    /// Whether the page was asked for and had nothing to give, which is when
+    /// signing in to the site is worth offering.
+    @State private var pageGaveNothing = false
+    @State private var signingIn = false
 
     var body: some View {
         Group {
@@ -190,11 +194,24 @@ struct ArticleScreen: View {
                             fetching
                         }
                     }
+                    .sheet(isPresented: $signingIn) {
+                        if let host = article.url.flatMap(FeedURL.room(of:)) {
+                            SiteLoginView(host: host) { cookies in
+                                await model.saveSession(for: host, cookies: cookies)
+                                // Signed in : ask the page again, as them.
+                                await showFullArticle()
+                            }
+                        }
+                    }
             } else {
                 ProgressView()
             }
         }
-        .task { await model.open(article: articleID) }
+        .task {
+            showing = .feed
+            pageGaveNothing = false
+            await model.open(article: articleID)
+        }
     }
 
     /// Said while the page is being fetched, and only then.
@@ -202,6 +219,25 @@ struct ArticleScreen: View {
     /// The feed's version is on screen the whole time, so this is not a wait :
     /// it is the reason the text is about to get longer, which a reader would
     /// otherwise watch happen without explanation.
+    /// Asks the page for the whole article, and shows it.
+    ///
+    /// On demand rather than on opening : the feed's version is what the reader
+    /// sees by default, so fetching a page nobody has asked to see would be a
+    /// request made to a publisher for something that is not going to be looked
+    /// at. `docs/technical/extraction.md` is built on not doing that.
+    private func showFullArticle() async {
+        if model.article?.hasFullText != true {
+            await model.fetchFullText()
+        }
+
+        if model.article?.hasFullText == true {
+            showing = .page
+            pageGaveNothing = false
+        } else {
+            pageGaveNothing = true
+        }
+    }
+
     private var fetching: some View {
         HStack(spacing: 8) {
             ProgressView().controlSize(.small)
@@ -238,16 +274,41 @@ struct ArticleScreen: View {
             }
         }
 
-        // Only where there are two to choose between.
-        if article.hasFullText {
+        if article.url != nil {
             ToolbarItem {
-                Button {
-                    showing = showing == .page ? .feed : .page
+                Menu {
+                    if showing == .page {
+                        Button {
+                            showing = .feed
+                        } label: {
+                            Label("Show what the feed sent", systemImage: "doc.plaintext")
+                        }
+                    } else {
+                        Button {
+                            Task { await showFullArticle() }
+                        } label: {
+                            Label("Show the full article", systemImage: "doc.richtext")
+                        }
+                        .disabled(model.isFetchingFullText)
+                    }
+
+                    // Offered where the problem appears rather than four screens
+                    // away : a page that gave nothing is usually a page that did
+                    // not recognize the reader as a subscriber, and this is the
+                    // moment they can do something about it.
+                    if pageGaveNothing || model.hasSession(for: article.url) {
+                        Divider()
+                        Button {
+                            signingIn = true
+                        } label: {
+                            Label(
+                                model.hasSession(for: article.url) ? "Sign in again" : "Sign in to this site",
+                                systemImage: "key"
+                            )
+                        }
+                    }
                 } label: {
-                    Label(
-                        showing == .page ? "Show what the feed sent" : "Show the full article",
-                        systemImage: showing == .page ? "doc.plaintext" : "doc.richtext"
-                    )
+                    Label("Article", systemImage: "doc.richtext")
                 }
             }
         }

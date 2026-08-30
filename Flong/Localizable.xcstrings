@@ -482,6 +482,16 @@
         }
       }
     },
+    "Article": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Article"
+          }
+        }
+      }
+    },
     "Articles appear as they arrive.": {
       "localizations": {
         "fr": {
@@ -1083,6 +1093,16 @@
         }
       }
     },
+    "Sign in to this site": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se connecter à ce site"
+          }
+        }
+      }
+    },
     "Sign out": {
       "localizations": {
         "fr": {
@@ -1484,5 +1504,5 @@
       }
     }
   },
-  "version": "1.0"
+  "version": "1.1"
 }

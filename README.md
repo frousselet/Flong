@@ -14,7 +14,7 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **Sources you pay for stay readable.** A per-subscriber feed address, HTTP Basic or a token, kept in the keychain. For a site whose articles sit behind a wall, sign in on its own page and Flong fetches the rest as you — it never holds your password.
 
-**A truncated article is completed from its page.** Most feeds send a standfirst and a link. Open the article and Flong fetches the page behind it, once, keeps what it finds beside what the feed sent, and lets you read either.
+**A truncated article is completed from its page.** Most feeds send a standfirst and a link. An article opens on what its feed sent ; ask for the whole one and Flong fetches the page behind it, once, and keeps what it finds beside the feed's version.
 
 **Search is genuinely indexed.** A full-text index over the whole local corpus, a query language with operators, and semantic search over the library through Spotlight.
 

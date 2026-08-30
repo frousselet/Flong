@@ -6,7 +6,11 @@ The article is at the end of that link. Flong goes and gets it, once, and keeps 
 
 ## When it happens
 
-**Only for an article the reader opened.** Never a whole feed, never ahead of time, never in a batch. A reader who does not open an article costs its publisher nothing, and a page fetched because somebody is reading it is a page fetched for the reason pages exist. Section 20 asks for politeness to publishers, and speculatively extracting five hundred articles a day is the opposite of it.
+**When the reader asks for it, and not before.** What the feed sent is what an article opens on : it is what the publisher chose to send, and it is right far more often than a guess about somebody else's markup. The full article is one entry in the article's menu away.
+
+Fetching on opening would be a request made to a publisher for something that is not going to be looked at, which is the traffic the rest of this page exists to avoid.
+
+**Only for an article the reader asked to see whole.** Never a whole feed, never ahead of time, never in a batch. A reader who does not open an article costs its publisher nothing, and a page fetched because somebody is reading it is a page fetched for the reason pages exist. Section 20 asks for politeness to publishers, and speculatively extracting five hundred articles a day is the opposite of it.
 
 **Only when the feed was short.** Under twelve hundred characters of text, what the feed sent is a summary : a standfirst and a first paragraph run to a few hundred, an article runs to thousands. A feed that serves the whole thing has already done the work, and asking its server again would be asking for something already in hand.
 
@@ -36,9 +40,9 @@ Paywalls are out of scope, as section 19 of the specification says. A wall is re
 
 ## What the reader sees
 
-The full text when there is one, since that is why it was fetched, and a toolbar switch back to what the feed sent. An extraction is a guess about somebody else's markup, and a guess the reader cannot get out of is a guess imposed on them.
+What the feed sent, and a menu entry for the whole article. An extraction is a guess about somebody else's markup, and a guess made before anybody asked for it is a guess imposed on them.
 
-While the page is being fetched the feed's version is on screen, with one line saying what is happening : it is not a wait, it is the reason the text is about to get longer, which a reader would otherwise watch happen without explanation.
+While the page is being fetched the feed's version stays on screen, with one line saying what is happening : it is not a wait, it is the reason the text is about to get longer, which a reader would otherwise watch happen without explanation.
 
 ## What is kept
 
@@ -51,3 +55,7 @@ A page states its encoding twice, in the `Content-Type` header and in a `<meta>`
 The header first, since it is what the server means today ; the `<meta>` next, since it is what the page was written as ; UTF-8 after that ; Latin-1 last, which decodes any bytes at all and so can never fail. A page read slightly wrong is better than no page.
 
 The list of honoured encodings is short on purpose, and every entry is the encoding it says it is. `iso-8859-15` is not on it : Foundation has no Latin-9, and mapping it to a neighbour would decode French as Central European, which is worse than falling through to the attempts below.
+
+## When the page gives nothing
+
+A page that answers with a teaser is usually a page that did not recognize the reader as a subscriber. **Signing in is offered there**, in the article's own menu, rather than four screens away in the settings : that is the moment the reader can do something about it, and a remedy nobody can find is a remedy nobody uses. `docs/technical/credentials.md` records what a session is and what it is not.

@@ -664,7 +664,6 @@ final class AppModel {
                 // anything : the row changes now.
                 try await articles.setRead([selectedArticle], to: true)
                 await refreshCounts(markingRead: selectedArticle)
-                await fetchFullText(of: selectedArticle)
             }
         } catch {
             Log.store.error("The article could not be opened : \(error, privacy: .public)")
@@ -892,6 +891,12 @@ final class AppModel {
 
         let withScheme = trimmed.contains("://") ? trimmed : "https://\(trimmed)"
         return URL(string: withScheme).flatMap(FeedURL.room(of:))
+    }
+
+    /// Whether the reader has signed in to the site an address belongs to.
+    func hasSession(for url: URL?) -> Bool {
+        guard let url else { return false }
+        return FullText.session(for: url, in: sessions) != nil
     }
 
     func loadSubscribedSites() async {
