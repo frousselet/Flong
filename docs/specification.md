@@ -172,7 +172,7 @@ Indexes, vectors of articles that were not retained, secrets, any log. Nor the l
 
 ### What it takes to work
 
-The archives need the `com.apple.developer.ubiquity-container-identifiers` entitlement, which has to be added to the target in Xcode. Without it, and without an iCloud account, the container is absent : everything to do with archives then does nothing at all rather than failing, and the reader loses the sharing of the stream and nothing else.
+The archives need the `com.apple.developer.ubiquity-container-identifiers` entitlement and `CloudDocuments` among the iCloud services, both of which the target carries, against the same container as CloudKit. Where an entitlement is absent, or an iCloud account is, the container is absent with it : everything to do with archives then does nothing at all rather than failing, and the reader loses the sharing of the stream and nothing else.
 
 ### Quotas and errors
 
