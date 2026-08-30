@@ -41,6 +41,14 @@ nonisolated final class ImageStore: Sendable {
     }
 
     private let memory = NSCache<NSString, Cached>()
+
+    /// Addresses that answered with something that is not a picture.
+    ///
+    /// Without this the same failure is repeated for ever : a row scrolling
+    /// back into view runs its task again, so one broken favicon in a list is
+    /// one fetch and one decode per appearance, and one line in the console
+    /// each time. A cache rather than a set, so it empties itself.
+    private let refused = NSCache<NSString, NSNumber>()
     private let session: URLSession
     private static let log = Logger(subsystem: "com.rslt.Flong", category: "images")
 
@@ -57,6 +65,7 @@ nonisolated final class ImageStore: Sendable {
         // Decoded thumbnails, not originals : a few hundred of them are a few
         // megabytes, and the system empties this under pressure anyway.
         memory.countLimit = 400
+        refused.countLimit = 500
     }
 
     /// The picture at that address, decoded no larger than it will be drawn.
@@ -68,6 +77,7 @@ nonisolated final class ImageStore: Sendable {
 
         let key = "\(url.absoluteString)|\(maximumPixels)" as NSString
         if let cached = memory.object(forKey: key) { return cached.image }
+        if refused.object(forKey: url.absoluteString as NSString) != nil { return nil }
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 20
@@ -78,16 +88,37 @@ nonisolated final class ImageStore: Sendable {
             Self.log.notice("Picture too large, ignored : \(data.count, privacy: .public) bytes")
             return nil
         }
-        guard let image = Self.thumbnail(from: data, maximumPixels: maximumPixels) else { return nil }
+        guard let image = Self.thumbnail(from: data, maximumPixels: maximumPixels) else {
+            refused.setObject(1, forKey: url.absoluteString as NSString)
+            return nil
+        }
 
         memory.setObject(Cached(image), forKey: key)
         return image
     }
 
+    /// Whether there is a picture in there at all.
+    ///
+    /// A source is made from any bytes at all and says nothing about it :
+    /// asking such a one for a thumbnail is what puts
+    /// `failed to create thumbnail [-50]` in the reader's console, once per
+    /// attempt, with the type printed as `n/a` because there is not one. A
+    /// server answering a redirect page, or an address that was never a
+    /// picture, lands here.
+    ///
+    /// The status matters as much as the type : a download cut short leaves a
+    /// source of the right type and not enough of it, which fails the same way
+    /// and just as loudly.
+    private static func holdsAPicture(_ source: CGImageSource) -> Bool {
+        CGImageSourceGetType(source) != nil
+            && CGImageSourceGetCount(source) > 0
+            && CGImageSourceGetStatus(source) == .statusComplete
+    }
+
     /// The encoded bytes, decoded once, at the size they are needed.
     private static func thumbnail(from data: Data, maximumPixels: Int) -> CGImage? {
         let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary)
-        guard let source else { return nil }
+        guard let source, Self.holdsAPicture(source) else { return nil }
 
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,

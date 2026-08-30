@@ -42,7 +42,16 @@ nonisolated enum ProfilePicture {
     /// Returns `nil` for anything that is not an image, which includes the file
     /// somebody picked by mistake.
     static func scaled(_ data: Data) -> Data? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        // A source is made from any bytes at all and says nothing about it.
+        // Asking such a one for a thumbnail is what puts `failed to create
+        // thumbnail [-50]` in the console, with the type printed as `n/a`
+        // because there is not one : a file picked by mistake is refused here,
+        // quietly, rather than one line further down and loudly.
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+            CGImageSourceGetType(source) != nil,
+            CGImageSourceGetCount(source) > 0,
+            CGImageSourceGetStatus(source) == .statusComplete
+        else { return nil }
 
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -82,7 +91,9 @@ nonisolated enum ProfilePicture {
 
     /// The picture, ready to draw.
     static func image(_ data: Data) -> CGImage? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+            CGImageSourceGetCount(source) > 0
+        else { return nil }
         return CGImageSourceCreateImageAtIndex(source, 0, nil)
     }
 
