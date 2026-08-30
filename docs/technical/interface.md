@@ -121,6 +121,12 @@ A collection is a tag, which was the plan before it was a need : section 4 says 
 
 Filing happens from the article's own menu, as a submenu of toggles. It is a decision made in passing, and a page that had to be opened and dismissed for it would cost more than the decision is worth. Filing keeps the article on the way : an article has to be kept before it can be filed, and asking the reader to star it first would be asking them to say something they did not mean.
 
+**Two marks, two meanings, side by side.** The star is favourites ; the folder is the collections the reader made. They stand next to each other in the article's bar because they are the two things done to an article worth keeping, and they are not the same thing : one is a judgement about it, the other is a place to put it. Favourites was folded into the folder's menu once, on the theory that one list was simpler, and it was the opposite : it made the two marks two ways of doing one thing, and a reader who starred everything they filed would have said something they did not mean.
+
+The bar holds three : the star, the folder, and everything else. A fourth wants checking before it goes in, because iOS folds what does not fit into an overflow of its own, and an action inside an overflow inside a menu is an action nobody finds. That is not a hypothetical here.
+
+Notes and the months are in neither menu. An article joins notes by being written on and joins a month by being kept : both are consequences, and a consequence is not a thing to choose. They are shown on the collections page and nowhere else.
+
 **Everything a square knows, it knows from the copy.** A kept article points at the article it came from with `ON DELETE SET NULL`, so anything asked of that row is an answer that disappears the day retention runs. Starring lived on the stream row alone, which meant a collection of favourites would have emptied itself on the first purge : the star is written on the copy now, and the migration that added it carried over what was already starred. The library exists precisely so that what was kept survives its source, and a collection is not allowed to be the exception.
 
 **Grouping by newsroom was tried and taken out.** It made a band of squares nobody had asked for, between the two the reader had made and the months : a page of squares is a page a reader scans, and a scan is spoiled by the row that is there because it could be.

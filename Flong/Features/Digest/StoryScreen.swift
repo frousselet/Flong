@@ -273,18 +273,29 @@ struct ArticleScreen: View {
         .padding(.bottom, 24)
     }
 
-    /// Two controls : the star, and everything else.
+    /// Three controls : the star, the folder, and everything else.
+    ///
+    /// The star and the folder stand side by side because they are the two
+    /// things a reader does to an article they want to keep, and they are not
+    /// the same thing : one is a judgement, the other is a place. Side by side
+    /// and differently marked is what says so ; one inside the other said the
+    /// opposite.
     ///
     /// Every item put here separately is an item iOS may decide to fold into an
     /// overflow of its own, and an action inside an overflow inside a menu is an
     /// action nobody finds. That is not a hypothetical : signing in to a site
     /// was in one, and the reader who asked for the feature could not find it.
+    /// Three is what this bar holds ; a fourth would want checking before it
+    /// went in.
     @ToolbarContentBuilder
     private func toolbar(for article: Article) -> some ToolbarContent {
         ToolbarItem {
             Button {
                 Task { await model.toggleStarredCurrent() }
             } label: {
+                // The same act as the first row of the collections menu, kept
+                // as a button because it is the one a reader performs most and
+                // one tap is what it is worth.
                 Label(
                     article.isStarred ? "Remove from favourites" : "Add to favourites",
                     systemImage: article.isStarred ? "star.fill" : "star"
@@ -293,14 +304,15 @@ struct ArticleScreen: View {
         }
 
         ToolbarItem {
+            filing
+        }
+
+        ToolbarItem {
             Menu {
                 if article.url != nil {
                     reading(article)
                     Divider()
                 }
-
-                filing
-                Divider()
 
                 if article.origin == .stream {
                     Button {
@@ -324,12 +336,27 @@ struct ArticleScreen: View {
         }
     }
 
-    /// Which collections this article is in, and the way into another.
+    /// Which of the reader's own collections this article is in.
+    ///
+    /// **Two marks, two meanings, and they do not overlap.** The star is
+    /// favourites and nothing else ; the folder is the collections the reader
+    /// made and nothing else. Favourites was put in this menu once, on the
+    /// theory that one list was simpler, and it was not : it made the star and
+    /// the folder two ways of doing one thing, where they are two things. The
+    /// star is a judgement about an article, the folder is a place to put it,
+    /// and a reader who stars everything they file has said something they did
+    /// not mean.
+    ///
+    /// Notes and the months are not here either, for a different reason. An
+    /// article joins notes by being written on and joins a month by being
+    /// kept : both are consequences, and a consequence is not a thing to
+    /// choose from a menu. They are shown on the collections page and nowhere
+    /// else.
     ///
     /// A submenu rather than a screen : filing something is a decision made in
     /// passing, and a page that had to be opened and dismissed for it would
-    /// cost more than the decision is worth. Each collection is a toggle, so
-    /// taking an article out of one is where putting it in was.
+    /// cost more than the decision is worth. Each row is a toggle, so taking an
+    /// article out of one is where putting it in was.
     ///
     /// Filing keeps the article. An article has to be kept before it can be
     /// filed, and asking the reader to star it first would be asking them to
@@ -360,7 +387,10 @@ struct ArticleScreen: View {
                 Label("New collection", systemImage: "plus")
             }
         } label: {
-            Label("Collections", systemImage: "folder")
+            // The same words as the band it files into, so that the folder in
+            // the toolbar and the shelf on the collections page are plainly one
+            // thing, and neither of them is the star.
+            Label("My collections", systemImage: "folder")
         }
     }
 
