@@ -16,25 +16,27 @@ A refusal is final until the reader goes to the system settings : asking again d
 
 **What the reader wants is carried between devices ; whether a device may interrupt them is not.** The preference is a decision about themselves and travels through the iCloud key-value store like every other one ; the permission is the system's answer on one device and never travels. It is right that the two disagree : a reader may want the notices and have refused them on the Mac.
 
-## New subjects
+## New stories
 
 The first, and so far the only one.
 
-The model files each story under the subjects the reader already has, and when nothing fits it names one. A subject it has never used before is usually a subject the press has just started covering, which is the kind of thing a reader watching a field wants to be told about.
+A story is several articles, from several newsrooms, about one thing : the unit of the front page, and the whole difference between watching a field and watching a list of what arrived. A story opening is the moment the press starts covering something, which is the one thing in a feed reader worth interrupting somebody for.
 
-**What counts as new** is a row written into `topic` by the model since this device last said anything. Three things are deliberately not new :
+**A cluster of one is not a story**, so this is not a notice per article. Two articles have to be close enough in vocabulary to be about the same thing before anything is opened at all.
 
-- **a subject the reader wrote themselves**, since telling somebody about a word they typed is the application repeating them back at them ;
-- **a second spelling of one that exists**, since the vocabulary folds `cybersecurite` into `Cybersécurité` before writing anything, so nothing was written and there is nothing to announce ;
-- **everything that existed before the reader turned the notices on**, since the watermark is stamped at that moment rather than at the beginning of time.
+**What counts as new** is a story row opened since this device last said anything. The identifier answers it : every technical key is a UUIDv7 and carries the moment it was made, so the question is a range on the primary key rather than a scan. Nothing else records it, `first_at` being the date of the story's earliest article, which may be days older than the story.
+
+Everything that was already open when the reader turned the notices on is not new : the watermark is stamped at that moment rather than at the beginning of time.
 
 **The watermark is this device's own**, kept in `UserDefaults` and never carried. One that travelled would have the second device stay silent about what only the first had announced.
 
-**Nothing interrupts a reader who is looking at the page it would be about.** A new subject appears as a pill on the front page, so a reader with Flong open has already seen it, and a notice about something they watched happen is a notice to dismiss for nothing. The watermark moves anyway : what it records is that the subject reached them, not that a notification was posted. Being told tomorrow about what they saw today would be worse than not being told.
+**Nothing interrupts a reader who is looking at the page it would be about.** A story that opens appears on the front page, so a reader with Flong open has already seen it, and a notice about something they watched happen is a notice to dismiss for nothing. The watermark moves anyway : what it records is that the story reached them, not that a notification was posted. Being told tomorrow about what they saw today would be worse than not being told.
 
-**The title counts and the body lists, and the two always agree.** One subject is named under `New subject` ; several are counted in the title and listed in the body. A body showing the first few of a longer list is a small lie, and the system truncating a long one is the system's business rather than a reason to say less than the truth.
+**One story leads with its own headline.** The headline is the news, and a notification titled `New story` with the headline underneath buries the thing the reader is being told. Underneath goes the line the model wrote saying what happened, or, when there is none, the newsrooms covering it, which is the front page's own signal that something is happening. A tap opens that story.
 
-A tap opens the subject on the front page, when there is one subject to open. Several are not a place to go, and a tap that had to pick one of three would pick wrongly twice out of three times.
+**Several are counted in the title and listed in the body**, so the two always agree, and the headlines are joined by a middle dot rather than by commas : a headline may hold commas of its own, and a comma list of them reads as one long broken sentence. A tap opens nothing, several stories not being a place to go.
+
+Announced after the model has written the headlines rather than before, so what the reader is shown is the written headline and not the title of whichever article happened to be nearest the middle of the group.
 
 ## Where it happens
 
@@ -50,6 +52,6 @@ The delegate has to be in place before launching finishes, or a notification tap
 
 The delivery needs an authorization, a bundle and a device, none of which a test can rely on, and none of which is where the mistakes are. `Announcing` is the seam : `Notifier` is the system, `MemoryAnnouncer` is a list a test reads back.
 
-What that buys is coverage of everything that can actually be wrong : the wording and the plural, the list that has to read well with one name and with five, which subjects count as new, that nothing is said twice, that nothing is said while the reader is reading and that it is not saved up for later either, that a refusal leaves the switch where it was, and that a reader who asked for nothing has their watermark left alone so that turning the notices on later starts from that moment.
+What that buys is coverage of everything that can actually be wrong : the wording and the plural, the headline leading rather than being buried, the written line taking the place of the newsrooms when there is one, the middle dot rather than commas, which stories count as new, that nothing is said twice, that nothing is said while the reader is reading and that it is not saved up for later either, that a refusal leaves the switch where it was, and that a reader who asked for nothing has their watermark left alone so that turning the notices on later starts from that moment.
 
 The prompt itself was checked by hand, on the simulator, outside XCUITest : XCUITest does not surface the notification permission alert at all, and a test that waits for it waits for ever.

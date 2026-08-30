@@ -161,25 +161,6 @@ nonisolated struct TopicPreferences: Sendable {
         }
     }
 
-    /// The subjects the model has written since a moment, oldest first.
-    ///
-    /// The reader's own are not among them. A subject somebody typed is not
-    /// news to the person who typed it, and telling them about it would be the
-    /// application repeating their own words back at them.
-    func made(since moment: Date) async throws -> [String] {
-        try await database.writer.read { db in
-            try String.fetchAll(
-                db,
-                sql: """
-                    SELECT name FROM topic
-                    WHERE is_own = 0 AND created_at > ?
-                    ORDER BY created_at
-                    """,
-                arguments: [moment]
-            )
-        }
-    }
-
     /// Removes a subject the reader wrote, and everything hanging off it.
     func remove(_ name: String) async throws {
         try await database.writer.write { db in

@@ -49,8 +49,8 @@ nonisolated final class Preferences: @unchecked Sendable {
         static let lastName = "reader.last-name"
         static let picture = "reader.picture"
         static let device = "device.identifier"
-        static let newSubjectNotices = "notify.new-subjects"
-        static let subjectsAnnouncedAt = "notify.subjects-announced-at"
+        static let newStoryNotices = "notify.new-stories"
+        static let storiesAnnouncedAt = "notify.stories-announced-at"
     }
 
     /// The largest picture that may be kept.
@@ -122,8 +122,7 @@ nonisolated final class Preferences: @unchecked Sendable {
 
     // MARK: - What the reader wants to be told
 
-    /// Whether the reader wants to hear about a subject the model has just
-    /// found.
+    /// Whether the reader wants to hear about a story that has just opened.
     ///
     /// **Carried between the devices, unlike the permission.** What the reader
     /// wants to be told is a decision about themselves and belongs on all their
@@ -134,28 +133,28 @@ nonisolated final class Preferences: @unchecked Sendable {
     ///
     /// Off until the reader says otherwise. Turning it on is what asks the
     /// system, which is the only honest moment to ask.
-    var wantsNewSubjectNotices: Bool {
-        get { flag(for: Key.newSubjectNotices) }
-        set { set(newValue, for: Key.newSubjectNotices) }
+    var wantsNewStoryNotices: Bool {
+        get { flag(for: Key.newStoryNotices) }
+        set { set(newValue, for: Key.newStoryNotices) }
     }
 
-    /// The last moment this device said anything about a new subject.
+    /// The last moment this device said anything about a new story.
     ///
     /// Local and never carried, for the same reason the device identifier is :
     /// each device tells its own reader, and a watermark that travelled would
     /// have the second device stay silent about what only the first announced.
     ///
     /// Nothing at all means nothing to announce. It is stamped when the reader
-    /// turns the notices on, so the subjects that already existed that day are
+    /// turns the notices on, so the stories that were already open that day are
     /// not news.
-    var subjectsAnnouncedAt: Date? {
-        get { local.object(forKey: Key.subjectsAnnouncedAt) as? Date }
+    var storiesAnnouncedAt: Date? {
+        get { local.object(forKey: Key.storiesAnnouncedAt) as? Date }
         set {
             guard let newValue else {
-                local.removeObject(forKey: Key.subjectsAnnouncedAt)
+                local.removeObject(forKey: Key.storiesAnnouncedAt)
                 return
             }
-            local.set(newValue, forKey: Key.subjectsAnnouncedAt)
+            local.set(newValue, forKey: Key.storiesAnnouncedAt)
         }
     }
 

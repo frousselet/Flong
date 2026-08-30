@@ -221,7 +221,7 @@
         }
       }
     },
-    "%lld new subjects" : {
+    "%lld new stories" : {
       "localizations" : {
         "en" : {
           "variations" : {
@@ -229,13 +229,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld new subject"
+                  "value" : "%lld new story"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld new subjects"
+                  "value" : "%lld new stories"
                 }
               }
             }
@@ -247,13 +247,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld nouveau thème"
+                  "value" : "%lld nouveau fil"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld nouveaux thèmes"
+                  "value" : "%lld nouveaux fils"
                 }
               }
             }
@@ -367,16 +367,26 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld sujet"
+                  "value" : "%lld fil"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld sujets"
+                  "value" : "%lld fils"
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "A story is several articles, from several newsrooms, about one thing. Flong can tell you when a new one opens, which is the moment the press starts covering something." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un fil, c'est plusieurs articles, de plusieurs rédactions, sur une même chose. Flong peut vous prévenir lorsqu'un nouveau s'ouvre, c'est-à-dire au moment où la presse se met à couvrir quelque chose."
           }
         }
       }
@@ -440,7 +450,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajouter un thème"
+            "value" : "Ajouter une thématique"
           }
         }
       }
@@ -491,7 +501,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence n'est pas disponible sur cet appareil. Les sujets gardent le titre de leur propre article."
+            "value" : "Apple Intelligence n'est pas disponible sur cet appareil. Les fils gardent le titre de leur propre article."
           }
         }
       }
@@ -501,7 +511,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence n'est pas disponible. Les sujets gardent le titre de leur propre article."
+            "value" : "Apple Intelligence n'est pas disponible. Les fils gardent le titre de leur propre article."
           }
         }
       }
@@ -511,7 +521,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence est en cours de téléchargement. Les sujets gardent le titre de leur propre article en attendant."
+            "value" : "Apple Intelligence est en cours de téléchargement. Les fils gardent le titre de leur propre article en attendant."
           }
         }
       }
@@ -521,7 +531,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Apple Intelligence est désactivé. Les sujets gardent le titre de leur propre article."
+            "value" : "Apple Intelligence est désactivé. Les fils gardent le titre de leur propre article."
           }
         }
       }
@@ -776,7 +786,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Flong regroupe vos articles en sujets à mesure qu'ils arrivent."
+            "value" : "Flong regroupe vos articles en fils à mesure qu'ils arrivent."
           }
         }
       }
@@ -1022,22 +1032,12 @@
         }
       }
     },
-    "New subject" : {
+    "New stories" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nouveau thème"
-          }
-        }
-      }
-    },
-    "New subjects" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nouveaux thèmes"
+            "value" : "Nouveaux fils"
           }
         }
       }
@@ -1077,7 +1077,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucun thème pour l'instant"
+            "value" : "Aucune thématique pour l'instant"
           }
         }
       }
@@ -1108,7 +1108,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rien n'est encore classé sous ce thème."
+            "value" : "Rien n'est encore classé sous cette thématique."
           }
         }
       }
@@ -1529,7 +1529,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sujets"
+            "value" : "Fils"
           }
         }
       }
@@ -1539,7 +1539,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sujet"
+            "value" : "Fil"
           }
         }
       }
@@ -1560,7 +1560,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Thème"
+            "value" : "Thématique"
           }
         }
       }
@@ -1570,7 +1570,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Thèmes"
+            "value" : "Thématiques"
           }
         }
       }
@@ -1580,7 +1580,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les thèmes apparaissent une fois que le modèle a lu une page."
+            "value" : "Les thématiques apparaissent une fois que le modèle a lu une page."
           }
         }
       }
@@ -1670,17 +1670,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le modèle classe les sujets sous les thèmes que vous avez, et prend les vôtres aussi volontiers que les siens."
-          }
-        }
-      }
-    },
-    "The model reads your front page and sorts it into subjects. Flong can tell you when it finds one it has never used before, which is usually a subject the press has just started covering." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le modèle lit votre une et la trie en thèmes. Flong peut vous prévenir lorsqu'il en trouve un qu'il n'avait jamais utilisé, ce qui est en général un thème que la presse vient de se mettre à couvrir."
+            "value" : "Le modèle classe les fils sous les thématiques que vous avez, et prend les vôtres aussi volontiers que les siennes."
           }
         }
       }
@@ -1710,7 +1700,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le modèle du système lit la page et la trie en thèmes. En demander plus ou moins déplace le thème, et tout ce qu'il couvre, vers le haut ou le bas de la une."
+            "value" : "Le modèle du système lit la page et la trie en thématiques. En demander plus ou moins déplace la thématique, et tout ce qu'elle couvre, vers le haut ou le bas de la une."
           }
         }
       }

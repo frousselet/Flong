@@ -31,18 +31,18 @@ struct NotificationsScreen: View {
             Section {
                 Toggle(
                     isOn: Binding(
-                        get: { model.wantsNewSubjectNotices },
-                        set: { wanted in Task { await model.setWantsNewSubjectNotices(wanted) } }
+                        get: { model.wantsNewStoryNotices },
+                        set: { wanted in Task { await model.setWantsNewStoryNotices(wanted) } }
                     )
                 ) {
-                    Label("New subjects", systemImage: "square.stack.3d.up")
+                    Label("New stories", systemImage: "sparkles.rectangle.stack")
                 }
                 .disabled(isRefused)
             } header: {
                 Text("What Flong tells you")
             } footer: {
                 Text(
-                    "The model reads your front page and sorts it into subjects. Flong can tell you when it finds one it has never used before, which is usually a subject the press has just started covering."
+                    "A story is several articles, from several newsrooms, about one thing. Flong can tell you when a new one opens, which is the moment the press starts covering something."
                 )
             }
 
