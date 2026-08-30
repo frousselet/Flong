@@ -76,8 +76,8 @@ struct ArrivalsChart: View {
     /// At rest the chart sits on the page, and glass over nothing is glass
     /// doing nothing : a material's whole job is to say that something passes
     /// behind it. The bars are legible on the page's own ground, so at the top
-    /// the strip is simply bars, and the glass arrives with the first row that
-    /// goes under them.
+    /// the strip is simply bars, the full width of the screen, and it narrows
+    /// into its glass as the first row goes under it.
     var isCovered = false
 
     /// How tall the busiest day of the chart stands.
@@ -90,6 +90,10 @@ struct ArrivalsChart: View {
     private static let gap: CGFloat = 2
 
     /// How far the first and last bars stand from the ends of the glass.
+    ///
+    /// Only once there is glass. Uncovered the chart runs the whole width of
+    /// the screen, and a bar standing in from an edge that is not there would
+    /// be standing in from nothing.
     ///
     /// Enough that neither is cut by the curve of the capsule, which turns
     /// through half the height of the strip at either end.
@@ -131,7 +135,7 @@ struct ArrivalsChart: View {
         // under the bars, so the height of the strip is the height of a bar and
         // can simply be said.
         .frame(height: Self.height)
-        .padding(.horizontal, Self.margin)
+        .padding(.horizontal, isCovered ? Self.margin : 0)
         .padding(.vertical, 7)
         // One piece of glass, in the shape the front page gives its subjects.
         // Not `interactive` : a pill is a control and this is a picture.
@@ -149,7 +153,10 @@ struct ArrivalsChart: View {
             Color.clear
                 .glassEffect(isCovered ? .regular : .identity, in: .capsule)
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: isCovered)
+        // The month narrows into its glass rather than appearing already
+        // narrowed : the width and the material are one movement, and the
+        // reader's own scroll is what drives it.
+        .animation(reduceMotion ? nil : .snappy(duration: 0.28), value: isCovered)
         .onChange(of: month, initial: true) { _, month in
             guard let month else { return }
             withAnimation(reduceMotion ? nil : .snappy(duration: 0.3)) {

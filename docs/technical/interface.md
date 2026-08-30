@@ -193,7 +193,9 @@ The picture is scaled on the way in and never after. What comes out of a photo l
 
 ## The month over the wire
 
-**The glass arrives with the scroll.** At rest the chart sits on the page and wears no material at all : glass over nothing is glass doing nothing, a material's whole job being to say that something passes behind it. The first row to go under the bars brings it, and it goes again when the page returns to the top. The shape is there either way, so the strip never changes size and the rows passing under it are not moved by its arrival.
+**The glass arrives with the scroll, and the month narrows into it.** At rest the chart runs the whole width of the screen and wears no material at all : glass over nothing is glass doing nothing, a material's whole job being to say that something passes behind it. The first row to go under the bars brings it, and the month steps back into the column the rest of the page is set in as it comes. The two are one movement, driven by the reader's own scroll, and both go again when the page returns to the top.
+
+A month is a picture of a whole month and reads better for having the whole width ; a piece of glass is a thing on the page and belongs within the measure like everything else on it. Uncovered, the chart steps out of the page's gutter with a negative inset of exactly its width, which is why that gutter is a named constant rather than a number written twice.
 
 The offset is what is asked, not the rows : a row is a landmark and this is a question about a single point, the top of the content against the top of what is shown. Against a hair rather than against nought, since a scroll view rests at a fractional offset often enough and a glass flickering on and off under a still thumb would be worse than one that never left.
 
