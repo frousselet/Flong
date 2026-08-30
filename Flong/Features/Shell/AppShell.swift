@@ -62,7 +62,7 @@ struct AppShell: View {
 
     var body: some View {
         TabView(selection: $section) {
-            Tab("Digest", systemImage: "house", value: AppSection.digest) {
+            Tab("Digest", systemImage: "sparkles.rectangle.stack", value: AppSection.digest) {
                 stack($digestPath) {
                     DigestScreen(
                         model: model,
@@ -81,9 +81,9 @@ struct AppShell: View {
             // still a view, in the sources list, for whoever does want it.
             //
             // A full tray, which is the mark the same view already wears in the
-            // sources list, and which the bar can fill : the two beside it fill
-            // themselves, and a row of waves that cannot was the one thing in
-            // the bar drawn in outline.
+            // sources list, and which the bar can fill : every mark in the bar
+            // has a filled variant and the bar reaches for it, so one that has
+            // none is the one thing in the row drawn as a hairline.
             //
             // Four sections and not five : the sources are not a place a reader
             // is, they are a thing a reader keeps, so they live in the menu with
