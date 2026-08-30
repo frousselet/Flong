@@ -206,7 +206,7 @@ struct ArticleFeedScreen: View {
         case .digest: Text("Digest")
         case .unread: Text("Unread")
         case .today: Text("Today")
-        case .library: Text("Library")
+        case .library: Text("Collections")
         case .starred: Text("Starred")
         case .all: Text("All articles")
         case .folder(let path): Text(verbatim: FolderPath.name(of: path))
