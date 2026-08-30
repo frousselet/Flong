@@ -228,7 +228,7 @@ struct LibraryStoreTests {
         let forgotten = try await add("Oublié", age: 400 * 86400)
         try await library.setStarred([kept.id], to: true, at: now)
 
-        let summary = try await Retention(database).purge(RetentionPolicy(), now: now)
+        let summary = try await Retention(database).purge(.bounded, now: now)
 
         #expect(summary.byAge == 1)
         #expect(try await library.count() == 1)
@@ -247,7 +247,7 @@ struct LibraryStoreTests {
         try await library.setStarred(entries, to: true, at: now)
 
         let retention = Retention(database)
-        var policy = RetentionPolicy()
+        var policy = RetentionPolicy.bounded
         policy.maximumBytes = try await retention.size() / 2
         _ = try await retention.purge(policy, now: now)
 

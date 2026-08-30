@@ -242,11 +242,27 @@ struct RetentionTests {
         try await fill(feed, count: 3, age: 60 * 86400, starred: true)
         try await fill(feed, count: 4, age: 3600)
 
-        let summary = try await Retention(database).purge(RetentionPolicy(), now: now)
+        let summary = try await Retention(database).purge(.bounded, now: now)
 
         #expect(summary.byAge == 5)
         let remaining = try await ArticleStore(database).count(.all, now: now)
         #expect(remaining == 7)
+    }
+
+    @Test("Nothing is thrown away unless a limit is asked for")
+    func nothingIsPurgedByDefault() async throws {
+        let feed = try await subscriptions.subscribe(
+            to: Subscription(address: "https://a.example.com/f.xml")
+        ).feed
+        // Two years old, which the old policy would have taken twenty times
+        // over. The reader keeps everything now, on every device, and the
+        // purge is a thing they ask for rather than a thing that happens.
+        try await fill(feed, count: 12, age: 700 * 86400)
+
+        let summary = try await Retention(database).purge(now: now)
+
+        #expect(summary.removed == 0)
+        #expect(try await ArticleStore(database).count(.all, now: now) == 12)
     }
 
     @Test("A store past its cap gives up its oldest articles")
@@ -258,12 +274,12 @@ struct RetentionTests {
 
         let retention = Retention(database)
         let before = try await retention.size()
-        var policy = RetentionPolicy()
+        var policy = RetentionPolicy.bounded
         policy.maximumBytes = before / 2
 
         let summary = try await retention.purge(policy, now: now)
 
         #expect(summary.byVolume > 0)
-        #expect(summary.bytesAfter <= policy.maximumBytes)
+        #expect(summary.bytesAfter <= (policy.maximumBytes ?? .max))
     }
 }

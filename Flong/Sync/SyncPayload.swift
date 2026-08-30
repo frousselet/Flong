@@ -47,9 +47,12 @@ nonisolated struct SyncPayload: Sendable {
 
     /// Everything this device would say if it had never spoken.
     ///
-    /// Around three thousand records for three years of reading : a few hundred
-    /// feeds, a couple of thousand kept articles, and a few dozen blocks of read
-    /// states. Never one record per article, which is the whole design.
+    /// Feeds, kept articles, read states, and the stream itself : one record
+    /// per feed and per day rather than one per article, which is what makes
+    /// the last of those possible at all. Section 7 was amended to carry the
+    /// whole stream, and the shape of the record is what keeps the count in
+    /// the thousands where one per article would put it in the hundreds of
+    /// thousands.
     func everything() async throws -> [CKRecord] {
         var records: [CKRecord] = []
 
@@ -62,6 +65,7 @@ nonisolated struct SyncPayload: Sendable {
         for block in try await readStates.blocks() {
             records.append(SyncRecords.record(for: block, in: zone))
         }
+        records += try await CatchUpHeaders.records(in: database, zone: zone)
 
         return records
     }
@@ -117,10 +121,15 @@ nonisolated struct SyncPayload: Sendable {
         return server
     }
 
-    /// The headers of what this device fetched lately, and the ones that have
-    /// fallen out of the window.
+    /// The days this device has touched lately, filled whole.
+    ///
+    /// A recent window, and only for deciding which days are worth rewriting :
+    /// a day nothing arrived in since the last push is a day whose record is
+    /// already right. The whole history goes out once, through ``everything()``.
+    static let recent: TimeInterval = 3 * 24 * 60 * 60
+
     func catchUpChanges(now: Date = Date()) async throws -> (records: [CKRecord], expired: [String]) {
-        let since = now.addingTimeInterval(-CatchUpHeaders.window)
+        let since = now.addingTimeInterval(-Self.recent)
         return (
             try await CatchUpHeaders.records(in: database, since: since, zone: zone),
             try await CatchUpHeaders.expiredNames(in: database, now: now)

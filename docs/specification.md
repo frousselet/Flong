@@ -146,15 +146,17 @@ Starred articles are not in these blocks. Being starred is what puts an article 
 
 Merging is a union, so the operation is commutative and idempotent. There is no conflict resolution logic to write, which removes the main source of bugs in multi-device synchronization. It follows that reading is one way : marking an article unread is a local decision and does not travel. That is the price of having no conflict resolution at all, and it is worth paying.
 
-### Catch-up headers
+### Stream blocks
 
-A device left switched off for several days misses the articles already dropped from their feeds. A bounded mechanism answers it : one record per feed and per day, holding identifiers, titles, links and dates only, over a sliding thirty-day window, purged automatically. The late device knows what it missed and can retry fetching it from the source.
+**Amended.** This began as catch-up headers : identifiers and titles only, over a sliding thirty-day window, so that a device switched off for a week learned what had already dropped out of its feeds. The reader asked for the whole stream instead, kept for good on every device, and retention was made unlimited to match. The window is gone and the bodies travel.
 
-The feature can be turned off, and its cost is capped by the window.
+The shape did not change, and that is what makes it possible at all : one record per feed, per day, cut into as many chunks as its bytes need, carrying every article of that day with its text compressed. Never one record per article. A day that has passed never changes again, so a block is written once and not rewritten, which is what change throughput punishes.
+
+**The honest limit of this.** The record count is now feeds multiplied by the days they published on. It is bounded for a reader following a few dozen feeds and it is not bounded for one following three hundred over several years, where it reaches six figures and meets the same rate limiting one record per article would. Unlimited retention and a per-record store are not reconcilable by any choice of record shape : the data grows without bound and CloudKit charges by the record. Carrying the bulk of the stream as append-only files in the iCloud Documents container, one per device and per day, is the design that answers it, and it is the next thing to build.
 
 ### What never transits
 
-Stream article bodies, indexes, vectors of articles that were not retained, secrets, any log.
+Indexes, vectors of articles that were not retained, secrets, any log.
 
 ### Quotas and errors
 
@@ -323,6 +325,8 @@ Two mandatory properties :
 Explicit evaluation order, individual enabling, and a consultable local log of triggers.
 
 ### Retention
+
+**Amended : nothing is thrown away on its own.** Both bounds, age and volume, are optional and both are absent. The reader keeps every article that has ever arrived, on every device. The purge still exists and is still correct ; it is asked for, from the sources page, rather than run on a schedule.
 
 Stream purge by age and by volume, with a configurable global cap expressed in days and in megabytes. What belongs to the library is never purged. This is the mechanism that bounds disk usage.
 
