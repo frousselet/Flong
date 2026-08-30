@@ -55,6 +55,7 @@ nonisolated struct FeedRefresh: Sendable {
     private let database: AppDatabase
     private let fetcher: FeedFetcher
     private let readStates: ReadStateStore
+    private let marks: MarkStore
     private let credentials: CredentialStoring
 
     init(
@@ -65,6 +66,7 @@ nonisolated struct FeedRefresh: Sendable {
         self.database = database
         self.fetcher = fetcher
         self.readStates = ReadStateStore(database)
+        self.marks = MarkStore(database)
         self.credentials = credentials
     }
 
@@ -149,6 +151,10 @@ nonisolated struct FeedRefresh: Sendable {
                 // last week, and has to land read rather than announce itself.
                 let read = (try? await readStates.fingerprints()) ?? []
                 let new = try await store(parsed, from: document, into: feed, read: read)
+                // A star another device set on one of these may have arrived
+                // before the article did, and this is the moment it can be
+                // written.
+                if new > 0 { _ = try? await marks.drain() }
                 return .updated(newArticles: new)
             } catch {
                 // Bytes arrived and made no sense. That is the publisher's

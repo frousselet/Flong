@@ -11,7 +11,7 @@
 
 import SwiftUI
 
-/// A plain list of articles : unread, a feed, a folder, the library.
+/// A plain list of articles : unread, a feed, a folder, everything.
 ///
 /// The same column and the same rows as the front page. A view of the stream is
 /// not a different kind of place, it is the same place with a narrower question.
@@ -206,7 +206,6 @@ struct ArticleFeedScreen: View {
         case .digest: Text("Digest")
         case .unread: Text("Unread")
         case .today: Text("Today")
-        case .library: Text("Collections")
         case .starred: Text("Starred")
         case .all: Text("All articles")
         case .folder(let path): Text(verbatim: FolderPath.name(of: path))

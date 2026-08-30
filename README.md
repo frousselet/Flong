@@ -10,13 +10,13 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **The main screen is a digest, not a list.** Its unit is the story : several articles, from several rooms, about one thing. What several rooms are covering right now is shown as it arrives, and what grouped with nothing is still there underneath. The system model sorts the page into subjects you can narrow it to. An aggregator shows what arrived and leaves you to work out what matters.
 
-**Stream and library are two different things.** The stream is a disposable cache, rebuildable at any time from the sources, purged by age and volume. The library is what you chose to keep : its content is frozen at that moment, so it survives the article disappearing from its feed, and it is never purged.
+**Every article you have ever received stays, and so does what you said about it.** There is one notion of an article and no second copy of anything. Star one, write on one, file one in a collection, and that mark is carried on the article itself : it follows you to your other devices, and an article carrying one is never purged, whatever you ask the store to free.
 
 **Sources you pay for stay readable.** A per-subscriber feed address, HTTP Basic or a token, kept in the keychain. For a site whose articles sit behind a wall, sign in on its own page and Flong fetches the rest as you — it never holds your password.
 
 **A truncated article is completed from its page.** Most feeds send a standfirst and a link. An article opens on what its feed sent ; ask for the whole one and Flong fetches the page behind it, once, and keeps what it finds beside the feed's version.
 
-**Search is genuinely indexed.** A full-text index over the whole local corpus, a query language with operators, and semantic search over the library through Spotlight.
+**Search is genuinely indexed.** A full-text index over the whole local corpus, a query language with operators, and semantic search over what you marked, through Spotlight.
 
 **Enrichment happens on the device.** Classification, tagging and summaries come from the system model, in your own language whatever language the articles are in, and no article content is sent anywhere.
 
@@ -111,9 +111,9 @@ The interface is authored in English and translated to French. All strings live 
 | [`docs/technical/fetching.md`](docs/technical/fetching.md) | How feeds are asked for, and how publishers are treated |
 | [`docs/technical/ingestion.md`](docs/technical/ingestion.md) | What happens between a fetched feed and the store, and what bounds it |
 | [`docs/technical/search.md`](docs/technical/search.md) | The index, the query language, and why nothing typed into it is ever run |
-| [`docs/technical/library.md`](docs/technical/library.md) | What promotion copies, what keeps an article, and what Spotlight is told |
+| [`docs/technical/marks.md`](docs/technical/marks.md) | What a mark is, why the library went, and what Spotlight is told |
 | [`docs/technical/sync.md`](docs/technical/sync.md) | What travels between devices, what never does, and why the record budget shapes it |
-| [`docs/technical/background.md`](docs/technical/background.md) | How long work survives being interrupted, and how the library is searched by meaning |
+| [`docs/technical/background.md`](docs/technical/background.md) | How long work survives being interrupted, and how the marked articles are searched by meaning |
 | [`docs/technical/digest.md`](docs/technical/digest.md) | How articles become stories, and why not with the vectors |
 | [`docs/technical/interface.md`](docs/technical/interface.md) | How the interface is set, where Liquid Glass is allowed, and what was rejected |
 | [`docs/technical/freshrss-api.md`](docs/technical/freshrss-api.md) | The Google Reader API surface, kept for the FreshRSS import |

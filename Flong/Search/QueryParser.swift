@@ -225,7 +225,8 @@ nonisolated struct QueryParser {
         case "unread": .unread
         case "read": .read
         case "starred", "favorite", "favourite": .starred
-        case "library", "kept": .library
+        case "collected", "filed": .collected
+        case "annotated", "noted": .annotated
         case "media", "enclosure", "podcast": .media
         case "fulltext", "content", "body": .fulltext
         default: nil

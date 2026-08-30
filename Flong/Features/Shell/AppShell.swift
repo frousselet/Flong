@@ -31,7 +31,7 @@ nonisolated enum Route: Hashable {
 nonisolated enum AppSection: Hashable {
     case digest
     case stream
-    case library
+    case collections
     case search
 }
 
@@ -49,7 +49,7 @@ struct AppShell: View {
     @State private var section = AppSection.digest
     @State private var digestPath: [Route] = []
     @State private var streamPath: [Route] = []
-    @State private var libraryPath: [Route] = []
+    @State private var collectionsPath: [Route] = []
     @State private var searchPath: [Route] = []
     @State private var isAddingFeed = false
     @State private var isChoosingFile = false
@@ -102,10 +102,10 @@ struct AppShell: View {
                 }
             }
 
-            Tab("Collections", systemImage: "folder", value: AppSection.library) {
-                stack($libraryPath) {
-                    CollectionsScreen(model: model, menu: { libraryPath.append($0) }) {
-                        libraryPath.append(.collection($0))
+            Tab("Collections", systemImage: "folder", value: AppSection.collections) {
+                stack($collectionsPath) {
+                    CollectionsScreen(model: model, menu: { collectionsPath.append($0) }) {
+                        collectionsPath.append(.collection($0))
                     }
                 }
             }

@@ -48,9 +48,20 @@ nonisolated struct PurgeSummary: Hashable, Sendable {
 ///
 /// The stream was a cache purged by age and by volume, and that was what
 /// bounded disk usage. It is kept whole now, so nothing here runs unless a
-/// policy carries a limit. What the reader kept is never touched either way : a
-/// starred article survives every purge, and so does a library item.
+/// policy carries a limit.
+///
+/// **What the reader marked is never touched.** Starring an article is not the
+/// only way to say something about one : a note and a filing say it just as
+/// plainly, and a purge that spared only the stars would throw away the article
+/// somebody wrote three paragraphs on. The three conditions are one sentence,
+/// written once here and used by both passes.
 nonisolated struct Retention: Sendable {
+    /// The articles a purge may not touch, whatever it is purging by.
+    static let marked = """
+        (is_starred = 1 OR COALESCE(annotation, '') <> ''
+         OR id IN (SELECT target_id FROM tag_binding WHERE target_kind = 'entry'))
+        """
+
     private let database: AppDatabase
 
     init(_ database: AppDatabase) {
@@ -89,7 +100,7 @@ nonisolated struct Retention: Sendable {
             try db.execute(
                 sql: """
                     DELETE FROM entry
-                    WHERE is_starred = 0 AND COALESCE(published_at, received_at) < ?
+                    WHERE NOT \(Self.marked) AND COALESCE(published_at, received_at) < ?
                     """,
                 arguments: [cutoff]
             )
@@ -109,7 +120,7 @@ nonisolated struct Retention: Sendable {
                 try db.execute(
                     sql: """
                         DELETE FROM entry WHERE id IN (
-                            SELECT id FROM entry WHERE is_starred = 0
+                            SELECT id FROM entry WHERE NOT \(Self.marked)
                             ORDER BY COALESCE(published_at, received_at) ASC LIMIT ?
                         )
                         """,

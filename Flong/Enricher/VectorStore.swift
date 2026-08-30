@@ -13,9 +13,10 @@ import Foundation
 import GRDB
 import OSLog
 
-/// The vectors of the library, and the search they answer.
+/// The vectors of what the reader marked, and the search they answer.
 ///
-/// Only the library is vectorized. Section 11 is explicit that the stream is
+/// Only what the reader marked is vectorized. Section 11 is explicit that the
+/// rest of the stream is
 /// not : a hundred and twenty five thousand vectors would cost hours of device
 /// time to compute and would answer a question nobody asks of a cache.
 nonisolated struct VectorStore: Sendable {
@@ -40,13 +41,28 @@ nonisolated struct VectorStore: Sendable {
 
     // MARK: - Computing
 
-    /// The kept articles whose vector is missing or was made by another model.
+    /// The marked articles whose vector is missing or was made by another model.
     ///
     /// A vector from a model this device no longer runs is worse than none : it
     /// would be compared against vectors it has nothing in common with.
-    func itemsNeedingVectors(limit: Int = VectorStore.batchSize) async throws -> [LibraryItem] {
+    ///
+    /// **Only what the reader marked.** Section 11 says the rest of the stream
+    /// is not vectorized, and it matters more than it did : the stream was
+    /// thirty days of articles and is now every article there has ever been, so
+    /// asking for all of them would be embedding a hundred thousand pieces to
+    /// answer questions about the few hundred somebody chose.
+    func itemsNeedingVectors(limit: Int = VectorStore.batchSize) async throws -> [Entry] {
         let candidates = try await database.writer.read { db in
-            try LibraryItem.order(Column("promoted_at").desc).fetchAll(db)
+            try Entry.fetchAll(
+                db,
+                sql: """
+                    SELECT * FROM entry
+                    WHERE is_hidden = 0 AND duplicate_of IS NULL
+                      AND (is_starred = 1 OR COALESCE(annotation, '') <> ''
+                           OR id IN (SELECT target_id FROM tag_binding WHERE target_kind = 'entry'))
+                    ORDER BY received_at DESC
+                    """
+            )
         }
 
         return
@@ -67,19 +83,35 @@ nonisolated struct VectorStore: Sendable {
 
     /// Computes and stores the vectors of a batch.
     @discardableResult
-    func vectorize(_ items: [LibraryItem]) async throws -> Int {
+    func vectorize(_ items: [Entry]) async throws -> Int {
         // Computed before the transaction opens, and handed in as one value :
         // embedding is the slow part, and a write transaction is the last place
         // to do slow things.
+        // The text is beside the article rather than on it, so it is fetched
+        // once for the batch instead of once per article.
+        let texts: [UUID: String] = try await database.writer.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT entry_id AS id, plain_text AS text FROM entry_body
+                    WHERE entry_id IN (\(databaseQuestionMarks(count: items.count)))
+                    """,
+                arguments: StatementArguments(items.map { $0.id.databaseValue })
+            )
+            .reduce(into: [:]) { all, row in
+                if let text = row["text"] as String? { all[row["id"] as UUID] = text }
+            }
+        }
+
         let vectors: [UUID: ArticleVector] = items.reduce(into: [:]) { result, item in
-            result[item.id] = embedder.vector(for: item)
+            result[item.id] = embedder.vector(for: item, text: texts[item.id])
         }
         let ids = items.map(\.id)
 
         return try await database.writer.write { db in
             var written = 0
             for id in ids {
-                guard var item = try LibraryItem.fetchOne(db, key: id) else { continue }
+                guard var item = try Entry.fetchOne(db, key: id) else { continue }
                 let vector = vectors[id]
 
                 item.vector = vector?.quantized()
@@ -101,11 +133,11 @@ nonisolated struct VectorStore: Sendable {
     // MARK: - Reading
 
     func vector(of itemID: UUID) async throws -> ArticleVector? {
-        let item = try await database.writer.read { db in try LibraryItem.fetchOne(db, key: itemID) }
+        let item = try await database.writer.read { db in try Entry.fetchOne(db, key: itemID) }
         return item.flatMap(Self.vector)
     }
 
-    static func vector(of item: LibraryItem) -> ArticleVector? {
+    static func vector(of item: Entry) -> ArticleVector? {
         guard let data = item.vector, let model = item.vectorModel,
             let revision = item.vectorRevision.flatMap(Int.init)
         else { return nil }
@@ -126,7 +158,7 @@ nonisolated struct VectorStore: Sendable {
 
     /// The kept articles closest in meaning to a phrase.
     ///
-    /// Cosine similarity over the whole library, which needs no index structure
+    /// Cosine similarity over what is marked, which needs no index structure
     /// at this scale : a few thousand vectors against one is a few million
     /// multiplications.
     func semanticMatches(for text: String, limit: Int = 50) async throws -> [UUID] {
@@ -134,10 +166,10 @@ nonisolated struct VectorStore: Sendable {
         guard !text.isEmpty else { return [] }
 
         let items = try await database.writer.read { db in
-            try LibraryItem.filter(Column("vector") != nil).fetchAll(db)
+            try Entry.filter(Column("vector") != nil).fetchAll(db)
         }
 
-        // The query is embedded once per model the library holds. A search is
+        // The query is embedded once per model there is. A search is
         // three words long and has no language to detect ; guessing one would
         // send a French question to an English model, which comes back with
         // nothing rather than with an error.

@@ -22,7 +22,7 @@ import Foundation
 /// 0.93 where two about the same event scored 0.92. A model that cannot tell a
 /// school calendar from a history of typography is not a signal, whatever its
 /// numbers look like. The vectors remain what they are good at, which is
-/// searching the library by meaning.
+/// searching what the reader marked by meaning.
 nonisolated struct TextSignature: Hashable, Sendable, Codable {
     /// Term to weight, already normalized to a length of one.
     let weights: [String: Double]

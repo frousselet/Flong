@@ -27,7 +27,7 @@ import OSLog
 nonisolated struct SyncPayload: Sendable {
     private let database: AppDatabase
     private let subscriptions: SubscriptionStore
-    private let library: LibraryStore
+    private let marks: MarkStore
     private let collections: CollectionStore
     private let readStates: ReadStateStore
     private let embedder: Embedder
@@ -37,7 +37,7 @@ nonisolated struct SyncPayload: Sendable {
     init(_ database: AppDatabase, zone: CKRecordZone.ID) {
         self.database = database
         self.subscriptions = SubscriptionStore(database)
-        self.library = LibraryStore(database)
+        self.marks = MarkStore(database)
         self.collections = CollectionStore(database)
         self.readStates = ReadStateStore(database)
         self.embedder = Embedder()
@@ -61,9 +61,8 @@ nonisolated struct SyncPayload: Sendable {
         for feed in try await subscriptions.feeds() {
             records.append(SyncRecords.record(for: feed, in: zone))
         }
-        let memberships = try await collections.memberships()
-        for item in try await library.allItems() {
-            records.append(SyncRecords.record(for: item, collections: memberships[item.id] ?? [], in: zone))
+        for mark in try await marks.all() where !mark.isEmpty {
+            records.append(SyncRecords.record(for: mark, in: zone))
         }
         for block in try await readStates.blocks() {
             records.append(SyncRecords.record(for: block, in: zone))
@@ -94,12 +93,9 @@ nonisolated struct SyncPayload: Sendable {
             let name = SyncRecords.name(forFeed: feed.url)
             if names.contains(name) { records[name] = SyncRecords.record(for: feed, in: zone) }
         }
-        let memberships = try await collections.memberships()
-        for item in try await library.allItems() {
-            let name = SyncRecords.name(forLibraryItemWithGUID: item.guid, feedURL: item.feedURL)
-            if names.contains(name) {
-                records[name] = SyncRecords.record(for: item, collections: memberships[item.id] ?? [], in: zone)
-            }
+        for mark in try await marks.all() {
+            let name = SyncRecords.name(forMarkWithGUID: mark.guid, feedURL: URL(string: mark.feedURL))
+            if names.contains(name) { records[name] = SyncRecords.record(for: mark, in: zone) }
         }
         if names.contains("collections") {
             let made = try await collections.names()
@@ -166,14 +162,16 @@ nonisolated struct SyncPayload: Sendable {
     /// What applying a batch came to.
     nonisolated struct Applied: Hashable, Sendable {
         var feeds = 0
-        var libraryItems = 0
+        /// Articles another device said something about : starred, wrote on,
+        /// or filed.
+        var markedArticles = 0
         var readArticles = 0
         /// Articles this device had missed while it was switched off.
         var caughtUp = 0
         var removed = 0
 
         var isEmpty: Bool {
-            feeds == 0 && libraryItems == 0 && readArticles == 0 && caughtUp == 0 && removed == 0
+            feeds == 0 && markedArticles == 0 && readArticles == 0 && caughtUp == 0 && removed == 0
         }
     }
 
@@ -192,15 +190,9 @@ nonisolated struct SyncPayload: Sendable {
                 guard let subscription = SyncRecords.subscription(from: record) else { continue }
                 if try await subscriptions.subscribe(to: subscription).isNew { applied.feeds += 1 }
 
-            case SyncRecords.RecordType.libraryItem:
-                guard let item = SyncRecords.libraryItem(from: record) else { continue }
-                if try await keep(item) { applied.libraryItems += 1 }
-                if let kept = try await library.item(guid: item.guid, feedURL: item.feedURL) {
-                    // What arrived is the whole truth about that article : a
-                    // collection missing from the list is one it was taken out
-                    // of, so the difference is applied and not the additions.
-                    try await collections.set(SyncRecords.collections(from: record), of: kept.id)
-                }
+            case SyncRecords.RecordType.mark:
+                guard let mark = SyncRecords.mark(from: record) else { continue }
+                if try await marks.merge(mark) { applied.markedArticles += 1 }
 
             case SyncRecords.RecordType.collections:
                 guard let names = SyncRecords.collectionNames(from: record) else { continue }
@@ -226,6 +218,10 @@ nonisolated struct SyncPayload: Sendable {
             }
         }
 
+        // A mark may have arrived before the article it is about, and the
+        // articles of this very batch may be the ones it was waiting for.
+        applied.markedArticles += try await marks.drain()
+
         return applied
     }
 
@@ -237,80 +233,12 @@ nonisolated struct SyncPayload: Sendable {
         for name in names {
             if name.hasPrefix("feed-") {
                 if try await unsubscribe(named: name) { applied.removed += 1 }
-            } else if name.hasPrefix("item-") {
-                if try await release(named: name) { applied.removed += 1 }
+            } else if name.hasPrefix("mark-") {
+                if try await unmark(named: name) { applied.removed += 1 }
             }
         }
 
         return applied
-    }
-
-    /// Keeps an article another device kept, and stars it here if it is here.
-    ///
-    /// A vector that arrives is kept only when this device runs the same model
-    /// at the same revision. Otherwise it is dropped and computed again here :
-    /// comparing vectors from two revisions does not fail loudly, it quietly
-    /// returns nonsense, and the device that recomputes republishes its version.
-    private func keep(_ item: LibraryItem) async throws -> Bool {
-        let arriving = Self.vetted(item, with: embedder)
-
-        return try await database.writer.write { db in
-            let existing =
-                try LibraryItem
-                .filter(LibraryItem.Columns.guid == item.guid && LibraryItem.Columns.feedURL == item.feedURL)
-                .fetchOne(db)
-
-            // The article may be in this device's stream, in which case its star
-            // has to agree with the library.
-            let entryID = try Self.entryID(forGUID: arriving.guid, feedURL: arriving.feedURL, in: db)
-            if let entryID {
-                _ = try Entry.filter(key: entryID).updateAll(db, Column("is_starred").set(to: true))
-            }
-
-            if var existing {
-                var changed = false
-
-                // The article may have reached this device's stream after the
-                // record did, in which case the link is made now.
-                if existing.entryID == nil, entryID != nil {
-                    existing.entryID = entryID
-                    changed = true
-                }
-                // A vector computed elsewhere spares this device the work.
-                if existing.vector == nil, arriving.vector != nil {
-                    existing.vector = arriving.vector
-                    existing.vectorModel = arriving.vectorModel
-                    existing.vectorRevision = arriving.vectorRevision
-                    changed = true
-                }
-
-                if changed { try existing.update(db) }
-                return false
-            }
-
-            var item = arriving
-            item.entryID = entryID
-            try item.insert(db)
-            return true
-        }
-    }
-
-    /// The item as this device may keep it.
-    ///
-    /// A vector made by another model, or another revision of this one, is
-    /// dropped rather than stored : comparing across revisions does not fail
-    /// loudly, it quietly returns nonsense. This device computes its own and
-    /// republishes it.
-    private static func vetted(_ item: LibraryItem, with embedder: Embedder) -> LibraryItem {
-        guard let model = item.vectorModel, let revision = item.vectorRevision.flatMap(Int.init),
-            !embedder.isCurrent(model: model, revision: revision)
-        else { return item }
-
-        var item = item
-        item.vector = nil
-        item.vectorModel = nil
-        item.vectorRevision = nil
-        return item
     }
 
     private func unsubscribe(named name: String) async throws -> Bool {
@@ -321,22 +249,20 @@ nonisolated struct SyncPayload: Sendable {
         }
     }
 
-    private func release(named name: String) async throws -> Bool {
-        try await database.writer.write { db in
-            let items = try LibraryItem.fetchAll(db)
-            let match = items.first {
-                SyncRecords.name(forLibraryItemWithGUID: $0.guid, feedURL: $0.feedURL) == name
-            }
-            guard let match else { return false }
+    /// Takes back the marks of an article another device unmarked entirely.
+    ///
+    /// A name is a digest and cannot be read backwards, so the marks are walked
+    /// and the one that names itself this way is the one. There are a few
+    /// thousand of them at most, and a deletion is rare.
+    private func unmark(named name: String) async throws -> Bool {
+        let marks = try await self.marks.all()
+        guard
+            let mark = marks.first(where: {
+                SyncRecords.name(forMarkWithGUID: $0.guid, feedURL: URL(string: $0.feedURL)) == name
+            }), let feedURL = URL(string: mark.feedURL)
+        else { return false }
 
-            // The star follows the library, whether or not the copy remembers
-            // which stream row it came from.
-            let entryID = try match.entryID ?? Self.entryID(forGUID: match.guid, feedURL: match.feedURL, in: db)
-            if let entryID {
-                _ = try Entry.filter(key: entryID).updateAll(db, Column("is_starred").set(to: false))
-            }
-            return try LibraryItem.deleteOne(db, key: match.id)
-        }
+        return try await self.marks.unmark(feedURL, guid: mark.guid)
     }
 
     private static func entryID(forGUID guid: String, feedURL: URL?, in db: Database) throws -> UUID? {

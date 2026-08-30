@@ -137,6 +137,124 @@ nonisolated extension AppDatabase {
             }
         }
 
+        // One notion of an article, and one only.
+        //
+        // The library was a second store holding a frozen copy of what the
+        // reader kept. Every reason it existed for has gone : the stream is
+        // never purged now, it synchronizes whole, and it carries its own text.
+        // What was left was freezing the version read, which the reader has
+        // decided they do not want at the price of two stores.
+        //
+        // What the copy really held, besides the frozen text, was the reader's
+        // own marks : the note, the vector, and through `tag_binding` the
+        // collections. Those move onto the article itself.
+        //
+        // A copy whose article had already been purged has no article to move
+        // onto, so one is made from the copy. Losing those would be losing
+        // exactly what the library was built to protect, on the one day it is
+        // taken away.
+        migrator.registerMigration("v18.oneArticle") { db in
+            try db.alter(table: "entry") { table in
+                table.add(column: "annotation", .text)
+                table.add(column: "vector", .blob)
+                table.add(column: "vector_model", .text)
+                table.add(column: "vector_revision", .text)
+            }
+
+            // The orphans first, so that everything below can assume an entry.
+            let orphans = try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT l.id AS id, l.feed_url AS feed_url, l.guid AS guid, l.url AS url, l.title AS title,
+                           l.author AS author, l.language AS language, l.published_at AS published_at,
+                           l.promoted_at AS promoted_at, l.content_html AS content_html,
+                           l.plain_text AS plain_text, l.image_url AS image_url
+                    FROM library_item l
+                    WHERE l.entry_id IS NULL OR l.entry_id NOT IN (SELECT id FROM entry)
+                    """
+            )
+            for row in orphans {
+                guard let feedURL = row["feed_url"] as String?,
+                    let feedID = try UUID.fetchOne(db, sql: "SELECT id FROM feed WHERE url = ?", arguments: [feedURL])
+                else { continue }
+
+                let made = UUID.v7()
+                try db.execute(
+                    sql: """
+                        INSERT OR IGNORE INTO entry
+                        (id, feed_id, guid, url, title, author, language, published_at, received_at,
+                         is_read, is_starred, is_hidden, has_media, image_url)
+                        VALUES (?,?,?,?,?,?,?,?,?,1,0,0,0,?)
+                        """,
+                    arguments: [
+                        made, feedID, row["guid"] as String, row["url"] as String?, row["title"] as String,
+                        row["author"] as String?, row["language"] as String?, row["published_at"] as Date?,
+                        row["promoted_at"] as Date, row["image_url"] as String?,
+                    ]
+                )
+                if let html = row["content_html"] as String? {
+                    try db.execute(
+                        sql: """
+                            INSERT OR IGNORE INTO entry_body (entry_id, sanitized_html, plain_text)
+                            VALUES (?,?,?)
+                            """,
+                        arguments: [made, html, row["plain_text"] as String?]
+                    )
+                }
+                try db.execute(
+                    sql: "UPDATE library_item SET entry_id = ? WHERE id = ?",
+                    arguments: [made, row["id"] as UUID]
+                )
+            }
+
+            // The marks, onto the article.
+            try db.execute(
+                sql: """
+                    UPDATE entry SET
+                        annotation = (SELECT l.annotation FROM library_item l WHERE l.entry_id = entry.id),
+                        vector = (SELECT l.vector FROM library_item l WHERE l.entry_id = entry.id),
+                        vector_model = (SELECT l.vector_model FROM library_item l WHERE l.entry_id = entry.id),
+                        vector_revision = (SELECT l.vector_revision FROM library_item l WHERE l.entry_id = entry.id),
+                        is_starred = CASE
+                            WHEN (SELECT l.starred_at FROM library_item l WHERE l.entry_id = entry.id) IS NOT NULL
+                            THEN 1 ELSE is_starred END
+                    WHERE id IN (SELECT entry_id FROM library_item WHERE entry_id IS NOT NULL)
+                    """
+            )
+
+            // The collections, onto the article. A binding names what it points
+            // at by kind, so the kind changes with the identifier.
+            try db.execute(
+                sql: """
+                    UPDATE OR IGNORE tag_binding SET
+                        target_kind = 'entry',
+                        target_id = (SELECT l.entry_id FROM library_item l WHERE l.id = tag_binding.target_id)
+                    WHERE target_kind = 'library_item'
+                      AND target_id IN (SELECT id FROM library_item WHERE entry_id IS NOT NULL)
+                    """
+            )
+            try db.execute(sql: "DELETE FROM tag_binding WHERE target_kind = 'library_item'")
+
+            try db.drop(table: "library_item")
+        }
+
+        // A mark that arrives before the article it is about.
+        //
+        // The whole stream travels between the devices now, so the article is
+        // on its way, but CloudKit hands its batches over in whatever order it
+        // likes and a star may well land first. Dropping it would lose it for
+        // good : nothing re-sends a record that was already delivered. It waits
+        // here instead, and is written the moment the article turns up.
+        migrator.registerMigration("v19.marksThatArriveFirst") { db in
+            try db.create(table: "pending_mark") { table in
+                table.column("feed_url", .text).notNull()
+                table.column("guid", .text).notNull()
+                table.column("payload", .blob).notNull()
+                table.column("received_at", .datetime).notNull()
+                table.primaryKey(["feed_url", "guid"])
+            }
+        }
+
         return migrator
     }
 

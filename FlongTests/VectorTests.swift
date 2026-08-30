@@ -133,14 +133,14 @@ struct EmbedderTests {
 @Suite("Vectors in the store")
 struct VectorStoreTests {
     private let database: AppDatabase
-    private let library: LibraryStore
+    private let articles: ArticleStore
     private let vectors: VectorStore
     private let feed: Feed
     private let now = Date(timeIntervalSince1970: 1_787_646_600)
 
     init() async throws {
         database = try AppDatabase.inMemory()
-        library = LibraryStore(database)
+        articles = ArticleStore(database)
         vectors = VectorStore(database)
         feed = try await SubscriptionStore(database).subscribe(
             to: Subscription(address: "https://feeds.example.com/f.xml", title: "A Feed")
@@ -148,7 +148,7 @@ struct VectorStoreTests {
     }
 
     @discardableResult
-    private func keep(_ title: String, text: String) async throws -> LibraryItem {
+    private func keep(_ title: String, text: String) async throws -> Entry {
         var entry = Entry(
             feedID: feed.id,
             guid: "urn:example:\(title)",
@@ -162,11 +162,13 @@ struct VectorStoreTests {
             try entry.insert(db)
             try EntryBody(entryID: entry.id, sanitizedHTML: "<p>\(text)</p>", plainText: text).insert(db)
         }
-        let change = try await library.setStarred([entry.id], to: true, at: now)
-        return change.kept[0]
+        // A vector is computed for what the reader marked and for nothing
+        // else, so an article has to be marked before it is a candidate.
+        try await articles.setStarred([entry.id], to: true)
+        return entry
     }
 
-    @Test("A kept article without a vector is one that needs one")
+    @Test("A marked article without a vector is one that needs one")
     func outstanding() async throws {
         try await keep("Une réforme", text: "Le ministère envisage un décalage de la rentrée scolaire.")
 
@@ -181,7 +183,7 @@ struct VectorStoreTests {
         let written = try await vectors.vectorize([item])
 
         #expect(written == 1)
-        let stored = try #require(try await library.item(id: item.id))
+        let stored = try #require(try await database.writer.read { db in try Entry.fetchOne(db, key: item.id) })
         #expect(stored.vector != nil)
         #expect(stored.vectorModel == "nl.sentence.fr")
         #expect(stored.vectorRevision != nil)
@@ -193,7 +195,7 @@ struct VectorStoreTests {
         let item = try await keep("Une réforme", text: "Le ministère envisage un décalage.")
 
         try await database.writer.write { db in
-            var stored = try LibraryItem.fetchOne(db, key: item.id)!
+            var stored = try Entry.fetchOne(db, key: item.id)!
             stored.vector = Data(repeating: 128, count: 512)
             stored.vectorModel = "nl.sentence.fr"
             stored.vectorRevision = "999999"
@@ -203,7 +205,7 @@ struct VectorStoreTests {
         #expect(try await vectors.outstandingCount() == 1)
     }
 
-    @Test("The library answers what it means, not only what it says", .enabled(if: hasFrenchEmbedding))
+    @Test("A search answers what it means, not only what it says", .enabled(if: hasFrenchEmbedding))
     func semanticSearch() async throws {
         let school = try await keep(
             "Une réforme du calendrier scolaire",

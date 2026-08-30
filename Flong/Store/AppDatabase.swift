@@ -14,7 +14,7 @@ import GRDB
 
 /// The local SQLite database, opened and migrated.
 ///
-/// Everything Flong knows lives here : the stream, the library, the tags, the
+/// Everything Flong knows lives here : the articles, the collections, the
 /// rules and the synchronization tokens. The store is the only writer, and it
 /// keeps its schema through ``migrator``.
 nonisolated final class AppDatabase: Sendable {
@@ -29,8 +29,9 @@ nonisolated final class AppDatabase: Sendable {
 
     /// The database of the running application.
     ///
-    /// It sits in Application Support, outside the backup exclusions : the stream
-    /// is rebuildable, but the library is not, so the file is worth backing up.
+    /// It sits in Application Support, outside the backup exclusions : the
+    /// articles are rebuildable from their feeds, but what the reader said about
+    /// them is not, so the file is worth backing up.
     static func onDisk(folder: URL? = nil) throws -> AppDatabase {
         let folder = try folder ?? defaultFolder()
         try prepare(folder: folder)

@@ -15,7 +15,7 @@ import Testing
 
 @testable import Flong
 
-/// What Spotlight is told about a kept article.
+/// What Spotlight is told about an article the reader marked.
 ///
 /// Whether Spotlight then finds it is the system's business and cannot be
 /// asserted here : indexing is asynchronous, and a simulator often has no
@@ -25,25 +25,20 @@ import Testing
 struct SpotlightIndexTests {
     private let now = Date(timeIntervalSince1970: 1_787_646_600)
 
-    private func item(annotated: Bool = false) -> LibraryItem {
-        LibraryItem(
-            entryID: .v7(),
-            feedURL: URL(string: "https://quotidien.example.com/f.xml"),
-            feedTitle: "Le Quotidien",
-            guid: "urn:example:1",
-            url: URL(string: "https://example.com/1"),
+    private func item() -> ArticleStore.Marked {
+        ArticleStore.Marked(
+            id: .v7(),
             title: "Une réforme du calendrier",
-            author: "Camille Dupuis",
-            language: "fr",
-            publishedAt: now.addingTimeInterval(-3600),
-            promotedAt: now,
-            contentHTML: "<p>Le corps.</p>",
             plainText: String(repeating: "Le corps de l'article. ", count: 40),
-            annotation: annotated ? "À relire" : nil
+            url: URL(string: "https://example.com/1"),
+            author: "Camille Dupuis",
+            feedTitle: "Le Quotidien",
+            publishedAt: now.addingTimeInterval(-3600),
+            markedAt: now
         )
     }
 
-    @Test("A kept article is described to Spotlight by what a reader would search for")
+    @Test("A marked article is described to Spotlight by what a reader would search for")
     func attributes() throws {
         let item = self.item()
         let searchable = SpotlightIndex.searchableItem(for: item)
@@ -70,7 +65,7 @@ struct SpotlightIndexTests {
         #expect((attributes.textContent?.count ?? 0) > 300)
     }
 
-    @Test("What the library never purges, Spotlight never expires")
+    @Test("What a purge never takes, Spotlight never expires")
     func expiry() throws {
         #expect(SpotlightIndex.searchableItem(for: item()).expirationDate == .distantFuture)
     }

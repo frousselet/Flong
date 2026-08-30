@@ -155,7 +155,8 @@ struct SearchTests {
         #expect(try await search("is:starred") == ["Concurrency, one year on"])
         #expect(try await search("has:media") == ["Concurrency, one year on"])
         #expect(try await search("has:fulltext").count == 3)
-        #expect(try await search("is:library").isEmpty)
+        #expect(try await search("is:collected").isEmpty)
+        #expect(try await search("is:annotated").isEmpty)
     }
 
     @Test("A language narrows it to what can be read")

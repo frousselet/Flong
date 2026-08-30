@@ -110,23 +110,23 @@ struct FullTextTests {
         #expect(requests.withLock { $0 } == 1)
     }
 
-    @Test("Keeping an article keeps the fullest version there is")
-    func keptWhole() async throws {
+    @Test("A fetched page is what the article holds from then on")
+    func fetchedWhole() async throws {
         let entry = try await add(summary: "Le ministère envisage de décaler la rentrée.")
         try serve("article.html")
         defer { server.reset() }
 
         await fullText.extract(entry.id)
 
-        let library = LibraryStore(database)
-        try await library.setStarred([entry.id], to: true, at: now)
-        let item = try #require(try await library.allItems().first)
+        // There is one article and no frozen second copy, so what the page
+        // gave is what starring, searching and Spotlight all see.
+        let articles = ArticleStore(database)
+        try await articles.setStarred([entry.id], to: true)
 
-        // The library exists so that what was kept survives its source. A
-        // frozen summary of something the reader read whole would not.
-        #expect(item.contentHTML?.contains("les fédérations de parents d'élèves") == true)
-        // And it is searched by the words it actually holds.
-        #expect(item.plainText?.contains("fédérations de parents") == true)
+        let article = try #require(await articles.article(id: entry.id))
+        #expect(article.extractedHTML?.contains("les fédérations de parents d'élèves") == true)
+        let marked = try #require(await articles.marked([entry.id]).first)
+        #expect(marked.plainText?.contains("fédérations de parents") == true)
     }
 
     // MARK: - What is never fetched

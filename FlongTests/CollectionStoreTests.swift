@@ -20,25 +20,25 @@ import Testing
 struct CollectionStoreTests {
     private let database: AppDatabase
     private let subscriptions: SubscriptionStore
-    private let library: LibraryStore
+    private let articles: ArticleStore
     private let collections: CollectionStore
     private let now = Date(timeIntervalSince1970: 1_787_646_600)
 
     init() throws {
         database = try AppDatabase.inMemory()
         subscriptions = SubscriptionStore(database)
-        library = LibraryStore(database)
+        articles = ArticleStore(database)
         collections = CollectionStore(database)
     }
 
-    private func kept(_ title: String) async throws -> LibraryItem {
+    private func article(_ title: String) async throws -> Entry {
         let feed = try await subscriptions.subscribe(
             to: Subscription(address: "https://a.example.com/\(title).xml", title: "A")
         ).feed
         var entry = Entry(feedID: feed.id, guid: "urn:\(title)", title: title, receivedAt: now)
         entry.hasMedia = false
         try await database.writer.write { db in try entry.insert(db) }
-        return try #require(await library.promote([entry.id], at: now).kept.first)
+        return entry
     }
 
     // MARK: - Naming
@@ -82,13 +82,13 @@ struct CollectionStoreTests {
 
     @Test("An article goes in, comes out, and the collection survives being emptied")
     func filling() async throws {
-        let article = try await kept("un")
+        let article = try await self.article("un")
         _ = try await collections.create("À lire", at: now)
 
         try await collections.add([article.id], to: "À lire", at: now)
         #expect(try await collections.collections(of: article.id) == ["À lire"])
         #expect(try await collections.made().first?.count == 1)
-        #expect(try await library.summaries(in: .made("À lire")).map(\.title) == ["un"])
+        #expect(try await articles.summaries(in: .made("À lire")).map(\.title) == ["un"])
 
         try await collections.remove([article.id], from: "À lire")
         #expect(try await collections.collections(of: article.id).isEmpty)
@@ -100,7 +100,7 @@ struct CollectionStoreTests {
 
     @Test("One article can be in several, and each of them knows")
     func several() async throws {
-        let article = try await kept("un")
+        let article = try await self.article("un")
         try await collections.add([article.id], to: "À lire", at: now)
         try await collections.add([article.id], to: "Thèse", at: now)
 
@@ -110,7 +110,7 @@ struct CollectionStoreTests {
 
     @Test("Renaming keeps what is in it, and throwing one away keeps the articles")
     func renamingAndDeleting() async throws {
-        let article = try await kept("un")
+        let article = try await self.article("un")
         try await collections.add([article.id], to: "À lire", at: now)
 
         _ = try await collections.rename("À lire", to: "Lu")
@@ -118,14 +118,14 @@ struct CollectionStoreTests {
 
         try await collections.delete("Lu")
         #expect(try await collections.made().isEmpty)
-        // A collection is a way of looking at what was kept. Putting the way of
+        // A collection is a way of looking at articles. Putting the way of
         // looking away does not throw anything out.
-        #expect(try await library.count() == 1)
+        #expect(try await articles.summaries(.all, now: now).count == 1)
     }
 
     @Test("What another device says is the whole truth about an article")
     func settingReplaces() async throws {
-        let article = try await kept("un")
+        let article = try await self.article("un")
         try await collections.add([article.id], to: "À lire", at: now)
         try await collections.add([article.id], to: "Thèse", at: now)
 
@@ -138,22 +138,16 @@ struct CollectionStoreTests {
 
     @Test("A collection says what it holds, and holds what it says")
     func theCountAgreesWithTheContents() async throws {
-        let feed = try await subscriptions.subscribe(
-            to: Subscription(address: "https://a.example.com/f.xml", title: "A")
-        ).feed
-        var entry = Entry(feedID: feed.id, guid: "urn:1", title: "Un", receivedAt: now)
-        entry.hasMedia = false
-        try await database.writer.write { db in try entry.insert(db) }
+        let entry = try await self.article("un")
 
         // Starred, filed, then unstarred. The reader has said the article is
         // not a favourite ; they have not said it is out of the collection.
-        try await library.setStarred([entry.id], to: true, at: now)
-        let item = try #require(await library.item(guid: "urn:1", feedURL: feed.url))
-        try await collections.add([item.id], to: "Thèse", at: now)
-        try await library.setStarred([entry.id], to: false, at: now)
+        try await articles.setStarred([entry.id], to: true)
+        try await collections.add([entry.id], to: "Thèse", at: now)
+        try await articles.setStarred([entry.id], to: false)
 
         let shelf = try #require(await collections.made().first)
-        let inside = try await library.summaries(in: .made("Thèse"))
+        let inside = try await articles.summaries(in: .made("Thèse"))
 
         // A count is a promise about what is inside, and a square saying two
         // over a page showing one is the promise broken.
@@ -161,79 +155,58 @@ struct CollectionStoreTests {
         #expect(inside.count == 1)
     }
 
-    @Test("Unstarring an article read from the library does not empty its collections")
+    @Test("Unstarring an article does not empty its collections")
     func unstarringKeepsTheFilings() async throws {
-        let article = try await kept("un")
+        let article = try await self.article("un")
         try await collections.add([article.id], to: "Thèse", at: now)
         try await collections.add([article.id], to: "Presse", at: now)
+        try await articles.setStarred([article.id], to: true)
 
-        // What the star in an article's own bar does, when that article was
-        // opened from the library : the copy is addressed by its own identity,
-        // and this used to throw the whole thing away.
-        _ = try await library.unstar([article.id], at: now)
+        // What the star in an article's own bar does. There used to be a
+        // second copy of the article behind the star, and unstarring threw the
+        // copy away and every filing with it.
+        try await articles.setStarred([article.id], to: false)
 
         #expect(try await collections.collections(of: article.id) == ["Presse", "Thèse"])
-        #expect(try await library.count() == 1)
-        #expect(try await library.summaries(in: .builtIn(.starred)).isEmpty)
-        #expect(try await library.summaries(in: .made("Thèse")).count == 1)
+        #expect(try await articles.summaries(in: .builtIn(.starred)).isEmpty)
+        #expect(try await articles.summaries(in: .made("Thèse")).count == 1)
     }
 
-    @Test("Unstarring an article nothing else keeps takes the copy with it")
-    func unstarringTheLastReason() async throws {
-        let article = try await kept("un")
-
-        _ = try await library.unstar([article.id], at: now)
-
-        // No note and no collection : the star was the only reason it was
-        // kept, and taking it off is taking the reason away.
-        #expect(try await library.count() == 0)
-    }
-
-    @Test("The star on an article read from the library goes both ways")
-    func starringFromTheLibrary() async throws {
-        // Kept for a collection and never starred, which is what the star in
-        // its own bar could not do anything about.
-        let article = try await kept("un")
+    @Test("The star goes both ways on an article that was never starred")
+    func starringGoesBothWays() async throws {
+        // Filed and never starred, which is what the star in its own bar could
+        // not do anything about.
+        let article = try await self.article("un")
         try await collections.add([article.id], to: "Thèse", at: now)
-        #expect(try await library.summaries(in: .builtIn(.starred)).isEmpty)
+        #expect(try await articles.summaries(in: .builtIn(.starred)).isEmpty)
 
-        _ = try await library.star([article.id], at: now)
-        #expect(try await library.summaries(in: .builtIn(.starred)).count == 1)
+        try await articles.setStarred([article.id], to: true)
+        #expect(try await articles.summaries(in: .builtIn(.starred)).count == 1)
 
-        _ = try await library.unstar([article.id], at: now)
-        #expect(try await library.summaries(in: .builtIn(.starred)).isEmpty)
+        try await articles.setStarred([article.id], to: false)
+        #expect(try await articles.summaries(in: .builtIn(.starred)).isEmpty)
         // And it is still filed, through both.
         #expect(try await collections.collections(of: article.id) == ["Thèse"])
     }
 
-    @Test("An article thrown out of the library leaves no phantom behind")
-    func removingClearsTheBindings() async throws {
-        let article = try await kept("un")
-        try await collections.add([article.id], to: "Thèse", at: now)
-        #expect(try await collections.made().first?.count == 1)
-
-        _ = try await library.remove([article.id])
-
-        // The copy is gone on purpose here, and the collection has to know :
-        // a binding carries no foreign key, so nothing removes it on its own.
-        #expect(try await collections.made().first?.count == 0)
-        #expect(try await library.summaries(in: .made("Thèse")).isEmpty)
-    }
-
     // MARK: - Between devices
 
-    @Test("A filing travels on the article, not on a record of its own")
+    @Test("A filing travels on the article's own mark, not on a record of its own")
     func membershipTravels() async throws {
         let zone = CKRecordZone.ID(zoneName: SyncRecords.zoneName, ownerName: CKCurrentUserDefaultName)
-        let article = try await kept("un")
+        let article = try await self.article("un")
         try await collections.add([article.id], to: "À lire", at: now)
 
-        let record = SyncRecords.record(for: article, collections: ["À lire"], in: zone)
-        #expect(SyncRecords.collections(from: record) == ["À lire"])
+        let mark = try #require(await MarkStore(database).all().first)
+        #expect(mark.collections == ["À lire"])
+        // Filed and not starred is something to say, and is sent.
+        #expect(!mark.isEmpty)
 
-        // A kept article already has a record. A membership is one more field
-        // on it and not one more record, which is the whole budget.
-        #expect(record.recordType == SyncRecords.RecordType.libraryItem)
+        // A marked article has a record already. A filing is one more field on
+        // it and never one more record, which is the whole budget.
+        let record = SyncRecords.record(for: mark, in: zone)
+        #expect(record.recordType == SyncRecords.RecordType.mark)
+        #expect(SyncRecords.mark(from: record) == mark)
     }
 
     @Test("An empty collection travels on its own record, since nothing else carries it")

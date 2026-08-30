@@ -35,7 +35,7 @@ The stream is a cache. It is purged by age and by volume, and that is the mechan
 
 - **By age**, with a default of thirty days.
 - **By volume**, against the real size of the store, `page_count` times `page_size`. Articles go oldest first, in batches, and the file is rewritten afterwards, since deleted rows leave their pages behind and the file would otherwise never shrink.
-- **What the reader kept is never purged.** A starred article survives, and so will a library item once M2 introduces one.
+- **What the reader marked is never purged.** Starred, written on, or filed in a collection : the three are one condition, and a purge that spared only the stars would take the article somebody wrote three paragraphs on.
 
 ## Refreshing many feeds
 
@@ -55,7 +55,7 @@ The body is read **after** sanitizing, never before : the sanitizer has already 
 
 **A thumbnail is not an enclosure.** It used to be counted as one, which put a media badge on every article of a feed that merely illustrates its headlines. `media:thumbnail` and `itunes:image` are statements about the article ; `enclosure` and `media:content` are files attached to it, and only those make an article carry media.
 
-Only the address is stored, never the file. It travels to the library with the rest of a kept article, so a picture can go dead on the publisher's side while the text stays : that is the deal, and it is why the text is copied and the picture is not.
+Only the address is stored, never the file. It travels with the article, so a picture can go dead on the publisher's side while the text stays : that is the deal, and it is why the text travels and the picture does not.
 
 A publisher who illustrates an article after publishing it is improving it, so a refresh takes the new picture ; one who drops it has usually just reworded the feed, and the picture already shown stays.
 

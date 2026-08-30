@@ -22,7 +22,7 @@ import OSLog
 /// device.
 ///
 /// A language the system has no embedding for simply has no vector, and the
-/// library search falls back on matching words. That is the whole failure mode.
+/// search falls back on matching words. That is the whole failure mode.
 nonisolated struct Embedder: Sendable {
     /// How much of an article is worth embedding.
     ///
@@ -52,14 +52,15 @@ nonisolated struct Embedder: Sendable {
         )
     }
 
-    func vector(for item: LibraryItem) -> ArticleVector? {
-        vector(title: item.title, text: item.plainText, language: item.language)
+    /// The vector of an article, whose text lives beside it rather than on it.
+    func vector(for item: Entry, text: String?) -> ArticleVector? {
+        vector(title: item.title, text: text, language: item.language)
     }
 
     /// The vector of a phrase, in the language a given model speaks.
     ///
     /// A query is short and often has no language of its own to detect, so it is
-    /// embedded once per model the library actually holds rather than once, in a
+    /// embedded once per model there actually is rather than once, in a
     /// language guessed from four words.
     func vector(text: String, model: String) -> ArticleVector? {
         guard let language = Self.language(ofModel: model) else { return nil }

@@ -314,12 +314,10 @@ struct ArticleScreen: View {
                     Divider()
                 }
 
-                if article.origin == .stream {
-                    Button {
-                        Task { await model.markCurrentUnread() }
-                    } label: {
-                        Label("Mark as unread", systemImage: "circle")
-                    }
+                Button {
+                    Task { await model.markCurrentUnread() }
+                } label: {
+                    Label("Mark as unread", systemImage: "circle")
                 }
 
                 if let url = article.url {

@@ -89,7 +89,9 @@ nonisolated enum QueryCompiler {
         case .read: "e.is_read = 1"
         case .starred: "e.is_starred = 1"
         case .media: "e.has_media = 1"
-        case .library: "EXISTS (SELECT 1 FROM library_item l WHERE l.entry_id = e.id)"
+        case .collected:
+            "EXISTS (SELECT 1 FROM tag_binding b WHERE b.target_kind = 'entry' AND b.target_id = e.id)"
+        case .annotated: "COALESCE(e.annotation, '') <> ''"
         case .fulltext:
             "EXISTS (SELECT 1 FROM entry_body b WHERE b.entry_id = e.id AND COALESCE(b.plain_text, '') <> '')"
         }

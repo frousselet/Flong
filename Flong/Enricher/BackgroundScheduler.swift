@@ -93,8 +93,8 @@ nonisolated enum BackgroundScheduler {
 
         private static func scheduleProcessing() {
             let request = BGProcessingTaskRequest(identifier: processingIdentifier)
-            // Vectorizing a library is minutes of work, which is a phone on
-            // charge and not a phone in a pocket.
+            // Vectorizing is minutes of work, which is a phone on charge and
+            // not a phone in a pocket.
             request.requiresExternalPower = true
             request.requiresNetworkConnectivity = false
             request.earliestBeginDate = Date(timeIntervalSinceNow: 2 * 60 * 60)

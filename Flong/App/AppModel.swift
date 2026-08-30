@@ -19,7 +19,7 @@ nonisolated struct SidebarItem: Identifiable, Hashable, Sendable {
     /// that changes when a feed is renamed.
     enum Kind: Hashable {
         case digest
-        case unread, today, library, starred, all
+        case unread, today, starred, all
         case folder(String)
         case feed(UUID)
     }
@@ -42,10 +42,7 @@ nonisolated struct SidebarItem: Identifiable, Hashable, Sendable {
         case .today: .today
         case .starred: .starred
         // The digest reads the stories, not a view of the stream.
-        case .digest: .all
-        // The library is not a view over the stream : it is its own table, and
-        // the list reads it directly.
-        case .library, .all: .all
+        case .digest, .all: .all
         case .folder(let path): .folder(path)
         case .feed(let id): .feed(id)
         }
@@ -87,8 +84,8 @@ final class AppModel {
     private let database: AppDatabase
     private let subscriptions: SubscriptionStore
     private let articles: ArticleStore
-    private let library: LibraryStore
     private let collectionStore: CollectionStore
+    private let marks: MarkStore
     private let spotlight: SpotlightIndex
     private let digestService: DigestService
     private var cloud: CloudSync?
@@ -118,9 +115,8 @@ final class AppModel {
 
     /// What is in the collection the reader has opened.
     ///
-    /// Held here rather than in the screen alone so that opening one of them
-    /// knows it came from the library : an article the window cannot place is
-    /// looked for in the stream, where a kept copy is not.
+    /// Held here rather than in the screen alone so that a row tapped in a
+    /// collection is one the window can place when it opens it.
     private(set) var collectionArticles: [ArticleSummary] = []
     private(set) var article: Article?
     /// Whether the page an article lives at is being fetched, so the reader is
@@ -326,11 +322,11 @@ final class AppModel {
         self.picture = preferences.picture.flatMap(ProfilePicture.image)
         let subscriptions = SubscriptionStore(database)
         self.subscriptions = subscriptions
-        self.articles = ArticleStore(database)
-        let library = LibraryStore(database)
-        self.library = library
+        let articles = ArticleStore(database)
+        self.articles = articles
         self.collectionStore = CollectionStore(database)
-        self.spotlight = SpotlightIndex(library)
+        self.marks = MarkStore(database)
+        self.spotlight = SpotlightIndex(articles)
         self.digestService = DigestService(database)
         self.refresher = FeedRefresh(database: database, fetcher: fetcher, credentials: credentials)
         self.retention = Retention(database)
@@ -342,7 +338,7 @@ final class AppModel {
     var smartLists: [SidebarItem] {
         sidebar.filter { item in
             switch item.kind {
-            case .digest, .unread, .today, .library, .starred, .all: true
+            case .digest, .unread, .today, .starred, .all: true
             default: false
             }
         }
@@ -582,10 +578,8 @@ final class AppModel {
         await doOutstandingWork()
     }
 
-    private func enqueueVectors(for items: [LibraryItem]) async {
-        await cloud?.enqueue(
-            recordNames: items.map { SyncRecords.name(forLibraryItemWithGUID: $0.guid, feedURL: $0.feedURL) }
-        )
+    private func enqueueVectors(for entries: [Entry]) async {
+        await enqueueMarks(for: entries.map(\.id))
     }
 
     /// What a background refresh does with the half minute it is given.
@@ -676,7 +670,7 @@ final class AppModel {
         }
     }
 
-    /// Writes the library to Spotlight when the two have drifted apart.
+    /// Writes the marked articles to Spotlight when the two have drifted apart.
     ///
     /// Spotlight keeps the record of what it holds, so an index it has lost is
     /// an index Flong writes again, without being told.
@@ -684,7 +678,7 @@ final class AppModel {
         do {
             try await spotlight.rebuildIfNeeded()
         } catch {
-            Log.index.error("The library could not be handed to Spotlight : \(error, privacy: .public)")
+            Log.index.error("The marks could not be handed to Spotlight : \(error, privacy: .public)")
         }
     }
 
@@ -692,29 +686,48 @@ final class AppModel {
     func open(spotlightIdentifier: String) async {
         guard let id = UUID(uuidString: spotlightIdentifier) else { return }
 
-        selection = .library
+        selection = .all
         await loadArticles()
         selectedArticle = id
     }
 
-    private func apply(_ change: LibraryChange) async {
-        guard !change.isEmpty else { return }
+    /// Tells Spotlight and the other devices that the reader marked something.
+    ///
+    /// An article the reader has just unmarked entirely is the interesting
+    /// case : it has nothing left to send, and that is exactly when the other
+    /// devices most need to hear from it. So the record is deleted rather than
+    /// left standing, and the deletion is what carries the `no`.
+    private func apply(marks ids: [UUID]) async {
+        guard !ids.isEmpty else { return }
 
         do {
-            try await spotlight.index(change.kept)
-            try await spotlight.remove(change.released.map(\.id))
+            let marked = try await articles.marked(ids)
+            try await spotlight.index(marked)
+
+            let stillMarked = Set(marked.map(\.id))
+            try await spotlight.remove(ids.filter { !stillMarked.contains($0) })
         } catch {
-            Log.index.error("Spotlight could not be told about the library : \(error, privacy: .public)")
+            Log.index.error("Spotlight could not be told about a mark : \(error, privacy: .public)")
+        }
+
+        await enqueueMarks(for: ids)
+    }
+
+    private func enqueueMarks(for ids: [UUID]) async {
+        guard let identities = try? await marks.identities(of: ids), !identities.isEmpty else { return }
+        let standing = Set((try? await marks.marks(of: ids))?.filter { !$0.isEmpty }.map(\.guid) ?? [])
+
+        var saved: [String] = []
+        var deleted: [String] = []
+        for identity in identities {
+            let name = SyncRecords.name(forMarkWithGUID: identity.guid, feedURL: identity.feedURL)
+            if standing.contains(identity.guid) { saved.append(name) } else { deleted.append(name) }
         }
 
         // The other devices hear about it on the next exchange, which the
         // engine schedules for itself.
-        await cloud?.enqueue(
-            recordNames: change.kept.map { SyncRecords.name(forLibraryItemWithGUID: $0.guid, feedURL: $0.feedURL) }
-        )
-        await cloud?.enqueue(
-            deletions: change.released.map { SyncRecords.name(forLibraryItemWithGUID: $0.guid, feedURL: $0.feedURL) }
-        )
+        await cloud?.enqueue(recordNames: saved)
+        await cloud?.enqueue(deletions: deleted)
     }
 
     func loadSidebar() async {
@@ -726,7 +739,6 @@ final class AppModel {
                 SidebarItem(kind: .digest, title: nil, unreadCount: 0),
                 SidebarItem(kind: .unread, title: nil, unreadCount: try await articles.count(.unread)),
                 SidebarItem(kind: .today, title: nil, unreadCount: try await articles.count(.today)),
-                SidebarItem(kind: .library, title: nil, unreadCount: 0),
                 SidebarItem(kind: .starred, title: nil, unreadCount: 0),
                 SidebarItem(kind: .all, title: nil, unreadCount: 0),
             ]
@@ -766,9 +778,6 @@ final class AppModel {
         )
     }
 
-    /// Whether the list is showing the library rather than a view of the stream.
-    var isShowingLibrary: Bool { selection == .library }
-
     /// The name of a feed or a folder, for a screen that only has its identity.
     func title(of kind: SidebarItem.Kind) -> String? {
         sidebar.flatMap { [$0] + $0.children }.first { $0.kind == kind }?.title
@@ -776,11 +785,8 @@ final class AppModel {
 
     func loadArticles() async {
         do {
-            summaries =
-                isShowingLibrary
-                ? try await library.summaries(matching: searchText)
-                : try await articles.summaries(filter, matching: query)
-            dailyCounts = isShowingLibrary ? [:] : try await articles.dailyCounts(filter, matching: query)
+            summaries = try await articles.summaries(filter, matching: query)
+            dailyCounts = try await articles.dailyCounts(filter, matching: query)
             if let selectedArticle, !summaries.contains(where: { $0.id == selectedArticle }) {
                 self.selectedArticle = nil
             }
@@ -836,53 +842,49 @@ final class AppModel {
     private(set) var articleCollections: [String] = []
 
     func loadArticleCollections() async {
-        guard let id = article?.id, article?.origin == .library else {
+        guard let id = article?.id else {
             articleCollections = []
             return
         }
         articleCollections = (try? await collectionStore.collections(of: id)) ?? []
     }
 
-    /// Puts the article being read into a collection, keeping it in the
-    /// process : an article has to be kept before it can be filed.
+    /// Puts the article being read into a collection.
+    ///
+    /// There is nothing to promote or copy first : the article is the article,
+    /// wherever it is shown, and filing it is one row saying so.
     func fileArticle(in name: String) async {
         guard let opened = article else { return }
 
         do {
-            let item: LibraryItem?
-            if opened.origin == .library {
-                item = try await library.item(id: opened.id)
-            } else {
-                item = try await library.promote([opened.id]).kept.first
-            }
-            guard let item else { return }
-
-            try await collectionStore.add([item.id], to: name)
+            try await collectionStore.add([opened.id], to: name)
             await loadArticleCollections()
             await loadCollections()
-            await refreshCounts(markingRead: nil)
+            await apply(marks: [opened.id])
         } catch {
             Log.store.error("The article could not be filed : \(error, privacy: .public)")
         }
     }
 
     func unfileArticle(from name: String) async {
-        guard let opened = article, opened.origin == .library else { return }
+        guard let opened = article else { return }
+
         try? await collectionStore.remove([opened.id], from: name)
         await loadArticleCollections()
         await loadCollections()
+        await apply(marks: [opened.id])
     }
 
     func loadCollection(_ kind: ArticleCollection.Kind) async {
         do {
-            // A dynamic one is a description answered by every article there
-            // is, so it is asked of the stream. The other two are lists of
-            // kept articles, so they are asked of the library.
+            // A dynamic one is a description, so it is answered by the same
+            // query path any other search goes through. The other two are
+            // memberships, which the articles carry themselves.
             if case .dynamic(let name) = kind {
                 let query = try await collectionStore.query(of: name) ?? ""
                 collectionArticles = try await articles.summaries(.all, matching: QueryParser.parse(query))
             } else {
-                collectionArticles = try await library.summaries(in: kind)
+                collectionArticles = try await articles.summaries(in: kind)
             }
         } catch {
             Log.store.error("A collection could not be read : \(error, privacy: .public)")
@@ -901,23 +903,12 @@ final class AppModel {
             return
         }
 
-        let known = summaries + storyArticles.values.flatMap { $0 } + looseArticles + collectionArticles
-        let origin = known.first { $0.id == selectedArticle }?.origin ?? .stream
-
         do {
-            switch origin {
-            case .library:
-                // A kept article was read the day it was kept, and reading it
-                // again changes nothing about it.
-                article = try await library.article(id: selectedArticle)
-
-            case .stream:
-                article = try await articles.article(id: selectedArticle)
-                // Opening an article is what marks it read. Nothing waits on
-                // anything : the row changes now.
-                try await articles.setRead([selectedArticle], to: true)
-                await refreshCounts(markingRead: selectedArticle)
-            }
+            article = try await articles.article(id: selectedArticle)
+            // Opening an article is what marks it read. Nothing waits on
+            // anything : the row changes now.
+            try await articles.setRead([selectedArticle], to: true)
+            await refreshCounts(markingRead: selectedArticle)
         } catch {
             Log.store.error("The article could not be opened : \(error, privacy: .public)")
         }
@@ -980,28 +971,20 @@ final class AppModel {
         }
     }
 
-    /// Stars an article, which is what keeps it, or lets go of a kept one.
+    /// Puts an article in the favourites, or takes it back out.
     func toggleStarred(_ summary: ArticleSummary) async {
         do {
-            switch summary.origin {
-            case .stream:
-                let change = try await library.setStarred([summary.id], to: !summary.isStarred)
-                if let index = summaries.firstIndex(where: { $0.id == summary.id }) {
-                    summaries[index].isStarred = !summary.isStarred
-                }
-                await apply(change)
-                await loadSidebar()
+            try await articles.setStarred([summary.id], to: !summary.isStarred)
 
-            case .library:
-                // The same sentence as the star in an article's own bar, and a
-                // toggle for the same reason.
-                await apply(
-                    summary.isStarred
-                        ? try await library.unstar([summary.id])
-                        : try await library.star([summary.id])
-                )
-                await load()
+            if let index = summaries.firstIndex(where: { $0.id == summary.id }) {
+                summaries[index].isStarred = !summary.isStarred
             }
+            if let index = collectionArticles.firstIndex(where: { $0.id == summary.id }) {
+                collectionArticles[index].isStarred = !summary.isStarred
+            }
+
+            await apply(marks: [summary.id])
+            await loadSidebar()
         } catch {
             Log.store.error("The starred state could not be changed : \(error, privacy: .public)")
         }
@@ -1012,32 +995,19 @@ final class AppModel {
         guard let article else { return }
 
         do {
-            switch article.origin {
-            case .stream:
-                let isStarred = !article.isStarred
-                await apply(try await library.setStarred([article.id], to: isStarred))
+            let isStarred = !article.isStarred
+            try await articles.setStarred([article.id], to: isStarred)
 
-                self.article?.isStarred = isStarred
-                if let index = summaries.firstIndex(where: { $0.id == article.id }) {
-                    summaries[index].isStarred = isStarred
-                }
-                await loadSidebar()
-
-            case .library:
-                // A toggle, both ways. It only ever unstarred, so the star did
-                // nothing at all on an article kept for a note or a collection,
-                // which is every article that is filed and not a favourite.
-                let isStarred = !article.isStarred
-                let change =
-                    isStarred
-                    ? try await library.star([article.id])
-                    : try await library.unstar([article.id])
-                await apply(change)
-
-                self.article?.isStarred = isStarred
-                await loadArticleCollections()
-                await load()
+            self.article?.isStarred = isStarred
+            if let index = summaries.firstIndex(where: { $0.id == article.id }) {
+                summaries[index].isStarred = isStarred
             }
+            if let index = collectionArticles.firstIndex(where: { $0.id == article.id }) {
+                collectionArticles[index].isStarred = isStarred
+            }
+
+            await apply(marks: [article.id])
+            await loadSidebar()
         } catch {
             Log.store.error("The starred state could not be changed : \(error, privacy: .public)")
         }
@@ -1045,12 +1015,10 @@ final class AppModel {
 
     /// Puts the article being read back in the unread pile, and closes it.
     ///
-    /// A kept article has no unread state to go back to.
-    ///
     /// Reading an article marks it read, so the only way this is ever asked for
     /// is deliberately, to come back to it later.
     func markCurrentUnread() async {
-        guard let article, article.origin == .stream else { return }
+        guard let article else { return }
 
         do {
             try await articles.setRead([article.id], to: false)
