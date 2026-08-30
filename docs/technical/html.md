@@ -34,6 +34,8 @@ An element that is not on the list does not survive, and neither does an attribu
 
 **Addresses are checked, not trusted.** Every `href`, `src`, `cite` and `poster` is resolved against the article address, so the relative links a feed serves still work, and kept only when it ends up as `http`, `https` or `mailto`. A `javascript:` link is not a link ; the element is unwrapped and its text stays.
 
+**What the view fetches is raised to TLS, and what the browser opens is not.** A `src` or a `poster` is fetched by the view rendering the article, and App Transport Security refuses a plain `http` request outright : the picture is missing, the console holds a `-1022`, and nothing on screen says why. A feed written years ago states `http` for its pictures long after the site started serving TLS, and the old address goes on working in a browser only because the server redirects, which `URLSession` never gets far enough to be told. So `src` and `poster` are raised. An `href` is left exactly as the publisher wrote it : it is handed to the browser, which is not bound by this policy and has its own opinion about upgrading, and rewriting one would break the few sites that genuinely serve nothing but `http`.
+
 **Links hand nothing to where they go.** `rel="noopener noreferrer"` is forced on every link that survives.
 
 **Tracking pixels are dropped.** An image whose width or height is zero or one is there to count readers, not to be seen. Opening an article should not tell the publisher who read it and when, and with no server of its own Flong cannot proxy the request away.
