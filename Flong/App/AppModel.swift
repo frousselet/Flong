@@ -412,14 +412,17 @@ final class AppModel {
                 // and during the reload collapses into one further tick.
                 try? await Task.sleep(for: StoreChanges.settling)
 
-                // A refresh the reader asked for writes throughout, so the tick
-                // that outlives it is the one it caused itself. Waiting for the
-                // gesture to finish and then dropping that tick is what keeps
-                // the page from being rebuilt the moment it settles.
+                // A refresh the reader asked for writes throughout, and
+                // SwiftUI holds its control out until the gesture's work
+                // returns. Nothing may move under it : the page is read back
+                // once the gesture is over and the control has had time to
+                // retract, which is also the reload that gesture needs.
+                var waited = false
                 while await self?.isRefreshing == true {
+                    waited = true
                     try? await Task.sleep(for: StoreChanges.settling)
                 }
-                guard await self?.hasJustRefreshed == false else { continue }
+                if waited { try? await Task.sleep(for: StoreChanges.settling) }
 
                 await self?.reloadWhatIsShown()
             }
@@ -440,18 +443,6 @@ final class AppModel {
         ticking?.cancel()
     }
 
-    /// When the reader's own refresh last finished reading everything back.
-    private var refreshedAt = Date.distantPast
-
-    /// Whether that was recent enough that a tick is the refresh's own echo.
-    ///
-    /// The observation cannot tell who wrote. What it can tell is that the
-    /// reader asked for a refresh a moment ago and that everything has already
-    /// been read back for them, which is the same answer.
-    private var hasJustRefreshed: Bool {
-        Date().timeIntervalSince(refreshedAt) < StoreChanges.echo
-    }
-
     /// How often an open window asks the publishers.
     ///
     /// A window open all day asked nobody anything : the only foreground
@@ -468,15 +459,9 @@ final class AppModel {
     /// reader is about to come back to. The list is read again the moment they
     /// are looking at it.
     private func reloadWhatIsShown() async {
-        // Not while the reader is pulling. A refresh they asked for writes a
-        // great deal, so it ticks repeatedly, and every tick replaced the page
-        // under the refresh control : the scroll never settled back to where it
-        // started. `refreshAll` reads everything back itself when it is done,
-        // which is the one reload that gesture needs.
-        guard !isRefreshing else { return }
-
         await loadSidebar()
         await loadDigest()
+        await loadLooseArticles()
         await loadCollections()
         if selectedArticle == nil { await loadArticles() }
     }
@@ -1253,10 +1238,21 @@ final class AppModel {
     /// belongs to ``backgroundProcessing()``, which runs at rest on the mains
     /// and still does every bit of it.
     ///
-    /// What is left is what the reader asked for : every feed, the page read
-    /// again from what arrived, and the window read back. Every feed and not
-    /// only those that are due, because they asked ; the token bucket per host
-    /// is what keeps that polite to the publishers.
+    /// What is left is what the reader asked for : every feed, and the page
+    /// rebuilt from what arrived. Every feed and not only those that are due,
+    /// because they asked ; the token bucket per host is what keeps that polite
+    /// to the publishers.
+    ///
+    /// **It writes, and reads nothing back.** SwiftUI holds the refresh control
+    /// out until this returns and retracts it afterwards, so replacing the
+    /// page's content as the last thing before returning has the scroll view
+    /// begin that retraction against content it has never laid out : the space
+    /// left for the spinner is never reclaimed, and the page stays wedged down
+    /// by exactly its height with the large title still open.
+    ///
+    /// So the gesture writes and nothing more. The window follows the store and
+    /// reads itself back once the control is gone, which is what
+    /// ``keepUp()`` is for.
     func refreshAll() async {
         guard !isRefreshing else { return }
         isRefreshing = true
@@ -1264,14 +1260,6 @@ final class AppModel {
 
         _ = await refresher.refreshAll()
         await digestService.rebuild()
-
-        // The rebuild wrote new stories, briefs and subjects. Reading the
-        // feeds back without reading the page back would leave the reader
-        // looking at the page from before the pull.
-        await load()
-        await loadDigest()
-        await loadLooseArticles()
-        refreshedAt = Date()
     }
 
     /// Refreshes the feeds that are due, on returning to the foreground.
