@@ -107,7 +107,7 @@ struct StoryScreen: View {
         Button {
             isExplaining = true
         } label: {
-            Label("Written by the model", systemImage: "sparkles")
+            Label("Written by the model", systemImage: "apple.intelligence")
                 .font(Editorial.metadata)
                 .foregroundStyle(.secondary)
         }

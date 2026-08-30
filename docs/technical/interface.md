@@ -117,7 +117,7 @@ It is still not an account. There is no account and nothing to sign in to, and t
 
 It holds the subjects, the sites the reader is signed in to, and the command to write the digest again, which had been buried at the foot of the sources list where it never belonged : the sources list is for the state of the machinery, and asking the model to write again is the reader's own decision.
 
-**The kept articles are called `Collections`, not `Bibliothèque`.** The specification's word for them is the library, and it stays the word everywhere the code and the documentation talk about the half of the store that is never purged : the split it names, stream against library, is the shape of the whole product. It is a poor label though. A library is a shelf of books, and what this section holds is articles somebody put aside ; `Bibliothèque` was also the longest of the four names in a bar that has to fit four. `Collections` is what Photos calls the same idea for the same reason, which means a reader has met it before. The icon follows the name off the shelf : a bookmark rather than a row of books.
+**The kept articles are called `Collections`, not `Bibliothèque`.** The specification's word for them is the library, and it stays the word everywhere the code and the documentation talk about the half of the store that is never purged : the split it names, stream against library, is the shape of the whole product. It is a poor label though. A library is a shelf of books, and what this section holds is articles somebody put aside ; `Bibliothèque` was also the longest of the four names in a bar that has to fit four. `Collections` is what Photos calls the same idea for the same reason, which means a reader has met it before. The icon follows the name off the shelf : a folder rather than a row of books, and the front page takes the house, being the page a reader lands on.
 
 **The sources came off the tab bar, which is now four sections and not five.** A tab names a place there is to read, and a folder tree is not one : it is something a reader touches when they are organizing, which is rarely, and the bar is better spent on reading.
 
@@ -161,6 +161,10 @@ A pill carries an arrow only when something was said about it. A row of arrows o
 The section under the pills is called `Stories`, never `Front page` : that is what the pill already says, and a page does not need to name itself twice. Narrowing to a subject renames the section to the subject, and leaves the other pills on screen : take them away and the way back is a button that is no longer there.
 
 Where there is no model there are no subjects, and no pills at all. The front page is entire on its own, which is what section 14 asks of every path that touches the model.
+
+**What the model wrote wears Apple's own mark.** `apple.intelligence` rather than `sparkles`, on the line that says a story was written by the model, on the story's own page, and on the command to write the digest again. It says which model, which is more than a generic shimmer says, and a reader who has seen it elsewhere on the system knows what it means.
+
+It is worth knowing that the symbol is a restricted one. It sits in `symbol_restrictions.strings` beside `apple.logo`, `siri` and `safari`, the set Apple reserves for depictions of its own products and features. It renders perfectly in a third party application, so this is a licensing question rather than a technical one, and it is a question to have answered before the application is submitted.
 
 ## What the model wrote, and how to refuse it
 

@@ -64,7 +64,7 @@ struct ReaderMenu: View {
             Button {
                 Task { await model.rewriteDigest() }
             } label: {
-                Label("Write the digest again", systemImage: "sparkles")
+                Label("Write the digest again", systemImage: "apple.intelligence")
             }
             .disabled(model.isRewriting || OnDeviceModel.absence != nil)
         } label: {

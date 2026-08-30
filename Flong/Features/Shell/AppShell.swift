@@ -62,7 +62,7 @@ struct AppShell: View {
 
     var body: some View {
         TabView(selection: $section) {
-            Tab("Digest", systemImage: "sparkles.rectangle.stack", value: AppSection.digest) {
+            Tab("Digest", systemImage: "house", value: AppSection.digest) {
                 stack($digestPath) {
                     DigestScreen(
                         model: model,
@@ -96,7 +96,7 @@ struct AppShell: View {
                 }
             }
 
-            Tab("Collections", systemImage: "bookmark", value: AppSection.library) {
+            Tab("Collections", systemImage: "folder", value: AppSection.library) {
                 stack($libraryPath) {
                     ArticleFeedScreen(model: model, kind: .library, menu: { libraryPath.append($0) }) {
                         libraryPath.append(.article($0))
