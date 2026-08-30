@@ -716,6 +716,54 @@
         }
       }
     },
+    "Écologie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Climate"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écologie"
+          }
+        }
+      }
+    },
+    "Économie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Business"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Économie"
+          }
+        }
+      }
+    },
+    "Éducation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Education"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Éducation"
+          }
+        }
+      }
+    },
     "Everything here has been read." : {
       "localizations" : {
         "fr" : {
@@ -1059,17 +1107,6 @@
         }
       }
     },
-    "My collections" : {
-      "comment" : "The band of squares the reader made deliberately",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mes collections"
-          }
-        }
-      }
-    },
     "Médias" : {
       "localizations" : {
         "en" : {
@@ -1082,6 +1119,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Médias"
+          }
+        }
+      }
+    },
+    "My collections" : {
+      "comment" : "The band of squares the reader made deliberately",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mes collections"
           }
         }
       }
@@ -1896,6 +1944,7 @@
       }
     },
     "The system model reads the page and sorts it into subjects. Saying more or less of one moves it, and everything under it, up or down the front page." : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -2098,6 +2147,7 @@
       }
     },
     "Yours" : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -2113,54 +2163,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "À vous d'en ajouter et d'en retirer. Le modèle y recourt aussi volontiers qu'aux siennes."
-          }
-        }
-      }
-    },
-    "Écologie" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Climate"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Écologie"
-          }
-        }
-      }
-    },
-    "Économie" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Business"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Économie"
-          }
-        }
-      }
-    },
-    "Éducation" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Education"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Éducation"
           }
         }
       }
