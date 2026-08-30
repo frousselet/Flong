@@ -21,6 +21,8 @@ import SwiftUI
 struct DigestScreen: View {
     let model: AppModel
     let zoom: Namespace.ID
+    @Binding var isAddingFeed: Bool
+    @Binding var isChoosingFile: Bool
     let open: (Route) -> Void
 
     /// Carries a pill's glass from one state to the next.
@@ -58,6 +60,12 @@ struct DigestScreen: View {
         .toolbar {
             ToolbarItem {
                 Menu {
+                    Button {
+                        open(.sources)
+                    } label: {
+                        Label("Sources", systemImage: "square.stack")
+                    }
+
                     Button {
                         open(.topics)
                     } label: {
@@ -104,13 +112,7 @@ struct DigestScreen: View {
         .refreshable { await model.refreshAll() }
         .overlay {
             if model.digest.isEmpty {
-                ContentUnavailableView {
-                    Label("Nothing has come in yet", systemImage: "sparkles.rectangle.stack")
-                } description: {
-                    Text("Flong groups your articles into stories as they arrive.")
-                } actions: {
-                    Button("Group now") { Task { await model.rebuildDigest() } }
-                }
+                empty
             }
         }
         .task { await model.loadLooseArticles() }
@@ -178,14 +180,28 @@ struct DigestScreen: View {
         model.digest.live.first?.id ?? model.digest.stories.first?.id
     }
 
-    /// An empty page and an empty subject are not the same emptiness.
+    /// An empty page, an empty subject and an empty account are three
+    /// different emptinesses.
     ///
-    /// A reader who has just written a subject nothing has been filed under
-    /// yet is looking at a page working exactly as it should, and telling them
-    /// nothing has come in would be telling them something untrue.
+    /// A reader who follows nothing needs a feed, not an explanation of what
+    /// grouping is : this is the first page they land on and there is no tab of
+    /// sources beside it any more, so the two ways in are offered where they
+    /// are already looking. A reader who has just written a subject nothing has
+    /// been filed under yet is looking at a page working exactly as it should,
+    /// and telling either of them that nothing has come in would be telling
+    /// them something untrue.
     @ViewBuilder
     private var empty: some View {
-        if let name = model.digestTopic.name {
+        if model.isEmpty {
+            ContentUnavailableView {
+                Label("No feed yet", systemImage: "dot.radiowaves.up.forward")
+            } description: {
+                Text("Add a feed, or import an OPML file to bring your subscriptions over.")
+            } actions: {
+                Button("Add a feed") { isAddingFeed = true }
+                Button("Import an OPML file") { isChoosingFile = true }
+            }
+        } else if let name = model.digestTopic.name {
             ContentUnavailableView {
                 Label(title: { Text(verbatim: name) }, icon: { Image(systemName: "square.stack.3d.up") })
             } description: {

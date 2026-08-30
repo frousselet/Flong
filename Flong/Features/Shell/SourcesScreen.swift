@@ -15,8 +15,11 @@ import SwiftUI
 ///
 /// A folder tree is something a reader touches when they are organizing, which
 /// is rarely, so it does not deserve a permanent column beside what they are
-/// reading, which is always. It is one section among five, and the rest of the
-/// window is the article.
+/// reading, which is always. It does not deserve a section of the tab bar
+/// either, for the same reason : the bar names the places there are to read,
+/// and this is not one of them. It is reached from the reader's own menu, with
+/// the rest of what they have decided, and the rest of the window is the
+/// article.
 struct SourcesScreen: View {
     let model: AppModel
     @Binding var isAddingFeed: Bool

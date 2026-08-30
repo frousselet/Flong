@@ -35,7 +35,7 @@ The application draws glass in exactly one place of its own : the subject pills 
 
 Everywhere else the glass on screen is the system's.
 
-On macOS the same five sections become a sidebar, through `tabViewStyle(.sidebarAdaptable)` : there is no bar to minimize on a Mac, and a window is already out of its own way.
+On macOS the same four sections become a sidebar, through `tabViewStyle(.sidebarAdaptable)` : there is no bar to minimize on a Mac, and a window is already out of its own way.
 
 ## Pictures
 
@@ -109,7 +109,11 @@ So the strip stands on one piece of glass, shaped like the pills the front page 
 
 One button in the digest's toolbar, holding what the reader has decided. Not an account : there is no account, nothing here belongs to anyone but the person holding the device, and a person icon would promise a profile that does not exist. It is called `Réglages` in French for the same reason.
 
-It holds the subjects, and the command to write the digest again, which had been buried at the foot of the sources list where it never belonged : the sources list is for the state of the machinery, and asking the model to write again is the reader's own decision.
+It holds the sources, the subjects, the sites the reader is signed in to, and the command to write the digest again, which had been buried at the foot of the sources list where it never belonged : the sources list is for the state of the machinery, and asking the model to write again is the reader's own decision.
+
+**The sources came here from the tab bar, which is now four sections and not five.** A tab names a place there is to read, and a folder tree is not one : it is something a reader touches when they are organizing, which is rarely, and it belongs with the rest of what they have decided rather than beside the pages they read. It costs the reader one press to get to and gives the bar back to reading.
+
+The one thing that move could have broken is the first launch, where a reader who follows nothing had the sources tab in front of them and now does not. The front page says so instead : with no feed at all it offers adding one and importing an OPML file where the reader is already looking, rather than explaining what grouping is to somebody with nothing to group.
 
 **The subjects screen is the other half of the pills.** A pill carries a subject of the day, where an opinion is formed and where saying it costs one press. The screen carries every subject there is, including those that have fallen off the page, so a reader who asked for less of something months ago can find it again and take it back : a preference nobody can find is a preference nobody can undo. Each row is a picker of three, down, nothing, up, rather than the pill's nudge by one : here the reader is choosing a side, and reading back three shades of the same side would be a control that says more than it lets them say.
 
