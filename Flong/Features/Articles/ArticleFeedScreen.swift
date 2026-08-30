@@ -111,7 +111,6 @@ struct ArticleFeedScreen: View {
                 }
             }
         }
-        .refreshable { await model.refreshAll() }
         .overlay {
             if model.summaries.isEmpty {
                 empty

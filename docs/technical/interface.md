@@ -149,7 +149,9 @@ A region rather than a value : what is wanted is the news that something moved, 
 
 **And a clock, for what the store cannot know.** Following the store shows what has arrived ; nothing in it asks the publishers. A window open all day asked nobody anything, the only foreground refresh being the return to the front, and a Mac window that never leaves the front never returns to it. Every ten minutes it asks, which the politeness of `docs/technical/fetching.md` then decides per feed : most of those ticks find nothing due and cost one query.
 
-**Pull to refresh stays.** It is no longer the way the page keeps up, and it is still the way a reader says now rather than soon. Every application worth using has one.
+**Pull to refresh stays, on the front page only.** It is no longer how the page keeps up, and it is still how a reader says now rather than soon : the clock is ten minutes and politeness may defer beyond it, Low Power Mode and an expensive network both suppress the background pass deliberately, and iOS may grant no background slot for hours. One place to say it is enough, and the front page is where a reader is when they wonder. The wire has none : it is a list of what has arrived, and what arrives reaches it on its own. A Mac has no pull at all and keeps the command, in the place a Mac keeps commands.
+
+**And a pull is a refresh, not a spring clean.** It used to purge, compact, enqueue read states, enqueue a catch-up and exchange the archives as well : the whole of the nightly pass, in the foreground, on a gesture a reader makes reflexively and willingly repeats twice. All of that belongs to the pass that runs at rest on the mains, which still does every bit of it. What is left is every feed, the page read again from what arrived, and the window read back.
 
 ## The reader's menu
 

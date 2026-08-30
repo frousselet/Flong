@@ -1211,22 +1211,30 @@ final class AppModel {
     // MARK: - Refreshing
 
     /// Refreshes every feed, which is what a pull means.
+    ///
+    /// **A refresh, and not the spring clean it had become.** It used to purge,
+    /// compact, enqueue read states, enqueue a catch-up and exchange the
+    /// archives as well : the whole of the nightly pass, in the foreground, on
+    /// a gesture a reader makes reflexively and willingly repeats. All of that
+    /// belongs to ``backgroundProcessing()``, which runs at rest on the mains
+    /// and still does every bit of it.
+    ///
+    /// What is left is what the reader asked for : every feed, the page read
+    /// again from what arrived, and the window read back. Every feed and not
+    /// only those that are due, because they asked ; the token bucket per host
+    /// is what keeps that polite to the publishers.
     func refreshAll() async {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
 
         _ = await refresher.refreshAll()
-        _ = try? await retention.purge()
         await digestService.rebuild()
-        await cloud?.enqueueReadStates()
-        await cloud?.enqueueCatchUp()
-        await exchangeArchives()
-        await load()
 
         // The rebuild wrote new stories, briefs and subjects. Reading the
         // feeds back without reading the page back would leave the reader
         // looking at the page from before the pull.
+        await load()
         await loadDigest()
         await loadLooseArticles()
     }

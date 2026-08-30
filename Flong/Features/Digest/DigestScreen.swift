@@ -66,7 +66,8 @@ struct DigestScreen: View {
         }
         // No refresh button : the page refreshes itself on returning to the
         // foreground and on a pull, which is every way a reader asks on a touch
-        // screen.
+        // screen. The wire has no pull of its own : the page keeps itself up to
+        // date now, and one place to say `now` is enough.
         #if !os(iOS)
             // A Mac has no pull, so it keeps the command, in the place a Mac
             // keeps commands.
