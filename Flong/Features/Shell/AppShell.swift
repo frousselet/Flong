@@ -17,6 +17,7 @@ nonisolated enum Route: Hashable {
     case story(UUID)
     case article(UUID)
     case view(SidebarItem.Kind)
+    case sources
     case topics
     case subscribedSites
 }
@@ -29,7 +30,6 @@ nonisolated enum AppSection: Hashable {
     case digest
     case stream
     case library
-    case sources
     case search
 }
 
@@ -48,7 +48,6 @@ struct AppShell: View {
     @State private var digestPath: [Route] = []
     @State private var streamPath: [Route] = []
     @State private var libraryPath: [Route] = []
-    @State private var sourcesPath: [Route] = []
     @State private var searchPath: [Route] = []
     @State private var isAddingFeed = false
     @State private var isChoosingFile = false
@@ -64,7 +63,12 @@ struct AppShell: View {
         TabView(selection: $section) {
             Tab("Digest", systemImage: "sparkles.rectangle.stack", value: AppSection.digest) {
                 stack($digestPath) {
-                    DigestScreen(model: model, zoom: zoom) { digestPath.append($0) }
+                    DigestScreen(
+                        model: model,
+                        zoom: zoom,
+                        isAddingFeed: $isAddingFeed,
+                        isChoosingFile: $isChoosingFile
+                    ) { digestPath.append($0) }
                 }
             }
 
@@ -74,6 +78,11 @@ struct AppShell: View {
             // either, for the same reason : a number that only ever grows is a
             // debt, and nobody owes their feeds anything. Unread on its own is
             // still a view, in the sources list, for whoever does want it.
+            //
+            // Four sections and not five : the sources are not a place a reader
+            // is, they are a thing a reader keeps, so they live in the menu with
+            // the rest of what has been decided rather than in the bar beside
+            // the places there are to read.
             Tab("Stream", systemImage: "dot.radiowaves.left.and.right", value: AppSection.stream) {
                 stack($streamPath) {
                     ArticleFeedScreen(model: model, kind: .all, named: "Stream", showsArrivals: true) {
@@ -85,14 +94,6 @@ struct AppShell: View {
             Tab("Library", systemImage: "books.vertical", value: AppSection.library) {
                 stack($libraryPath) {
                     ArticleFeedScreen(model: model, kind: .library) { libraryPath.append(.article($0)) }
-                }
-            }
-
-            Tab("Sources", systemImage: "square.stack", value: AppSection.sources) {
-                stack($sourcesPath) {
-                    SourcesScreen(model: model, isAddingFeed: $isAddingFeed, isChoosingFile: $isChoosingFile) {
-                        sourcesPath.append(.view($0))
-                    }
                 }
             }
 
@@ -183,6 +184,11 @@ struct AppShell: View {
 
         case .view(let kind):
             ArticleFeedScreen(model: model, kind: kind) { path.wrappedValue.append(.article($0)) }
+
+        case .sources:
+            SourcesScreen(model: model, isAddingFeed: $isAddingFeed, isChoosingFile: $isChoosingFile) {
+                path.wrappedValue.append(.view($0))
+            }
 
         case .topics:
             TopicsScreen(model: model)
