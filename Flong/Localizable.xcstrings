@@ -802,6 +802,7 @@
       }
     },
     "Force a synchronization" : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {

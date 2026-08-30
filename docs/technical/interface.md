@@ -191,6 +191,14 @@ The picture is scaled on the way in and never after. What comes out of a photo l
 
 `Fil` says what a story is, several articles following one thing, and `thématique` is unambiguous where `thème` was merely unclaimed. The cost is that the stream section is called `Flux`, so `Fil` and `Flux` sit near each other ; they are different words for different things and the sections they name are never side by side.
 
+## The month over the wire
+
+**The glass arrives with the scroll.** At rest the chart sits on the page and wears no material at all : glass over nothing is glass doing nothing, a material's whole job being to say that something passes behind it. The first row to go under the bars brings it, and it goes again when the page returns to the top. The shape is there either way, so the strip never changes size and the rows passing under it are not moved by its arrival.
+
+The offset is what is asked, not the rows : a row is a landmark and this is a question about a single point, the top of the content against the top of what is shown. Against a hair rather than against nought, since a scroll view rests at a fractional offset often enough and a glass flickering on and off under a still thumb would be worse than one that never left.
+
+**A day with nothing in it is grey, not absent.** Whether it has been and gone or has not happened yet, it keeps its place at the height of the shortest bar there is. The row stays a row, with a level floor an eye can run along, and the ink is kept for the days something actually arrived on.
+
 ## The dateline
 
 **The title of the page is the date.** Not the name of the section : the tab bar says that already, and a page that repeats its own label has spent a line saying nothing. A dateline says what the label did not, which is how old what follows is allowed to be, and it is where a newspaper puts it.
