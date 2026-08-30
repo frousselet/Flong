@@ -25,6 +25,11 @@ import SwiftUI
 /// what they starred and notes is what they wrote on. Then what they made
 /// themselves, under their own name. Then the months, which fall out of when a
 /// copy was kept and cost the reader nothing to maintain.
+///
+/// **A band with nothing in it is not drawn at all**, its heading included. A
+/// reader who has made no collections is not shown an empty shelf with a label
+/// on it : the way to make one is in the corner of the page, where the sources
+/// are, and it is there whether the shelf exists or not.
 struct CollectionsScreen: View {
     let model: AppModel
     let menu: (Route) -> Void
@@ -39,31 +44,7 @@ struct CollectionsScreen: View {
         ScrollView {
             LazyVGrid(columns: [Self.square], spacing: 18) {
                 section(nil, of: marked)
-
-                // The band the reader made, and the way to add to it. The
-                // heading is drawn whether or not there is anything under it,
-                // unlike the others : a reader with no collections is exactly
-                // the reader who needs to be shown where they are made.
-                Section {
-                    ForEach(mine) { collection in
-                        Button {
-                            open(collection.kind)
-                        } label: {
-                            CollectionSquare(collection: collection)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    Button {
-                        named = ""
-                        isNaming = true
-                    } label: {
-                        NewCollectionSquare()
-                    }
-                    .buttonStyle(.plain)
-                } header: {
-                    heading("My collections")
-                }
-
+                section("My collections", of: mine)
                 section("By month", of: months)
             }
             .editorialColumn()
@@ -75,6 +56,17 @@ struct CollectionsScreen: View {
         .toolbar {
             ToolbarItem(placement: .sectionLeading) {
                 SourcesButton(open: menu)
+            }
+            // Beside the sources rather than opposite them : the leading corner
+            // is where this page is acted on, and the trailing one belongs to
+            // the reader's own menu in every section.
+            ToolbarItem(placement: .sectionLeading) {
+                Button {
+                    named = ""
+                    isNaming = true
+                } label: {
+                    Label("New collection", systemImage: "plus")
+                }
             }
             ToolbarItem(placement: .primaryAction) {
                 ReaderMenu(model: model, open: menu)
@@ -217,34 +209,5 @@ struct CollectionSquare: View {
         case .made: "folder"
         case .month: "calendar"
         }
-    }
-}
-
-/// The square that makes a new collection.
-///
-/// It sits at the end of the reader's own band rather than in a toolbar, the
-/// way an album is added in Photos : the place a thing is made is the place
-/// the things of that kind already are.
-struct NewCollectionSquare: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Color.clear
-                .aspectRatio(1, contentMode: .fit)
-                .overlay {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(.quaternary, style: StrokeStyle(lineWidth: 1.5, dash: [6, 5]))
-                        Image(systemName: "plus")
-                            .font(.system(size: 26, weight: .medium))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-            Text("New collection")
-                .font(.system(.subheadline, weight: .medium))
-                .lineLimit(1)
-                .foregroundStyle(.secondary)
-        }
-        .accessibilityElement(children: .combine)
     }
 }
