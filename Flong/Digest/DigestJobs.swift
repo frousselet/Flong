@@ -90,30 +90,51 @@ nonisolated struct FileStoriesJob: ResumableJob {
             guard OnDeviceModel.isAvailable else { break }
 
             let vocabulary = (try? await preferences.vocabulary()) ?? []
-            var filed = await namer.file(story.title, summary: story.summary, into: vocabulary)
+            var filed: [String]
 
-            // Nothing the reader has is about this story, so the model names one
-            // thing, once.
-            if filed?.isEmpty == true || (vocabulary.isEmpty && filed == nil) {
+            switch await namer.file(story.title, summary: story.summary, into: vocabulary) {
+            case .chosen(let chosen) where !chosen.isEmpty:
+                filed = chosen
+
+            case .chosen:
+                // Nothing the reader has is about this story, so the model
+                // names one thing, once.
+                filed = []
                 if let proposed = await namer.newSubject(for: story.title, summary: story.summary),
                     let settled = try? await preferences.record(proposed)
                 {
                     filed = [settled]
                 }
+
+            case .declined:
+                // The model will not write about this story, and will not next
+                // time either. It keeps the subjects of its own articles and
+                // the asking stops.
+                filed = []
+
+            case .unusable:
+                // Not this story's fault, so it does not pay for it. Nothing is
+                // stamped and the pass stops : the model is not usable now, so
+                // the stories behind this one would fail the same way, and the
+                // next pass finds them all still waiting.
+                //
+                // This is what was losing them. Every failure used to look
+                // alike, the story was stamped as asked whatever had happened,
+                // and one guardrail refusal or one rate limit left a fil with
+                // no thématique for good.
+                return asked
             }
 
-            // Asked, whatever came of it. A story the model cannot file would
-            // otherwise sit at the head of the queue for ever, since the
-            // unfiled are taken newest first, and stop everything behind it
-            // from being asked at all. An empty page is better than a wrong
-            // one, and a story asked about once and left is better than a
-            // queue that never moves.
+            // Asked, and answered. A story the model answered about, even to
+            // say nothing fits, is not asked again : the answer would be the
+            // same, and the unfiled are taken newest first, so it would sit at
+            // the head of the queue and stop everything behind it.
             try await database.writer.write { db in
                 try db.execute(
                     sql: "UPDATE story SET topics_asked_at = ? WHERE id = ?",
                     arguments: [Date(), story.id]
                 )
-                for name in filed ?? [] {
+                for name in filed {
                     try StoryTopic(storyID: story.id, name: name).insert(db, onConflict: .ignore)
                 }
             }

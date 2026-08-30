@@ -13,6 +13,31 @@ import Foundation
 import FoundationModels
 import OSLog
 
+/// What came of asking the model to file one story.
+///
+/// **Three answers, not two.** The first version gave back an optional list,
+/// which folded a model that chose nothing into a model that could not be
+/// asked. The caller then stamped the story as asked either way, so one
+/// guardrail refusal, one rate limit or one moment with the assets unloaded
+/// left a story unfiled for good : it is never asked again, and the reader sees
+/// a fil with no thématique and no way to give it one.
+///
+/// ``OnDeviceModel/isTheModelItself(_:)`` already draws exactly this line, and
+/// the summarizer already acts on it. This is the same distinction, carried far
+/// enough to be acted on here too.
+nonisolated enum Filing: Sendable {
+    /// The model answered. Possibly with nothing, which is an answer : this
+    /// story falls under none of the subjects it was shown.
+    case chosen([String])
+    /// The model would not write about this story. It will not next time
+    /// either, so there is no point asking again.
+    case declined
+    /// The model could not be used at all : unloaded, rate limited, busy. The
+    /// next pass may well find it working, so the story keeps its place in the
+    /// queue.
+    case unusable
+}
+
 /// A subject the model proposes when nothing it was shown fits.
 @Generable
 nonisolated struct GeneratedTopic {
@@ -67,12 +92,12 @@ nonisolated struct TopicNamer: Sendable {
 
     /// The subjects one story belongs to, chosen from the vocabulary.
     ///
-    /// `nil` when the model said nothing at all : unavailable, refusing, or
-    /// unable to read the page. An empty answer is the model saying this story
-    /// falls under nothing it was shown, which is a different thing and is what
-    /// `newSubject` is for.
-    func file(_ headline: String, summary: String?, into vocabulary: [String]) async -> [String]? {
-        guard OnDeviceModel.isAvailable, !vocabulary.isEmpty else { return nil }
+    /// An empty choice is the model saying this story falls under nothing it
+    /// was shown, which is what `newSubject` is for. A vocabulary with nothing
+    /// in it is the same answer reached without asking.
+    func file(_ headline: String, summary: String?, into vocabulary: [String]) async -> Filing {
+        guard OnDeviceModel.isAvailable else { return .unusable }
+        guard !vocabulary.isEmpty else { return .chosen([]) }
 
         do {
             let schema = try Self.schema(for: vocabulary)
@@ -84,10 +109,10 @@ nonisolated struct TopicNamer: Sendable {
 
             // The way out is not a subject, and choosing it beside real ones
             // means it fits those.
-            return chosen.filter { $0 != Self.noneOfThese && vocabulary.contains($0) }
+            return .chosen(chosen.filter { $0 != Self.noneOfThese && vocabulary.contains($0) })
         } catch {
             OnDeviceModel.refused(error)
-            return nil
+            return OnDeviceModel.isTheModelItself(error) ? .unusable : .declined
         }
     }
 
