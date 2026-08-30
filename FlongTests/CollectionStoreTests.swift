@@ -136,6 +136,45 @@ struct CollectionStoreTests {
         #expect(try await collections.collections(of: article.id) == ["Presse", "Thèse"])
     }
 
+    @Test("A collection says what it holds, and holds what it says")
+    func theCountAgreesWithTheContents() async throws {
+        let feed = try await subscriptions.subscribe(
+            to: Subscription(address: "https://a.example.com/f.xml", title: "A")
+        ).feed
+        var entry = Entry(feedID: feed.id, guid: "urn:1", title: "Un", receivedAt: now)
+        entry.hasMedia = false
+        try await database.writer.write { db in try entry.insert(db) }
+
+        // Starred, filed, then unstarred. The reader has said the article is
+        // not a favourite ; they have not said it is out of the collection.
+        try await library.setStarred([entry.id], to: true, at: now)
+        let item = try #require(await library.item(guid: "urn:1", feedURL: feed.url))
+        try await collections.add([item.id], to: "Thèse", at: now)
+        try await library.setStarred([entry.id], to: false, at: now)
+
+        let shelf = try #require(await collections.made().first)
+        let inside = try await library.summaries(in: .made("Thèse"))
+
+        // A count is a promise about what is inside, and a square saying two
+        // over a page showing one is the promise broken.
+        #expect(shelf.count == inside.count)
+        #expect(inside.count == 1)
+    }
+
+    @Test("An article thrown out of the library leaves no phantom behind")
+    func removingClearsTheBindings() async throws {
+        let article = try await kept("un")
+        try await collections.add([article.id], to: "Thèse", at: now)
+        #expect(try await collections.made().first?.count == 1)
+
+        _ = try await library.remove([article.id])
+
+        // The copy is gone on purpose here, and the collection has to know :
+        // a binding carries no foreign key, so nothing removes it on its own.
+        #expect(try await collections.made().first?.count == 0)
+        #expect(try await library.summaries(in: .made("Thèse")).isEmpty)
+    }
+
     // MARK: - Between devices
 
     @Test("A filing travels on the article, not on a record of its own")
