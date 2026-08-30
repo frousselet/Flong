@@ -64,24 +64,6 @@ nonisolated extension View {
     }
 }
 
-nonisolated extension VerticalAlignment {
-    /// Where a story's picture meets its text : the line that says what
-    /// happened.
-    ///
-    /// A row opens with the subjects it is filed under and its headline, and a
-    /// picture set level with a one-word rubric leaves the column ragged. Level
-    /// with the summary, the text reads as one block with a picture beside it.
-    ///
-    /// A story with no summary has no such line, and the guide falls back to
-    /// the top of whatever is there, which is where a picture belongs when
-    /// there is nothing to meet.
-    private enum SummaryAlignment: AlignmentID {
-        static func defaultValue(in context: ViewDimensions) -> CGFloat { context[.top] }
-    }
-
-    static let summary = VerticalAlignment(SummaryAlignment.self)
-}
-
 /// A dot that says something is still arriving.
 ///
 /// The motion is the information : a story nobody is adding to has a still dot,

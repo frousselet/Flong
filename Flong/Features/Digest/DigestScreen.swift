@@ -373,31 +373,45 @@ struct StoryRow: View {
                 RemoteImage(url: story.imageURL, corner: 10)
                     .padding(.bottom, 2)
             }
-            text(headline: .title2)
+            VStack(alignment: .leading, spacing: 7) {
+                masthead(headline: .title2)
+                whatHappened
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private var standard: some View {
-        // The picture meets the line that says what happened, not the top of
-        // the row. Above the summary sit the subjects and the headline, and a
-        // picture starting level with a one-word rubric leaves the column
-        // ragged : level with the summary, the two blocks read as one thing
-        // with a picture beside it.
-        HStack(alignment: .summary, spacing: 14) {
-            text(headline: .title3)
+        // **The headline crosses the whole measure ; the picture comes in
+        // beside what follows it.** A headline is the widest thing a story
+        // says and the thing a reader scans for, and one squeezed into the
+        // column left over by a thumbnail breaks over three lines where it
+        // would have taken two.
+        //
+        // So the picture is not beside the story, it is beside the summary :
+        // the rubric and the headline run the full width above it, and what
+        // explains them shares the line with it.
+        VStack(alignment: .leading, spacing: 7) {
+            masthead(headline: .title3)
 
-            if story.imageURL != nil {
-                RemoteImage(url: story.imageURL, width: Self.thumbnailWidth)
-                    .alignmentGuide(.summary) { $0[.top] }
+            HStack(alignment: .top, spacing: 14) {
+                whatHappened
+
+                if story.imageURL != nil {
+                    RemoteImage(url: story.imageURL, width: Self.thumbnailWidth)
+                }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func text(headline: Font.TextStyle) -> some View {
+    /// What the story is filed under and what it is called, which run the
+    /// whole measure whether there is a picture or not.
+    private func masthead(headline: Font.TextStyle) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            // What the story is filed under, above what it says : a reader
-            // scanning the page reads the subject before the headline, the way
-            // a rubric is read before the piece under it.
+            // The subject above the headline : a reader scanning the page reads
+            // it before the headline, the way a rubric is read before the piece
+            // under it.
             if !story.topics.isEmpty {
                 Text(verbatim: story.topics.joined(separator: " · "))
                     .font(.system(.caption2, weight: .semibold))
@@ -412,7 +426,13 @@ struct StoryRow: View {
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
+    /// What happened and who is saying it, which is what a picture sits beside.
+    private var whatHappened: some View {
+        VStack(alignment: .leading, spacing: 7) {
             if let summary = story.summary, !summary.isEmpty {
                 Text(verbatim: summary)
                     .font(Editorial.standfirst)
@@ -420,7 +440,6 @@ struct StoryRow: View {
                     .multilineTextAlignment(.leading)
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
-                    .alignmentGuide(.summary) { $0[.top] }
             }
 
             facts
