@@ -163,7 +163,11 @@ One button in the same corner of every section, holding what the reader has deci
 
 It is still not an account. There is no account and nothing to sign in to, and the face on the button is the reader's own picture rather than a sign that they are signed in to something. It is called `Réglages` in French.
 
-It holds the subjects, the sites the reader is signed in to, and the command to write the digest again, which had been buried at the foot of the sources list where it never belonged : the sources list is for the state of the machinery, and asking the model to write again is the reader's own decision.
+It holds the subjects, the sites the reader is signed in to, the notices, and `Actualiser`, which is the only way to ask for a refresh now that no page has a pull.
+
+It also holds `Forcer la synchronisation`, under `#if DEBUG` and nowhere else. The engine decides when to send and when to fetch and is right far more often than a button would be ; what that command is for is watching an exchange happen on demand while something is being built. It queues every record this device holds, which is the repair path and costs a few thousand records against a budget of three thousand, and that is why it does not ship.
+
+The command to write the digest again was here and is gone, replaced by that one. Nothing in the interface asks the model to re-read a page it has already read : stories already filed are never re-read, which is what makes the page stable.
 
 **The section is called `Collections`, not `Bibliothèque`.** A library is a shelf of books, and what this section holds is articles somebody put aside ; `Bibliothèque` was also the longest of the four names in a bar that has to fit four. `Collections` is what Photos calls the same idea for the same reason, which means a reader has met it before. The word outlived the thing : the library it was renamed from is gone from the store as well as from the bar, and `docs/technical/marks.md` says why.
 
