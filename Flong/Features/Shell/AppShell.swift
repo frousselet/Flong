@@ -18,6 +18,7 @@ nonisolated enum Route: Hashable {
     case article(UUID)
     case view(SidebarItem.Kind)
     case sources
+    case collection(LibraryCollection.Kind)
     case profile
     case topics
     case subscribedSites
@@ -103,8 +104,8 @@ struct AppShell: View {
 
             Tab("Collections", systemImage: "folder", value: AppSection.library) {
                 stack($libraryPath) {
-                    ArticleFeedScreen(model: model, kind: .library, menu: { libraryPath.append($0) }) {
-                        libraryPath.append(.article($0))
+                    CollectionsScreen(model: model, menu: { libraryPath.append($0) }) {
+                        libraryPath.append(.collection($0))
                     }
                 }
             }
@@ -203,6 +204,9 @@ struct AppShell: View {
             SourcesScreen(model: model, isAddingFeed: $isAddingFeed, isChoosingFile: $isChoosingFile) {
                 path.wrappedValue.append(.view($0))
             }
+
+        case .collection(let kind):
+            CollectionScreen(model: model, kind: kind) { path.wrappedValue.append(.article($0)) }
 
         case .profile:
             ProfileScreen(model: model)

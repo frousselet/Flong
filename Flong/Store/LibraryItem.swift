@@ -35,6 +35,7 @@ nonisolated struct LibraryItem: Identifiable, Hashable, StoredRecord {
         case language
         case publishedAt = "published_at"
         case promotedAt = "promoted_at"
+        case starredAt = "starred_at"
         case contentHTML = "content_html"
         case plainText = "plain_text"
         case annotation
@@ -57,6 +58,13 @@ nonisolated struct LibraryItem: Identifiable, Hashable, StoredRecord {
     var language: String?
     var publishedAt: Date?
     var promotedAt: Date
+
+    /// When the reader starred it, if they did.
+    ///
+    /// Written on the copy and not read back off the article it came from : the
+    /// stream row goes when retention says so, and what the reader thought of
+    /// something does not go with it.
+    var starredAt: Date?
 
     /// The article as it read on the day it was kept.
     var contentHTML: String?
@@ -85,6 +93,7 @@ nonisolated struct LibraryItem: Identifiable, Hashable, StoredRecord {
         language: String? = nil,
         publishedAt: Date? = nil,
         promotedAt: Date = Date(),
+        starredAt: Date? = nil,
         contentHTML: String? = nil,
         plainText: String? = nil,
         annotation: String? = nil,
@@ -101,6 +110,7 @@ nonisolated struct LibraryItem: Identifiable, Hashable, StoredRecord {
         self.language = language
         self.publishedAt = publishedAt
         self.promotedAt = promotedAt
+        self.starredAt = starredAt
         self.contentHTML = contentHTML
         self.plainText = plainText
         self.annotation = annotation
@@ -119,5 +129,6 @@ nonisolated extension LibraryItem {
         static let guid = Column(CodingKeys.guid)
         static let feedURL = Column(CodingKeys.feedURL)
         static let annotation = Column(CodingKeys.annotation)
+        static let starredAt = Column(CodingKeys.starredAt)
     }
 }
