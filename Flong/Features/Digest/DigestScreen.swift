@@ -54,8 +54,12 @@ struct DigestScreen: View {
         // A large title like every other section's, so it shrinks into the bar
         // as the reader scrolls into the page.
         .navigationTitle(Text(verbatim: Self.today()))
-        // The reader's own menu, in the same corner of every section.
+        // The sources in one corner, the reader's own menu in the other, the
+        // same way round in every section.
         .toolbar {
+            ToolbarItem(placement: .sectionLeading) {
+                SourcesButton(open: open)
+            }
             ToolbarItem(placement: .primaryAction) {
                 ReaderMenu(model: model, open: open)
             }

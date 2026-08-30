@@ -115,9 +115,11 @@ One button in the same corner of every section, holding what the reader has deci
 
 It is still not an account. There is no account and nothing to sign in to, and the face on the button is the reader's own picture rather than a sign that they are signed in to something. It is called `Réglages` in French.
 
-It holds the sources, the subjects, the sites the reader is signed in to, and the command to write the digest again, which had been buried at the foot of the sources list where it never belonged : the sources list is for the state of the machinery, and asking the model to write again is the reader's own decision.
+It holds the subjects, the sites the reader is signed in to, and the command to write the digest again, which had been buried at the foot of the sources list where it never belonged : the sources list is for the state of the machinery, and asking the model to write again is the reader's own decision.
 
-**The sources came here from the tab bar, which is now four sections and not five.** A tab names a place there is to read, and a folder tree is not one : it is something a reader touches when they are organizing, which is rarely, and it belongs with the rest of what they have decided rather than beside the pages they read. It costs the reader one press to get to and gives the bar back to reading.
+**The sources came off the tab bar, which is now four sections and not five.** A tab names a place there is to read, and a folder tree is not one : it is something a reader touches when they are organizing, which is rarely, and the bar is better spent on reading.
+
+They are not in the menu either, though they passed through it. They were the one thing in it a reader opens often, and a thing opened often is a button rather than a line in a menu : they sit in the leading corner, opposite the reader's own face, in each of the three sections a reader reads in. Search does not carry it, its bar belonging to the field, and a reader who is searching is not organizing.
 
 The one thing that move could have broken is the first launch, where a reader who follows nothing had the sources tab in front of them and now does not. The front page says so instead : with no feed at all it offers adding one and importing an OPML file where the reader is already looking, rather than explaining what grouping is to somebody with nothing to group.
 
