@@ -171,7 +171,11 @@ Half a point wide, at half the separator's opacity. A point was tried and read a
 
 **A source's mark is round**, with the same hairline inside it. A favicon arrives as whatever square its publisher drew, dark on dark as often as not, and a round crop is what makes a column of them read as one column rather than as a row of unrelated stamps. The generic mark, for a source that serves none, keeps its bare glyph : an edge around it would make an absence look like a mark.
 
-**A picture meets the line that says what happened.** Above a story's summary sit the subjects it is filed under and its headline, and a picture set level with a one-word rubric leaves the column ragged. It is aligned on the summary instead, through a `VerticalAlignment` of its own, so the text reads as one block with a picture beside it. A story with no summary has no such line, and the guide falls back to the top, which is where a picture belongs when there is nothing to meet.
+**The headline crosses the whole measure ; the picture comes in beside what follows it.** A headline is the widest thing a story says and the thing a reader scans for, and one squeezed into the column a thumbnail leaves over breaks across three lines where it would have taken two.
+
+So a picture is not beside the story, it is beside the summary. The rubric and the headline run the full width above it, and what explains them shares the line with it. The row is a stack of two rather than a column and a picture : the masthead, then the summary and the marks with the picture at their side.
+
+An alignment guide was tried first, holding the whole text block to the left and pinning the picture to the summary's own top. It put the picture in the right place and left the headline in the wrong one, which was the fault being fixed.
 
 **The pictures are decoded off the main thread, and were not.** The target builds with `SWIFT_APPROACHABLE_CONCURRENCY`, under which a `nonisolated async` function runs on its caller's actor rather than on the pool. Every caller of the image store is a view, so every caller is the main actor, so the ImageIO decode was happening on the main thread : one picture at a time, a few milliseconds each, for every row a reader scrolls past. A list that stops moving while it fills is the shape of that, and it is what the reader reported as the interface freezing.
 
