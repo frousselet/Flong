@@ -229,10 +229,15 @@ struct ArrivalsChart: View {
 
     /// How dark an hour that had something is drawn.
     ///
-    /// Not the full ink. Thirty bars at the weight of a headline read as
-    /// loudly as the headlines under them, and the chart is a picture of the
-    /// page rather than a part of it.
-    static let ink = Color.primary.opacity(0.55)
+    /// The page's ink, less a little.
+    ///
+    /// The bar wants the weight of the ink : anything much lighter and it stops
+    /// being something to count by. What it does not want is to be the hardest
+    /// thing on the page, and a tenth of transparency is the whole of the
+    /// difference. Measured against a white page : the full ink lands at
+    /// nought, half of it at a mid grey too faint to read, and this a shade off
+    /// black.
+    static let ink = Color.primary.opacity(0.9)
 
     /// The shortest a bar is ever drawn.
     ///
