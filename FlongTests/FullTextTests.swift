@@ -234,6 +234,45 @@ struct FullTextTests {
         #expect(!session.covers(URL(string: "https://lemonde.fr.example.com/a")!))
     }
 
+    @Test("One sign-in covers every feed and article of the site")
+    func oneSignInCoversTheSite() throws {
+        // The reader signed in at `www.lemonde.fr`, and the site set its cookies
+        // for the whole domain, which is the site saying where they belong.
+        let cookies = [
+            SessionCookie(named: "sub", value: "abc", domain: ".lemonde.fr"),
+            SessionCookie(named: "csrf", value: "def", domain: "www.lemonde.fr"),
+        ]
+
+        // The broadest domain the cookies claim, not the address signed in at.
+        #expect(SiteSession.site(of: cookies, signedInAt: "www.lemonde.fr") == "lemonde.fr")
+
+        let sessions = MemorySessions()
+        try sessions.setSession(SiteSession(host: "lemonde.fr", cookies: cookies), for: "lemonde.fr")
+
+        // Every subdomain the feeds and articles of that site live on.
+        for address in [
+            "https://www.lemonde.fr/a", "https://abonnes.lemonde.fr/a",
+            "https://rss.lemonde.fr/a", "https://lemonde.fr/a",
+        ] {
+            let url = URL(string: address)!
+            #expect(FullText.session(for: url, in: sessions) != nil, "\(address)")
+        }
+
+        // And nowhere else.
+        #expect(FullText.session(for: URL(string: "https://notlemonde.fr/a")!, in: sessions) == nil)
+    }
+
+    @Test("A site that claims nothing keeps the address it was signed in at")
+    func siteWithoutClaims() {
+        let cookies = [SessionCookie(named: "sub", value: "abc", domain: "abonnes.lemonde.fr")]
+        #expect(SiteSession.site(of: cookies, signedInAt: "abonnes.lemonde.fr") == "abonnes.lemonde.fr")
+
+        // A cookie claiming a domain the reader did not sign in at is not the
+        // site : that is a third party, and it does not get to widen anything.
+        let foreign = [SessionCookie(named: "ad", value: "x", domain: ".doubleclick.example")]
+        #expect(SiteSession.site(of: foreign, signedInAt: "www.lemonde.fr") == "www.lemonde.fr")
+    }
+
     @Test("A session whose cookies have all expired is not a session")
     func expiry() {
         let dead = SiteSession(

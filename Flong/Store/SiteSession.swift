@@ -117,6 +117,28 @@ nonisolated struct SiteSession: Hashable, Sendable, Codable {
         guard let target = FeedURL.room(of: url) else { return false }
         return target == host || target.hasSuffix("." + host)
     }
+
+    /// The site a set of cookies belongs to, as the cookies themselves say.
+    ///
+    /// A reader signs in at `www.lemonde.fr`, and the session is wanted for
+    /// every feed and article of the site : `abonnes.lemonde.fr`,
+    /// `rss.lemonde.fr`, the lot. Guessing that from the address they happened
+    /// to sign in at would mean guessing where a domain ends, which needs the
+    /// public suffix list and gets `example.co.uk` wrong.
+    ///
+    /// The cookies say it themselves. A site that wants its session to work
+    /// across its subdomains sets `.lemonde.fr`, and that declaration is the
+    /// site's own and is authoritative. The broadest of them is the site.
+    static func site(of cookies: [SessionCookie], signedInAt host: String) -> String {
+        let claimed =
+            cookies
+            .map { $0.domain.hasPrefix(".") ? String($0.domain.dropFirst()) : $0.domain }
+            .filter { host == $0 || host.hasSuffix("." + $0) }
+
+        // The shortest is the broadest, and a site that claims nothing keeps
+        // the host the reader signed in at.
+        return claimed.min { $0.count < $1.count } ?? host
+    }
 }
 
 /// Where a reader's sessions are kept, which is the keychain and nowhere else.

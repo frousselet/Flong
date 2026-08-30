@@ -919,9 +919,13 @@ final class AppModel {
             return
         }
 
-        let existing = try? sessions.session(for: host)
+        // Kept under the site the cookies claim rather than the address the
+        // reader happened to sign in at, so one sign-in covers every feed and
+        // article of the site.
+        let site = SiteSession.site(of: kept, signedInAt: host)
+        let existing = try? sessions.session(for: site)
         let session = SiteSession(
-            host: host,
+            host: site,
             cookies: kept,
             signedInAt: Date(),
             // A fresh sign-in has not proved anything yet, and saying it worked
@@ -929,7 +933,10 @@ final class AppModel {
             lastWorkedAt: existing?.lastWorkedAt
         )
 
-        try? sessions.setSession(session, for: host)
+        try? sessions.setSession(session, for: site)
+        // A session that used to sit under a subdomain is replaced by the one
+        // that covers the site, rather than left behind to shadow it.
+        if site != host { try? sessions.setSession(nil, for: host) }
         await loadSubscribedSites()
     }
 
