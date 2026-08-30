@@ -6,9 +6,9 @@ The article is at the end of that link. Flong goes and gets it, once, and keeps 
 
 ## When it happens
 
-**When the reader asks for it, and not before.** What the feed sent is what an article opens on : it is what the publisher chose to send, and it is right far more often than a guess about somebody else's markup. The full article is one entry in the article's menu away.
+**What the reader last chose.** An article opens on what its feed sent until the reader asks for the whole one, and asking is also saying so for next time : somebody who wants whole articles is not making a remark about one article. The choice is kept in the iCloud key-value store, so it follows them to their other devices — not in CloudKit, whose three-thousand-record budget is spent on subscriptions, kept articles and read states, and has no business holding a preference.
 
-Fetching on opening would be a request made to a publisher for something that is not going to be looked at, which is the traffic the rest of this page exists to avoid.
+Once they have chosen the whole article, opening one fetches it : that is no longer speculation, it is what they asked for. Until then nothing is fetched, since a page asked for on opening is a request made to a publisher for something nobody is going to look at.
 
 **Only for an article the reader asked to see whole.** Never a whole feed, never ahead of time, never in a batch. A reader who does not open an article costs its publisher nothing, and a page fetched because somebody is reading it is a page fetched for the reason pages exist. Section 20 asks for politeness to publishers, and speculatively extracting five hundred articles a day is the opposite of it.
 

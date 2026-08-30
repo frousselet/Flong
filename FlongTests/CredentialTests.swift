@@ -165,3 +165,39 @@ struct KeychainCredentialTests {
         #expect(try store.identifiers().filter { $0 == feed }.count == 1)
     }
 }
+
+@Suite("What the reader has chosen")
+struct PreferenceTests {
+    private func preferences() -> Preferences {
+        // A defaults of its own, and no iCloud : what a device with no account
+        // has, which is a device Flong works perfectly well on.
+        let defaults = UserDefaults(suiteName: "com.rslt.Flong.tests.\(UUID().uuidString)")!
+        return Preferences(cloud: nil, local: defaults)
+    }
+
+    @Test("An article opens on what the feed sent until the reader says otherwise")
+    func theDefault() {
+        #expect(preferences().articleBody == .feed)
+    }
+
+    @Test("A choice is remembered")
+    func remembered() {
+        let store = preferences()
+
+        store.articleBody = .page
+        #expect(store.articleBody == .page)
+
+        store.articleBody = .feed
+        #expect(store.articleBody == .feed)
+    }
+
+    @Test("A value nobody wrote, or one nobody recognizes, is the default")
+    func unreadableValue() {
+        let defaults = UserDefaults(suiteName: "com.rslt.Flong.tests.\(UUID().uuidString)")!
+        defaults.set("something else entirely", forKey: "article.body")
+
+        // A version that wrote something this one does not know is not a reason
+        // to open an article on nothing.
+        #expect(Preferences(cloud: nil, local: defaults).articleBody == .feed)
+    }
+}

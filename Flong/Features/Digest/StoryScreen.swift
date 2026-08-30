@@ -170,9 +170,9 @@ struct ArticleScreen: View {
 
     /// Which body is being read.
     ///
-    /// What the feed sent, which is what the publisher chose to send and is
-    /// right far more often than a guess about somebody else's markup. The
-    /// full article is one tap away, and asked for rather than assumed.
+    /// Whatever the reader last chose, which is carried between their devices.
+    /// A reader who asked for the whole article once was not making a remark
+    /// about that article.
     @State private var showing = ArticleDocument.Body.feed
     /// Whether the page was asked for and had nothing to give, which is when
     /// signing in to the site is worth offering.
@@ -208,9 +208,14 @@ struct ArticleScreen: View {
             }
         }
         .task {
-            showing = .feed
             pageGaveNothing = false
+            showing = model.articleBody == .page ? .page : .feed
             await model.open(article: articleID)
+
+            // A reader who reads whole articles is not making a request each
+            // time : fetching on opening is what they asked for, and only for
+            // them.
+            if model.articleBody == .page { await showFullArticle() }
         }
     }
 
@@ -302,14 +307,18 @@ struct ArticleScreen: View {
     /// What there is to read, and how to get the rest of it.
     @ViewBuilder
     private func reading(_ article: Article) -> some View {
+        // Choosing is also saying so for next time : a reader who asks for the
+        // whole article is not making a remark about this one article.
         if showing == .page {
             Button {
                 showing = .feed
+                model.articleBody = .feed
             } label: {
                 Label("Show what the feed sent", systemImage: "doc.plaintext")
             }
         } else {
             Button {
+                model.articleBody = .page
                 Task { await showFullArticle() }
             } label: {
                 Label("Show the full article", systemImage: "doc.richtext")

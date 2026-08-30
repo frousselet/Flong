@@ -96,6 +96,7 @@ final class AppModel {
     private let opml: OPMLImport
     private let credentials: CredentialStoring
     private let sessions: SessionStoring
+    private let preferences: Preferences
 
     private(set) var sidebar: [SidebarItem] = []
     private(set) var summaries: [ArticleSummary] = []
@@ -107,6 +108,18 @@ final class AppModel {
     private(set) var authenticatedFeeds: Set<UUID> = []
     /// The sites the reader has signed in to, for the screen that manages them.
     private(set) var subscribedSites: [SiteSession] = []
+
+    /// Which body an article opens on, as the reader last chose.
+    ///
+    /// Kept in the iCloud key-value store, so a choice made on the phone is
+    /// what the iPad opens on. Not CloudKit : a preference has no business in
+    /// a record budget spent on articles.
+    var articleBody = Preferences.ArticleBody.feed {
+        didSet {
+            guard articleBody != oldValue else { return }
+            preferences.articleBody = articleBody
+        }
+    }
     private(set) var isRefreshing = false
     private(set) var feedCount = 0
 
@@ -209,11 +222,14 @@ final class AppModel {
         database: AppDatabase,
         fetcher: FeedFetcher = FeedFetcher(),
         credentials: CredentialStoring = KeychainCredentials(),
-        sessions: SessionStoring = KeychainSessions()
+        sessions: SessionStoring = KeychainSessions(),
+        preferences: Preferences = Preferences()
     ) {
         self.database = database
         self.credentials = credentials
         self.sessions = sessions
+        self.preferences = preferences
+        self.articleBody = preferences.articleBody
         let subscriptions = SubscriptionStore(database)
         self.subscriptions = subscriptions
         self.articles = ArticleStore(database)
@@ -261,6 +277,9 @@ final class AppModel {
         await loadSidebar()
         await loadArticles()
         await loadCredentials()
+        // Another device may have changed it while this one was away.
+        preferences.synchronize()
+        articleBody = preferences.articleBody
         await countOutstandingWork()
     }
 
