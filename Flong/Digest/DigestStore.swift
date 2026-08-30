@@ -131,7 +131,7 @@ nonisolated struct DigestStore: Sendable {
     /// Not a day : a reader opening Flong on Monday morning would find a page
     /// emptied by the weekend. Not a month either, since a front page is about
     /// what is current, and everything older is still reachable through unread,
-    /// the library and search. Three days is a story still worth a headline.
+    /// the collections and search. Three days is a story still worth a headline.
     static let window: TimeInterval = 3 * 24 * 60 * 60
 
     /// How many rooms a row shows the mark of before it counts the rest.

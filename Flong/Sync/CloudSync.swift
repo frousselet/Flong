@@ -232,7 +232,7 @@ extension CloudSync: CKSyncEngineDelegate {
             if !applied.isEmpty || !removed.isEmpty {
                 Log.sync.notice(
                     """
-                    Applied \(applied.feeds) feeds, \(applied.libraryItems) kept articles, \
+                    Applied \(applied.feeds) feeds, \(applied.markedArticles) marked articles, \
                     \(applied.readArticles) read states, \(removed.removed) removals
                     """
                 )
@@ -294,8 +294,8 @@ extension CloudSync: CKSyncEngineDelegate {
             status = .idle(lastSynchronized: nil)
 
         case .signOut, .switchAccounts:
-            // What is here stays here : signing out of iCloud is not a reason to
-            // lose a library.
+            // What is here stays here : signing out of iCloud is not a reason
+            // to lose what the reader collected.
             try? await state.setEngineState(nil)
             engine = nil
             status = .unavailable

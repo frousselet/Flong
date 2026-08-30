@@ -11,7 +11,7 @@ CloudKit degrades on record count and change throughput, not on bytes. Around th
 | What | How many | Why that many |
 | ---- | -------- | ------------- |
 | feeds | a few hundred | one per subscription |
-| library items | one to two thousand | one per kept article, content and all |
+| marks | one to two thousand | one per marked article : starred, annotation, collections, vector |
 | read-state blocks | a few dozen | **one per month**, over every feed |
 | catch-up headers | a few hundred, sliding | one per feed and per day, over thirty days |
 
@@ -31,7 +31,7 @@ The whole budget rests on this. Read states travel as one record per month, hold
 - **Reading is therefore one way.** Marking an article unread is a local decision and does not travel : a set that only grows has nothing to say about what left it. That is the price of having no conflict resolution at all, and it is the right price.
 - **A block that arrives is kept, not merely applied.** An article read elsewhere may not have been fetched here yet, and when it arrives it has to arrive read.
 
-Starred articles are deliberately **not** in these blocks. Starring is what puts an article in the library, and a library item is a record with a real deletion, so it travels as itself and unstarring travels with it.
+Starred articles are deliberately **not** in these blocks. A star travels as a mark of its own, which is a record with a real deletion, so unstarring travels with it.
 
 ## What never travels
 
@@ -92,6 +92,6 @@ The development environment invents the schema as it goes : the first save of a 
 
 Production does not. It takes the schema it was given, and a save carrying a field it has never heard of is refused. **TestFlight and the App Store use production**, so the schema has to be deployed from the CloudKit console before the first build that leaves this machine, not after.
 
-The part that catches people is the second time. Adding a field later is invisible in development and fatal in production until it is deployed again : the console's *Deploy Schema Changes* is not a one-off. Anything that changes what `SyncRecords` writes, or adds a record type, is a change to redeploy. `starredAt` on `LibraryItem` is the most recent of those.
+The part that catches people is the second time. Adding a field later is invisible in development and fatal in production until it is deployed again : the console's *Deploy Schema Changes* is not a one-off. Anything that changes what `SyncRecords` writes, or adds a record type, is a change to redeploy. The `Mark` record type is the most recent of those, and the `LibraryItem` type it replaces is dead : a production schema is additive only, so it can never be removed, only left unused.
 
 `SyncRecords` is the only description of the schema there is. There is no separate declaration to keep in step, deliberately, since two descriptions of one thing are one description and one lie.

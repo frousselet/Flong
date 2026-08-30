@@ -1,6 +1,6 @@
 # Search
 
-Two things make search work : an index that holds every article, and a language that says what to look for. Both are here ; the semantic search of section 11 belongs to the library and arrives with M2.
+Two things make search work : an index that holds every article, and a language that says what to look for. Both are here ; the semantic search of section 11 is over the marked articles only and arrives with M2.
 
 ## The index
 
@@ -28,7 +28,7 @@ Words next to each other are joined by an implicit `AND`, which is what everyone
 | Category | Operators |
 | -------- | --------- |
 | fields | `title:`, `text:`, `author:`, `feed:`, `site:`, `tag:`, `lang:` |
-| states | `is:unread`, `is:read`, `is:starred`, `is:library`, `has:media`, `has:fulltext` |
+| states | `is:unread`, `is:read`, `is:starred`, `is:collected`, `is:annotated`, `has:media`, `has:fulltext` |
 | time | `after:2026-01`, `before:2026-08-25`, `age:<7d`, `age:>2w` |
 | logic | `AND`, `OR`, `NOT`, brackets, `"a phrase"`, `-` or `!` to exclude, `*` to match a prefix |
 

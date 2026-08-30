@@ -32,7 +32,7 @@ struct StoreTests {
         }
 
         let expected: Set<String> = [
-            "feed", "entry", "entry_body", "library_item", "tag", "tag_binding",
+            "feed", "entry", "entry_body", "tag", "tag_binding",
             "rule", "saved_query", "read_state_block", "sync_state", "sync_record", "entry_fts", "story",
             "story_member", "story_topic", "topic_preference", "topic",
         ]
@@ -51,13 +51,14 @@ struct StoreTests {
                 "v1.model", "v2.search", "v3.readStates", "v4.stories", "v5.covers", "v6.topics",
                 "v7.briefLanguage", "v8.recordTags", "v9.askAgain", "v10.topicPreferences",
                 "v11.severalTopics", "v12.duplicates", "v13.keyWhatIsAlreadyHere", "v14.vocabulary",
-                "v15.askedOnce", "v16.whyItWasKept", "v17.archiveLedger",
+                "v15.askedOnce", "v16.whyItWasKept", "v17.archiveLedger", "v18.oneArticle",
+                "v19.marksThatArriveFirst",
             ]
         )
     }
 
-    @Test("The migration that froze the star carries over what was already starred")
-    func starIsCarriedOver() throws {
+    @Test("The migration that folded the library in carries the marks onto the articles")
+    func marksAreCarriedOver() throws {
         let queue = try DatabaseQueue()
         // The schema as it stood before the star was written on the copy.
         try AppDatabase.migrator.migrate(queue, upTo: "v15.askedOnce")
@@ -91,15 +92,63 @@ struct StoreTests {
         try AppDatabase.migrator.migrate(queue)
 
         // A reader who starred things before the update finds them in their
-        // favourites afterwards, which is the whole reason the migration
-        // backfills rather than starting the column empty.
+        // favourites afterwards. The star was written on the copy by v16 and
+        // is written back onto the article by v18, and neither step may lose
+        // it : it is the one thing in the library nothing else recorded.
         let carried = try queue.read { db in
-            try UUID.fetchAll(
-                db,
-                sql: "SELECT entry_id FROM library_item WHERE starred_at IS NOT NULL"
-            )
+            try UUID.fetchAll(db, sql: "SELECT id FROM entry WHERE is_starred = 1")
         }
         #expect(carried == [starred])
+
+        // And the second store is gone rather than left behind to drift.
+        let tables = try queue.read { db in
+            try String.fetchSet(db, sql: "SELECT name FROM sqlite_master WHERE type = 'table'")
+        }
+        #expect(!tables.contains("library_item"))
+    }
+
+    @Test("An article kept after its stream row was purged comes back as an article")
+    func theOrphansAreRebuilt() throws {
+        let queue = try DatabaseQueue()
+        try AppDatabase.migrator.migrate(queue, upTo: "v15.askedOnce")
+
+        let feed = UUID.v7()
+        try queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO feed (id, url, title, folder, created_at) VALUES (?, ?, ?, NULL, ?)",
+                arguments: [feed, "https://a.example.com/f.xml", "A", Date()]
+            )
+            // A copy whose article was purged long ago : exactly what the
+            // library existed to protect, and exactly what a careless removal
+            // would have thrown away on the one day it was taken out.
+            try db.execute(
+                sql: """
+                    INSERT INTO library_item
+                    (id, entry_id, feed_url, feed_title, guid, title, promoted_at, content_html, plain_text)
+                    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                arguments: [
+                    UUID.v7(), "https://a.example.com/f.xml", "A", "urn:orphelin",
+                    "Un article gardé", Date(), "<p>Le corps.</p>", "Le corps.",
+                ]
+            )
+        }
+
+        try AppDatabase.migrator.migrate(queue)
+
+        let rebuilt = try queue.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT e.title AS title, b.sanitized_html AS html
+                    FROM entry e LEFT JOIN entry_body b ON b.entry_id = e.id
+                    WHERE e.guid = 'urn:orphelin'
+                    """
+            )
+        }
+        #expect(rebuilt.count == 1)
+        #expect(rebuilt.first?["title"] as String? == "Un article gardé")
+        #expect(rebuilt.first?["html"] as String? == "<p>Le corps.</p>")
     }
 
     @Test("A feed, an article and its body round trip with every column filled")

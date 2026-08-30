@@ -12,23 +12,12 @@
 import Foundation
 import GRDB
 
-/// Where a row in a list comes from.
-nonisolated enum ArticleOrigin: String, Hashable, Sendable {
-    /// The stream, which is a cache and will be purged.
-    case stream
-    /// The library, which is a copy and never will be.
-    case library
-}
-
 /// What a list shows about an article.
 ///
 /// The body is deliberately absent : it is what weighs in the store, and a list
 /// of five hundred rows must not carry five hundred articles' worth of markup.
 nonisolated struct ArticleSummary: Identifiable, Hashable, Sendable, FetchableRecord {
     let id: UUID
-    let origin: ArticleOrigin
-    /// The feed a stream article came from. A kept article has the name of its
-    /// feed and not a row to point at, the feed itself being unsubscribable.
     let feedID: UUID?
     let feedTitle: String
     let title: String
@@ -48,7 +37,6 @@ nonisolated struct ArticleSummary: Identifiable, Hashable, Sendable, FetchableRe
 
     init(row: Row) {
         id = row["id"]
-        origin = ArticleOrigin(rawValue: row["origin"] ?? "") ?? .stream
         feedID = row["feed_id"]
         feedTitle = row["feed_title"] ?? ""
         title = row["title"]
@@ -70,7 +58,6 @@ nonisolated struct ArticleSummary: Identifiable, Hashable, Sendable, FetchableRe
 /// An article as the reader sees it, wherever it was read from.
 nonisolated struct Article: Identifiable, Hashable, Sendable {
     let id: UUID
-    let origin: ArticleOrigin
     let title: String
     let feedTitle: String
     let author: String?
@@ -81,8 +68,7 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
     var isStarred: Bool
     /// What the feed gave.
     let bodyHTML: String?
-    /// What the page gave, when it has been fetched. A kept article never
-    /// has one : it was frozen the day it was kept, and that is the point.
+    /// What the page gave, when it has been fetched.
     let extractedHTML: String?
     let annotation: String?
 
@@ -91,7 +77,6 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
 
     init(
         id: UUID,
-        origin: ArticleOrigin,
         title: String,
         feedTitle: String,
         author: String? = nil,
@@ -105,7 +90,6 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
         annotation: String? = nil
     ) {
         self.id = id
-        self.origin = origin
         self.title = title
         self.feedTitle = feedTitle
         self.author = author
@@ -164,7 +148,7 @@ nonisolated struct ArticleStore: Sendable {
 
     /// The columns a list needs, whichever way the rows were found.
     static let columns = """
-        SELECT e.id, 'stream' AS origin, e.feed_id, e.title, e.excerpt, e.author, e.url,
+        SELECT e.id, e.feed_id, e.title, e.excerpt, e.author, e.url,
                e.is_read, e.is_starred, e.has_media, e.image_url,
                f.icon_url, f.site_url, f.url AS feed_url,
                COALESCE(e.published_at, e.received_at) AS date,
@@ -249,7 +233,6 @@ nonisolated struct ArticleStore: Sendable {
             let body = try EntryBody.fetchOne(db, key: id)
             return Article(
                 id: entry.id,
-                origin: .stream,
                 title: entry.title,
                 feedTitle: feed.title,
                 author: entry.author,
@@ -259,7 +242,8 @@ nonisolated struct ArticleStore: Sendable {
                 isRead: entry.isRead,
                 isStarred: entry.isStarred,
                 bodyHTML: body?.sanitizedHTML,
-                extractedHTML: body?.extractedHTML
+                extractedHTML: body?.extractedHTML,
+                annotation: entry.annotation
             )
         }
     }
@@ -348,6 +332,160 @@ nonisolated struct ArticleStore: Sendable {
             counts[start] = count
         }
         return counts
+    }
+
+    // MARK: - The reader's own marks
+
+    /// Writes what the reader thinks of an article.
+    ///
+    /// An empty note is no note : it takes the article out of the notes rather
+    /// than putting an empty string in them.
+    func annotate(_ entryID: UUID, with note: String?) async throws {
+        let note = note?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        try await database.writer.write { db in
+            _ = try Entry.filter(key: entryID).updateAll(
+                db,
+                Column("annotation").set(to: (note?.isEmpty ?? true) ? nil : note)
+            )
+        }
+    }
+
+    func annotation(of entryID: UUID) async throws -> String? {
+        try await database.writer.read { db in
+            try String.fetchOne(db, sql: "SELECT annotation FROM entry WHERE id = ?", arguments: [entryID])
+        }
+    }
+
+    /// The collections every reader has, which are questions the articles
+    /// answer about themselves.
+    func builtInCollections() async throws -> [ArticleCollection] {
+        let counted: [Counted] = try await database.writer.read { db in
+            let deliberate: [(ArticleCollection.BuiltIn, String, String)] = [
+                (.starred, "e.is_starred = 1", "i.is_starred = 1"),
+                (.annotated, "COALESCE(e.annotation, '') <> ''", "COALESCE(i.annotation, '') <> ''"),
+            ]
+            return try deliberate.compactMap { kind, condition, ofTheCover in
+                let row = try Row.fetchOne(
+                    db,
+                    sql: """
+                        SELECT COUNT(*) AS count,
+                               (SELECT i.image_url FROM entry i
+                                WHERE \(ofTheCover) AND i.image_url IS NOT NULL AND i.is_hidden = 0
+                                ORDER BY COALESCE(i.published_at, i.received_at) DESC LIMIT 1) AS cover
+                        FROM entry e WHERE \(condition) AND e.is_hidden = 0 AND e.duplicate_of IS NULL
+                        """
+                )
+                guard let row, row["count"] as Int > 0 else { return nil }
+                return Counted(kind: kind, count: row["count"], cover: row["cover"])
+            }
+        }
+
+        return counted.map { ArticleCollection(kind: .builtIn($0.kind), count: $0.count, cover: $0.cover) }
+    }
+
+    /// What is in one collection of the first two natures, newest first.
+    ///
+    /// A dynamic one is not here : it is a description, answered by the ordinary
+    /// query path, and it would be strange for a description to be a case in a
+    /// list of memberships.
+    func summaries(in collection: ArticleCollection.Kind, limit: Int = 500) async throws -> [ArticleSummary] {
+        let (condition, arguments) = Self.condition(for: collection)
+
+        return try await database.writer.read { db in
+            try ArticleSummary.fetchAll(
+                db,
+                sql: """
+                    \(Self.columns)
+                    FROM entry e JOIN feed f ON f.id = e.feed_id
+                    WHERE e.is_hidden = 0 AND e.duplicate_of IS NULL AND \(condition)
+                    ORDER BY date DESC LIMIT \(limit)
+                    """,
+                arguments: arguments
+            )
+        }
+    }
+
+    /// An article the reader has marked, as the indexer needs it.
+    ///
+    /// What makes an article worth handing to Spotlight is that the reader did
+    /// something to it : starred it, wrote on it, or filed it. Everything else
+    /// is a cache, and a system-wide index of a cache is an index of things
+    /// nobody chose.
+    nonisolated struct Marked: Hashable, Sendable {
+        var id: UUID
+        var title: String
+        var plainText: String?
+        var url: URL?
+        var author: String?
+        var feedTitle: String?
+        var publishedAt: Date?
+        var markedAt: Date
+    }
+
+    /// Every article the reader has marked, for the indexer.
+    ///
+    /// Narrowed to a few of them when only a few changed, so that starring one
+    /// article does not read every mark there is back out of the database.
+    func marked(_ ids: [UUID]? = nil) async throws -> [Marked] {
+        let narrowing = ids.map { " AND e.id IN (\(databaseQuestionMarks(count: $0.count)))" } ?? ""
+        let arguments = StatementArguments(ids ?? [])
+
+        return try await database.writer.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT e.id AS id, e.title AS title, b.plain_text AS plain_text, e.url AS url,
+                           e.author AS author, f.title AS feed_title, e.published_at AS published_at,
+                           e.received_at AS received_at
+                    FROM entry e
+                    JOIN feed f ON f.id = e.feed_id
+                    LEFT JOIN entry_body b ON b.entry_id = e.id
+                    WHERE e.is_hidden = 0 AND e.duplicate_of IS NULL
+                      AND (e.is_starred = 1 OR COALESCE(e.annotation, '') <> ''
+                           OR e.id IN (SELECT target_id FROM tag_binding WHERE target_kind = 'entry'))
+                    \(narrowing)
+                    """,
+                arguments: arguments
+            )
+            .map { row in
+                Marked(
+                    id: row["id"],
+                    title: row["title"],
+                    plainText: row["plain_text"],
+                    url: (row["url"] as String?).flatMap(URL.init(string:)),
+                    author: row["author"],
+                    feedTitle: row["feed_title"],
+                    publishedAt: row["published_at"],
+                    markedAt: row["received_at"]
+                )
+            }
+        }
+    }
+
+    private struct Counted: Sendable {
+        var kind: ArticleCollection.BuiltIn
+        var count: Int
+        var cover: URL?
+    }
+
+    private static func condition(for kind: ArticleCollection.Kind) -> (String, StatementArguments) {
+        switch kind {
+        case .builtIn(.starred): ("e.is_starred = 1", [])
+        case .builtIn(.annotated): ("COALESCE(e.annotation, '') <> ''", [])
+        case .made(let name):
+            (
+                """
+                e.id IN (
+                    SELECT b.target_id FROM tag_binding b JOIN tag t ON t.id = b.tag_id
+                    WHERE b.target_kind = 'entry' AND t.path = ?
+                )
+                """,
+                [CollectionStore.path(of: name)]
+            )
+        // A dynamic one is a description, answered by the ordinary query path.
+        case .dynamic: ("0", [])
+        }
     }
 
     // MARK: - Writing

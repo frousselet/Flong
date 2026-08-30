@@ -63,8 +63,8 @@ nonisolated struct ArticleVector: Hashable, Sendable {
     /// with a precision of about half a percent, which changes a similarity in
     /// the third decimal and nothing a reader would notice. Five hundred
     /// dimensions become five hundred bytes instead of two thousand, and the
-    /// whole library becomes about a megabyte, which is what section 14 budgets
-    /// for it in CloudKit.
+    /// marked articles come to about a megabyte between them, which is what
+    /// section 14 budgets for them in CloudKit.
     func quantized() -> Data {
         // Scaled by its own largest component first. A normalized vector of five
         // hundred dimensions has components around a twentieth, so quantizing it

@@ -36,13 +36,13 @@ nonisolated protocol ResumableJob: Sendable {
     func step() async throws -> Int
 }
 
-/// Computes the vectors of the library, a batch at a time.
+/// Computes the vectors of what the reader marked, a batch at a time.
 nonisolated struct VectorizeJob: ResumableJob {
     let name = "vectorize"
     private let vectors: VectorStore
-    private let onProgress: @Sendable ([LibraryItem]) async -> Void
+    private let onProgress: @Sendable ([Entry]) async -> Void
 
-    init(_ database: AppDatabase, onProgress: @escaping @Sendable ([LibraryItem]) async -> Void = { _ in }) {
+    init(_ database: AppDatabase, onProgress: @escaping @Sendable ([Entry]) async -> Void = { _ in }) {
         self.vectors = VectorStore(database)
         self.onProgress = onProgress
     }

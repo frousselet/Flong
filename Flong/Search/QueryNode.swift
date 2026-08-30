@@ -56,7 +56,10 @@ nonisolated enum QueryState: String, Hashable, Sendable, CaseIterable {
     case unread
     case read
     case starred
-    case library
+    /// Filed in at least one collection the reader made.
+    case collected
+    /// Written on.
+    case annotated
     case media
     case fulltext
 }

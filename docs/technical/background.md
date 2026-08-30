@@ -38,18 +38,18 @@ Registration happens in the application's initializer, before launching finishes
 
 ## Vectors
 
-Only the library is vectorized. A hundred and twenty five thousand vectors would cost hours of device time and would answer a question nobody asks of a cache.
+Only the marked articles are vectorized. Hundreds of thousands of vectors would cost hours of device time and would answer a question nobody asks of an article they never looked twice at.
 
 - **The system's own sentence embeddings** do the work, on the device. They need no download, no account and no Apple Intelligence, which matters : section 14 treats the language model as a feature flag with a path that always works without it. A language the system cannot embed simply has no vector, and search falls back on matching words.
 - **A vector is only comparable to vectors from the same model at the same revision.** Both travel with it. A vector whose pair does not match this device's is dropped and computed again, and the device that recomputes republishes it. Mixing revisions does not fail loudly ; it quietly returns nonsense.
 - **Quantized to eight bits, scaled by the vector's own largest component.** A normalized vector of five hundred dimensions has components around a twentieth, so quantizing against the range minus one to one would spend most of the available values on nothing and lose a tenth of a percent of similarity ; scaled, it loses a hundredth of that. The scale is not stored, because reading a vector normalizes it again and a cosine does not care how long either vector was.
-- **Five hundred bytes per article**, so about a megabyte for a whole library, which is what section 14 budgets for it in CloudKit.
+- **Five hundred bytes per article**, so about a megabyte for all of them together, which is what section 14 budgets for them in CloudKit.
 
 ## Searching by meaning
 
-Cosine similarity over the whole library, which needs no index structure at this scale : a few thousand vectors against one is a few million multiplications.
+Cosine similarity over every vector there is, which needs no index structure at this scale : a few thousand vectors against one is a few million multiplications.
 
-The query is embedded **once per model the library holds**, not once. A search is three words long and has no language to detect ; guessing one would send a French question to an English model, which comes back with nothing rather than with an error.
+The query is embedded **once per model the vectors were made with**, not once. A search is three words long and has no language to detect ; guessing one would send a French question to an English model, which comes back with nothing rather than with an error.
 
 ## Filing the stories
 

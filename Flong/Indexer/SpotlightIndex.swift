@@ -14,13 +14,15 @@ import Foundation
 import OSLog
 import UniformTypeIdentifiers
 
-/// Hands the library to Spotlight.
+/// Hands what the reader marked to Spotlight.
 ///
-/// Section 11 of the specification gives Spotlight the library and only the
-/// library : a few thousand items, which is what it is good at, against the
-/// hundred and twenty five thousand of the stream, which it is not. Two things
-/// come of it at once : what the reader kept turns up in the system search, and
-/// the semantic matching Spotlight does is had for nothing.
+/// Section 11 of the specification gives Spotlight the marked articles and only
+/// those : a few thousand items, which is what it is good at, against the
+/// hundreds of thousands of the whole stream, which it is not. An article is
+/// marked when the reader did something to it - starred it, wrote on it, filed
+/// it - and everything else is a cache nobody chose. Two things come of it at
+/// once : what the reader kept turns up in the system search, and the semantic
+/// matching Spotlight does is had for nothing.
 ///
 /// The index is local to the device and never shared between the devices of one
 /// account. Each of them indexes for itself.
@@ -31,6 +33,10 @@ import UniformTypeIdentifiers
 nonisolated struct SpotlightIndex: @unchecked Sendable {
     /// Everything Flong writes goes under one domain, so it can all be taken
     /// back in one call.
+    ///
+    /// The name is what it was called when only the library was indexed. It is
+    /// an opaque identifier the system keys its own records on, and renaming it
+    /// would abandon what is already indexed rather than replace it.
     static let domain = "library"
 
     /// The index is a named one rather than the shared one.
@@ -44,10 +50,10 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
     static let indexName = "flong-library"
 
     private let index: CSSearchableIndex
-    private let library: LibraryStore
+    private let articles: ArticleStore
 
-    init(_ library: LibraryStore, index: CSSearchableIndex = CSSearchableIndex(name: SpotlightIndex.indexName)) {
-        self.library = library
+    init(_ articles: ArticleStore, index: CSSearchableIndex = CSSearchableIndex(name: SpotlightIndex.indexName)) {
+        self.articles = articles
         self.index = index
     }
 
@@ -56,7 +62,7 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
     // MARK: - Keeping Spotlight in step
 
     /// Adds or replaces items in the index.
-    func index(_ items: [LibraryItem]) async throws {
+    func index(_ items: [ArticleStore.Marked]) async throws {
         guard Self.isAvailable, !items.isEmpty else { return }
         try await index.indexSearchableItems(items.map(Self.searchableItem))
     }
@@ -67,7 +73,7 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
         try await index.deleteSearchableItems(withIdentifiers: ids.map(\.uuidString))
     }
 
-    /// Writes the whole library, and tells Spotlight what it now holds.
+    /// Writes everything the reader has marked, and tells Spotlight what it holds.
     ///
     /// The client state is kept **by Spotlight**, not by Flong. That is what
     /// makes this self healing : if Spotlight loses its index, it loses the
@@ -76,7 +82,7 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
     /// skip the rebuild it most needed.
     func rebuild() async throws {
         guard Self.isAvailable else { return }
-        let items = try await library.allItems()
+        let items = try await articles.marked()
 
         index.beginBatch()
         try await index.deleteAllSearchableItems()
@@ -85,14 +91,14 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
         }
         try await endBatch(state: Self.state(of: items))
 
-        Log.index.notice("Wrote \(items.count) kept articles to Spotlight")
+        Log.index.notice("Wrote \(items.count) marked articles to Spotlight")
     }
 
-    /// Rebuilds only when Spotlight and the library disagree about what it holds.
+    /// Rebuilds only when Spotlight and the store disagree about what it holds.
     func rebuildIfNeeded() async throws {
         guard Self.isAvailable else { return }
 
-        let items = try await library.allItems()
+        let items = try await articles.marked()
         let expected = Self.state(of: items)
         guard try await lastState() != expected else { return }
 
@@ -101,8 +107,8 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
 
     // MARK: - Shapes
 
-    /// What Spotlight is told about a kept article.
-    static func searchableItem(for item: LibraryItem) -> CSSearchableItem {
+    /// What Spotlight is told about a marked article.
+    static func searchableItem(for item: ArticleStore.Marked) -> CSSearchableItem {
         let attributes = CSSearchableItemAttributeSet(contentType: .text)
         attributes.title = item.title
         attributes.displayName = item.title
@@ -112,8 +118,8 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
         // Spotlight actually searches through.
         attributes.contentDescription = item.plainText.map { String($0.prefix(300)) }
         attributes.textContent = item.plainText
-        attributes.contentCreationDate = item.publishedAt ?? item.promotedAt
-        attributes.contentModificationDate = item.promotedAt
+        attributes.contentCreationDate = item.publishedAt ?? item.markedAt
+        attributes.contentModificationDate = item.markedAt
         attributes.contentURL = item.url
         attributes.identifier = item.id.uuidString
 
@@ -125,18 +131,18 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
             domainIdentifier: domain,
             attributeSet: attributes
         )
-        // The library is never purged, so neither is its index.
-        searchable.expirationDate = .distantFuture
+        // Nothing is purged any more, so neither is its index.
+        searchable.expirationDate = Date.distantFuture
         return searchable
     }
 
-    /// A short summary of what the library holds, for Spotlight to hand back.
-    private static func state(of items: [LibraryItem]) -> Data {
+    /// A short summary of what is marked, for Spotlight to hand back.
+    private static func state(of items: [ArticleStore.Marked]) -> Data {
         var hasher = Hasher()
         hasher.combine(items.count)
         for item in items.sorted(by: { $0.id.uuidString < $1.id.uuidString }) {
             hasher.combine(item.id)
-            hasher.combine(item.promotedAt)
+            hasher.combine(item.markedAt)
         }
         return withUnsafeBytes(of: hasher.finalize()) { Data($0) }
     }

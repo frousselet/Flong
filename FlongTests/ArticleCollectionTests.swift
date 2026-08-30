@@ -15,17 +15,26 @@ import Testing
 
 @testable import Flong
 
+/// The three natures of a collection, and what each of them actually stores.
+///
+/// That is the whole distinction : a built-in one stores a column, a made one
+/// stores a binding, a dynamic one stores a sentence. The last is the one worth
+/// guarding, since a dynamic collection that quietly started writing bindings
+/// would cost a record per article and nobody would notice until the budget
+/// was gone.
 @Suite("The squares on the collections page")
 struct ArticleCollectionTests {
     private let database: AppDatabase
     private let subscriptions: SubscriptionStore
-    private let library: LibraryStore
+    private let articles: ArticleStore
+    private let collections: CollectionStore
     private let now = Date(timeIntervalSince1970: 1_787_646_600)
 
     init() throws {
         database = try AppDatabase.inMemory()
         subscriptions = SubscriptionStore(database)
-        library = LibraryStore(database)
+        articles = ArticleStore(database)
+        collections = CollectionStore(database)
     }
 
     private func feed(_ address: String, title: String) async throws -> Feed {
@@ -34,7 +43,7 @@ struct ArticleCollectionTests {
 
     @discardableResult
     private func article(_ title: String, in feed: Feed, image: String? = nil) async throws -> UUID {
-        let entry = Entry(
+        var stored = Entry(
             feedID: feed.id,
             guid: "urn:example:\(title)",
             url: URL(string: "https://example.com/\(title)"),
@@ -42,71 +51,53 @@ struct ArticleCollectionTests {
             publishedAt: now,
             receivedAt: now
         )
-        var stored = entry
         stored.imageURL = image.flatMap(URL.init(string:))
         try await database.writer.write { db in try stored.insert(db) }
         return stored.id
     }
 
-    // MARK: - What the reader did on purpose
+    // MARK: - Made article by article
 
-    @Test("Favourites and notes each become a square, and neither counts the other")
-    func deliberate() async throws {
+    @Test("A made collection holds what the reader put in it, and gives it back")
+    func made() async throws {
         let paper = try await feed("https://a.example.com/f.xml", title: "Le Quotidien")
-        let starred = try await article("starred", in: paper, image: "https://example.com/a.jpg")
-        let noted = try await article("noted", in: paper)
-        try await article("neither", in: paper)
+        let filed = try await article("Les macros Swift", in: paper, image: "https://example.com/a.jpg")
+        try await article("Une réforme du calendrier", in: paper)
 
-        try await library.setStarred([starred], to: true, at: now)
-        _ = try await library.annotate(noted, with: "Worth coming back to", at: now)
+        #expect(try await collections.create("Typographie") == "Typographie")
+        try await collections.add([filed], to: "Typographie")
 
-        let collections = try await library.builtInCollections()
-        let favourites = try #require(collections.first { $0.kind == ArticleCollection.Kind.builtIn(.starred) })
-        let notes = try #require(collections.first { $0.kind == ArticleCollection.Kind.builtIn(.annotated) })
-
-        #expect(favourites.count == 1)
-        #expect(favourites.cover?.absoluteString == "https://example.com/a.jpg")
-        #expect(notes.count == 1)
-        // The article nobody touched is in neither, and is not kept at all.
-        #expect(try await library.count() == 2)
+        let made = try #require(await collections.made().first)
+        #expect(made.kind == .made("Typographie"))
+        #expect(made.count == 1)
+        #expect(made.cover?.absoluteString == "https://example.com/a.jpg")
+        #expect(try await articles.summaries(in: .made("Typographie")).map(\.title) == ["Les macros Swift"])
     }
 
-    @Test("Unstarring takes an article out of the favourites without losing a note")
-    func unstarring() async throws {
+    @Test("An article is in as many collections as the reader filed it in")
+    func filedTwice() async throws {
         let paper = try await feed("https://a.example.com/f.xml", title: "Le Quotidien")
-        let both = try await article("both", in: paper)
+        let filed = try await article("Les macros Swift", in: paper)
 
-        try await library.setStarred([both], to: true, at: now)
-        _ = try await library.annotate(both, with: "A note", at: now)
-        try await library.setStarred([both], to: false, at: now)
+        _ = try await collections.create("Typographie")
+        _ = try await collections.create("À lire")
+        try await collections.add([filed], to: "Typographie")
+        try await collections.add([filed], to: "À lire")
 
-        let collections = try await library.builtInCollections()
-        #expect(collections.first { $0.kind == ArticleCollection.Kind.builtIn(.starred) } == nil)
-        #expect(collections.first { $0.kind == ArticleCollection.Kind.builtIn(.annotated) }?.count == 1)
-        // The copy stays, because the note is a reason of its own.
-        #expect(try await library.count() == 1)
+        #expect(try await collections.collections(of: filed).sorted() == ["Typographie", "À lire"].sorted())
     }
 
-    @Test("A favourite survives the article it came from")
-    func survivesThePurge() async throws {
+    @Test("Taking an article out of a collection leaves the article where it is")
+    func unfiled() async throws {
         let paper = try await feed("https://a.example.com/f.xml", title: "Le Quotidien")
-        let kept = try await article("kept", in: paper)
-        try await library.setStarred([kept], to: true, at: now)
+        let filed = try await article("Les macros Swift", in: paper)
 
-        // Retention takes the stream row, and the copy's `entry_id` goes to
-        // NULL with it. Reading the star back off the stream would have the
-        // favourites empty themselves the first time a purge runs.
-        try await database.writer.write { db in _ = try Entry.deleteAll(db) }
+        _ = try await collections.create("Typographie")
+        try await collections.add([filed], to: "Typographie")
+        try await collections.remove([filed], from: "Typographie")
 
-        #expect(
-            try await library.builtInCollections().first { $0.kind == ArticleCollection.Kind.builtIn(.starred) }?.count
-                == 1)
-        #expect(try await library.summaries(in: .builtIn(.starred)).count == 1)
-    }
-
-    @Test("An empty library shows no squares at all")
-    func empty() async throws {
-        #expect(try await library.builtInCollections().isEmpty)
+        #expect(try await collections.collections(of: filed).isEmpty)
+        #expect(try await articles.summaries(.all, now: now).count == 1)
     }
 
     // MARK: - Described rather than filled
@@ -117,7 +108,6 @@ struct ArticleCollectionTests {
         try await article("Une réforme du calendrier", in: paper)
         try await article("Les macros Swift", in: paper)
 
-        let collections = CollectionStore(database)
         #expect(try await collections.createDynamic("Calendrier", matching: "title:calendrier") == "Calendrier")
 
         let made = try #require(await collections.dynamic(now: now).first)
@@ -134,8 +124,6 @@ struct ArticleCollectionTests {
 
     @Test("A description nothing can be made of is refused where it was written")
     func unusableDescription() async throws {
-        let collections = CollectionStore(database)
-
         #expect(try await collections.createDynamic("Vide", matching: "   ") == nil)
         #expect(try await collections.dynamic(now: now).isEmpty)
     }
@@ -145,7 +133,6 @@ struct ArticleCollectionTests {
         let paper = try await feed("https://a.example.com/f.xml", title: "Le Quotidien")
         try await article("Une réforme", in: paper)
 
-        let collections = CollectionStore(database)
         _ = try await collections.createDynamic("Tout", matching: "title:réforme")
 
         // Nothing was bound to anything : this is the whole reason a dynamic

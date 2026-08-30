@@ -14,7 +14,7 @@ import SwiftUI
 /// One square, opened.
 ///
 /// The same column and the same rows as everywhere else. A collection is not a
-/// different kind of place, it is the library with one question asked of it.
+/// different kind of place, it is the stream with one question asked of it.
 struct CollectionScreen: View {
     let model: AppModel
     let kind: ArticleCollection.Kind

@@ -139,12 +139,18 @@ nonisolated struct FullText: Sendable {
             try? sessions.setSession(session, for: host)
         }
 
+        // The plain text goes with it. It is what the search index and
+        // Spotlight read, and leaving it as the feed's two-line summary would
+        // mean fetching the whole article and then searching the teaser.
+        let plainText = HTMLSanitizer.plainText(extracted)
+
         try? await database.writer.write { db in
             guard var body = try EntryBody.fetchOne(db, key: entryID) else {
-                try EntryBody(entryID: entryID, extractedHTML: extracted).insert(db)
+                try EntryBody(entryID: entryID, extractedHTML: extracted, plainText: plainText).insert(db)
                 return
             }
             body.extractedHTML = extracted
+            body.plainText = plainText
             try body.update(db)
         }
         return extracted

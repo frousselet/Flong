@@ -26,7 +26,8 @@ private struct Device {
     let database: AppDatabase
     let subscriptions: SubscriptionStore
     let articles: ArticleStore
-    let library: LibraryStore
+    let marks: MarkStore
+    let collections: CollectionStore
     let readStates: ReadStateStore
     let payload: SyncPayload
 
@@ -34,7 +35,8 @@ private struct Device {
         database = try AppDatabase.inMemory()
         subscriptions = SubscriptionStore(database)
         articles = ArticleStore(database)
-        library = LibraryStore(database)
+        marks = MarkStore(database)
+        collections = CollectionStore(database)
         readStates = ReadStateStore(database)
         payload = SyncPayload(database, zone: zone)
     }
@@ -74,8 +76,12 @@ struct SyncRecordsTests {
         #expect(SyncRecords.name(forFeed: url) == SyncRecords.name(forFeed: url))
         #expect(SyncRecords.name(forFeed: url) != SyncRecords.name(forFeed: URL(string: "https://other.example/f")!))
         #expect(
-            SyncRecords.name(forLibraryItemWithGUID: "urn:1", feedURL: url)
-                == SyncRecords.name(forLibraryItemWithGUID: "urn:1", feedURL: url)
+            SyncRecords.name(forMarkWithGUID: "urn:1", feedURL: url)
+                == SyncRecords.name(forMarkWithGUID: "urn:1", feedURL: url)
+        )
+        #expect(
+            SyncRecords.name(forMarkWithGUID: "urn:1", feedURL: url)
+                != SyncRecords.name(forMarkWithGUID: "urn:2", feedURL: url)
         )
         #expect(SyncRecords.name(forReadStatePeriod: "2026-08", kind: .read) == "read-read-2026-08")
     }
@@ -115,48 +121,42 @@ struct SyncRecordsTests {
         #expect(record["observedInterval"] == nil)
     }
 
-    @Test("A kept article survives the wire, text and all")
-    func libraryItemRoundTrip() throws {
-        let item = LibraryItem(
-            feedURL: URL(string: "https://feeds.example.com/f.xml"),
-            feedTitle: "Le Quotidien",
+    @Test("A mark survives the wire, filings and all")
+    func markRoundTrip() throws {
+        let mark = Mark(
+            feedURL: "https://feeds.example.com/f.xml",
             guid: "urn:example:1",
-            url: URL(string: "https://example.com/1"),
-            title: "Une réforme du calendrier",
-            author: "Camille Dupuis",
-            language: "fr",
-            publishedAt: now,
-            promotedAt: now,
-            starredAt: now,
-            contentHTML: String(repeating: "<p>Le corps de l'article.</p>", count: 200),
-            plainText: String(repeating: "Le corps de l'article. ", count: 200),
-            annotation: "À relire"
+            isStarred: true,
+            annotation: "À relire",
+            collections: ["Thèse", "Presse"],
+            vector: Data(repeating: 128, count: 512),
+            vectorModel: "nl.sentence.fr",
+            vectorRevision: "1"
         )
 
-        let record = SyncRecords.record(for: item, in: zone)
-        let restored = try #require(SyncRecords.libraryItem(from: record))
+        let restored = try #require(SyncRecords.mark(from: SyncRecords.record(for: mark, in: zone)))
 
-        #expect(restored.title == item.title)
-        #expect(restored.guid == item.guid)
-        #expect(restored.author == item.author)
-        #expect(restored.annotation == "À relire")
-        // Why it was kept travels with it : a favourite that arrived merely
-        // kept would be a favourite to make again on every other device.
-        #expect(restored.starredAt == item.starredAt)
-        #expect(restored.contentHTML == item.contentHTML)
-        #expect(restored.plainText == item.plainText)
-
-        // Compressed, because an article is markup and markup compresses.
-        let content = try #require(record["contentHTML"] as? Data)
-        #expect(content.count < Data(item.contentHTML!.utf8).count / 2)
+        #expect(restored == mark)
+        // A filing rides on the article's own record and never costs one of
+        // its own, which is the whole of the collections budget.
+        #expect(restored.collections == ["Thèse", "Presse"])
     }
 
-    @Test("A kept article that is not a favourite does not become one")
-    func keptWithoutTheStar() throws {
-        let item = LibraryItem(guid: "urn:example:2", title: "Gardé sans étoile", promotedAt: now)
+    @Test("An article filed but not starred does not arrive starred")
+    func filedWithoutTheStar() throws {
+        let mark = Mark(
+            feedURL: "https://feeds.example.com/f.xml",
+            guid: "urn:example:2",
+            isStarred: false,
+            annotation: nil,
+            collections: ["Thèse"]
+        )
 
-        let restored = try #require(SyncRecords.libraryItem(from: SyncRecords.record(for: item, in: zone)))
-        #expect(restored.starredAt == nil)
+        let restored = try #require(SyncRecords.mark(from: SyncRecords.record(for: mark, in: zone)))
+        #expect(restored.isStarred == false)
+        #expect(restored.collections == ["Thèse"])
+        // And it is not silence : a filing is something to say.
+        #expect(!restored.isEmpty)
     }
 
     @Test("A block of read states survives the wire")
@@ -184,29 +184,30 @@ struct SyncPayloadTests {
         ).feed
         let kept = try await first.add("urn:1", to: feed, title: "Une réforme", published: now)
         try await first.add("urn:2", to: feed, title: "Autre chose", published: now)
-        try await first.library.setStarred([kept.id], to: true, at: now)
+        try await first.articles.setStarred([kept.id], to: true)
         try await first.articles.setRead([kept.id], to: true)
         _ = try await first.readStates.compact(at: now)
 
         let records = try await first.payload.everything()
         let applied = try await second.payload.apply(records)
 
-        // A feed, a kept article, one block of read states, and one block of
+        // A feed, a marked article, one block of read states, and one block of
         // the stream : two articles of one feed on one day travel as a single
         // record, not as two. That is the budget, and it is what lets the whole
         // stream travel at all.
         #expect(records.count == 4)
         #expect(records.filter { $0.recordType == SyncRecords.RecordType.catchUp }.count == 1)
         #expect(applied.feeds == 1)
-        #expect(applied.libraryItems == 1)
+        #expect(applied.markedArticles == 1)
 
         #expect(try await second.subscriptions.feeds().map(\.title) == ["Le Quotidien"])
         #expect(try await second.subscriptions.feeds().first?.folder == "Presse")
-        #expect(try await second.library.count() == 1)
-        #expect(try await second.library.allItems().first?.contentHTML == "<p>Un corps.</p>")
         // And the stream arrives with it, whole : the reader keeps everything
         // on every device, which is what section 7 was amended to say.
         #expect(try await second.articles.count(.all, now: now) == 2)
+        #expect(try await second.articles.summaries(in: .builtIn(.starred)).map(\.title) == ["Une réforme"])
+        let arrived = try #require(await second.articles.summaries(.all, now: now).first)
+        #expect(try await second.articles.article(id: arrived.id)?.bodyHTML == "<p>Un corps.</p>")
     }
 
     @Test("The stream is sent, but never one record per article")
@@ -298,7 +299,7 @@ struct SyncPayloadTests {
             to: Subscription(address: "https://feeds.example.com/f.xml", title: "A")
         ).feed
         let kept = try await first.add("urn:1", to: feed, title: "Gardé", published: now)
-        try await first.library.setStarred([kept.id], to: true, at: now)
+        try await first.articles.setStarred([kept.id], to: true)
 
         let records = try await first.payload.everything()
         try await second.payload.apply(records)
@@ -306,7 +307,7 @@ struct SyncPayloadTests {
 
         #expect(again.isEmpty)
         #expect(try await second.subscriptions.count() == 1)
-        #expect(try await second.library.count() == 1)
+        #expect(try await second.articles.summaries(in: .builtIn(.starred)).count == 1)
     }
 
     @Test("What one device lets go of, the other lets go of too")
@@ -318,18 +319,25 @@ struct SyncPayloadTests {
             to: Subscription(address: "https://feeds.example.com/f.xml", title: "A")
         ).feed
         let kept = try await first.add("urn:1", to: feed, title: "Gardé", published: now)
-        try await first.library.setStarred([kept.id], to: true, at: now)
+        try await first.articles.setStarred([kept.id], to: true)
+        try await first.collections.add([kept.id], to: "Thèse", at: now)
         try await second.payload.apply(try await first.payload.everything())
 
         // The article is already in the second device's stream, since the
         // stream travels now, and starred by the record that arrived with it.
+        #expect(try await second.articles.summaries(.starred, now: now).count == 1)
+        #expect(try await second.collections.made().first?.count == 1)
 
-        let itemName = SyncRecords.name(forLibraryItemWithGUID: "urn:1", feedURL: feed.url)
-        let removed = try await second.payload.apply(deletions: [itemName])
+        // Unmarking an article deletes its record, and the deletion is what
+        // carries the `no` : there is nothing left to send that would say it.
+        let markName = SyncRecords.name(forMarkWithGUID: "urn:1", feedURL: feed.url)
+        let removed = try await second.payload.apply(deletions: [markName])
 
         #expect(removed.removed == 1)
-        #expect(try await second.library.count() == 0)
         #expect(try await second.articles.summaries(.starred, now: now).isEmpty)
+        // The article itself stays. It was never the mark.
+        #expect(try await second.articles.count(.all, now: now) == 1)
+        #expect(try await second.collections.made().first?.count == 0)
     }
 
     @Test("A device that was switched off learns what it missed")
@@ -401,8 +409,8 @@ struct SyncPayloadTests {
         #expect(try await second.articles.count(.unread, now: now) == 0)
     }
 
-    @Test("Two devices keeping the same article keep one article")
-    func concurrentPromotion() async throws {
+    @Test("Two devices marking the same article write one record")
+    func concurrentMarking() async throws {
         let first = try Device(zone: zone)
         let second = try Device(zone: zone)
 
@@ -411,7 +419,7 @@ struct SyncPayloadTests {
                 to: Subscription(address: "https://feeds.example.com/f.xml", title: "A")
             ).feed
             let entry = try await device.add("urn:1", to: feed, title: "Gardé des deux côtés", published: now)
-            try await device.library.setStarred([entry.id], to: true, at: now)
+            try await device.articles.setStarred([entry.id], to: true)
         }
 
         // Both wrote a record ; both computed the same name for it, so CloudKit
@@ -421,7 +429,7 @@ struct SyncPayloadTests {
         #expect(fromFirst.map(\.recordID.recordName).sorted() == fromSecond.map(\.recordID.recordName).sorted())
 
         try await second.payload.apply(fromFirst)
-        #expect(try await second.library.count() == 1)
+        #expect(try await second.articles.summaries(in: .builtIn(.starred)).count == 1)
     }
 
     // MARK: - What the server said

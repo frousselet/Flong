@@ -46,7 +46,7 @@ While the page is being fetched the feed's version stays on screen, with one lin
 
 ## What is kept
 
-**Promotion freezes the fullest version there is.** Keeping the feed's two sentences when the page has already been fetched would freeze the summary of something the reader read whole, and the library exists precisely so that what was kept survives its source. The plain text is taken from whichever body was frozen, or the library would be searched by words the kept copy does not contain.
+**The plain text is rewritten with the extraction.** The plain text is what the full-text index and Spotlight read, and leaving it as the feed's two-line summary would mean fetching the whole article and then searching the teaser. There is no frozen copy to keep in step any more : there is one article, and what the page gave is what everything sees.
 
 ## Reading the bytes
 

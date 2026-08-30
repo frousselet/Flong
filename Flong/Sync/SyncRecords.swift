@@ -27,7 +27,7 @@ nonisolated enum SyncRecords {
 
     enum RecordType {
         static let feed = "Feed"
-        static let libraryItem = "LibraryItem"
+        static let mark = "Mark"
         static let readState = "ReadState"
         static let catchUp = "CatchUp"
         static let collections = "Collections"
@@ -37,8 +37,12 @@ nonisolated enum SyncRecords {
 
     static func name(forFeed url: URL) -> String { "feed-" + digest(url.absoluteString) }
 
-    static func name(forLibraryItemWithGUID guid: String, feedURL: URL?) -> String {
-        "item-" + digest((feedURL?.absoluteString ?? "") + "\n" + guid)
+    /// One marked article, named after the article and not after the device.
+    ///
+    /// The same pair on two devices gives the same name, so two readers of one
+    /// account starring the same piece write one record between them.
+    static func name(forMarkWithGUID guid: String, feedURL: URL?) -> String {
+        "mark-" + digest((feedURL?.absoluteString ?? "") + "\n" + guid)
     }
 
     static func name(forReadStatePeriod period: String, kind: ReadStateKind) -> String {
@@ -119,22 +123,63 @@ nonisolated enum SyncRecords {
         )
     }
 
-    // MARK: - Library items
+    // MARK: - The reader's marks
 
-    /// A kept article, content and all.
+    /// What the reader said about one article.
     ///
-    /// The text is compressed. An article is a few tens of kilobytes of markup
-    /// and compresses to a fifth of that, which keeps a record well inside what
-    /// CloudKit accepts and a first synchronization well inside what a phone
-    /// wants to upload.
-    /// The one record naming every collection the reader has made.
+    /// One record apiece, which is what the library's record was and what
+    /// section 8 budgeted for : a reader marks a few thousand articles in
+    /// years. See ``Mark`` for why a block per month, the shape read states
+    /// take, is the wrong one here.
     ///
-    /// One record for the lot, and not one apiece : a collection is a name, and
-    /// a few dozen names are a field rather than a table. What it exists for is
-    /// the empty one. Membership travels on the articles, so a collection with
-    /// something in it would arrive anyway ; a collection made a moment ago and
-    /// not yet filled would not, and it is the one the reader is most likely to
-    /// be looking at.
+    /// The collections it is filed in ride along as a field. A filing costs a
+    /// field on a record that exists anyway, and never a record of its own.
+    static func record(for mark: Mark, in zone: CKRecordZone.ID) -> CKRecord {
+        let record = CKRecord(
+            recordType: RecordType.mark,
+            recordID: CKRecord.ID(
+                recordName: name(forMarkWithGUID: mark.guid, feedURL: URL(string: mark.feedURL)),
+                zoneID: zone
+            )
+        )
+        record["feedURL"] = mark.feedURL
+        record["guid"] = mark.guid
+        record["isStarred"] = mark.isStarred ? 1 : 0
+        record["annotation"] = mark.annotation
+        record["collections"] = mark.collections
+        record["vector"] = mark.vector
+        record["vectorModel"] = mark.vectorModel
+        record["vectorRevision"] = mark.vectorRevision
+        return record
+    }
+
+    static func mark(from record: CKRecord) -> Mark? {
+        guard record.recordType == RecordType.mark,
+            let feedURL = record["feedURL"] as? String,
+            let guid = record["guid"] as? String
+        else { return nil }
+
+        return Mark(
+            feedURL: feedURL,
+            guid: guid,
+            isStarred: (record["isStarred"] as? Int ?? 0) == 1,
+            annotation: record["annotation"] as? String,
+            collections: record["collections"] as? [String] ?? [],
+            vector: record["vector"] as? Data,
+            vectorModel: record["vectorModel"] as? String,
+            vectorRevision: record["vectorRevision"] as? String
+        )
+    }
+
+    // MARK: - Collections
+
+    /// Every collection the reader has, as one record.
+    ///
+    /// One record for the lot, and not one apiece. What it exists for is the
+    /// collection that carries no articles : a made one with something in it
+    /// arrives on the articles themselves, and a dynamic one is nothing but a
+    /// description, which is exactly what makes it cost the same whether it
+    /// holds nothing or ten thousand.
     static func record(
         forCollections names: [String],
         dynamic: [String: String] = [:],
@@ -145,9 +190,6 @@ nonisolated enum SyncRecords {
             recordID: CKRecord.ID(recordName: "collections", zoneID: zone)
         )
         record["names"] = names
-        // A dynamic collection travels as its description and never as what
-        // answers it : that is the whole point of it, and it is what makes one
-        // holding ten thousand articles cost the same as one holding none.
         record["dynamic"] = try? JSONEncoder().encode(dynamic)
         return record
     }
@@ -163,74 +205,6 @@ nonisolated enum SyncRecords {
             let described = try? JSONDecoder().decode([String: String].self, from: payload)
         else { return [:] }
         return described
-    }
-
-    static func record(for item: LibraryItem, collections: [String] = [], in zone: CKRecordZone.ID) -> CKRecord {
-        let record = CKRecord(
-            recordType: RecordType.libraryItem,
-            recordID: CKRecord.ID(
-                recordName: name(forLibraryItemWithGUID: item.guid, feedURL: item.feedURL),
-                zoneID: zone
-            )
-        )
-        record["guid"] = item.guid
-        record["feedURL"] = item.feedURL?.absoluteString
-        record["feedTitle"] = item.feedTitle
-        record["url"] = item.url?.absoluteString
-        record["title"] = item.title
-        record["author"] = item.author
-        record["language"] = item.language
-        record["publishedAt"] = item.publishedAt
-        record["promotedAt"] = item.promotedAt
-        // Why it was kept travels with it. A favourite that arrived on another
-        // device as merely kept would be a favourite the reader has to make
-        // again, on every device but the one they made it on.
-        record["starredAt"] = item.starredAt
-        record["annotation"] = item.annotation
-        // Which collections it is in, on the article itself : a membership is
-        // a fact about one article, and a record apiece would be one record per
-        // filing in a budget that has none to spare.
-        record["collections"] = collections
-        record["contentHTML"] = compressed(item.contentHTML)
-        record["plainText"] = compressed(item.plainText)
-
-        // A vector travels with the pair that says what it can be compared to.
-        // Section 14 is emphatic : a vector without them is not a vector, it is
-        // five hundred numbers.
-        record["vector"] = item.vector
-        record["vectorModel"] = item.vectorModel
-        record["vectorRevision"] = item.vectorRevision
-        return record
-    }
-
-    /// Which collections a kept article says it is in.
-    static func collections(from record: CKRecord) -> [String] {
-        record["collections"] as? [String] ?? []
-    }
-
-    static func libraryItem(from record: CKRecord) -> LibraryItem? {
-        guard record.recordType == RecordType.libraryItem, let guid = record["guid"] as? String else { return nil }
-
-        var item = LibraryItem(
-            feedURL: (record["feedURL"] as? String).flatMap(URL.init(string:)),
-            feedTitle: record["feedTitle"] as? String,
-            guid: guid,
-            url: (record["url"] as? String).flatMap(URL.init(string:)),
-            title: record["title"] as? String ?? "",
-            author: record["author"] as? String,
-            language: record["language"] as? String,
-            publishedAt: record["publishedAt"] as? Date,
-            promotedAt: record["promotedAt"] as? Date ?? Date(),
-            contentHTML: expanded(record["contentHTML"] as? Data),
-            plainText: expanded(record["plainText"] as? Data),
-            annotation: record["annotation"] as? String
-        )
-
-        item.starredAt = record["starredAt"] as? Date
-        item.vector = record["vector"] as? Data
-        item.vectorModel = record["vectorModel"] as? String
-        item.vectorRevision = record["vectorRevision"] as? String
-        return item
     }
 
     // MARK: - Read states

@@ -19,10 +19,11 @@ nonisolated struct Enclosure: Hashable, Codable, Sendable {
     var length: Int?
 }
 
-/// An article of the stream.
+/// An article.
 ///
-/// The stream is a cache : an entry is purged by age and by volume, and what the
-/// user keeps lives in the library instead.
+/// There is one of these per article and no second copy anywhere : what the
+/// reader says about one - starred, written on, filed - is written on the row
+/// itself, and that is what keeps it from ever being purged.
 nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
     static let databaseTableName = "entry"
 
@@ -46,6 +47,10 @@ nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
         case hasMedia = "has_media"
         case imageURL = "image_url"
         case canonicalKey = "canonical_key"
+        case annotation
+        case vector
+        case vectorModel = "vector_model"
+        case vectorRevision = "vector_revision"
         case duplicateOf = "duplicate_of"
     }
 
@@ -80,6 +85,18 @@ nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
 
     /// What makes this the same article as another : see ``ArticleKey``.
     var canonicalKey: String?
+
+    /// What the reader wrote on it, which is one of the two things that puts an
+    /// article in a collection every reader has.
+    var annotation: String?
+
+    /// What it means, for the search that goes by meaning rather than by words.
+    ///
+    /// A vector only compares to vectors of the same model and revision, so
+    /// both travel with it and a mismatch means computing it again.
+    var vector: Data?
+    var vectorModel: String?
+    var vectorRevision: String?
 
     /// The copy that arrived first, when this one is the same article reaching
     /// the reader through a second feed of the same newsroom. A duplicate is

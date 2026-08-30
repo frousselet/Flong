@@ -12,9 +12,11 @@ Flong is a feed reader for iOS, iPadOS and macOS. There is no server, no account
 
 The product rests on three commitments.
 
-**A clean split between library and stream.** The stream is a disposable cache, rebuildable at any time from the sources. The library is what the user chose to keep : frozen, retained, enriched and synchronized. An article enters the library only on a decision, explicit or by rule.
+**One article, and what the reader said about it.** There is a single notion of an article and no second copy of anything. What the reader says about one - starred, written on, filed in a collection - is a mark carried on the article itself, and it is what makes the article theirs : a mark is synchronized, is never purged, and is the whole of what distinguishes a kept article from one that merely arrived.
 
-**Search that is genuinely indexed.** A local full-text index over the whole corpus, a query language with operators, and semantic search over the library.
+**Amended.** This section, and the whole document with it, used to describe a clean split between a disposable stream and a frozen library. The split was dissolved deliberately, and section 4 sets out what each half of it was for and what became of it : once the stream is retained without limit and synchronized whole, a second store holding a frozen copy of a subset of it has nothing left to protect.
+
+**Search that is genuinely indexed.** A local full-text index over the whole corpus, a query language with operators, and semantic search over what the reader marked.
 
 **Enrichment entirely on device.** Classification, tagging and summaries by the system model, without any content leaving the device.
 
@@ -59,9 +61,20 @@ An active iCloud account is required for synchronization, but not for operation 
 
 **Article** : an entry in a feed, identified stably by its GUID, or failing that by the pair of link and publication date.
 
-**Reading stream** : the set of articles present locally, unread and recently read. A local cache, bounded in age and volume, never synchronized, rebuildable.
+**Reading stream** : the set of articles present locally. It began as a local cache, bounded in age and volume and never synchronized ; it is now retained without limit and synchronized whole, which is what dissolved the library below.
 
-**Library** : the set of retained articles. Content frozen at the moment of promotion, synchronized, never purged.
+**Mark** : what the reader said about an article, carried on the article itself : starred or not, the note if there is one, and the collections it was filed into. A mark is synchronized, and an article that carries one is never purged.
+
+**Collection** : a set of articles the reader looks at as one thing, of one of three natures - predefined, made article by article, or described by a query. See section 13.
+
+**Library** : *removed*. It was a second table holding a frozen copy of what the reader chose to keep, and every reason it existed for went away one at a time :
+
+- it survived the purge of the stream : nothing is purged now, unless the reader asks, and a marked article is spared even then ;
+- it survived the article vanishing from the web : the stream keeps the text and travels with it, so every device has it ;
+- it survived a device being set up fresh : the stream travels whole, so it arrives with everything else ;
+- it froze the version read, so a later edit could not reach it : the one guarantee that genuinely went, and not worth a second store on its own.
+
+What it really held, once the frozen text stopped being wanted, was the reader's own marks. Those moved onto the article, which is where they had always belonged.
 
 **Tag** : a namespaced label, for example `veille/ios`, applicable to articles and to feeds. A folder is only a view over a root tag.
 
@@ -82,7 +95,7 @@ A single application, shared code, distinct interface layers per platform.
 | `Sanitizer` | whitelist-based HTML sanitization |
 | `Extractor` | full-text extraction, reader mode. `docs/technical/extraction.md` |
 | `Store` | SQLite through GRDB, migrations, purge |
-| `Indexer` | FTS5 for the stream, Core Spotlight for the library |
+| `Indexer` | FTS5 for every article, Core Spotlight for the marked ones |
 | `Search` | The query language, and its compilation to SQL |
 | `Enricher` | vectors, classification, rule execution |
 | `Sync` | `CKSyncEngine` on the private database |
@@ -100,10 +113,10 @@ GRDB is the only external dependency, and it stays that way. A package is added 
 | Table | Contents |
 | ----- | -------- |
 | `feed` | canonical URL, title, folder, conditionality metadata (`etag`, `last_modified`), health, observed periodicity, local settings |
-| `entry` | stream article, stable identifier, metadata, read state, reception date |
+| `entry` | article, stable identifier, metadata, read state, reception date, and the reader's own marks : starred, annotation, vector with its model identifier and revision |
 | `entry_body` | sanitized body, extracted body, normalized plain text |
 | `entry_fts` | FTS5 virtual table, contentless, kept in step by triggers |
-| `library_item` | retained article, frozen content, annotations, vector, model identifier and revision |
+| `pending_mark` | a mark that arrived from another device before the article it is about |
 | `tag`, `tag_binding` | tags and assignments |
 | `rule` | condition, actions, order, enabled state |
 | `saved_query` | named queries |
@@ -127,7 +140,7 @@ This is the dominant design constraint. CloudKit degrades on record count and ch
 | Record type | Over three years | Contents |
 | ----------- | ---------------- | -------- |
 | feeds, folders, tags, rules, queries, settings | a few hundred | complete |
-| library items | 1,000 to 2,500 | frozen content, tags, annotations, vector |
+| marks | 1,000 to 2,500 | starred, annotation, collections, vector |
 | read-state blocks | a few dozen | compressed sets of fingerprints, one per month |
 | catch-up headers | a few hundred, sliding | metadata only |
 | **target total** | **around 3,000** | |
@@ -142,9 +155,19 @@ Per month, and not per feed and per month : a reader following three hundred fee
 
 A fingerprint is eight bytes of a digest of the feed address and the article's own identity, which two devices work out to the same value without ever having spoken. Local identifiers cannot travel ; these can.
 
-Starred articles are not in these blocks. Being starred is what puts an article in the library, and a library item is a record with a real deletion, so it travels as itself. A set of fingerprints only grows, and unstarring would have nowhere to go in it.
+Starred articles are not in these blocks. A star travels as a mark of its own, which is a record with a real deletion. A set of fingerprints only grows, and unstarring would have nowhere to go in it.
 
 Merging is a union, so the operation is commutative and idempotent. There is no conflict resolution logic to write, which removes the main source of bugs in multi-device synchronization. It follows that reading is one way : marking an article unread is a local decision and does not travel. That is the price of having no conflict resolution at all, and it is worth paying.
+
+### Marks
+
+One record per marked article, named after the pair of feed address and article identity, so two devices marking the same article write one record between them.
+
+**Not compacted into a block per month**, which is the shape read states take and the shape this was first written as. Reading happens once and never unhappens, so a union merge is right for it and is commutative : two devices writing the same month cannot lose each other's work. A mark is not like that. A star comes off, a note is deleted, an article leaves a collection, and the `no` has to travel as surely as the `yes`. In a block that means the last device to write a month wins the whole month, and a star made on one device while another was offline is silently rubbed out. One record per article is the only shape in which the `no` travels and nothing is clobbered, and it costs exactly what the library items it replaces cost : the reader marks a few thousand articles in years, not a hundred thousand.
+
+An article unmarked entirely has nothing left to say, and its record is deleted. The deletion is what carries the `no`.
+
+**A mark may arrive before its article.** The whole stream travels, so the article is on its way, but CloudKit hands its batches over in whatever order it likes. A mark whose article is not here is held in `pending_mark` and written the moment the article turns up, whether from iCloud or from the feed itself. Dropping it would lose a star for good, since nothing re-sends a record that was already delivered.
 
 ### Stream blocks
 
@@ -260,12 +283,12 @@ A secret URL is treated as a secret in its own right : masked in the interface, 
 
 | Index | Scope | Technology | Target volume |
 | ----- | ----- | ---------- | ------------- |
-| stream | every local article | SQLite FTS5, external content | up to 125,000 |
-| library | retained articles | Core Spotlight | a few thousand |
+| full text | every local article | SQLite FTS5, contentless | hundreds of thousands |
+| system | the marked articles | Core Spotlight | a few thousand |
 
-Core Spotlight cannot serve as the primary index : `contentDescription` is capped at around three hundred characters, and the recommendation is to stay within a few thousand items per application, beyond which search performance degrades severely. It suits the library perfectly, with two immediate benefits : retained articles show up in system Spotlight, and natural-language semantic search comes from the system.
+Core Spotlight cannot serve as the primary index : `contentDescription` is capped at around three hundred characters, and the recommendation is to stay within a few thousand items per application, beyond which search performance degrades severely. It suits the marked articles perfectly, with two immediate benefits : what the reader kept shows up in system Spotlight, and natural-language semantic search comes from the system.
 
-### Lexical index of the stream
+### Lexical index
 
 A contentless FTS5 virtual table, weighting title, standfirst, body and author, kept in step by triggers on the articles and their bodies. Contentless rather than external content : it holds an index and not a second copy of the articles, which is the point either way, and a row can be removed on its identifier alone. External content demands the exact original text back on every delete, and a cascade that has already removed the body has nothing to give back, which is how a full-text index quietly corrupts itself.
 
@@ -273,15 +296,15 @@ The `unicode61` tokenizer with diacritics removed, wrapped in `porter`. The stem
 
 A full rebuild is possible at any time, on the order of a minute over the target corpus.
 
-### Library index
+### System index
 
-Items handed to Core Spotlight with title, excerpt, author, date, tags and thumbnail. `CSIndexExtensionRequestHandler` is implemented so Spotlight schedules reindexing itself under favourable conditions, device asleep or idle, outside the application lifecycle.
+The marked articles are handed to Core Spotlight with title, excerpt, author, date, tags and thumbnail. An article is marked when the reader did something to it : starred it, wrote on it, or filed it in a collection. Everything else is a cache nobody chose, and a system-wide index of a cache is an index of things nobody asked for. `CSIndexExtensionRequestHandler` is implemented so Spotlight schedules reindexing itself under favourable conditions, device asleep or idle, outside the application lifecycle.
 
 The Spotlight index is local and private, and is never shared between the devices of one account. Every device indexes on its own behalf.
 
 ### Semantic search
 
-Over the library only, through Core Spotlight semantic search, falling back on vectors computed by the application and cosine similarity, which needs no particular index structure at this scale.
+Over the marked articles only, through Core Spotlight semantic search, falling back on vectors computed by the application and cosine similarity, which needs no particular index structure at this scale.
 
 The stream is not vectorized. Grouping the reprints of one wire story was implemented that way, measured, and abandoned : the system's sentence embeddings scored two unrelated French articles at 0.93 and two about the same event at 0.92. The digest groups on shared vocabulary instead, weighted by rarity, which separates them cleanly and needs no model at all. `docs/technical/digest.md` carries the measurement.
 
@@ -290,7 +313,7 @@ The stream is not vectorized. Grouping the reprints of one wire story was implem
 | Operation | Target |
 | --------- | ------ |
 | lexical query over 125,000 articles | under 100 ms |
-| semantic search over the library | under 300 ms |
+| semantic search over the marked articles | under 300 ms |
 | full FTS5 index rebuild | under 2 min |
 | indexing one article at ingestion | under 10 ms |
 
@@ -307,7 +330,7 @@ tag:veille/ios (title:"vision pro" OR title:visionos) -site:medium.com after:202
 | Category | Operators |
 | -------- | --------- |
 | fields | `title:`, `text:`, `author:`, `feed:`, `site:`, `tag:`, `lang:` |
-| states | `is:unread`, `is:read`, `is:starred`, `is:library`, `has:media`, `has:fulltext` |
+| states | `is:unread`, `is:read`, `is:starred`, `is:collected`, `is:annotated`, `has:media`, `has:fulltext` |
 | time | `after:`, `before:`, `age:<7d` |
 | logic | `AND`, `OR`, `NOT`, nested parentheses, quoted phrases, `-` prefix for exclusion |
 
@@ -319,9 +342,13 @@ Input assistance : completion of feed and tag names, a live result count, and ex
 
 ## 13. Organization and automation
 
-### Promotion to the library
+### Marking an article
 
-An article enters the library by being starred, tagged, annotated, or by a rule action. At that moment its content is frozen and copied, which is what guarantees it survives the purge of the stream and its disappearance from the source.
+**Amended.** This section described promotion to the library : starring, tagging or annotating an article froze a copy of it in a second table, which is what guaranteed it survived the purge and the article's disappearance from the source.
+
+There is no second copy any more, and there is no library. Starring, writing on or filing an article writes a mark on the article itself. The mark is what is synchronized, and an article carrying one is never purged, whatever the retention policy says. Section 4 lists the guarantees the copy used to give and what became of each ; the short of it is this : retention is unlimited and the whole stream travels between devices, so the article does not need protecting from the purge, and the marks are on it rather than beside it, so nothing can drift out of step with anything.
+
+What is genuinely lost is freezing the version read : a publisher's later edit now reaches the article. That was the one thing the copy still bought, and it was not worth a second store.
 
 ### Rules
 
@@ -329,7 +356,7 @@ A condition expressed in the query language, with composable actions :
 
 - add or remove a tag ;
 - mark read or unread ;
-- promote to the library ;
+- star, or write on ;
 - hide ;
 - notify locally.
 
@@ -360,7 +387,7 @@ Nothing new was needed in the store for any of it. A built-in one is a column ; 
 
 **Amended : nothing is thrown away on its own.** Both bounds, age and volume, are optional and both are absent. The reader keeps every article that has ever arrived, on every device. The purge still exists and is still correct ; it is asked for, from the sources page, rather than run on a schedule.
 
-Stream purge by age and by volume, with a configurable global cap expressed in days and in megabytes. What belongs to the library is never purged. This is the mechanism that bounds disk usage.
+Purge by age and by volume, with a configurable global cap expressed in days and in megabytes. **An article the reader marked is never purged, however it was marked.** Starring is not the only way to say something about an article : a note and a filing say it just as plainly, and a purge sparing only the stars would throw away the article somebody wrote three paragraphs on.
 
 ---
 
@@ -386,7 +413,7 @@ No sending to a remote service by default. If the user configures an external pr
 
 ### Vectors and multiple devices
 
-Library vectors are synchronized, not recomputed. The system's own sentence embeddings produce them, on the device, with no download and no dependency on Apple Intelligence ; the dimension is the model's, around five hundred. Quantized to 8-bit integers, scaled by the vector's own largest component, that is about five hundred bytes each and a megabyte for the whole library. The scale is not stored : reading a vector normalizes it again, and a cosine does not care how long either vector was.
+Vectors are synchronized, not recomputed, and only the marked articles have one. The system's own sentence embeddings produce them, on the device, with no download and no dependency on Apple Intelligence ; the dimension is the model's, around five hundred. Quantized to 8-bit integers, scaled by the vector's own largest component, that is about five hundred bytes each and a megabyte for all of them together. The scale is not stored : reading a vector normalizes it again, and a cosine does not care how long either vector was.
 
 **Compatibility rule, mandatory.** A vector is only comparable to those produced by the same model and the same revision, and system models evolve with the operating system. The model identifier and revision are stored with every vector. On a mismatch the received vector is ignored and recomputed locally, never mixed, and the most up-to-date device republishes its version.
 
@@ -394,7 +421,7 @@ Library vectors are synchronized, not recomputed. The system's own sentence embe
 
 ## 15. Background processing
 
-Two workloads of different natures. Lexical indexing is negligible, on the order of a second to a minute for the whole corpus, and happens inline at ingestion. Vectorization is the only genuinely expensive work, and that is why it is limited to the library : two thousand five hundred items at a hundred milliseconds is about four minutes, feasible on an iPhone while charging.
+Two workloads of different natures. Lexical indexing is negligible, on the order of a second to a minute for the whole corpus, and happens inline at ingestion. Vectorization is the only genuinely expensive work, and that is why it is limited to the marked articles : two thousand five hundred of them at a hundred milliseconds is about four minutes, feasible on an iPhone while charging.
 
 | API | Use |
 | --- | --- |
@@ -423,7 +450,7 @@ Not a list of articles : a list of **stories**, each one several articles from s
 
 - **Happening now** : the stories with at least three articles from two rooms in the last six hours. Ten articles from one room is not an event, and a room is a newsroom rather than a feed : a paper with a feed per desk counts once.
 - The same article reaching the reader through two feeds of one newsroom is shown once. It keeps both rows, since each belongs to a feed they follow, and `docs/technical/ingestion.md` records what makes two articles the same one.
-- **The subjects**, as pills that scroll : the front page first, then the subjects the model found across the stories, most covered first. **Amended** : this section asked for a day, week and month selector. A period is a question about the calendar, and nobody watching a subject asks it. The front page looks back three days, which is a story still worth a headline, and everything older stays reachable through unread, the library and search.
+- **The subjects**, as pills that scroll : the front page first, then the subjects the model found across the stories, most covered first. **Amended** : this section asked for a day, week and month selector. A period is a question about the calendar, and nobody watching a subject asks it. The front page looks back three days, which is a story still worth a headline, and everything older stays reachable through unread, the collections and search.
 - A story is under **several** subjects, or under none, in which case it is still on the front page and simply on no pill. Its subjects are shown above its headline, the way a rubric is set above a piece.
 - The subjects are a **vocabulary**, written once and kept. A story is filed into it once and keeps what it was given ; the model is shown the vocabulary and reaches for it before naming anything new, and the reader may write subjects of their own, which the model files under like any other.
 - A long press on a subject says more of this or less of this, on a score from minus three to three that starts at nought. A screen in the reader's menu lists every subject there is, including those no longer on the page, and sets each to down, nothing or up. The score orders the stories before their weight does, and orders the pills themselves. It stays on the device for now : `docs/technical/digest.md` says why it ought not to. Without a model there are no subjects and no pills, and the front page is entire ; a model that answers nothing leaves the subjects already on the page alone, rather than blanking a good page over a transient.
@@ -437,7 +464,7 @@ The model names and summarizes ; without one, a story takes the title and standf
 
 ### Common structure
 
-**Amended.** This section asked for three levels, sidebar, list and article, shown as three columns on iPad and Mac. What is built shows one column at a time on every platform, under the system tab bar : the digest, the wire, the library, sources, and search. Two columns of chrome around an article are two columns of not reading, and the sections a sidebar was to hold are the sections the tab bar holds. Each section keeps its own navigation stack.
+**Amended.** This section asked for three levels, sidebar, list and article, shown as three columns on iPad and Mac. What is built shows one column at a time on every platform, under the system tab bar : the digest, the wire, the collections, and search, with the sources reached from the header. Two columns of chrome around an article are two columns of not reading, and the sections a sidebar was to hold are the sections the tab bar holds. Each section keeps its own navigation stack.
 
 On macOS those same sections become a sidebar, drawn by the system for an adaptable tab view, since a Mac window keeps its sections at the side.
 
@@ -461,7 +488,7 @@ Reader mode when the reader has chosen it, a switch to the feed content or the w
 
 ### Search
 
-A single field accepting the query language, live results, a switch between stream and library, and saving a query straight from the field.
+A single field accepting the query language, live results, and saving a query straight from the field. The switch between stream and library is gone with the library : there is one corpus, and `is:starred`, `is:collected` and `is:annotated` narrow it to what the reader marked.
 
 ### macOS
 
@@ -469,11 +496,11 @@ A window whose sections sit in a sidebar, complete keyboard shortcuts, a menu ba
 
 ### Widgets and extensions
 
-Unread, library and saved-query widgets. A Share extension for subscribing and promoting. Controls for Control Center and the Lock Screen.
+Unread, collection and saved-query widgets. A Share extension for subscribing and for marking. Controls for Control Center and the Lock Screen.
 
 ### First launch
 
-An OPML import or an import from an existing service offered right away, an optional starter set of feeds, a one-sentence explanation of the stream and library split, and no account creation.
+An OPML import or an import from an existing service offered right away, an optional starter set of feeds, a one-sentence explanation of what a mark is and why it never disappears, and no account creation.
 
 ---
 
@@ -508,7 +535,7 @@ This entry point is local to the machine ; it is neither remote nor available wi
 
 **Query translation** from FreshRSS to the Flong language, with an explicit report of the expressions that could not be translated rather than a silent approximate conversion.
 
-**Export** : OPML for subscriptions, JSON for everything, tags, rules, queries, library and annotations included. A complete export must be able to rebuild the state of the application on a fresh install.
+**Export** : OPML for subscriptions, JSON for everything, tags, rules, queries, collections and annotations included. A complete export must be able to rebuild the state of the application on a fresh install.
 
 The initial import runs in a resumable task with system progress.
 
@@ -534,14 +561,14 @@ The initial import runs in a resumable task with system progress.
 | -------- | ------ |
 | followed feeds | 1,000 |
 | articles kept locally | 125,000, around 500 MB |
-| library items | 2,500 |
+| marked articles | 2,500 |
 | CloudKit records over three years | around 3,000 |
 | cold launch to a usable list | under 500 ms |
 | refresh of 300 feeds on a decent network | under 60 s |
 | memory footprint while reading | under 150 MB |
 | cellular consumption per day, default settings | under 10 MB |
 
-Automatic purge triggered when the volume cap is exceeded, with the user informed, and never deleting a library item.
+Automatic purge triggered when the volume cap is exceeded, with the user informed, and never deleting a marked article.
 
 ---
 
@@ -581,7 +608,7 @@ Flong is not affiliated with any third-party service. Service names cited in the
 | --------- | -------- | -------------- |
 | M0 | collection, parsing, storage, reading | 300 feeds followed for a week with no intervention |
 | M1 | FTS5 index, query language, search | the targets of section 11 met over 125,000 articles |
-| M2 | library, promotion, Core Spotlight | retained articles found in system Spotlight |
+| M2 | marks, collections, Core Spotlight | marked articles found in system Spotlight |
 | M3 | `CKSyncEngine` synchronization | a second device added with no bulk transfer, and the complete walkthrough validated on an iPhone alone |
 | M4 | background tasks, vectors, vector sharing | a complete import resumed and finished after backgrounding |
 | M5 | tags, rules, replay, saved queries | a rule replayed over the whole local corpus in under a minute |
@@ -598,7 +625,7 @@ Flong is not affiliated with any third-party service. Service names cited in the
 | background tasks never triggered | functional | foreground refresh as the primary mechanism, background tasks treated as a bonus |
 | `BGContinuedProcessingTask` unreliable | functional | resumable tasks in idempotent batches, a persisted resume point |
 | articles missed by a switched-off device | functional | thirty-day catch-up headers |
-| Core Spotlight caps | design | use restricted to the library, sized under the caps by construction |
+| Core Spotlight caps | design | use restricted to the marked articles, sized under the caps by construction |
 | model divergence between devices | data | identifier and revision stored, local recomputation rather than mixing |
 | drift towards a mandatory Mac | product | no macOS-exclusive feature allowed, blocking install test on an iPhone alone |
 | traffic multiplied by device count | externality | systematic HTTP conditionality, pseudo-random stagger |

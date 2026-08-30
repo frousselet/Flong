@@ -539,6 +539,7 @@
       }
     },
     "By month" : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {

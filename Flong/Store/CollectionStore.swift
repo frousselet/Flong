@@ -17,13 +17,13 @@ import OSLog
 ///
 /// **One place that answers what the collections are**, because the answer
 /// comes from three different tables and a page should not have to know that.
-/// The built-in ones are columns on the kept articles, the made ones are tags
-/// under a `collection/` root, and the dynamic ones are the saved queries
-/// section 12 described and v1 put in the schema.
+/// The built-in ones are columns on the article, the made ones are tags under
+/// a `collection/` root, and the dynamic ones are the saved queries section 12
+/// described and v1 put in the schema.
 ///
-/// **Nothing new was needed in the store for any of it.** A tag applies to a
-/// library item by section 4, and a saved query is a name and a query by
-/// section 5. Both had been sitting there unused.
+/// **Nothing new was needed in the store for any of it.** A tag applies to an
+/// article by section 4, and a saved query is a name and a query by section 5.
+/// Both had been sitting there unused.
 nonisolated struct CollectionStore: Sendable {
     /// The root every made collection's tag hangs off.
     ///
@@ -34,12 +34,10 @@ nonisolated struct CollectionStore: Sendable {
 
     private let database: AppDatabase
     private let articles: ArticleStore
-    private let library: LibraryStore
 
     init(_ database: AppDatabase) {
         self.database = database
         self.articles = ArticleStore(database)
-        self.library = LibraryStore(database)
     }
 
     // MARK: - Names
@@ -76,7 +74,7 @@ nonisolated struct CollectionStore: Sendable {
 
     /// The ones every reader has, which are the state of their own articles.
     func builtIn() async throws -> [ArticleCollection] {
-        try await library.builtInCollections()
+        try await articles.builtInCollections()
     }
 
     // MARK: - Made, article by article
@@ -160,7 +158,7 @@ nonisolated struct CollectionStore: Sendable {
         }
     }
 
-    /// Which made collections one kept article is in.
+    /// Which made collections one article is in.
     func collections(of itemID: UUID) async throws -> [String] {
         try await database.writer.read { db in
             try String.fetchAll(
@@ -177,7 +175,7 @@ nonisolated struct CollectionStore: Sendable {
         }
     }
 
-    /// Says which collections a kept article belongs to, and only those.
+    /// Says which collections an article belongs to, and only those.
     ///
     /// What arrives from another device is the whole truth about that article :
     /// a collection missing from the list is one it was taken out of, so the
@@ -190,10 +188,10 @@ nonisolated struct CollectionStore: Sendable {
         for name in current.subtracting(wanted) { try await remove([itemID], from: name) }
     }
 
-    /// Which made collections every kept article is in, keyed by the article.
+    /// Which made collections every filed article is in, keyed by the article.
     ///
-    /// One pass rather than one query per article : synchronizing walks the
-    /// whole library, and a few thousand items asked one at a time is a few
+    /// One pass rather than one query per article : synchronizing walks every
+    /// mark there is, and a few thousand of them asked one at a time is a few
     /// thousand statements for an answer one join already holds.
     func memberships() async throws -> [UUID: [String]] {
         let rows: [Pair] = try await database.writer.read { db in
@@ -228,16 +226,16 @@ nonisolated struct CollectionStore: Sendable {
                 db,
                 sql: """
                     SELECT t.path AS path, COUNT(i.id) AS count,
-                           (SELECT i2.image_url FROM library_item i2
+                           (SELECT i2.image_url FROM entry i2
                             JOIN tag_binding c ON c.target_id = i2.id AND c.target_kind = ?
                             WHERE c.tag_id = t.id AND i2.image_url IS NOT NULL
-                            ORDER BY COALESCE(i2.published_at, i2.promoted_at) DESC LIMIT 1) AS cover
+                            ORDER BY COALESCE(i2.published_at, i2.received_at) DESC LIMIT 1) AS cover
                     FROM tag t
                     LEFT JOIN tag_binding b ON b.tag_id = t.id AND b.target_kind = ?
                     -- Counting the articles and not the bindings. A binding
                     -- carries no foreign key, since it points at one of three
                     -- tables, so nothing removes it when what it names goes.
-                    LEFT JOIN library_item i ON i.id = b.target_id
+                    LEFT JOIN entry i ON i.id = b.target_id
                     WHERE t.path LIKE ?
                     GROUP BY t.path
                     """,
@@ -373,6 +371,6 @@ nonisolated struct CollectionStore: Sendable {
         var cover: URL?
     }
 
-    /// What a binding points at, when it points at a kept article.
-    private static let kind = "library_item"
+    /// What a binding points at, which is an article.
+    private static let kind = "entry"
 }
