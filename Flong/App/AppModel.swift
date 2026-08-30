@@ -156,6 +156,8 @@ final class AppModel {
     /// there is a window.
     private var watching: Task<Void, Never>?
     private var ticking: Task<Void, Never>?
+    /// The model's own work, which no gesture waits for.
+    private var enriching: Task<Void, Never>?
 
     /// Whether the reader is looking at Flong right now.
     ///
@@ -441,6 +443,7 @@ final class AppModel {
     deinit {
         watching?.cancel()
         ticking?.cancel()
+        enriching?.cancel()
     }
 
     /// How often an open window asks the publishers.
@@ -1243,23 +1246,51 @@ final class AppModel {
     /// because they asked ; the token bucket per host is what keeps that polite
     /// to the publishers.
     ///
-    /// **It writes, and reads nothing back.** SwiftUI holds the refresh control
-    /// out until this returns and retracts it afterwards, so replacing the
-    /// page's content as the last thing before returning has the scroll view
-    /// begin that retraction against content it has never laid out : the space
-    /// left for the spinner is never reclaimed, and the page stays wedged down
-    /// by exactly its height with the large title still open.
+    /// **It ends when the fetching ends.** SwiftUI holds the refresh control out
+    /// until this returns, so whatever this waits for is how long the page sits
+    /// pushed down by the spinner's height with the large title still open.
     ///
-    /// So the gesture writes and nothing more. The window follows the store and
-    /// reads itself back once the control is gone, which is what
-    /// ``keepUp()`` is for.
+    /// It used to wait for `rebuild`, which runs the model over the whole
+    /// backlog with no deadline : a headline written and a subject filed for
+    /// every story that has just arrived, one call to the model apiece, seconds
+    /// each. On a device with Apple Intelligence and a page of new stories that
+    /// is minutes of gesture. It looked like a scroll view stuck in the wrong
+    /// place and it was a refresh that had not finished.
+    ///
+    /// So the gesture is the fetching and the grouping, which is what a reader
+    /// means by a refresh and is bounded by the network's own timeouts. The
+    /// model's work carries on behind it : those are resumable jobs, the window
+    /// follows the store, and each headline appears as it is written.
+    ///
+    /// It writes and reads nothing back for the same reason. Replacing the
+    /// page's content as the last thing before returning would have the scroll
+    /// view begin its retraction against content it has never laid out.
     func refreshAll() async {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
 
         _ = await refresher.refreshAll()
-        await digestService.rebuild()
+        await digestService.buildStories()
+
+        enrich()
+    }
+
+    /// Writes the headlines and files the subjects, behind whatever asked.
+    ///
+    /// One at a time : a second pull while the first is still being written
+    /// would have two runs of the model competing for it, and the jobs pick up
+    /// where they were left anyway.
+    private func enrich() {
+        guard enriching?.isCancelled ?? true else { return }
+
+        enriching = Task { [weak self] in
+            guard let self else { return }
+            await digestService.brief()
+            await digestService.nameTopics()
+            await announceNewStories()
+            enriching = nil
+        }
     }
 
     /// Refreshes the feeds that are due, on returning to the foreground.
