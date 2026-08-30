@@ -340,6 +340,14 @@ Two mandatory properties :
 
 Explicit evaluation order, individual enabling, and a consultable local log of triggers.
 
+### Collections
+
+The collections a reader makes are tags under a `collection/` root, bound to library items through `tag_binding`. Nothing new in the store : this is the mechanism section 4 already described, and folders, rules and saved queries inherit it when their turn comes.
+
+They travel between devices without a record of their own. A membership is a fact about one article, so it rides on that article's record as a list of names : one more field, not one more record. The single `Collections` record exists for the empty one, which nothing else would carry, and it is sent only when there is at least one collection to name.
+
+**Made, never unmade.** A name arriving from another device is created ; a name absent from what arrived is not deleted. Deleting a collection is therefore local until every device has been told by other means, which is the price of not carrying a tombstone for every name ever used. Membership is the other way round : what arrives about one article is the whole truth about it, so a collection missing from its list is one it was taken out of.
+
 ### Retention
 
 **Amended : nothing is thrown away on its own.** Both bounds, age and volume, are optional and both are absent. The reader keeps every article that has ever arrived, on every device. The purge still exists and is still correct ; it is asked for, from the sources page, rather than run on a schedule.

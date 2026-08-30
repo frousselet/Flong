@@ -168,6 +168,9 @@ struct ArticleScreen: View {
     let model: AppModel
     let articleID: UUID
 
+    @State private var isNamingCollection = false
+    @State private var collectionName = ""
+
     /// Which body is being read.
     ///
     /// Whatever the reader last chose, which is carried between their devices.
@@ -216,6 +219,20 @@ struct ArticleScreen: View {
             // time : fetching on opening is what they asked for, and only for
             // them.
             if model.articleBody == .page { await showFullArticle() }
+            await model.loadCollections()
+            await model.loadArticleCollections()
+        }
+        .alert(Text("New collection"), isPresented: $isNamingCollection) {
+            TextField("Name", text: $collectionName)
+            Button("Cancel", role: .cancel) {}
+            Button("Create") {
+                let name = collectionName
+                collectionName = ""
+                Task {
+                    await model.makeCollection(named: name)
+                    await model.fileArticle(in: name)
+                }
+            }
         }
     }
 
@@ -282,6 +299,9 @@ struct ArticleScreen: View {
                     Divider()
                 }
 
+                filing
+                Divider()
+
                 if article.origin == .stream {
                     Button {
                         Task { await model.markCurrentUnread() }
@@ -301,6 +321,46 @@ struct ArticleScreen: View {
             } label: {
                 Label("Actions", systemImage: "ellipsis")
             }
+        }
+    }
+
+    /// Which collections this article is in, and the way into another.
+    ///
+    /// A submenu rather than a screen : filing something is a decision made in
+    /// passing, and a page that had to be opened and dismissed for it would
+    /// cost more than the decision is worth. Each collection is a toggle, so
+    /// taking an article out of one is where putting it in was.
+    ///
+    /// Filing keeps the article. An article has to be kept before it can be
+    /// filed, and asking the reader to star it first would be asking them to
+    /// say something they did not mean.
+    @ViewBuilder
+    private var filing: some View {
+        Menu {
+            ForEach(model.collectionNames, id: \.self) { name in
+                let isIn = model.articleCollections.contains(name)
+                Button {
+                    Task {
+                        if isIn {
+                            await model.unfileArticle(from: name)
+                        } else {
+                            await model.fileArticle(in: name)
+                        }
+                    }
+                } label: {
+                    Label(name, systemImage: isIn ? "checkmark" : "folder")
+                }
+            }
+
+            if !model.collectionNames.isEmpty { Divider() }
+
+            Button {
+                isNamingCollection = true
+            } label: {
+                Label("New collection", systemImage: "plus")
+            }
+        } label: {
+            Label("Collections", systemImage: "folder")
         }
     }
 
