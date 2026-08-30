@@ -594,6 +594,15 @@ final class AppModel {
     /// Every subject there is, for the screen that manages them.
     private(set) var knownTopics: [TopicPreferences.Known] = []
 
+    /// Writes down the sections every reader has, once, at the first launch
+    /// that finds them missing.
+    ///
+    /// Not in a migration : the names are in the reader's language, and a
+    /// migration runs before anything has asked what that is.
+    func seedStandardTopics() async {
+        try? await TopicPreferences(database).seedStandards()
+    }
+
     func loadKnownTopics() async {
         knownTopics = (try? await TopicPreferences(database).known()) ?? []
     }

@@ -660,6 +660,22 @@
         }
       }
     },
+    "Culture" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Culture"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Culture"
+          }
+        }
+      }
+    },
     "Delete" : {
       "localizations" : {
         "fr" : {
@@ -821,6 +837,16 @@
         }
       }
     },
+    "Found by the model" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trouvées par le modèle"
+          }
+        }
+      }
+    },
     "Free up space" : {
       "localizations" : {
         "fr" : {
@@ -921,12 +947,44 @@
         }
       }
     },
+    "International" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "World"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "International"
+          }
+        }
+      }
+    },
     "It fills itself with whatever matches, and goes on filling itself. Try `title:Swift` or `is:unread`." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Elle se remplit de tout ce qui correspond, et continue de se remplir. Essayez `title:Swift` ou `is:unread`."
+          }
+        }
+      }
+    },
+    "Justice" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Justice"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Justice"
           }
         }
       }
@@ -1008,6 +1066,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mes collections"
+          }
+        }
+      }
+    },
+    "Médias" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Media"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Médias"
           }
         }
       }
@@ -1213,6 +1287,22 @@
         }
       }
     },
+    "Politique" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Politics"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Politique"
+          }
+        }
+      }
+    },
     "Profile" : {
       "localizations" : {
         "fr" : {
@@ -1259,6 +1349,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Renommer"
+          }
+        }
+      }
+    },
+    "Santé" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Health"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Santé"
+          }
+        }
+      }
+    },
+    "Sciences" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Science"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sciences"
           }
         }
       }
@@ -1473,6 +1595,22 @@
         }
       }
     },
+    "Société" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Society"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Société"
+          }
+        }
+      }
+    },
     "Something went wrong" : {
       "localizations" : {
         "fr" : {
@@ -1489,6 +1627,32 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sources"
+          }
+        }
+      }
+    },
+    "Sport" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sport"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sport"
+          }
+        }
+      }
+    },
+    "Standard subjects" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thématiques standard"
           }
         }
       }
@@ -1635,6 +1799,22 @@
         }
       }
     },
+    "Technologie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Technology"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Technologie"
+          }
+        }
+      }
+    },
     "That file is not an image" : {
       "localizations" : {
         "fr" : {
@@ -1691,6 +1871,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le reste"
+          }
+        }
+      }
+    },
+    "The sections every reader has. The model files each story under one of these or one of yours, and then adds what it found the story is actually about." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les rubriques que tout lecteur connaît. Le modèle classe chaque fil sous l'une d'elles ou sous l'une des vôtres, puis ajoute ce qu'il a trouvé du sujet réel."
           }
         }
       }
@@ -1846,6 +2036,16 @@
         }
       }
     },
+    "What the model named itself, beside the section it filed the story under." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que le modèle a nommé lui-même, à côté de la rubrique sous laquelle il a classé le fil."
+          }
+        }
+      }
+    },
     "Words, or a query : title:, author:, tag:, is:unread, after:2026-01." : {
       "localizations" : {
         "fr" : {
@@ -1876,6 +2076,16 @@
         }
       }
     },
+    "Your own subjects" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos thématiques"
+          }
+        }
+      }
+    },
     "Your profile" : {
       "comment" : "The menu entry that opens the profile, when no name has been given",
       "localizations" : {
@@ -1893,6 +2103,64 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le vôtre"
+          }
+        }
+      }
+    },
+    "Yours to add and to remove. The model reaches for them as readily as its own." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À vous d'en ajouter et d'en retirer. Le modèle y recourt aussi volontiers qu'aux siennes."
+          }
+        }
+      }
+    },
+    "Écologie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Climate"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écologie"
+          }
+        }
+      }
+    },
+    "Économie" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Business"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Économie"
+          }
+        }
+      }
+    },
+    "Éducation" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Education"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Éducation"
           }
         }
       }

@@ -283,6 +283,27 @@ nonisolated extension AppDatabase {
             }
         }
 
+        // Three natures of subject, where there had been two.
+        //
+        // The column said whether the reader wrote it. What is wanted is where
+        // it came from : the sections every newspaper has, the ones this reader
+        // wrote, and the ones the model came up with for one story. The first
+        // of those did not exist and is what the change is for : a page that
+        // reads sensibly on its first day rather than after a fortnight of the
+        // model naming things.
+        //
+        // The old column stays and stays true. Reading it is how this is
+        // backfilled, and a reader's own subject is still their own.
+        migrator.registerMigration("v21.threeKindsOfSubject") { db in
+            try db.alter(table: "topic") { table in
+                table.add(column: "kind", .text).notNull().defaults(to: TopicKind.smart.rawValue)
+            }
+            try db.execute(
+                sql: "UPDATE topic SET kind = ? WHERE is_own = 1",
+                arguments: [TopicKind.own.rawValue]
+            )
+        }
+
         return migrator
     }
 

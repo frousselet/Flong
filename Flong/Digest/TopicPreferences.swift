@@ -12,6 +12,22 @@
 import Foundation
 import GRDB
 
+/// Where a subject came from.
+///
+/// Three natures, and what tells them apart is who decided. A standard one was
+/// decided by a century of newspapers ; a reader's own by the reader ; a smart
+/// one by the model, when nothing it was shown covered a story.
+///
+/// The difference is what the reader may do to it and what the model is asked
+/// for. A standard one cannot be deleted, since it is not a thing that was
+/// made ; the reader's own are theirs to add and to remove ; a smart one is the
+/// model's and goes when its stories do.
+nonisolated enum TopicKind: String, Hashable, Sendable, Codable, CaseIterable {
+    case standard
+    case own
+    case smart
+}
+
 /// One subject of the vocabulary.
 nonisolated struct Topic: Hashable, StoredRecord {
     static let databaseTableName = "topic"
@@ -19,18 +35,25 @@ nonisolated struct Topic: Hashable, StoredRecord {
     enum CodingKeys: String, CodingKey {
         case name
         case isOwn = "is_own"
+        case kind
         case createdAt = "created_at"
     }
 
     var name: String
     /// Whether the reader wrote it themselves, which is what makes it theirs
     /// to delete.
+    ///
+    /// The column the kind was carried in before there were three of them. It
+    /// is derived from the kind rather than passed, so the two cannot come to
+    /// disagree, and it stays true for anything still reading it.
     var isOwn: Bool
+    var kind: TopicKind
     var createdAt: Date
 
-    init(name: String, isOwn: Bool = false, createdAt: Date = Date()) {
+    init(name: String, kind: TopicKind, createdAt: Date = Date()) {
         self.name = name
-        self.isOwn = isOwn
+        self.kind = kind
+        self.isOwn = kind == .own
         self.createdAt = createdAt
     }
 }
@@ -65,6 +88,7 @@ nonisolated struct TopicPreferences: Sendable {
         let score: Int
         /// Whether the reader wrote it themselves.
         let isOwn: Bool
+        let kind: TopicKind
 
         var id: String { name }
     }
@@ -80,7 +104,7 @@ nonisolated struct TopicPreferences: Sendable {
             let rows = try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT t.name AS name, t.is_own AS is_own,
+                    SELECT t.name AS name, t.is_own AS is_own, t.kind AS kind,
                            (SELECT COUNT(*) FROM story_topic s WHERE s.name = t.name) AS stories,
                            COALESCE((SELECT p.score FROM topic_preference p WHERE p.name = t.name), 0) AS score
                     FROM topic t
@@ -91,7 +115,8 @@ nonisolated struct TopicPreferences: Sendable {
                     name: $0["name"],
                     stories: $0["stories"] ?? 0,
                     score: $0["score"] ?? 0,
-                    isOwn: $0["is_own"] ?? false
+                    isOwn: $0["is_own"] ?? false,
+                    kind: TopicKind(rawValue: $0["kind"] ?? "") ?? .smart
                 )
             }
 
@@ -105,6 +130,40 @@ nonisolated struct TopicPreferences: Sendable {
         }
     }
 
+    /// The subjects the model must choose from : the sections every reader has
+    /// and the ones this reader wrote.
+    ///
+    /// **Not the smart ones.** Those are what the model came up with for one
+    /// story, and offering them back to it turns a page into a drift of near
+    /// synonyms : the model reaches for whatever is nearest, and what is
+    /// nearest is whatever it said last. A story is filed under something a
+    /// reader recognizes first, and given a smart subject afterwards.
+    func settled() async throws -> [String] {
+        try await database.writer.read { db in
+            try String.fetchAll(
+                db,
+                sql: """
+                    SELECT name FROM topic WHERE kind IN ('standard', 'own')
+                    ORDER BY kind = 'own' DESC, created_at
+                    """
+            )
+        }
+    }
+
+    /// Writes down the sections every reader has, once.
+    ///
+    /// Idempotent, and folded like everything else : a reader who had already
+    /// written `Écologie` themselves keeps theirs, and the standard one is not
+    /// added beside it.
+    func seedStandards(_ names: [String] = StandardTopics.names(), at date: Date = Date()) async throws {
+        try await database.writer.write { db in
+            for name in names {
+                guard try Self.folded(name, in: db) == nil else { continue }
+                try Topic(name: name, kind: .standard, createdAt: date).insert(db)
+            }
+        }
+    }
+
     /// The subjects the reader wrote themselves.
     ///
     /// They are on the page whether anything has been filed under them yet or
@@ -113,6 +172,13 @@ nonisolated struct TopicPreferences: Sendable {
     func ownNames() async throws -> [String] {
         try await database.writer.read { db in
             try String.fetchAll(db, sql: "SELECT name FROM topic WHERE is_own = 1 ORDER BY created_at")
+        }
+    }
+
+    /// The subjects the model named itself.
+    func smartNames() async throws -> [String] {
+        try await database.writer.read { db in
+            try String.fetchAll(db, sql: "SELECT name FROM topic WHERE kind = 'smart'")
         }
     }
 
@@ -143,7 +209,7 @@ nonisolated struct TopicPreferences: Sendable {
 
         return try await database.writer.write { db in
             if let existing = try Self.folded(name, in: db) { return existing }
-            try Topic(name: name, isOwn: true, createdAt: date).insert(db)
+            try Topic(name: name, kind: .own, createdAt: date).insert(db)
             return name
         }
     }
@@ -156,7 +222,7 @@ nonisolated struct TopicPreferences: Sendable {
 
         return try await database.writer.write { db in
             if let existing = try Self.folded(name, in: db) { return existing }
-            try Topic(name: name, createdAt: date).insert(db)
+            try Topic(name: name, kind: .smart, createdAt: date).insert(db)
             return name
         }
     }
@@ -166,7 +232,9 @@ nonisolated struct TopicPreferences: Sendable {
         try await database.writer.write { db in
             try db.execute(sql: "DELETE FROM story_topic WHERE name = ?", arguments: [name])
             try db.execute(sql: "DELETE FROM topic_preference WHERE name = ?", arguments: [name])
-            try db.execute(sql: "DELETE FROM topic WHERE name = ? AND is_own = 1", arguments: [name])
+            // A standard one is not a thing that was made, so there is
+            // nothing there to unmake.
+            try db.execute(sql: "DELETE FROM topic WHERE name = ? AND kind = 'own'", arguments: [name])
         }
     }
 
@@ -217,7 +285,7 @@ nonisolated struct TopicPreferences: Sendable {
             // A preference on a subject the vocabulary does not have would be
             // a preference the reader can never find again to take back.
             let name = try Self.folded(name, in: db) ?? name
-            try Topic(name: name, createdAt: date).insert(db, onConflict: .ignore)
+            try Topic(name: name, kind: .smart, createdAt: date).insert(db, onConflict: .ignore)
 
             let current =
                 try Int.fetchOne(db, sql: "SELECT score FROM topic_preference WHERE name = ?", arguments: [name]) ?? 0

@@ -108,10 +108,17 @@ struct TopicNamerLiveTests {
         }
     }
 
-    @Test("A headline about nothing the reader has is filed under nothing")
-    func nothingFits() async throws {
+    @Test("A headline is always filed under something it was shown")
+    func alwaysSomething() async throws {
         let namer = TopicNamer(locale: Locale(identifier: "fr_FR"))
 
+        // Nothing here is about macros. The list it is shown is the sections
+        // every newspaper has plus whatever the reader wrote, and a headline
+        // belonging under none of them is rare enough that an escape costs
+        // more than it saves : the model took it constantly, and a page where
+        // half the stories are filed under nothing is a page whose pills say
+        // nothing. What saves this story is the second pass, which names what
+        // it is actually about.
         guard
             case .chosen(let filed) = await namer.file(
                 "Les macros Swift, deux ans après",
@@ -122,10 +129,12 @@ struct TopicNamerLiveTests {
             Issue.record("The model would not file the headline")
             return
         }
-        print("=== nothing fits -> \(filed)")
-        #expect(filed.isEmpty)
+        print("=== always something -> \(filed)")
+        #expect(!filed.isEmpty)
+        #expect(filed.allSatisfy { ["Jardinage", "Cuisine"].contains($0) })
 
-        // And then it is asked to name one.
+        // And then it is asked for one of its own, which every story gets and
+        // not only the ones that fit nothing.
         let proposed = try #require(await namer.newSubject(for: "Les macros Swift, deux ans après", summary: nil))
         print("=== proposed -> \(proposed)")
 

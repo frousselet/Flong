@@ -1076,3 +1076,74 @@ struct ModelFailureTests {
         #expect(chosen.isEmpty)
     }
 }
+
+/// The three natures of a subject, and what the model is asked of each.
+@Suite("Standard, personal and smart subjects")
+struct TopicKindTests {
+    private let database: AppDatabase
+    private let topics: TopicPreferences
+    private let now = Date(timeIntervalSince1970: 1_787_646_600)
+
+    init() throws {
+        database = try AppDatabase.inMemory()
+        topics = TopicPreferences(database)
+    }
+
+    @Test("The sections every reader has are written down once")
+    func seeding() async throws {
+        try await topics.seedStandards(["Politique", "Économie"], at: now)
+        try await topics.seedStandards(["Politique", "Économie"], at: now)
+
+        let known = try await topics.known()
+        #expect(known.count == 2)
+        #expect(known.allSatisfy { $0.kind == .standard })
+    }
+
+    @Test("A section the reader had already written stays theirs")
+    func seedingFolds() async throws {
+        try await topics.add("écologie", at: now)
+        try await topics.seedStandards(["Écologie", "Politique"], at: now)
+
+        let known = try await topics.known()
+        // Folded like everything else : one subject, and it is the reader's.
+        #expect(known.count == 2)
+        #expect(known.first { $0.name == "écologie" }?.kind == .own)
+        #expect(known.first { $0.name == "Écologie" } == nil)
+    }
+
+    @Test("The model chooses from the settled subjects and never from its own")
+    func settled() async throws {
+        try await topics.seedStandards(["Politique"], at: now)
+        try await topics.add("Typographie", at: now)
+        try await topics.record("Réforme des retraites", at: now)
+
+        // Offering its own answers back to it turns a page into a drift of
+        // near synonyms : it reaches for whatever it said last.
+        #expect(try await topics.settled().sorted() == ["Politique", "Typographie"])
+        #expect(try await topics.smartNames() == ["Réforme des retraites"])
+    }
+
+    @Test("A reader may unmake what they made, and nothing else")
+    func removing() async throws {
+        try await topics.seedStandards(["Politique"], at: now)
+        try await topics.add("Typographie", at: now)
+        try await topics.record("Réforme des retraites", at: now)
+
+        for name in ["Politique", "Typographie", "Réforme des retraites"] {
+            try await topics.remove(name)
+        }
+
+        // A standard section is not a thing that was made, and one the model
+        // found would only be found again on the next page.
+        let left = try await topics.known().map(\.name).sorted()
+        #expect(left == ["Politique", "Réforme des retraites"])
+    }
+
+    @Test("What a reader wrote comes before the sections, for the model to reach first")
+    func ownFirst() async throws {
+        try await topics.seedStandards(["Politique", "Économie"], at: now)
+        try await topics.add("Typographie", at: now.addingTimeInterval(60))
+
+        #expect(try await topics.settled().first == "Typographie")
+    }
+}

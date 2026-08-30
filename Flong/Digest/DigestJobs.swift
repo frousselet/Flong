@@ -89,21 +89,27 @@ nonisolated struct FileStoriesJob: ResumableJob {
         for story in stories {
             guard OnDeviceModel.isAvailable else { break }
 
-            let vocabulary = (try? await preferences.vocabulary()) ?? []
+            // **Two passes, and they ask different questions.** The first files
+            // the story under something a reader recognizes, from the sections
+            // every newspaper has and whatever they wrote themselves. The
+            // second lets the model name what the story is actually about.
+            // `Politique` and `Réforme des retraites` are both true of one
+            // story, the first says what kind of news it is and the second
+            // says what it is, and a page wants both.
+            let settled = (try? await preferences.settled()) ?? []
             var filed: [String]
 
-            switch await namer.file(story.title, summary: story.summary, into: vocabulary) {
-            case .chosen(let chosen) where !chosen.isEmpty:
+            switch await namer.file(story.title, summary: story.summary, into: settled) {
+            case .chosen(let chosen):
                 filed = chosen
 
-            case .chosen:
-                // Nothing the reader has is about this story, so the model
-                // names one thing, once.
-                filed = []
+                // And then one of the model's own, beside it. Folded against
+                // the whole vocabulary before it is kept, so a second spelling
+                // of something that exists is not a second subject.
                 if let proposed = await namer.newSubject(for: story.title, summary: story.summary),
-                    let settled = try? await preferences.record(proposed)
+                    let smart = try? await preferences.record(proposed), !filed.contains(smart)
                 {
-                    filed = [settled]
+                    filed.append(smart)
                 }
 
             case .declined:

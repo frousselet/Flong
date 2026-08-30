@@ -106,6 +106,13 @@ nonisolated struct Digest: Hashable, Sendable {
     /// about at all.
     var scores: [String: Int] = [:]
 
+    /// The ones the model named itself, which wear a mark saying so.
+    ///
+    /// A standard section and one the reader wrote are things they decided ;
+    /// this is the model's own reading of their page, and a reader is owed the
+    /// difference before they form an opinion about it.
+    var smart: Set<String> = []
+
     var isEmpty: Bool { live.isEmpty && stories.isEmpty && looseCount == 0 }
 }
 
@@ -150,6 +157,7 @@ nonisolated struct DigestStore: Sendable {
         let preferences = TopicPreferences(database)
         let scores = try await preferences.scores()
         let own = try await preferences.ownNames()
+        let smart = try await preferences.smartNames()
 
         let (stories, topics, members, loose) = try await database.writer.read { db in
             let stories =
@@ -217,7 +225,11 @@ nonisolated struct DigestStore: Sendable {
         // The pills are read from the whole page, then the page is narrowed :
         // the other subjects have to stay on screen, or the way back would be a
         // button that is no longer there.
-        var digest = Digest(topics: Self.topics(of: all, scores: scores, own: own), scores: scores)
+        var digest = Digest(
+            topics: Self.topics(of: all, scores: scores, own: own),
+            scores: scores,
+            smart: Set(smart)
+        )
         let built = all.filter { topic.holds($0.topics) }
 
         // What is happening now is ordered by when, and by nothing else : a

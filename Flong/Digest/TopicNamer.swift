@@ -71,9 +71,6 @@ nonisolated struct TopicNamer: Sendable {
     /// carried four subjects on one story, of which one was right.
     static let subjectsPerStory = 2
 
-    /// What the model picks when the vocabulary has nothing for this story.
-    static let noneOfThese = "None of these"
-
     /// What a filing answer is allowed to cost.
     ///
     /// Two short labels chosen from a list. The cap is loose enough that a
@@ -94,16 +91,24 @@ nonisolated struct TopicNamer: Sendable {
         You file one news headline under the subjects a reader already has.
         A subject is a field of interest, not a single event.
         Choose only from the subjects you are given. Choose the fewest that fit.
-        Choose \(Self.noneOfThese) when none of them is about this headline.
+        Every headline belongs under at least one of them : choose the closest         when none is exact, and never answer with nothing.
         Never mention that you are a model or that you were asked anything.
         """
     }
 
     /// The subjects one story belongs to, chosen from the vocabulary.
     ///
-    /// An empty choice is the model saying this story falls under nothing it
-    /// was shown, which is what `newSubject` is for. A vocabulary with nothing
-    /// in it is the same answer reached without asking.
+    /// **There is no way out of this one.** The list it is shown is the
+    /// sections every newspaper has plus whatever the reader wrote, and a news
+    /// headline that belongs under none of `Politique`, `Économie`,
+    /// `International`, `Société` and the rest is rare enough that offering an
+    /// escape costs more than it saves : the model took it constantly, and a
+    /// page where half the stories are filed under nothing is a page whose
+    /// pills say nothing.
+    ///
+    /// What it does not do is invent. The schema is an enumeration of the names
+    /// it was given, so it cannot answer something that is not one of them.
+    /// Inventing is the second pass and is deliberately separate.
     func file(_ headline: String, summary: String?, into vocabulary: [String]) async -> Filing {
         guard OnDeviceModel.isAvailable else { return .unusable }
         guard !vocabulary.isEmpty else { return .chosen([]) }
@@ -123,16 +128,21 @@ nonisolated struct TopicNamer: Sendable {
             let chosen = try response.content.value([String].self, forProperty: "subjects")
             OnDeviceModel.succeeded()
 
-            // The way out is not a subject, and choosing it beside real ones
-            // means it fits those.
-            return .chosen(chosen.filter { $0 != Self.noneOfThese && vocabulary.contains($0) })
+            return .chosen(chosen.filter { vocabulary.contains($0) })
         } catch {
             OnDeviceModel.refused(error)
             return OnDeviceModel.isTheModelItself(error) ? .unusable : .declined
         }
     }
 
-    /// A subject for a story that fits nothing the reader has.
+    /// A subject of the model's own for a story, beside the settled one it was
+    /// already filed under.
+    ///
+    /// **Every story gets one, not only the ones that fit nothing.** The
+    /// standard sections say what kind of news a story is ; this says what the
+    /// story is actually about, which is the finer thing a reader following a
+    /// subject is following. `Politique` and `Réforme des retraites` are both
+    /// true of one story and only the second is worth a pill of its own.
     ///
     /// Free text, and the only time the model is allowed to name anything. What
     /// it answers is folded against the vocabulary before it is kept, so a
@@ -212,7 +222,7 @@ nonisolated struct TopicNamer: Sendable {
     /// prompt, so `Cybersécurité` cannot come back as `Cyber sécurité` and a
     /// subject nobody has cannot come back at all.
     static func schema(for vocabulary: [String]) throws -> GenerationSchema {
-        let choice = DynamicGenerationSchema(name: "Subject", anyOf: vocabulary + [noneOfThese])
+        let choice = DynamicGenerationSchema(name: "Subject", anyOf: vocabulary)
         let list = DynamicGenerationSchema(arrayOf: choice, minimumElements: 1, maximumElements: subjectsPerStory)
         let root = DynamicGenerationSchema(
             name: "Filing",

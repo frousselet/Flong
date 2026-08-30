@@ -27,19 +27,31 @@ struct TopicsScreen: View {
 
     var body: some View {
         List {
-            if !model.knownTopics.isEmpty {
-                Section {
-                    ForEach(model.knownTopics) { topic in
-                        row(topic)
-                    }
-                } header: {
-                    Text("Subjects")
-                } footer: {
-                    Text(
-                        "The system model reads the page and sorts it into subjects. Saying more or less of one moves it, and everything under it, up or down the front page."
-                    )
-                }
-            }
+            // Three bands, in the order a reader meets them : the sections
+            // they already knew before opening this, then the ones they wrote,
+            // then what the model made of their own page. A band with nothing
+            // in it is not drawn at all, heading included.
+            group(
+                .own,
+                titled: Text("Your own subjects"),
+                saying: Text("Yours to add and to remove. The model reaches for them as readily as its own.")
+            )
+
+            group(
+                .standard,
+                titled: Text("Standard subjects"),
+                saying: Text(
+                    "The sections every reader has. The model files each story under one of these or one of yours, and then adds what it found the story is actually about."
+                )
+            )
+
+            group(
+                .smart,
+                titled: Text("Found by the model"),
+                saying: Text(
+                    "What the model named itself, beside the section it filed the story under."
+                )
+            )
 
             if model.knownTopics.contains(where: { $0.score != 0 || $0.isOwn }) {
                 Section {
@@ -84,19 +96,39 @@ struct TopicsScreen: View {
         .task { await model.loadKnownTopics() }
     }
 
+    /// One band of the list, or nothing when that nature has no subjects.
+    @ViewBuilder
+    private func group(_ kind: TopicKind, titled title: Text, saying footer: Text) -> some View {
+        let topics = model.knownTopics.filter { $0.kind == kind }
+
+        if !topics.isEmpty {
+            Section {
+                ForEach(topics) { row($0) }
+            } header: {
+                title
+            } footer: {
+                footer
+            }
+        }
+    }
+
     @ViewBuilder
     private func row(_ topic: TopicPreferences.Known) -> some View {
         let content = HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: topic.name)
-                HStack(spacing: 6) {
-                    if topic.isOwn {
-                        Text("Yours")
-                    }
-                    Text("\(topic.stories) stories")
+                // The model's own wear its mark, here as on the page : a
+                // standard section and one the reader wrote are things they
+                // decided, and this is the model's reading of their page.
+                if topic.kind == .smart {
+                    Text(Image(systemName: "sparkles")) + Text(verbatim: " ") + Text(verbatim: topic.name)
+                } else {
+                    Text(verbatim: topic.name)
                 }
-                .font(Editorial.metadata)
-                .foregroundStyle(.secondary)
+                // The band above says whose it is, so the line under the name
+                // says only how much of the page it covers.
+                Text("\(topic.stories) stories")
+                    .font(Editorial.metadata)
+                    .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 8)
@@ -116,10 +148,11 @@ struct TopicsScreen: View {
         }
         .accessibilityElement(children: .contain)
 
-        // A subject the reader wrote is theirs to take back. One the model
-        // found is not : deleting it would only have it found again on the
-        // next page, and what a reader wants from those is the preference.
-        if topic.isOwn {
+        // A subject the reader wrote is theirs to take back. A standard one is
+        // not a thing that was made, and one the model found would only be
+        // found again on the next page : what a reader wants from those is the
+        // preference rather than the deletion.
+        if topic.kind == .own {
             content.swipeActions {
                 Button(role: .destructive) {
                     Task { await model.removeTopic(topic.name) }
