@@ -119,7 +119,7 @@ It holds the subjects, the sites the reader is signed in to, and the command to 
 
 **The kept articles are called `Collections`, not `Bibliothèque`.** The specification's word for them is the library, and it stays the word everywhere the code and the documentation talk about the half of the store that is never purged : the split it names, stream against library, is the shape of the whole product. It is a poor label though. A library is a shelf of books, and what this section holds is articles somebody put aside ; `Bibliothèque` was also the longest of the four names in a bar that has to fit four. `Collections` is what Photos calls the same idea for the same reason, which means a reader has met it before.
 
-**The bar's three marks are one family, and they had to be made one.** A tab bar fills its symbols itself, so `house` and `folder` arrive as `house.fill` and `folder.fill` : solid shapes with weight. `dot.radiowaves.left.and.right` has no filled variant, so it stayed a hairline drawing between two solid ones, which is what unbalanced the row. The stream takes `tray.full` instead, which fills, and which is the mark the same view already wears in the sources list, since it is the same view. What is left is a house where a reader lands, a full tray of what has come in, and a folder of what they filed.
+**The bar's three marks are one family, and they had to be made one.** A tab bar fills its symbols itself, so every mark in the row arrives as its `.fill` variant : solid shapes with weight. `dot.radiowaves.left.and.right` has no filled variant, so it stayed a hairline drawing between solid ones, which is what unbalanced the row. The stream takes `tray.full` instead, which fills, and which is the mark the same view already wears in the sources list, since it is the same view. What is left is the front page's own stack of sparkles, a full tray of what has come in, and a folder of what the reader filed, all three drawn at the same weight.
 
 **The sources came off the tab bar, which is now four sections and not five.** A tab names a place there is to read, and a folder tree is not one : it is something a reader touches when they are organizing, which is rarely, and the bar is better spent on reading.
 
@@ -164,9 +164,7 @@ The section under the pills is called `Stories`, never `Front page` : that is wh
 
 Where there is no model there are no subjects, and no pills at all. The front page is entire on its own, which is what section 14 asks of every path that touches the model.
 
-**What the model wrote wears Apple's own mark.** `apple.intelligence` rather than `sparkles`, on the line that says a story was written by the model, on the story's own page, and on the command to write the digest again. It says which model, which is more than a generic shimmer says, and a reader who has seen it elsewhere on the system knows what it means.
-
-It is worth knowing that the symbol is a restricted one. It sits in `symbol_restrictions.strings` beside `apple.logo`, `siri` and `safari`, the set Apple reserves for depictions of its own products and features. It renders perfectly in a third party application, so this is a licensing question rather than a technical one, and it is a question to have answered before the application is submitted.
+**What the model wrote wears `sparkles`, and not `apple.intelligence`.** The Apple Intelligence symbol says which model, which is more than a generic shimmer says, and it was tried. It is a restricted one : it sits in `symbol_restrictions.strings` beside `apple.logo`, `siri` and `safari`, the set Apple reserves for depictions of its own products and features. It renders perfectly in a third-party application, so the objection is a licensing one rather than a technical one, and it is not worth carrying to a submission for the sake of a glyph. `sparkles` carries no such restriction.
 
 ## What the model wrote, and how to refuse it
 

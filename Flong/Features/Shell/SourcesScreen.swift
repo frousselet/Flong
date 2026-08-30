@@ -204,7 +204,7 @@ struct SourcesScreen: View {
 
     private static func icon(of kind: SidebarItem.Kind) -> String {
         switch kind {
-        case .digest: "house"
+        case .digest: "sparkles.rectangle.stack"
         case .unread: "circle.inset.filled"
         case .today: "sun.max"
         case .library: "folder"

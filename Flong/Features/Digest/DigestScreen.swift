@@ -489,7 +489,7 @@ struct StoryRow: View {
             Spacer(minLength: 4)
 
             if story.isGenerated {
-                Image(systemName: "apple.intelligence")
+                Image(systemName: "sparkles")
                     .accessibilityLabel(Text("Written by the model"))
                     .help(Text("Written by the model"))
             }
