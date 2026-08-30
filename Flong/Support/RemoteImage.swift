@@ -61,6 +61,11 @@ nonisolated final class ImageStore: Sendable {
 
     /// The picture at that address, decoded no larger than it will be drawn.
     func image(at url: URL, maximumPixels: Int) async throws -> CGImage? {
+        // The last guard before the network. Everything upstream resolves and
+        // vets its addresses ; this is what makes a hole upstream a picture
+        // that does not appear rather than an error in the reader's console.
+        guard HTTPURL.isFetchable(url) else { return nil }
+
         let key = "\(url.absoluteString)|\(maximumPixels)" as NSString
         if let cached = memory.object(forKey: key) { return cached.image }
 

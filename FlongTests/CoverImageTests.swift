@@ -188,4 +188,61 @@ struct CoverImageTests {
         #expect(candidates.count == 2)
         #expect(candidates.first?.absoluteString == "https://example.com/favicon.ico")
     }
+
+    // MARK: - Addresses worth asking for
+
+    @Test("A relative address is resolved against where it was found")
+    func resolving() throws {
+        let base = URL(string: "https://www.liberation.fr/rss/")!
+        let relative = URL(string: "/arc-photo-liberation/eu-central-1-prod/public/3QH5F2.png")!
+
+        let resolved = try #require(HTTPURL.resolved(relative, against: base))
+        #expect(
+            resolved.absoluteString
+                == "https://www.liberation.fr/arc-photo-liberation/eu-central-1-prod/public/3QH5F2.png")
+    }
+
+    @Test("An address nothing can fetch is not asked for")
+    func notFetchable() {
+        // The one that reached URLSession and came back as `unsupported URL`.
+        #expect(!HTTPURL.isFetchable(URL(string: "/arc-photo-liberation/public/3QH5F2.png")))
+        #expect(!HTTPURL.isFetchable(URL(string: "data:image/gif;base64,R0lGOD")))
+        #expect(!HTTPURL.isFetchable(URL(string: "file:///tmp/a.png")))
+        #expect(!HTTPURL.isFetchable(nil))
+
+        #expect(HTTPURL.isFetchable(URL(string: "https://example.com/a.png")))
+        #expect(HTTPURL.isFetchable(URL(string: "http://example.com/a.png")))
+    }
+
+    @Test("A scheme that is not a relative address is not resolved into one")
+    func notResolved() {
+        let base = URL(string: "https://example.com/")
+
+        // `mailto:` has a scheme and is simply not a picture.
+        #expect(HTTPURL.resolved(URL(string: "mailto:a@example.com")!, against: base) == nil)
+        // And a relative one with nowhere to resolve against stays nothing.
+        #expect(HTTPURL.resolved(URL(string: "/a.png")!, against: nil) == nil)
+    }
+
+    @Test("A feed's relatively stated icon is still found")
+    func relativeIcon() throws {
+        let candidates = FeedIcon.candidates(
+            stated: URL(string: "/img/logo.png"),
+            site: URL(string: "https://www.liberation.fr/")
+        )
+        .map(\.absoluteString)
+
+        #expect(candidates.first == "https://www.liberation.fr/img/logo.png")
+    }
+
+    @Test("A stated icon nothing can fetch is skipped, and the site still tried")
+    func unfetchableIcon() {
+        let candidates = FeedIcon.candidates(
+            stated: URL(string: "/img/logo.png"),
+            site: nil
+        )
+        // Nothing to resolve against, so the stated one goes and there is no
+        // site to fall back to either.
+        #expect(candidates.isEmpty)
+    }
 }
