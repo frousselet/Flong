@@ -263,6 +263,47 @@ nonisolated struct LibraryStore: Sendable {
         }
     }
 
+    /// Takes the star off a kept copy, by the copy's own identity.
+    ///
+    /// **Not the same thing as throwing it out of the library.** An article
+    /// read from the library is addressed by the identity of the copy, not of
+    /// the article it was made from, so `setStarred` cannot be used on it : it
+    /// looks a copy up by the article, and a copy whose article has been purged
+    /// no longer names one. Removing it was what stood in, and removing it is a
+    /// different sentence : the reader said this is not a favourite, not throw
+    /// away what I kept.
+    ///
+    /// The copy goes only when nothing else keeps it, which is the same rule
+    /// the other way in follows : a note is a reason, and so is a collection.
+    @discardableResult
+    func unstar(_ itemIDs: [UUID], at date: Date = Date()) async throws -> LibraryChange {
+        guard !itemIDs.isEmpty else { return LibraryChange() }
+
+        return try await database.writer.write { db in
+            var change = LibraryChange()
+            for id in itemIDs {
+                guard var item = try LibraryItem.fetchOne(db, key: id) else { continue }
+
+                // The article it was made from, when there still is one, so the
+                // stream and the copy do not disagree about the star.
+                if let entryID = item.entryID {
+                    _ = try Entry.filter(key: entryID).updateAll(db, Column("is_starred").set(to: false))
+                }
+
+                guard item.annotation?.isEmpty ?? true, try !Self.isFiled(item.id, in: db) else {
+                    item.starredAt = nil
+                    try item.update(db)
+                    continue
+                }
+
+                try Self.unbind([item.id], in: db)
+                _ = try item.delete(db)
+                change.released.append(item)
+            }
+            return change
+        }
+    }
+
     /// Keeps articles, whatever their starred state.
     ///
     /// This is the path a rule takes at M5, and the one an annotation takes.
@@ -300,17 +341,7 @@ nonisolated struct LibraryStore: Sendable {
 
             _ = try Entry.filter(keys: entryIDs).updateAll(db, Column("is_starred").set(to: false))
 
-            // The bindings go with it. A binding points at one of three tables
-            // by identifier, so it cannot carry a foreign key and nothing
-            // cascades : a copy deleted without them leaves a collection
-            // counting an article that is not there any more.
-            try db.execute(
-                sql: """
-                    DELETE FROM tag_binding
-                    WHERE target_kind = ? AND target_id IN (\(databaseQuestionMarks(count: itemIDs.count)))
-                    """,
-                arguments: StatementArguments([Self.filedKind] + itemIDs.map { $0.databaseValue })
-            )
+            try Self.unbind(itemIDs, in: db)
             _ = try LibraryItem.filter(keys: itemIDs).deleteAll(db)
             return LibraryChange(released: items)
         }
@@ -412,6 +443,23 @@ nonisolated struct LibraryStore: Sendable {
     }
 
     private static let filedKind = "library_item"
+
+    /// Takes a copy out of every collection it was in.
+    ///
+    /// A binding points at one of three tables by identifier, so it cannot
+    /// carry a foreign key and nothing cascades : a copy deleted without this
+    /// leaves a collection counting an article that is not there any more.
+    private static func unbind(_ itemIDs: [UUID], in db: Database) throws {
+        guard !itemIDs.isEmpty else { return }
+
+        try db.execute(
+            sql: """
+                DELETE FROM tag_binding
+                WHERE target_kind = ? AND target_id IN (\(databaseQuestionMarks(count: itemIDs.count)))
+                """,
+            arguments: StatementArguments([filedKind] + itemIDs.map { $0.databaseValue })
+        )
+    }
 
     // MARK: - Shapes
 

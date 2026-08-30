@@ -161,6 +161,34 @@ struct CollectionStoreTests {
         #expect(inside.count == 1)
     }
 
+    @Test("Unstarring an article read from the library does not empty its collections")
+    func unstarringKeepsTheFilings() async throws {
+        let article = try await kept("un")
+        try await collections.add([article.id], to: "Thèse", at: now)
+        try await collections.add([article.id], to: "Presse", at: now)
+
+        // What the star in an article's own bar does, when that article was
+        // opened from the library : the copy is addressed by its own identity,
+        // and this used to throw the whole thing away.
+        _ = try await library.unstar([article.id], at: now)
+
+        #expect(try await collections.collections(of: article.id) == ["Presse", "Thèse"])
+        #expect(try await library.count() == 1)
+        #expect(try await library.summaries(in: .starred).isEmpty)
+        #expect(try await library.summaries(in: .made("Thèse")).count == 1)
+    }
+
+    @Test("Unstarring an article nothing else keeps takes the copy with it")
+    func unstarringTheLastReason() async throws {
+        let article = try await kept("un")
+
+        _ = try await library.unstar([article.id], at: now)
+
+        // No note and no collection : the star was the only reason it was
+        // kept, and taking it off is taking the reason away.
+        #expect(try await library.count() == 0)
+    }
+
     @Test("An article thrown out of the library leaves no phantom behind")
     func removingClearsTheBindings() async throws {
         let article = try await kept("un")
