@@ -171,6 +171,10 @@ The separator's own colour rather than a white highlight. White is the glass idi
 
 **A picture meets the line that says what happened.** Above a story's summary sit the subjects it is filed under and its headline, and a picture set level with a one-word rubric leaves the column ragged. It is aligned on the summary instead, through a `VerticalAlignment` of its own, so the text reads as one block with a picture beside it. A story with no summary has no such line, and the guide falls back to the top, which is where a picture belongs when there is nothing to meet.
 
+**The pictures are decoded off the main thread, and were not.** The target builds with `SWIFT_APPROACHABLE_CONCURRENCY`, under which a `nonisolated async` function runs on its caller's actor rather than on the pool. Every caller of the image store is a view, so every caller is the main actor, so the ImageIO decode was happening on the main thread : one picture at a time, a few milliseconds each, for every row a reader scrolls past. A list that stops moving while it fills is the shape of that, and it is what the reader reported as the interface freezing.
+
+`@concurrent` on the fetch is what takes it back to the pool. It never showed on a simulator, where a Mac decodes a photograph faster than a frame lasts ; it shows on a phone. The lesson is worth keeping rather than the fix : under approachable concurrency, `nonisolated` no longer means off the main actor, and anything expensive a view awaits has to say so.
+
 ## The reader's menu
 
 One button in the same corner of every section, holding what the reader has decided. It sat in the digest alone at first, which made it the digest's menu rather than the reader's : what it holds belongs to the person and not to the page, and a thing that belongs to the person is in the same place wherever they are.

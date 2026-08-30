@@ -74,6 +74,18 @@ nonisolated final class ImageStore: Sendable {
     }
 
     /// The picture at that address, decoded no larger than it will be drawn.
+    ///
+    /// **`@concurrent`, and the whole freeze is in that word.** The target
+    /// builds with `SWIFT_APPROACHABLE_CONCURRENCY`, under which a
+    /// `nonisolated async` function runs on its caller's actor rather than on
+    /// the pool. Every caller of this is a view, so every caller is the main
+    /// actor, so the ImageIO decode below was happening on the main thread :
+    /// one picture at a time, a few milliseconds each, for every row a reader
+    /// scrolls past. That is a list that stops moving while it fills.
+    ///
+    /// It never showed on a simulator, where a Mac decodes a photograph faster
+    /// than a frame lasts. It shows on a phone.
+    @concurrent
     func image(at url: URL, maximumPixels: Int) async throws -> CGImage? {
         // The last guard before the network. Everything upstream resolves and
         // vets its addresses ; this is what makes a hole upstream a picture
