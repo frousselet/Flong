@@ -9,6 +9,7 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //
 
+import CoreGraphics
 import Foundation
 import OSLog
 
@@ -124,6 +125,75 @@ final class AppModel {
             preferences.articleBody = articleBody
         }
     }
+    // MARK: - Who is reading
+
+    /// The reader's own name, which belongs to nobody else.
+    ///
+    /// There is no account and nothing to send it to : it is here so that a
+    /// device the reader picks up looks like theirs, and it travels between
+    /// their devices through their own iCloud like every other preference.
+    var firstName = "" {
+        didSet {
+            guard firstName != oldValue else { return }
+            preferences.firstName = firstName
+        }
+    }
+
+    var lastName = "" {
+        didSet {
+            guard lastName != oldValue else { return }
+            preferences.lastName = lastName
+        }
+    }
+
+    /// The reader's own face, ready to draw.
+    ///
+    /// Decoded once and held, rather than decoded at each draw : it is on
+    /// screen in the toolbar of every section, which is as often as anything
+    /// gets drawn.
+    private(set) var picture: CGImage?
+
+    /// What stands in for a face when there is none.
+    var initials: String? {
+        ProfilePicture.initials(first: firstName, last: lastName)
+    }
+
+    /// The reader's name as one line, when they have given one.
+    var name: String? {
+        let whole = [firstName, lastName]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        return whole.isEmpty ? nil : whole
+    }
+
+    /// Takes what the reader picked, scales it, and keeps the small version.
+    ///
+    /// Anything that is not an image is refused rather than stored : a file
+    /// picked by mistake would otherwise become a face that never draws.
+    @discardableResult
+    func setPicture(_ data: Data?) -> Bool {
+        guard let data else {
+            preferences.picture = nil
+            picture = nil
+            return true
+        }
+        guard let scaled = ProfilePicture.scaled(data) else {
+            Log.store.error("What was picked as a profile picture is not an image.")
+            return false
+        }
+        preferences.picture = scaled
+        picture = ProfilePicture.image(scaled)
+        return true
+    }
+
+    /// Reads the name and the face back from what has been kept.
+    private func loadProfile() {
+        firstName = preferences.firstName
+        lastName = preferences.lastName
+        picture = preferences.picture.flatMap(ProfilePicture.image)
+    }
+
     private(set) var isRefreshing = false
     private(set) var feedCount = 0
 
@@ -234,6 +304,9 @@ final class AppModel {
         self.sessions = sessions
         self.preferences = preferences
         self.articleBody = preferences.articleBody
+        self.firstName = preferences.firstName
+        self.lastName = preferences.lastName
+        self.picture = preferences.picture.flatMap(ProfilePicture.image)
         let subscriptions = SubscriptionStore(database)
         self.subscriptions = subscriptions
         self.articles = ArticleStore(database)
@@ -281,9 +354,10 @@ final class AppModel {
         await loadSidebar()
         await loadArticles()
         await loadCredentials()
-        // Another device may have changed it while this one was away.
+        // Another device may have changed them while this one was away.
         preferences.synchronize()
         articleBody = preferences.articleBody
+        loadProfile()
         await countOutstandingWork()
     }
 

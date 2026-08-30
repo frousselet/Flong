@@ -18,6 +18,7 @@ nonisolated enum Route: Hashable {
     case article(UUID)
     case view(SidebarItem.Kind)
     case sources
+    case profile
     case topics
     case subscribedSites
 }
@@ -85,21 +86,29 @@ struct AppShell: View {
             // the places there are to read.
             Tab("Stream", systemImage: "dot.radiowaves.left.and.right", value: AppSection.stream) {
                 stack($streamPath) {
-                    ArticleFeedScreen(model: model, kind: .all, named: "Stream", showsArrivals: true) {
-                        streamPath.append(.article($0))
-                    }
+                    ArticleFeedScreen(
+                        model: model,
+                        kind: .all,
+                        named: "Stream",
+                        showsArrivals: true,
+                        menu: { streamPath.append($0) }
+                    ) { streamPath.append(.article($0)) }
                 }
             }
 
             Tab("Library", systemImage: "books.vertical", value: AppSection.library) {
                 stack($libraryPath) {
-                    ArticleFeedScreen(model: model, kind: .library) { libraryPath.append(.article($0)) }
+                    ArticleFeedScreen(model: model, kind: .library, menu: { libraryPath.append($0) }) {
+                        libraryPath.append(.article($0))
+                    }
                 }
             }
 
             Tab(value: AppSection.search, role: .search) {
                 stack($searchPath) {
-                    SearchScreen(model: model, zoom: zoom) { searchPath.append(.article($0)) }
+                    SearchScreen(model: model, zoom: zoom, menu: { searchPath.append($0) }) {
+                        searchPath.append(.article($0))
+                    }
                 }
             }
         }
@@ -189,6 +198,9 @@ struct AppShell: View {
             SourcesScreen(model: model, isAddingFeed: $isAddingFeed, isChoosingFile: $isChoosingFile) {
                 path.wrappedValue.append(.view($0))
             }
+
+        case .profile:
+            ProfileScreen(model: model)
 
         case .topics:
             TopicsScreen(model: model)

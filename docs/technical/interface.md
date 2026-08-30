@@ -107,7 +107,9 @@ So the strip stands on one piece of glass, shaped like the pills the front page 
 
 ## The reader's menu
 
-One button in the digest's toolbar, holding what the reader has decided. Not an account : there is no account, nothing here belongs to anyone but the person holding the device, and a person icon would promise a profile that does not exist. It is called `Réglages` in French for the same reason.
+One button in the same corner of every section, holding what the reader has decided. It sat in the digest alone at first, which made it the digest's menu rather than the reader's : what it holds belongs to the person and not to the page, and a thing that belongs to the person is in the same place wherever they are.
+
+It is still not an account. There is no account and nothing to sign in to, and the face on the button is the reader's own picture rather than a sign that they are signed in to something. It is called `Réglages` in French.
 
 It holds the sources, the subjects, the sites the reader is signed in to, and the command to write the digest again, which had been buried at the foot of the sources list where it never belonged : the sources list is for the state of the machinery, and asking the model to write again is the reader's own decision.
 
@@ -116,6 +118,12 @@ It holds the sources, the subjects, the sites the reader is signed in to, and th
 The one thing that move could have broken is the first launch, where a reader who follows nothing had the sources tab in front of them and now does not. The front page says so instead : with no feed at all it offers adding one and importing an OPML file where the reader is already looking, rather than explaining what grouping is to somebody with nothing to group.
 
 **The subjects screen is the other half of the pills.** A pill carries a subject of the day, where an opinion is formed and where saying it costs one press. The screen carries every subject there is, including those that have fallen off the page, so a reader who asked for less of something months ago can find it again and take it back : a preference nobody can find is a preference nobody can undo. Each row is a picker of three, down, nothing, up, rather than the pill's nudge by one : here the reader is choosing a side, and reading back three shades of the same side would be a control that says more than it lets them say.
+
+**The face is the button.** A name and a picture, both optional, both the reader's own, kept in their own iCloud beside their other preferences. There is nowhere to send them : section 3 says there is no server, and a name typed into a feed reader is not an exception to that. What they buy is that a device the reader picks up looks like theirs, and that is the whole of it. The mark has three states, in the order a reader arrives at them : the picture they chose, the initials of the name they typed, and the generic face of somebody who has told the application nothing. The third is not a failure and is not nagged at.
+
+The picture is scaled on the way in and never after. What comes out of a photo library is a photograph, twelve megapixels and four megabytes ; what is wanted is a mark twenty-six points across. It is resized once to two hundred and fifty-six pixels, re-encoded as JPEG so that a HEIC from a phone and a PNG from a Mac take the same room, and anything that still exceeds a hundred and twenty-eight kilobytes is refused rather than allowed to fill a store that holds one megabyte for everything. A face on a phone comes from the photo library, through the picker Apple runs outside the application, so nothing here ever sees the library and no permission is asked for ; a face on a Mac comes from the open panel, because a Mac reader offered a photo library would be offered the wrong drawer.
+
+**Marking everything as read left the sections a reader lands in.** It is a command about a list, and the two sections that had it are not lists of a thing to get to the end of : the stream is a wire and the library is what was kept. It stays where it means something, on a feed, a folder or the unread view, each of which is a list with an end. What takes its place in the corner is the reader's own menu, which is now the same one button in all four sections.
 
 **`sujet` is a story in French, so a topic is a `thème`.** The story page is titled `Sujet` and the front page's second section is `SUJETS` ; calling the topics `Sujets` as well would have had `Typographie, 1 sujet` mean two different things in one line.
 

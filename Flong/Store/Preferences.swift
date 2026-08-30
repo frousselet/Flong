@@ -45,7 +45,19 @@ nonisolated final class Preferences: @unchecked Sendable {
 
     private enum Key {
         static let articleBody = "article.body"
+        static let firstName = "reader.first-name"
+        static let lastName = "reader.last-name"
+        static let picture = "reader.picture"
     }
+
+    /// The largest picture that may be kept.
+    ///
+    /// The key-value store holds one megabyte in all, and everything else the
+    /// reader has chosen has to fit beside this. A picture scaled down to the
+    /// size it is shown at comes in well under this ; anything that does not is
+    /// a picture that was not scaled, and it is refused rather than quietly
+    /// filling the store.
+    static let pictureLimit = 128 * 1024
 
     private let cloud: NSUbiquitousKeyValueStore?
     private let local: UserDefaults
@@ -65,6 +77,44 @@ nonisolated final class Preferences: @unchecked Sendable {
     var articleBody: ArticleBody {
         get { value(for: Key.articleBody).flatMap(ArticleBody.init(rawValue:)) ?? .feed }
         set { set(newValue.rawValue, for: Key.articleBody) }
+    }
+
+    // MARK: - Who is reading
+
+    /// The reader's own name and face, which belong to nobody else.
+    ///
+    /// They are the reader's, kept in the reader's own iCloud, and Flong has no
+    /// account to attach them to and nowhere to send them : section 3 says
+    /// there is no server, and a name typed into a feed reader is not an
+    /// exception to that. They are here so that a device the reader picks up
+    /// looks like theirs, and for nothing else.
+    var firstName: String {
+        get { value(for: Key.firstName) ?? "" }
+        set { set(newValue, for: Key.firstName) }
+    }
+
+    var lastName: String {
+        get { value(for: Key.lastName) ?? "" }
+        set { set(newValue, for: Key.lastName) }
+    }
+
+    var picture: Data? {
+        get { cloud?.data(forKey: Key.picture) ?? local.data(forKey: Key.picture) }
+        set {
+            guard let newValue else {
+                local.removeObject(forKey: Key.picture)
+                cloud?.removeObject(forKey: Key.picture)
+                cloud?.synchronize()
+                return
+            }
+            guard newValue.count <= Self.pictureLimit else {
+                Log.store.error("A profile picture of \(newValue.count) bytes was not kept : it was never scaled.")
+                return
+            }
+            local.set(newValue, forKey: Key.picture)
+            cloud?.set(newValue, forKey: Key.picture)
+            cloud?.synchronize()
+        }
     }
 
     // MARK: - Both stores

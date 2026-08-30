@@ -23,6 +23,13 @@ struct ArticleFeedScreen: View {
     var named: LocalizedStringResource?
     /// Whether the last thirty days of arrivals are drawn over the list.
     var showsArrivals = false
+    /// Where the reader's menu goes, when this screen is one a section opens on.
+    ///
+    /// A pushed list is a feed, a folder or a view of the stream, and it keeps
+    /// the command that belongs to it, which is giving up on the lot. A section
+    /// the reader lands in keeps the menu instead : one button, one corner, the
+    /// same in all four.
+    var menu: ((Route) -> Void)?
     let open: (UUID) -> Void
 
     @Namespace private var zoom
@@ -86,13 +93,17 @@ struct ArticleFeedScreen: View {
         // where you are without ever saying it was worth a line.
         .navigationTitle(title)
         .toolbar {
-            ToolbarItem {
-                Button {
-                    Task { await model.markAllRead() }
-                } label: {
-                    Label("Mark all as read", systemImage: "checkmark.circle")
+            ToolbarItem(placement: .primaryAction) {
+                if let menu {
+                    ReaderMenu(model: model, open: menu)
+                } else {
+                    Button {
+                        Task { await model.markAllRead() }
+                    } label: {
+                        Label("Mark all as read", systemImage: "checkmark.circle")
+                    }
+                    .disabled(model.summaries.allSatisfy(\.isRead))
                 }
-                .disabled(model.summaries.allSatisfy(\.isRead))
             }
         }
         .refreshable { await model.refreshAll() }
