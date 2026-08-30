@@ -63,12 +63,22 @@ import SwiftUI
 /// bars stand on rather than a material they are mixed into.
 ///
 struct ArrivalsChart: View {
+
     /// How many articles arrived on each day, keyed by the local day.
     let counts: [Date: Int]
     /// The months worth offering, newest first, each named by its first day.
     let months: [Date]
     /// The day the reader has the list scrolled to.
     let current: Date?
+
+    /// Whether anything has scrolled under the chart yet.
+    ///
+    /// At rest the chart sits on the page, and glass over nothing is glass
+    /// doing nothing : a material's whole job is to say that something passes
+    /// behind it. The bars are legible on the page's own ground, so at the top
+    /// the strip is simply bars, and the glass arrives with the first row that
+    /// goes under them.
+    var isCovered = false
 
     /// How tall the busiest day of the chart stands.
     private static let height: CGFloat = 26
@@ -132,8 +142,14 @@ struct ArrivalsChart: View {
         // background it is a surface the bars are drawn on rather than a
         // material they are drawn into.
         .background {
-            Color.clear.glassEffect(.regular, in: .capsule)
+            // The shape is always there and the material is not, so the strip
+            // does not change size when the glass arrives : a chart that
+            // resized on the first scroll would move the very rows that were
+            // passing under it.
+            Color.clear
+                .glassEffect(isCovered ? .regular : .identity, in: .capsule)
         }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: isCovered)
         .onChange(of: month, initial: true) { _, month in
             guard let month else { return }
             withAnimation(reduceMotion ? nil : .snappy(duration: 0.3)) {
@@ -151,24 +167,24 @@ struct ArrivalsChart: View {
         let isAhead = day > today
 
         return VStack {
-            if isAhead {
-                // A day that has not happened yet is not a quiet day. It keeps
-                // its place at the height a day with nothing in it would have,
-                // and says in grey that there is nothing there to have.
-                Capsule()
-                    .fill(.quaternary)
-                    .frame(height: Self.floor)
-            } else if count > 0 {
+            if !isAhead, count > 0 {
                 Capsule()
                     // The page's own ink, which inverts with the page and so
                     // with the glass under it : dark bars on the light
                     // material, light ones on the dark.
                     .fill(isCurrent ? Color.accentColor : Color.primary)
                     .frame(height: height(of: count, peak: peak))
+            } else {
+                // A day nothing came in on keeps its place, in grey, at the
+                // height of the shortest bar there is. Whether it has been and
+                // gone or has not happened yet, it is a day with nothing in it
+                // and it is drawn the same way : the row stays a row, with a
+                // even floor a reader's eye can run along, and the ink is
+                // reserved for the days something did arrive on.
+                Capsule()
+                    .fill(.quaternary)
+                    .frame(height: Self.floor)
             }
-            // A day gone by that nothing came in on draws nothing at all. With
-            // no axis to stand on there is no line for it to hide in, and a gap
-            // in the row is the honest picture of a gap in the month.
         }
         // Outside the branches, so that every bar is the same width whichever
         // one drew it. Held inside one of them, the grey of a day still to come
@@ -194,9 +210,9 @@ struct ArrivalsChart: View {
     /// The shortest a bar is ever drawn.
     ///
     /// A day that had one article is a day something happened on, and a bar too
-    /// short to see says it did not. It is also the height of a day still to
-    /// come, so that the days ahead read as a level grey run rather than as a
-    /// story about nothing.
+    /// short to see says it did not. It is also the height of every day with
+    /// nothing in it, so those read as a level grey run along the foot of the
+    /// month rather than as gaps in it.
     private static let floor: CGFloat = 4
 
     private func height(of count: Int, peak: Int) -> CGFloat {

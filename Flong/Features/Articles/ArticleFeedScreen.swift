@@ -36,6 +36,9 @@ struct ArticleFeedScreen: View {
 
     /// The day the reader has scrolled to, which is what the chart is about.
     @State private var day: Date?
+    /// Whether anything has scrolled under the chart, which is what its glass
+    /// is for. At rest there is nothing behind it and it wears none.
+    @State private var isCovered = false
 
     var body: some View {
         let rows = self.rows
@@ -79,6 +82,19 @@ struct ArticleFeedScreen: View {
         .onScrollTargetVisibilityChange(idType: WireRow.Key.self) { visible in
             guard let top = visible.map(\.day).max(), top != day else { return }
             day = top
+        }
+        // Whether the list has moved under the chart at all. Asked of the
+        // offset rather than of the rows : a row is a landmark and this is a
+        // question about a single point, the top of the content against the top
+        // of what is shown.
+        //
+        // Against a hair rather than against nought : a scroll view rests at a
+        // fractional offset often enough, and a glass that flickered on and off
+        // while the reader held still would be worse than one that never left.
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top > 1
+        } action: { _, covered in
+            isCovered = covered
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         // The day turning over is felt as well as seen. Only once the reader
@@ -131,7 +147,8 @@ struct ArticleFeedScreen: View {
             ArrivalsChart(
                 counts: model.dailyCounts,
                 months: Month.spanning(oldest, to: newest),
-                current: day ?? newest
+                current: day ?? newest,
+                isCovered: isCovered
             )
             .padding(.vertical, 9)
             // Pinned is not the same as in front : without this the rows pass
