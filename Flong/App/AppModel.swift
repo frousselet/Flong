@@ -12,6 +12,7 @@
 import CoreGraphics
 import Foundation
 import OSLog
+import UserNotifications
 
 /// An entry of the sidebar.
 nonisolated struct SidebarItem: Identifiable, Hashable, Sendable {
@@ -96,6 +97,7 @@ final class AppModel {
     private let credentials: CredentialStoring
     private let sessions: SessionStoring
     private let preferences: Preferences
+    private let announcer: Announcing
 
     /// The whole stream, as files in the reader's own iCloud.
     ///
@@ -138,6 +140,28 @@ final class AppModel {
             preferences.articleBody = articleBody
         }
     }
+    // MARK: - What the reader is told
+
+    /// Whether the reader wants to hear when the model finds a new subject.
+    ///
+    /// Set through ``setWantsNewSubjectNotices(_:)`` rather than written to,
+    /// since turning it on has to ask the system first and may be refused.
+    private(set) var wantsNewSubjectNotices = false
+
+    /// What the system last said about this device, for the screen to explain
+    /// a switch that will not stay on.
+    private(set) var notificationStatus = UNAuthorizationStatus.notDetermined
+
+    /// Whether the reader is looking at Flong right now.
+    ///
+    /// Nothing is announced while they are : a new subject appears as a pill
+    /// on the page they are already reading, and a notice about something they
+    /// watched happen is a notice to dismiss for nothing.
+    var isReading = true
+
+    /// The subject a tapped notification asked for, until a screen takes it.
+    var openedSubject: String?
+
     // MARK: - Who is reading
 
     /// The reader's own name, which belongs to nobody else.
@@ -310,13 +334,16 @@ final class AppModel {
         fetcher: FeedFetcher = FeedFetcher(),
         credentials: CredentialStoring = KeychainCredentials(),
         sessions: SessionStoring = KeychainSessions(),
-        preferences: Preferences = Preferences()
+        preferences: Preferences = Preferences(),
+        announcer: Announcing = Notifier()
     ) {
         self.database = database
         self.credentials = credentials
         self.sessions = sessions
         self.preferences = preferences
+        self.announcer = announcer
         self.articleBody = preferences.articleBody
+        self.wantsNewSubjectNotices = preferences.wantsNewSubjectNotices
         self.firstName = preferences.firstName
         self.lastName = preferences.lastName
         self.picture = preferences.picture.flatMap(ProfilePicture.image)
@@ -429,6 +456,58 @@ final class AppModel {
         await digestService.brief()
         await digestService.nameTopics()
         await loadDigest()
+        await announceNewSubjects()
+    }
+
+    // MARK: - Telling the reader
+
+    /// Says whether the reader wants the notices, asking the system when they
+    /// do.
+    ///
+    /// The switch is the request. A reader who has refused Flong at the system
+    /// level cannot be talked round from here : the switch goes back where it
+    /// was and the screen says where the answer lives, which is the only thing
+    /// an application may honestly do about a refusal.
+    func setWantsNewSubjectNotices(_ wanted: Bool) async {
+        guard wanted else {
+            preferences.wantsNewSubjectNotices = false
+            wantsNewSubjectNotices = false
+            return
+        }
+
+        let allowed = await announcer.authorize()
+        notificationStatus = await announcer.status()
+        guard allowed else {
+            wantsNewSubjectNotices = false
+            return
+        }
+
+        // From now, and not from the beginning of time : the subjects that
+        // already exist are not news to a reader who has been reading them.
+        preferences.subjectsAnnouncedAt = Date()
+        preferences.wantsNewSubjectNotices = true
+        wantsNewSubjectNotices = true
+    }
+
+    func refreshNotificationStatus() async {
+        notificationStatus = await announcer.status()
+    }
+
+    /// Tells the reader about the subjects the model has just found.
+    ///
+    /// **The watermark moves whether anything was said or not.** A subject the
+    /// reader watched appear, on a page they had open, is a subject they know
+    /// about ; keeping it for later would mean telling them tomorrow about
+    /// something they saw today. What the watermark records is that the subject
+    /// reached them, not that a notification was posted.
+    func announceNewSubjects() async {
+        guard wantsNewSubjectNotices, let since = preferences.subjectsAnnouncedAt else { return }
+
+        let found = (try? await TopicPreferences(database).made(since: since)) ?? []
+        preferences.subjectsAnnouncedAt = Date()
+
+        guard !isReading, let announcement = Announcement.newSubjects(found) else { return }
+        await announcer.post(announcement)
     }
 
     /// Every subject there is, for the screen that manages them.
@@ -594,6 +673,7 @@ final class AppModel {
     func backgroundProcessing() async {
         await doOutstandingWork()
         await digestService.rebuild()
+        await announceNewSubjects()
         _ = try? await Retention(database).purge()
         try? await SearchIndex(database).optimize()
         await cloud?.enqueueCatchUp()

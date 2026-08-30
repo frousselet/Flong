@@ -49,6 +49,8 @@ nonisolated final class Preferences: @unchecked Sendable {
         static let lastName = "reader.last-name"
         static let picture = "reader.picture"
         static let device = "device.identifier"
+        static let newSubjectNotices = "notify.new-subjects"
+        static let subjectsAnnouncedAt = "notify.subjects-announced-at"
     }
 
     /// The largest picture that may be kept.
@@ -118,6 +120,45 @@ nonisolated final class Preferences: @unchecked Sendable {
         }
     }
 
+    // MARK: - What the reader wants to be told
+
+    /// Whether the reader wants to hear about a subject the model has just
+    /// found.
+    ///
+    /// **Carried between the devices, unlike the permission.** What the reader
+    /// wants to be told is a decision about themselves and belongs on all their
+    /// devices ; whether a given device may interrupt them is the system's
+    /// answer on that device, asked for separately and never travelling. The
+    /// two are different questions and it is right that they disagree : a
+    /// reader may want the notices and have refused them on the Mac.
+    ///
+    /// Off until the reader says otherwise. Turning it on is what asks the
+    /// system, which is the only honest moment to ask.
+    var wantsNewSubjectNotices: Bool {
+        get { flag(for: Key.newSubjectNotices) }
+        set { set(newValue, for: Key.newSubjectNotices) }
+    }
+
+    /// The last moment this device said anything about a new subject.
+    ///
+    /// Local and never carried, for the same reason the device identifier is :
+    /// each device tells its own reader, and a watermark that travelled would
+    /// have the second device stay silent about what only the first announced.
+    ///
+    /// Nothing at all means nothing to announce. It is stamped when the reader
+    /// turns the notices on, so the subjects that already existed that day are
+    /// not news.
+    var subjectsAnnouncedAt: Date? {
+        get { local.object(forKey: Key.subjectsAnnouncedAt) as? Date }
+        set {
+            guard let newValue else {
+                local.removeObject(forKey: Key.subjectsAnnouncedAt)
+                return
+            }
+            local.set(newValue, forKey: Key.subjectsAnnouncedAt)
+        }
+    }
+
     /// What this device calls itself in the shared archive.
     ///
     /// Local and never carried to iCloud, which is the point of it : every
@@ -138,6 +179,22 @@ nonisolated final class Preferences: @unchecked Sendable {
     }
 
     private func set(_ value: String, for key: String) {
+        local.set(value, forKey: key)
+        cloud?.set(value, forKey: key)
+        cloud?.synchronize()
+    }
+
+    /// A yes or a no, taking iCloud's answer when iCloud has one.
+    ///
+    /// The presence of the key is what is asked, not its value : `bool(forKey:)`
+    /// answers `false` for a key nobody ever wrote, so reading it directly would
+    /// have an empty iCloud store overrule a `true` written here.
+    private func flag(for key: String) -> Bool {
+        if let cloud, cloud.object(forKey: key) != nil { return cloud.bool(forKey: key) }
+        return local.bool(forKey: key)
+    }
+
+    private func set(_ value: Bool, for key: String) {
         local.set(value, forKey: key)
         cloud?.set(value, forKey: key)
         cloud?.synchronize()

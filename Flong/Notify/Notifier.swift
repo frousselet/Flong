@@ -1,0 +1,167 @@
+//
+//  Notifier.swift
+//  Flong
+//
+//  Created by François Rousselet on 30/08/2026.
+//
+//  This Source Code Form is subject to the terms of the Mozilla Public
+//  License, v. 2.0. If a copy of the MPL was not distributed with this
+//  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+
+import Foundation
+import OSLog
+import UserNotifications
+
+#if os(iOS)
+    import UIKit
+#else
+    import AppKit
+#endif
+
+/// Local notifications, and nothing else.
+///
+/// **No push, and nothing arrives from anywhere.** There is no server, so there
+/// is nobody to send a notification : every one of these is written by the
+/// device that shows it, about something that device worked out for itself.
+/// A second device may say the same thing at a different moment, or never, and
+/// that is correct rather than a drift to fix : each of them reads its own page
+/// and tells its own reader.
+///
+/// **Permission is asked at the moment the reader asks for the notifications**,
+/// and never before. A prompt at first launch is a prompt about something the
+/// reader has not seen yet, which is how an application is refused permanently
+/// for a feature that would have been welcome later. Every switch here starts
+/// off, and turning one on is what asks.
+protocol Announcing {
+    func status() async -> UNAuthorizationStatus
+    func authorize() async -> Bool
+    func post(_ announcement: Announcement) async
+}
+
+struct Notifier: Announcing {
+    /// Whether the system will let this device say anything, as it stands now.
+    func status() async -> UNAuthorizationStatus {
+        await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+    }
+
+    /// Asks the reader, or takes the answer they already gave.
+    ///
+    /// A refusal is final until the reader goes to the system settings : asking
+    /// again does not prompt, it returns the refusal, which is why the screen
+    /// says where to go rather than offering the switch again.
+    func authorize() async -> Bool {
+        do {
+            return try await UNUserNotificationCenter.current()
+                .requestAuthorization(options: [.alert, .sound])
+        } catch {
+            Log.notify.error("Notifications could not be asked for : \(error, privacy: .public)")
+            return false
+        }
+    }
+
+    /// Says one thing, now.
+    func post(_ announcement: Announcement) async {
+        let content = UNMutableNotificationContent()
+        content.title = announcement.title
+        content.body = announcement.body
+        content.threadIdentifier = announcement.thread
+        if let subject = announcement.subject { content.userInfo = [Key.subject: subject] }
+
+        // No trigger : a trigger of nil is delivered immediately, and there is
+        // nothing here worth scheduling for later.
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+        } catch {
+            Log.notify.error("A notification could not be posted : \(error, privacy: .public)")
+        }
+    }
+
+    /// Takes the reader to where the system keeps its own answer.
+    static func openSystemSettings() {
+        #if os(iOS)
+            guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+            UIApplication.shared.open(url)
+        #else
+            guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") else {
+                return
+            }
+            NSWorkspace.shared.open(url)
+        #endif
+    }
+
+    enum Key {
+        static let subject = "subject"
+    }
+}
+
+/// What was said, for a test to read back.
+///
+/// The system's own delivery needs an authorization, a bundle and a device,
+/// none of which a test can rely on, and none of which is where the mistakes
+/// are. What is worth checking is which notifications are posted and when, and
+/// that is exactly what this records.
+final class MemoryAnnouncer: Announcing {
+    private(set) var posted: [Announcement] = []
+    var granted = true
+    var stated = UNAuthorizationStatus.authorized
+
+    init() {}
+
+    func status() async -> UNAuthorizationStatus { stated }
+
+    func authorize() async -> Bool {
+        stated = granted ? .authorized : .denied
+        return granted
+    }
+
+    func post(_ announcement: Announcement) async { posted.append(announcement) }
+}
+
+/// Holds what a tapped notification asked for, until there is a window to show
+/// it in.
+///
+/// The delegate has to be in place before launching finishes, or a notification
+/// tapped from a cold start is never handed over ; the window and its model do
+/// not exist that early. This is the one link between the two, exactly as
+/// ``BackgroundWorkBox`` is for the background tasks, and it holds the answer
+/// rather than dropping it.
+final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = NotificationRouter()
+
+    /// A subject tapped before anything was listening.
+    private var waiting: String?
+    private var open: ((String) -> Void)?
+
+    /// Starts listening, and takes whatever was tapped before there was a
+    /// window.
+    func listen(_ open: @escaping (String) -> Void) {
+        self.open = open
+
+        if let waiting {
+            self.waiting = nil
+            open(waiting)
+        }
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        guard let subject = response.notification.request.content.userInfo[Notifier.Key.subject] as? String else {
+            return
+        }
+
+        guard let open else {
+            waiting = subject
+            return
+        }
+        open(subject)
+    }
+}

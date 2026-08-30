@@ -67,6 +67,7 @@ The app target uses an Xcode synchronized file group, so a new file placed in `F
 | `Flong/Search/` | The query language : lexer, parser, and the compiler that turns a tree into SQL |
 | `Flong/Enricher/` | Vectors, classification, rule execution |
 | `Flong/Sync/` | `CKSyncEngine` on the private database |
+| `Flong/Notify/` | Local notifications : what is worth saying, and the rules for saying it |
 | `Flong/Automation/` | App Intents, widgets, local MCP server |
 | `Flong/Import/` | Reading a subscription list or an export back in, and writing one out |
 | `Flong/Features/` | One directory per screen area, each holding its views |
