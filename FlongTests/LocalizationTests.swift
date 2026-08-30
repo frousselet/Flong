@@ -29,6 +29,8 @@ struct LocalizationTests {
         #expect(String(localized: "Import an OPML file", locale: french) == "Importer un fichier OPML")
         #expect(String(localized: "Mark all as read", locale: french) == "Tout marquer comme lu")
         #expect(String(localized: "Add to favourites", locale: french) == "Mettre en favori")
+        #expect(String(localized: "Choose a picture", locale: french) == "Choisir une photo")
+        #expect(String(localized: "Your profile", locale: french) == "Votre profil")
     }
 
     @Test("The import summary agrees with French plural rules")

@@ -19,6 +19,8 @@ import SwiftUI
 struct SearchScreen: View {
     let model: AppModel
     let zoom: Namespace.ID
+    /// Where the reader's menu goes : the same corner as in every other section.
+    var menu: ((Route) -> Void)?
     let open: (UUID) -> Void
 
     var body: some View {
@@ -37,6 +39,13 @@ struct SearchScreen: View {
         #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
         #endif
+        .toolbar {
+            if let menu {
+                ToolbarItem(placement: .primaryAction) {
+                    ReaderMenu(model: model, open: menu)
+                }
+            }
+        }
         .searchable(
             text: Binding(get: { model.searchText }, set: { model.searchText = $0 }),
             prompt: Text("Search")

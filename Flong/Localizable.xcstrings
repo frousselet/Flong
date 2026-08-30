@@ -548,6 +548,16 @@
         }
       }
     },
+    "Choose a picture" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir une photo"
+          }
+        }
+      }
+    },
     "Delete" : {
       "localizations" : {
         "fr" : {
@@ -624,6 +634,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Finalisation de l'installation"
+          }
+        }
+      }
+    },
+    "First name" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prénom"
           }
         }
       }
@@ -774,6 +794,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Import terminé"
+          }
+        }
+      }
+    },
+    "Kept on your own devices, through your iCloud. Flong has no account and nowhere to send them." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conservés sur vos propres appareils, via votre iCloud. Flong n'a pas de compte et nulle part où les envoyer."
+          }
+        }
+      }
+    },
+    "Last name" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom"
           }
         }
       }
@@ -938,6 +978,16 @@
         }
       }
     },
+    "Profile" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profil"
+          }
+        }
+      }
+    },
     "Refresh" : {
       "localizations" : {
         "fr" : {
@@ -954,6 +1004,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirer des favoris"
+          }
+        }
+      }
+    },
+    "Remove the picture" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer la photo"
           }
         }
       }
@@ -1309,6 +1369,16 @@
         }
       }
     },
+    "That file is not an image" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce fichier n'est pas une image"
+          }
+        }
+      }
+    },
     "The address of a site you subscribe to, such as lemonde.fr." : {
       "localizations" : {
         "fr" : {
@@ -1505,6 +1575,27 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Écrit par le modèle"
+          }
+        }
+      }
+    },
+    "Your name" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre nom"
+          }
+        }
+      }
+    },
+    "Your profile" : {
+      "comment" : "The menu entry that opens the profile, when no name has been given",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre profil"
           }
         }
       }
