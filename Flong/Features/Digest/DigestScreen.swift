@@ -362,8 +362,9 @@ struct StoryRow: View {
     let zoom: Namespace.ID
     let open: () -> Void
 
-    /// The side of the picture beside a story that is not the lead.
-    private static let thumbnailSide: CGFloat = 88
+    /// The width of the picture beside a story that is not the lead. Its
+    /// height follows from the one ratio every picture is shown in.
+    private static let thumbnailWidth: CGFloat = 96
 
     var body: some View {
         Button(action: open) {
@@ -387,7 +388,7 @@ struct StoryRow: View {
     private var lead: some View {
         VStack(alignment: .leading, spacing: 10) {
             if story.imageURL != nil {
-                RemoteImage(url: story.imageURL, aspect: Editorial.bandAspect, corner: 10)
+                RemoteImage(url: story.imageURL, corner: 10)
                     .padding(.bottom, 2)
             }
             text(headline: .title2)
@@ -399,7 +400,7 @@ struct StoryRow: View {
             text(headline: .title3)
 
             if story.imageURL != nil {
-                RemoteImage(url: story.imageURL, side: Self.thumbnailSide)
+                RemoteImage(url: story.imageURL, width: Self.thumbnailWidth)
             }
         }
     }
@@ -516,8 +517,8 @@ struct ArticleRow: View {
     let zoom: Namespace.ID
     let open: () -> Void
 
-    /// The side of the picture beside an article.
-    private static let thumbnailSide: CGFloat = 64
+    /// The width of the picture beside an article.
+    private static let thumbnailWidth: CGFloat = 78
 
     /// The headline, with a tick at the end of it when the article has been
     /// read.
@@ -577,7 +578,7 @@ struct ArticleRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 if showsImage, article.imageURL != nil {
-                    RemoteImage(url: article.imageURL, side: Self.thumbnailSide, corner: 6)
+                    RemoteImage(url: article.imageURL, width: Self.thumbnailWidth, corner: 6)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

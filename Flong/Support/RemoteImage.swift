@@ -103,8 +103,9 @@ nonisolated final class ImageStore: Sendable {
 
 /// A picture from the network, drawn at the size it is shown.
 ///
-/// Either a fixed square beside a headline, or, with no side given, the width it
-/// is offered at a stated ratio : the photograph above a lead story.
+/// A fixed square, a fixed width at a stated ratio, or the width it is offered
+/// at that ratio : a source's mark, a thumbnail beside a headline, and the
+/// photograph above a lead story.
 ///
 /// It occupies nothing until it has something to show, and nothing again if the
 /// address turns out to be dead : a grey rectangle where a photograph failed is
@@ -113,9 +114,12 @@ nonisolated final class ImageStore: Sendable {
 /// text, and reading a headline out twice helps nobody.
 struct RemoteImage: View {
     let url: URL?
-    /// A fixed side, or `nil` to take the width offered and hold `aspect`.
+    /// A fixed side, for a picture that must be square whatever it holds :
+    /// a source's own mark, which is square by every convention there is.
     var side: CGFloat?
-    var aspect: CGFloat = 16 / 9
+    /// A fixed width, the height following from `aspect`.
+    var width: CGFloat?
+    var aspect: CGFloat = Editorial.pictureAspect
     var corner: CGFloat = 8
 
     @State private var image: CGImage?
@@ -140,6 +144,10 @@ struct RemoteImage: View {
             content
                 .frame(width: side, height: side)
                 .clipShape(.rect(cornerRadius: corner))
+        } else if let width {
+            content
+                .frame(width: width, height: (width / aspect).rounded())
+                .clipShape(.rect(cornerRadius: corner))
         } else {
             Color.clear
                 .aspectRatio(aspect, contentMode: .fit)
@@ -153,7 +161,7 @@ struct RemoteImage: View {
         isLoading = url != nil
         guard let url else { return }
 
-        let points = side ?? Editorial.measure
+        let points = side ?? width ?? Editorial.measure
         let loaded = try? await ImageStore.shared.image(
             at: url,
             maximumPixels: max(Int(points * displayScale), 1)

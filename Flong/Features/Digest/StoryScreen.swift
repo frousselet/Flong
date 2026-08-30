@@ -63,7 +63,7 @@ struct StoryScreen: View {
     private func header(_ story: DigestStory) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if story.imageURL != nil {
-                RemoteImage(url: story.imageURL, aspect: Editorial.bandAspect, corner: 10)
+                RemoteImage(url: story.imageURL, corner: 10)
                     .padding(.bottom, 2)
             }
 
