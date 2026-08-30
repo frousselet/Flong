@@ -255,6 +255,34 @@ nonisolated extension AppDatabase {
             }
         }
 
+        // The pictures a publisher stated over plain `http`.
+        //
+        // App Transport Security refuses such a request outright, so every one
+        // of them is a hole in an article the reader is looking at now, with a
+        // `-1022` in the console and nothing on screen to say why. The
+        // sanitizer raises them as articles arrive ; this raises the ones
+        // already written down, which nothing would ever sanitize again.
+        //
+        // Only what the view fetches itself. A link stays exactly as the
+        // publisher wrote it : it is handed to the browser, which is not bound
+        // by this policy.
+        migrator.registerMigration("v20.secureThePictures") { db in
+            for column in ["sanitized_html", "extracted_html"] {
+                for attribute in ["src", "poster"] {
+                    try db.execute(
+                        sql: """
+                            UPDATE entry_body SET \(column) = replace(\(column), ?, ?)
+                            WHERE \(column) LIKE ?
+                            """,
+                        arguments: [
+                            "\(attribute)=\"http://", "\(attribute)=\"https://",
+                            "%\(attribute)=\"http://%",
+                        ]
+                    )
+                }
+            }
+        }
+
         return migrator
     }
 

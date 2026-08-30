@@ -29,6 +29,33 @@ nonisolated enum HTTPURL {
         return scheme == "http" || scheme == "https"
     }
 
+    /// The same address over TLS.
+    ///
+    /// **App Transport Security refuses a plain `http` request outright**, and
+    /// the refusal is a `-1022` in the reader's console rather than anything
+    /// they can act on : the picture is simply missing and nothing says why.
+    /// A feed written years ago states `http` for its pictures, its icon and
+    /// sometimes for itself, long after the site started serving TLS, and the
+    /// old address goes on working in a browser because the server redirects.
+    /// `URLSession` never gets far enough to be redirected.
+    ///
+    /// So the scheme is raised at the moment an address becomes a request. A
+    /// site that has no TLS at all fails either way, and fails the same way it
+    /// does today ; every site that has it, which is very nearly all of them
+    /// now, answers.
+    ///
+    /// **Only what the application fetches for itself.** A link the reader
+    /// follows is opened by the browser, which is not bound by this policy and
+    /// has its own opinion about upgrading, and rewriting one here would break
+    /// the few sites that genuinely serve nothing but `http`.
+    static func secured(_ url: URL) -> URL {
+        guard url.scheme?.lowercased() == "http" else { return url }
+
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.scheme = "https"
+        return components?.url ?? url
+    }
+
     /// The address made absolute against where it was found, or `nil` when it
     /// is not one to ask for at all.
     static func resolved(_ url: URL, against base: URL?) -> URL? {

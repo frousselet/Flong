@@ -190,7 +190,11 @@ actor FeedFetcher {
     }
 
     private func urlRequest(for request: FetchRequest) -> URLRequest {
-        var urlRequest = URLRequest(url: request.url, timeoutInterval: limits.timeout)
+        // Raised here rather than where a feed is subscribed to : `http` and
+        // `https` are two different addresses and a feed is identified by the
+        // one it was subscribed at, so what changes is the request and never
+        // the identity.
+        var urlRequest = URLRequest(url: HTTPURL.secured(request.url), timeoutInterval: limits.timeout)
         urlRequest.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         urlRequest.setValue(
             "application/atom+xml, application/rss+xml, application/feed+json, application/xml;q=0.9, */*;q=0.8",

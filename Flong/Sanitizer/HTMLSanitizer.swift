@@ -64,6 +64,9 @@ nonisolated enum HTMLSanitizer {
     /// Attributes holding an address, which is checked rather than trusted.
     private static let addressAttributes: Set<String> = ["href", "src", "cite", "poster"]
 
+    /// The ones the view fetches itself, rather than hands to a browser.
+    private static let fetchedAttributes: Set<String> = ["src", "poster"]
+
     private static let allowedSchemes: Set<String> = ["http", "https", "mailto"]
 
     /// Sanitizes a fragment of feed HTML.
@@ -132,7 +135,7 @@ nonisolated enum HTMLSanitizer {
             guard !value.isEmpty || name == "alt" else { continue }
 
             if addressAttributes.contains(name) {
-                guard let address = self.address(value, relativeTo: baseURL) else { continue }
+                guard let address = self.address(value, in: name, relativeTo: baseURL) else { continue }
                 kept[name] = address
             } else {
                 kept[name] = value
@@ -148,14 +151,25 @@ nonisolated enum HTMLSanitizer {
     }
 
     /// An address resolved and vetted, or `nil` when it is not one Flong follows.
-    private static func address(_ value: String, relativeTo baseURL: URL?) -> String? {
+    ///
+    /// A `src` or a `poster` is fetched by the view rendering the article, so
+    /// it is raised to TLS like everything else the application asks for : a
+    /// plain `http` picture inside an article is refused by App Transport
+    /// Security and leaves a hole in the text with nothing to say why.
+    ///
+    /// An `href` is left exactly as the publisher wrote it. It is not fetched
+    /// here : it is handed to the browser, which is not bound by this policy
+    /// and has its own opinion about upgrading, and rewriting one would break
+    /// the few sites that genuinely serve nothing but `http`.
+    private static func address(_ value: String, in attribute: String, relativeTo baseURL: URL?) -> String? {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
         guard let url = URL(string: trimmed, relativeTo: baseURL)?.absoluteURL else { return nil }
         guard let scheme = url.scheme?.lowercased() else { return nil }
         guard allowedSchemes.contains(scheme) else { return nil }
-        return url.absoluteString
+
+        return fetchedAttributes.contains(attribute) ? HTTPURL.secured(url).absoluteString : url.absoluteString
     }
 
     /// An image sized to be invisible is there to count readers, not to be seen.

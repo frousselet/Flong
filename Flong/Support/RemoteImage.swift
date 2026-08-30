@@ -75,6 +75,11 @@ nonisolated final class ImageStore: Sendable {
         // that does not appear rather than an error in the reader's console.
         guard HTTPURL.isFetchable(url) else { return nil }
 
+        // A feed states `http` for a picture the site has been serving over
+        // TLS for years, and App Transport Security refuses the request before
+        // the redirect that would have fixed it.
+        let url = HTTPURL.secured(url)
+
         let key = "\(url.absoluteString)|\(maximumPixels)" as NSString
         if let cached = memory.object(forKey: key) { return cached.image }
         if refused.object(forKey: url.absoluteString as NSString) != nil { return nil }
