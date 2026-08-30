@@ -299,6 +299,18 @@ nonisolated struct LibraryStore: Sendable {
             let entryIDs = items.compactMap(\.entryID)
 
             _ = try Entry.filter(keys: entryIDs).updateAll(db, Column("is_starred").set(to: false))
+
+            // The bindings go with it. A binding points at one of three tables
+            // by identifier, so it cannot carry a foreign key and nothing
+            // cascades : a copy deleted without them leaves a collection
+            // counting an article that is not there any more.
+            try db.execute(
+                sql: """
+                    DELETE FROM tag_binding
+                    WHERE target_kind = ? AND target_id IN (\(databaseQuestionMarks(count: itemIDs.count)))
+                    """,
+                arguments: StatementArguments([Self.filedKind] + itemIDs.map { $0.databaseValue })
+            )
             _ = try LibraryItem.filter(keys: itemIDs).deleteAll(db)
             return LibraryChange(released: items)
         }
@@ -364,14 +376,20 @@ nonisolated struct LibraryStore: Sendable {
     /// about must not throw away what they wrote.
     /// Takes the star off, and the copy with it when nothing else keeps it.
     ///
-    /// An annotated article stays : the note is a reason of its own. What it
-    /// loses is its place in the favourites, which is the star and nothing
-    /// more.
+    /// **Two things keep an article besides the star.** A note is a reason of
+    /// its own, and so is a collection : a reader who files something and then
+    /// decides it is not a favourite has said one thing, not two, and the
+    /// article they filed must still be there. It was not, and the collection
+    /// went on counting it, which is how a square came to say two over a page
+    /// showing one.
+    ///
+    /// What it loses in every case is its place in the favourites, which is the
+    /// star and nothing more.
     private static func unstar(_ entryID: UUID, at date: Date, in db: Database) throws -> LibraryItem? {
         guard var item = try LibraryItem.filter(LibraryItem.Columns.entryID == entryID).fetchOne(db) else {
             return nil
         }
-        guard item.annotation?.isEmpty ?? true else {
+        guard item.annotation?.isEmpty ?? true, try !isFiled(item.id, in: db) else {
             item.starredAt = nil
             try item.update(db)
             return nil
@@ -380,6 +398,20 @@ nonisolated struct LibraryStore: Sendable {
         _ = try item.delete(db)
         return item
     }
+
+    /// Whether the reader has put this article in a collection of their own.
+    private static func isFiled(_ itemID: UUID, in db: Database) throws -> Bool {
+        try Int.fetchOne(
+            db,
+            sql: """
+                SELECT COUNT(*) FROM tag_binding b JOIN tag t ON t.id = b.tag_id
+                WHERE b.target_kind = ? AND b.target_id = ? AND t.path LIKE ?
+                """,
+            arguments: [Self.filedKind, itemID, CollectionStore.root + "/%"]
+        ) ?? 0 > 0
+    }
+
+    private static let filedKind = "library_item"
 
     // MARK: - Shapes
 

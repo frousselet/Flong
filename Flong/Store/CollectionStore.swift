@@ -228,13 +228,20 @@ nonisolated struct CollectionStore: Sendable {
             let rows = try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT t.path AS path, COUNT(b.target_id) AS count,
+                    SELECT t.path AS path, COUNT(i.id) AS count,
                            (SELECT i.image_url FROM library_item i
                             JOIN tag_binding c ON c.target_id = i.id AND c.target_kind = ?
                             WHERE c.tag_id = t.id AND i.image_url IS NOT NULL
                             ORDER BY COALESCE(i.published_at, i.promoted_at) DESC LIMIT 1) AS cover
                     FROM tag t
                     LEFT JOIN tag_binding b ON b.tag_id = t.id AND b.target_kind = ?
+                    -- Counting the articles and not the bindings. A binding
+                    -- carries no foreign key, since it points at one of three
+                    -- tables, so nothing removes it when what it names goes :
+                    -- counting bindings is counting articles that may not be
+                    -- there, and a square that says two over a page showing one
+                    -- has broken the only promise a count makes.
+                    LEFT JOIN library_item i ON i.id = b.target_id
                     WHERE t.path LIKE ?
                     GROUP BY t.path
                     """,
