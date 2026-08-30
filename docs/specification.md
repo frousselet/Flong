@@ -200,7 +200,13 @@ Every device collects on its own behalf.
 
 **In scope** : a per-subscriber secret URL, the dominant case among subscription platforms, HTTP Basic authentication, bearer token or fixed header.
 
-**Out of scope** : cookie sessions, form authentication, OAuth, extraction behind a paywall. These break constantly and do not deliver enough to justify their cost.
+**Amended.** Cookie sessions are in scope. The reason this section gave for excluding them was a good one and still holds : a site's login form is not an interface anybody promised to keep, and a session breaks when the site decides it does, with no warning and no error a program can read. What changed is the weighing, not the facts. A reader who pays for a newspaper and cannot read it in the reader they chose is a reader the application has failed, and a session that has to be renewed by hand now and then is a smaller failure than that.
+
+The cost is made legible rather than hidden : a session records when it was signed in and when it last worked, and a site that has stopped recognizing the reader says so instead of quietly serving teasers.
+
+**Still out of scope** : form authentication, OAuth, and working around a paywall for something the reader has not paid for. Flong never holds a site's password, never fills in a login form and never automates a sign-in : the reader signs in on the site's own page, in a web view, and what is kept is the session that page left. There is nothing to be trusted with because nothing is given.
+
+`docs/technical/credentials.md` records how a session is scoped to its own site and no other.
 
 **Secret storage** : the keychain exclusively, with the appropriate protection class, propagated between devices by iCloud Keychain. Never in the database, never in CloudKit, never in a log. `docs/technical/credentials.md` records how a secret address is identified without being written down.
 

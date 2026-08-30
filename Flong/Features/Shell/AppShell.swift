@@ -18,6 +18,7 @@ nonisolated enum Route: Hashable {
     case article(UUID)
     case view(SidebarItem.Kind)
     case topics
+    case subscribedSites
 }
 
 /// Which part of the application the reader is in.
@@ -185,6 +186,9 @@ struct AppShell: View {
 
         case .topics:
             TopicsScreen(model: model)
+
+        case .subscribedSites:
+            SubscribedSitesScreen(model: model)
         }
     }
 

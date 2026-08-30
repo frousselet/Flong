@@ -59,6 +59,7 @@ nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
     case invalidAddress
     case unreachableFeed
     case noFeedFound
+    case notSignedIn
 
     var id: Self { self }
 
@@ -70,6 +71,7 @@ nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
         case .invalidAddress: "This address is not one Flong can follow."
         case .unreachableFeed: "This address could not be reached."
         case .noFeedFound: "No feed was found at this address."
+        case .notSignedIn: "This site left no session. Sign in on its page, then say so."
         }
     }
 }
@@ -93,6 +95,7 @@ final class AppModel {
     private let finder: FeedFinder
     private let opml: OPMLImport
     private let credentials: CredentialStoring
+    private let sessions: SessionStoring
 
     private(set) var sidebar: [SidebarItem] = []
     private(set) var summaries: [ArticleSummary] = []
@@ -102,6 +105,8 @@ final class AppModel {
     private(set) var isFetchingFullText = false
     /// Which feeds have a credential. The identifiers, never the secrets.
     private(set) var authenticatedFeeds: Set<UUID> = []
+    /// The sites the reader has signed in to, for the screen that manages them.
+    private(set) var subscribedSites: [SiteSession] = []
     private(set) var isRefreshing = false
     private(set) var feedCount = 0
 
@@ -203,10 +208,12 @@ final class AppModel {
     init(
         database: AppDatabase,
         fetcher: FeedFetcher = FeedFetcher(),
-        credentials: CredentialStoring = KeychainCredentials()
+        credentials: CredentialStoring = KeychainCredentials(),
+        sessions: SessionStoring = KeychainSessions()
     ) {
         self.database = database
         self.credentials = credentials
+        self.sessions = sessions
         let subscriptions = SubscriptionStore(database)
         self.subscriptions = subscriptions
         self.articles = ArticleStore(database)
@@ -874,6 +881,56 @@ final class AppModel {
             // says a secret must not appear.
             failure = .notSaved
         }
+    }
+
+    // MARK: - Sites the reader pays for
+
+    /// The site an address belongs to, however the reader spelled it.
+    static func site(of address: String) -> String? {
+        let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let withScheme = trimmed.contains("://") ? trimmed : "https://\(trimmed)"
+        return URL(string: withScheme).flatMap(FeedURL.room(of:))
+    }
+
+    func loadSubscribedSites() async {
+        let hosts = (try? sessions.hosts()) ?? []
+        subscribedSites = hosts.compactMap { try? sessions.session(for: $0) }
+    }
+
+    /// Keeps the session a site left after the reader signed in.
+    ///
+    /// Only that site's own cookies : a login page loads a dozen third parties,
+    /// and what they left has nothing to do with the reader being a subscriber.
+    func saveSession(for host: String, cookies: [HTTPCookie]) async {
+        let kept = cookies.compactMap(SessionCookie.init).filter { cookie in
+            let domain = cookie.domain.hasPrefix(".") ? String(cookie.domain.dropFirst()) : cookie.domain
+            return domain == host || domain.hasSuffix("." + host)
+        }
+
+        guard !kept.isEmpty else {
+            failure = .notSignedIn
+            return
+        }
+
+        let existing = try? sessions.session(for: host)
+        let session = SiteSession(
+            host: host,
+            cookies: kept,
+            signedInAt: Date(),
+            // A fresh sign-in has not proved anything yet, and saying it worked
+            // a moment ago would be saying something nobody has checked.
+            lastWorkedAt: existing?.lastWorkedAt
+        )
+
+        try? sessions.setSession(session, for: host)
+        await loadSubscribedSites()
+    }
+
+    func signOut(of host: String) async {
+        try? sessions.setSession(nil, for: host)
+        await loadSubscribedSites()
     }
 
     /// Keeps what a feed needs to prove the reader is entitled to it.

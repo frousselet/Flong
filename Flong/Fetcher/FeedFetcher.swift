@@ -21,6 +21,9 @@ nonisolated struct FetchRequest: Hashable, Sendable {
     /// Section 9 keeps it in the keychain ; it reaches a request and goes no
     /// further.
     var credential: FeedCredential?
+    /// The cookies of a session the reader signed in for, when the request is
+    /// to a site they subscribe to. Only ever that site's own.
+    var cookies: [SessionCookie] = []
 }
 
 /// A feed as the server just served it.
@@ -201,6 +204,16 @@ actor FeedFetcher {
         // has already been spent by the time there is a request.
         if let header = request.credential?.header {
             urlRequest.setValue(header.value, forHTTPHeaderField: header.name)
+        }
+
+        // The session the reader signed in for, spelled the way a browser
+        // spells it. Set on the request rather than left to a shared cookie
+        // store, so that one site's cookies can never reach another.
+        if !request.cookies.isEmpty {
+            let jar = request.cookies.compactMap(\.cookie)
+            for (name, value) in HTTPCookie.requestHeaderFields(with: jar) {
+                urlRequest.setValue(value, forHTTPHeaderField: name)
+            }
         }
 
         if let etag = request.etag { urlRequest.setValue(etag, forHTTPHeaderField: "If-None-Match") }

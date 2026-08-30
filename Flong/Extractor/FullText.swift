@@ -46,9 +46,11 @@ nonisolated struct FullText: Sendable {
 
     private let database: AppDatabase
     private let fetcher: FeedFetcher
+    private let sessions: SessionStoring
 
-    init(_ database: AppDatabase, fetcher: FeedFetcher? = nil) {
+    init(_ database: AppDatabase, fetcher: FeedFetcher? = nil, sessions: SessionStoring = KeychainSessions()) {
         self.database = database
+        self.sessions = sessions
         self.fetcher =
             fetcher
             ?? FeedFetcher(limits: FeedFetcher.Limits(maximumBytes: FullText.maximumBytes))
@@ -64,6 +66,27 @@ nonisolated struct FullText: Sendable {
         guard extractedHTML == nil else { return false }
 
         return HTMLSanitizer.plainText(feedHTML ?? "").count < summaryLength
+    }
+
+    /// The session that covers an address, if the reader has one.
+    ///
+    /// Matched on the site rather than the exact host, since a session signed
+    /// in on `lemonde.fr` is the same session `www.lemonde.fr` needs.
+    static func session(for url: URL, in sessions: SessionStoring) -> SiteSession? {
+        guard let host = FeedURL.room(of: url) else { return nil }
+
+        // The host itself, then the site above it, which is where a session
+        // signed in on the front page lives.
+        var candidates = [host]
+        let parts = host.split(separator: ".")
+        if parts.count > 2 { candidates.append(parts.dropFirst().joined(separator: ".")) }
+
+        for candidate in candidates {
+            guard let session = try? sessions.session(for: candidate), session.covers(url), session.isUsable()
+            else { continue }
+            return session
+        }
+        return nil
     }
 
     /// Fetches the page, extracts the article and keeps it.
@@ -83,14 +106,32 @@ nonisolated struct FullText: Sendable {
             Self.isWorthFetching(url: article.url, feedHTML: article.feedHTML, extractedHTML: article.extracted)
         else { return nil }
 
-        guard case .updated(let document) = await fetcher.fetch(FetchRequest(url: article.url)) else { return nil }
+        // A site the reader subscribes to is asked as the reader, with the
+        // session they signed in for. A site they do not is asked as anybody.
+        let session = Self.session(for: article.url, in: sessions)
+        let request = FetchRequest(url: article.url, cookies: session?.valid() ?? [])
+
+        guard case .updated(let document) = await fetcher.fetch(request) else { return nil }
 
         // A page states its encoding in a header and in a `<meta>`, and either
         // may be wrong or missing : `PageText` is what knows the order to try.
         let html = PageText.text(of: document.data, contentType: document.contentType)
         guard let extracted = ArticleExtractor.extract(html, from: document.url) else {
-            Log.enrich.notice("A page held no article that could be told apart from the page")
+            // A site the reader signed in to and which answers with no article
+            // is a site that has stopped recognizing them. Saying so is the
+            // whole mitigation for a session being a thing that breaks.
+            if session != nil {
+                Log.enrich.notice("A subscribed site answered with no article : the session may have expired")
+            } else {
+                Log.enrich.notice("A page held no article that could be told apart from the page")
+            }
             return nil
+        }
+
+        // It worked, which is the only honest proof a session still does.
+        if var session, let host = FeedURL.room(of: article.url) {
+            session.lastWorkedAt = Date()
+            try? sessions.setSession(session, for: host)
         }
 
         try? await database.writer.write { db in

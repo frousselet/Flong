@@ -64,6 +64,12 @@ struct DigestScreen: View {
                         Label("Subjects", systemImage: "square.stack.3d.up")
                     }
 
+                    Button {
+                        open(.subscribedSites)
+                    } label: {
+                        Label("Subscribed sites", systemImage: "key")
+                    }
+
                     Divider()
 
                     Button {
