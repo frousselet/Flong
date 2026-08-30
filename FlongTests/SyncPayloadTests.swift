@@ -191,9 +191,12 @@ struct SyncPayloadTests {
         let records = try await first.payload.everything()
         let applied = try await second.payload.apply(records)
 
-        // A feed, a kept article and one block of read states. Not one record
-        // per article : that is the whole point of the budget.
-        #expect(records.count == 3)
+        // A feed, a kept article, one block of read states, and one block of
+        // the stream : two articles of one feed on one day travel as a single
+        // record, not as two. That is the budget, and it is what lets the whole
+        // stream travel at all.
+        #expect(records.count == 4)
+        #expect(records.filter { $0.recordType == SyncRecords.RecordType.catchUp }.count == 1)
         #expect(applied.feeds == 1)
         #expect(applied.libraryItems == 1)
 
@@ -201,11 +204,13 @@ struct SyncPayloadTests {
         #expect(try await second.subscriptions.feeds().first?.folder == "Presse")
         #expect(try await second.library.count() == 1)
         #expect(try await second.library.allItems().first?.contentHTML == "<p>Un corps.</p>")
-        #expect(try await second.articles.count(.all, now: now) == 0)
+        // And the stream arrives with it, whole : the reader keeps everything
+        // on every device, which is what section 7 was amended to say.
+        #expect(try await second.articles.count(.all, now: now) == 2)
     }
 
-    @Test("The stream is never sent : each device fetches for itself")
-    func theStreamStaysHome() async throws {
+    @Test("The stream is sent, but never one record per article")
+    func theStreamTravelsCompacted() async throws {
         let first = try Device(zone: zone)
         let feed = try await first.subscriptions.subscribe(
             to: Subscription(address: "https://feeds.example.com/f.xml", title: "A")
@@ -215,9 +220,45 @@ struct SyncPayloadTests {
         }
 
         let records = try await first.payload.everything()
+        let blocks = records.filter { $0.recordType == SyncRecords.RecordType.catchUp }
 
-        #expect(records.count == 1)
-        #expect(records.allSatisfy { $0.recordType == SyncRecords.RecordType.feed })
+        // Fifty articles of one feed on one day : one record. The specification
+        // is blunt about the alternative, and this is the whole reason the
+        // stream can travel without the count going to a hundred thousand.
+        #expect(records.count == 2)
+        #expect(blocks.count == 1)
+    }
+
+    @Test("A day too big for one record is cut into as many as it needs")
+    func aBusyDayIsChunked() async throws {
+        let first = try Device(zone: zone)
+        let feed = try await first.subscriptions.subscribe(
+            to: Subscription(address: "https://feeds.example.com/f.xml", title: "A")
+        ).feed
+        // Bodies that do not compress, so the cut is by bytes and not by luck.
+        for index in 0..<60 {
+            try await first.add(
+                "urn:\(index)",
+                to: feed,
+                title: "Article \(index)",
+                published: now,
+                body: String((0..<20_000).map { _ in "abcdefghijklmnopqrstuvwxyz".randomElement()! })
+            )
+        }
+
+        let blocks = try await first.payload.everything()
+            .filter { $0.recordType == SyncRecords.RecordType.catchUp }
+
+        #expect(blocks.count > 1)
+        // Every one of them inside what CloudKit takes, which is what the cut
+        // is for.
+        for block in blocks {
+            #expect((block["headers"] as? Data)?.count ?? 0 <= CatchUpHeaders.chunkLimit)
+        }
+        // And no article is lost in the cutting.
+        let second = try Device(zone: zone)
+        _ = try await second.payload.apply(try await first.payload.everything())
+        #expect(try await second.articles.count(.all, now: now) == 60)
     }
 
     @Test("An article read on one device arrives read on the other, whenever it arrives")
@@ -280,11 +321,8 @@ struct SyncPayloadTests {
         try await first.library.setStarred([kept.id], to: true, at: now)
         try await second.payload.apply(try await first.payload.everything())
 
-        // The article is in the second device's stream too, and starred by the
-        // record that arrived.
-        let sameFeed = try #require(try await second.subscriptions.feeds().first)
-        try await second.add("urn:1", to: sameFeed, title: "Gardé", published: now)
-        try await second.payload.apply(try await first.payload.everything())
+        // The article is already in the second device's stream, since the
+        // stream travels now, and starred by the record that arrived with it.
 
         let itemName = SyncRecords.name(forLibraryItemWithGUID: "urn:1", feedURL: feed.url)
         let removed = try await second.payload.apply(deletions: [itemName])
@@ -305,8 +343,10 @@ struct SyncPayloadTests {
         try await first.add("urn:1", to: feed, title: "Pendant l'absence", published: now)
         try await first.add("urn:2", to: feed, title: "Aussi", published: now)
 
-        // The other device follows the feed and holds none of it.
-        try await second.payload.apply(try await first.payload.everything())
+        // The other device follows the feed and holds none of it, which is
+        // what a device switched off for a week comes back to.
+        let records = try await first.payload.everything()
+        try await second.payload.apply(records.filter { $0.recordType == SyncRecords.RecordType.feed })
 
         let changes = try await first.payload.catchUpChanges(now: now)
         let applied = try await second.payload.apply(changes.records)
@@ -316,11 +356,12 @@ struct SyncPayloadTests {
 
         let summaries = try await second.articles.summaries(.all, now: now)
         #expect(summaries.map(\.title).sorted() == ["Aussi", "Pendant l'absence"])
-        // Metadata only : the bodies were never sent, and the next refresh
-        // fetches them if the articles are still in the feed.
+        // And readable on arrival. The body travels with the article now, so a
+        // caught-up piece is not a title waiting on a fetch that may find the
+        // article gone from its feed.
         let newest = try #require(summaries.first)
         let article = try #require(await second.articles.article(id: newest.id))
-        #expect(article.bodyHTML == nil)
+        #expect(article.bodyHTML == "<p>Un corps.</p>")
     }
 
     @Test("A header for a feed nobody follows is not an invitation to follow it")

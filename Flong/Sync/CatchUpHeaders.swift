@@ -14,92 +14,176 @@ import Foundation
 import GRDB
 import OSLog
 
-/// What a device missed while it was switched off.
+/// Every article this device has, on its way to the reader's other ones.
 ///
-/// A feed holds twenty articles ; a device left off for a week comes back to
-/// find that half of what its other devices saw has scrolled out of it and is
-/// gone for good. Section 7 answers that with a bounded mechanism : one record
-/// per feed and per day, holding identifiers, titles, links and dates and
-/// nothing else, over a sliding window of thirty days.
+/// **The whole stream travels now, and this is what carries it.** It began as
+/// the bounded answer of section 7 to a narrower problem, a device switched off
+/// for a week coming back to find half of what its other devices saw had
+/// scrolled out of the feeds : identifiers and titles only, over thirty days.
+/// The reader asked for all of it, kept for good, and section 7 was amended.
 ///
-/// It is metadata only. The bodies are not sent, since the stream is a cache
-/// each device fills for itself, so a caught up article arrives as a title and
-/// a link, which is enough to decide whether to go and read it.
+/// **What did not change is the shape, and that is the point.** One record per
+/// feed, per day, per chunk, carrying every article of that day with its text
+/// compressed. Never one record per article : a wire service publishing two
+/// hundred pieces a day is two hundred records a day the old way and one this
+/// way, and the specification is blunt about which of those CloudKit survives.
+/// A day that has passed never changes again either, so the record is written
+/// once and never rewritten, which is the other half of what rate limiting
+/// punishes.
+///
+/// **A record holds about a megabyte of fields.** A busy day of full articles
+/// goes past that, so a day is cut into as many records as it needs, numbered
+/// from zero. The cut is by encoded size rather than by article count, since
+/// what the limit is about is bytes.
 nonisolated enum CatchUpHeaders {
-    /// How far back the window reaches, and how long a record is kept.
-    static let window: TimeInterval = 30 * 24 * 60 * 60
+    /// How much of a record the articles may fill.
+    ///
+    /// Comfortably under CloudKit's own limit : the rest of the record is a
+    /// feed address and a date, and a margin costs nothing next to a save that
+    /// is refused for being eleven bytes too big.
+    static let chunkLimit = 700 * 1024
 
-    /// How many articles one day of one feed may name. A feed that publishes
-    /// more than this in a day is a firehose, and missing the tail of it is not
-    /// what anybody is worried about.
-    static let limit = 200
-
-    /// One article, as a header.
+    /// One article, whole.
+    ///
+    /// The body travels compressed, the same way a kept article's does. Markup
+    /// compresses to about a fifth, which is what makes a day of a feed fit in
+    /// a record at all.
     nonisolated struct Header: Hashable, Sendable, Codable {
         let guid: String
         let title: String
         let url: String?
         let publishedAt: Date?
+        var author: String?
+        var excerpt: String?
+        var imageURL: String?
+        var hasMedia: Bool?
+        var language: String?
+        /// The sanitized article, compressed.
+        var body: Data?
     }
 
     // MARK: - Sending
 
-    /// The headers of what this device fetched recently, one record per feed and
-    /// per day.
-    static func records(in database: AppDatabase, since: Date, zone: CKRecordZone.ID) async throws -> [CKRecord] {
-        // The grouping happens inside the read : a GRDB row is not `Sendable`
-        // and has no business leaving the database's own queue.
+    /// The articles of every day this device has touched since a moment.
+    ///
+    /// **The days are found first, then filled whole.** A block stands for a
+    /// day, so a block built from only the articles that arrived since the last
+    /// push would replace a complete day with a partial one. What `since`
+    /// narrows is which days are worth rewriting, and each of those is then
+    /// read out in full.
+    static func records(
+        in database: AppDatabase,
+        since: Date = .distantPast,
+        zone: CKRecordZone.ID
+    ) async throws -> [CKRecord] {
         let groups: [Group] = try await database.writer.read { db in
-            let rows = try Row.fetchAll(
+            let touched = try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT f.url AS feed_url, e.guid AS guid, e.title AS title, e.url AS url,
-                           e.published_at AS published_at,
+                    SELECT DISTINCT e.feed_id AS feed_id,
                            SUBSTR(COALESCE(e.published_at, e.received_at), 1, 10) AS day
-                    FROM entry e JOIN feed f ON f.id = e.feed_id
+                    FROM entry e
                     WHERE e.received_at >= ?
-                    ORDER BY e.received_at DESC
                     """,
                 arguments: [since]
             )
+            guard !touched.isEmpty else { return [] }
 
             var grouped: [String: Group] = [:]
-            for row in rows {
-                guard let url = (row["feed_url"] as String?).flatMap(URL.init(string:)) else { continue }
-                let day: String = row["day"]
-                let key = url.absoluteString + "|" + day
+            for pair in touched {
+                let feedID: UUID = pair["feed_id"]
+                let day: String = pair["day"]
 
-                var group = grouped[key] ?? Group(url: url, day: day, headers: [])
-                guard group.headers.count < limit else { continue }
+                let rows = try Row.fetchAll(
+                    db,
+                    sql: """
+                        SELECT f.url AS feed_url, e.guid AS guid, e.title AS title, e.url AS url,
+                               e.published_at AS published_at, e.author AS author, e.excerpt AS excerpt,
+                               e.image_url AS image_url, e.has_media AS has_media, e.language AS language,
+                               b.sanitized_html AS body
+                        FROM entry e
+                        JOIN feed f ON f.id = e.feed_id
+                        LEFT JOIN entry_body b ON b.entry_id = e.id
+                        WHERE e.feed_id = ?
+                          AND SUBSTR(COALESCE(e.published_at, e.received_at), 1, 10) = ?
+                          AND e.is_hidden = 0
+                        ORDER BY COALESCE(e.published_at, e.received_at)
+                        """,
+                    arguments: [feedID, day]
+                )
+                guard let url = (rows.first?["feed_url"] as String?).flatMap(URL.init(string:)) else { continue }
 
-                group.headers.append(
+                let headers = rows.map { row in
                     Header(
                         guid: row["guid"],
                         title: row["title"],
                         url: row["url"],
-                        publishedAt: row["published_at"]
+                        publishedAt: row["published_at"],
+                        author: row["author"],
+                        excerpt: row["excerpt"],
+                        imageURL: row["image_url"],
+                        hasMedia: row["has_media"],
+                        language: row["language"],
+                        body: SyncRecords.compressed(row["body"])
                     )
-                )
-                grouped[key] = group
+                }
+                grouped[url.absoluteString + "|" + day] = Group(url: url, day: day, headers: headers)
             }
             return Array(grouped.values)
         }
 
-        return groups.compactMap { group in
-            guard let payload = try? JSONEncoder().encode(group.headers) else { return nil }
+        return groups.flatMap { chunked($0, in: zone) }
+    }
 
+    /// One day of one feed, cut into as many records as its bytes need.
+    private static func chunked(_ group: Group, in zone: CKRecordZone.ID) -> [CKRecord] {
+        var records: [CKRecord] = []
+        var batch: [Header] = []
+        var size = 0
+
+        func flush() {
+            guard !batch.isEmpty, let payload = try? JSONEncoder().encode(batch) else { return }
             let record = CKRecord(
                 recordType: SyncRecords.RecordType.catchUp,
                 recordID: CKRecord.ID(
-                    recordName: SyncRecords.name(forCatchUpFeed: group.url, day: group.day),
+                    recordName: SyncRecords.name(forCatchUpFeed: group.url, day: group.day, chunk: records.count),
                     zoneID: zone
                 )
             )
             record["feedURL"] = group.url.absoluteString
             record["day"] = group.day
             record["headers"] = payload
-            return record
+            records.append(record)
+            batch = []
+            size = 0
         }
+
+        for header in group.headers {
+            // Every field, and the body as base64 : JSON carries a `Data` at
+            // four bytes for every three, and an article's excerpt is as long
+            // as its body when nothing has trimmed it. Weighing the body alone
+            // put a chunk at twice the limit, which is a save CloudKit refuses
+            // rather than trims.
+            let weight =
+                (header.body?.count ?? 0) * 4 / 3
+                + header.title.utf8.count
+                + (header.excerpt?.utf8.count ?? 0)
+                + (header.author?.utf8.count ?? 0)
+                + (header.url?.utf8.count ?? 0)
+                + (header.imageURL?.utf8.count ?? 0)
+                + header.guid.utf8.count
+                + 256
+            if size > 0, size + weight > chunkLimit { flush() }
+            batch.append(header)
+            size += weight
+
+            // An article too big for a record of its own goes alone : the save
+            // is refused either way, and refusing it alone at least lets the
+            // rest of the day through.
+            if size >= chunkLimit { flush() }
+        }
+        flush()
+        return records
     }
 
     /// One feed's articles for one day.
@@ -109,39 +193,27 @@ nonisolated enum CatchUpHeaders {
         var headers: [Header]
     }
 
-    /// The records that have fallen out of the window, for the engine to delete.
+    /// Nothing expires any more.
     ///
-    /// The cost of the whole mechanism is capped by this : without it, a reader
-    /// would accumulate one record per feed per day for ever.
+    /// The window was what capped the cost of the mechanism, and the reader
+    /// asked for the cost instead : they keep everything, on every device, for
+    /// good. The function stays so that the engine's shape does not change and
+    /// so that a bound can be put back in one place if it is ever wanted.
     static func expiredNames(in database: AppDatabase, now: Date = Date()) async throws -> [String] {
-        let cutoff = dayFormatter.string(from: now.addingTimeInterval(-window))
-
-        return try await database.writer.read { db in
-            let rows = try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT DISTINCT f.url AS feed_url,
-                           SUBSTR(COALESCE(e.published_at, e.received_at), 1, 10) AS day
-                    FROM entry e JOIN feed f ON f.id = e.feed_id
-                    WHERE SUBSTR(COALESCE(e.published_at, e.received_at), 1, 10) < ?
-                    """,
-                arguments: [cutoff]
-            )
-
-            return rows.compactMap { row -> String? in
-                guard let url = (row["feed_url"] as String?).flatMap(URL.init(string:)) else { return nil }
-                return SyncRecords.name(forCatchUpFeed: url, day: row["day"])
-            }
-        }
+        []
     }
 
     // MARK: - Receiving
 
-    /// Writes down what another device saw and this one missed.
+    /// Writes down what another device has and this one does not.
     ///
-    /// Only for feeds this device follows, and only for articles it does not
-    /// already hold. They arrive without a body, which the next refresh fills in
-    /// when the article is still in the feed.
+    /// Only for feeds this device follows : a block naming a feed nobody here
+    /// subscribes to is not an invitation to subscribe. An article already held
+    /// is left alone, since what this device knows about its own copy, chiefly
+    /// whether it has been read, is not the sending device's to overwrite.
+    ///
+    /// The body arrives with it now, so a caught-up article is readable rather
+    /// than a title and a link waiting for a fetch that may find nothing.
     @discardableResult
     static func apply(
         _ record: CKRecord, into database: AppDatabase, read: Set<ArticleFingerprint>, at now: Date = Date()
@@ -171,12 +243,24 @@ nonisolated enum CatchUpHeaders {
                     guid: header.guid,
                     url: header.url.flatMap(URL.init(string:)),
                     title: header.title,
+                    excerpt: header.excerpt,
+                    author: header.author,
+                    language: header.language,
                     publishedAt: header.publishedAt,
                     receivedAt: now,
                     isRead: read.contains(ArticleFingerprint(feedURL: feedURL, guid: header.guid))
                 )
-                entry.hasMedia = false
+                entry.hasMedia = header.hasMedia ?? false
+                entry.imageURL = header.imageURL.flatMap(URL.init(string:))
                 try entry.insert(db)
+
+                if let html = SyncRecords.expanded(header.body) {
+                    try EntryBody(
+                        entryID: entry.id,
+                        sanitizedHTML: html,
+                        plainText: HTMLSanitizer.plainText(html)
+                    ).insert(db)
+                }
                 added += 1
             }
             return added

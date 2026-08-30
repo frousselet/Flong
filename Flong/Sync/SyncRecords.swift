@@ -44,8 +44,14 @@ nonisolated enum SyncRecords {
         "read-\(kind.rawValue)-\(period)"
     }
 
-    static func name(forCatchUpFeed url: URL, day: String) -> String {
-        "catchup-" + digest(url.absoluteString) + "-" + day
+    /// One feed, one day, one chunk of it.
+    ///
+    /// The chunk is what keeps a busy day inside a record. CloudKit takes about
+    /// a megabyte of fields, and a day of a wire service carrying its articles
+    /// whole goes past that : the day is cut into as many records as it needs,
+    /// numbered from zero, and a day that fits is simply `-0`.
+    static func name(forCatchUpFeed url: URL, day: String, chunk: Int = 0) -> String {
+        "catchup-" + digest(url.absoluteString) + "-" + day + "-" + String(chunk)
     }
 
     /// The same record, carrying the tag the server expects.
@@ -207,14 +213,14 @@ nonisolated enum SyncRecords {
 
     // MARK: - Bytes
 
-    private static func compressed(_ text: String?) -> Data? {
+    static func compressed(_ text: String?) -> Data? {
         guard let text, !text.isEmpty else { return nil }
         let data = Data(text.utf8)
         guard let compressed = try? (data as NSData).compressed(using: .lzfse) as Data else { return data }
         return compressed.count < data.count ? compressed : data
     }
 
-    private static func expanded(_ data: Data?) -> String? {
+    static func expanded(_ data: Data?) -> String? {
         guard let data, !data.isEmpty else { return nil }
         if let expanded = try? (data as NSData).decompressed(using: .lzfse) as Data {
             return String(decoding: expanded, as: UTF8.self)

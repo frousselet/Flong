@@ -621,9 +621,12 @@ final class AppModel {
     }
 
     /// Frees what the stream is holding, which is what a full iCloud calls for.
+    ///
+    /// Explicitly bounded, since nothing is thrown away on its own any more :
+    /// asking for space back is the one time a reader means it.
     func purge() async {
         do {
-            let summary = try await retention.purge()
+            let summary = try await retention.purge(.bounded)
             Log.store.notice("Purged \(summary.removed) articles on request")
             await load()
         } catch {
