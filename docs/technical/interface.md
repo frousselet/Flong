@@ -151,6 +151,12 @@ A region rather than a value : what is wanted is the news that something moved, 
 
 **Pull to refresh stays, on the front page only.** It is no longer how the page keeps up, and it is still how a reader says now rather than soon : the clock is ten minutes and politeness may defer beyond it, Low Power Mode and an expensive network both suppress the background pass deliberately, and iOS may grant no background slot for hours. One place to say it is enough, and the front page is where a reader is when they wonder. The wire has none : it is a list of what has arrived, and what arrives reaches it on its own. A Mac has no pull at all and keeps the command, in the place a Mac keeps commands.
 
+**A pull ends when the fetching ends.** SwiftUI holds the refresh control out until the work the gesture started returns, so whatever that work waits for is how long the page sits pushed down by the spinner's height with the large title still open.
+
+It used to wait for the whole digest rebuild, which runs the model over the backlog with no deadline : a headline written and a subject filed for every story that has just arrived, one call apiece, seconds each. On a device with Apple Intelligence and a page of new stories that is minutes of gesture. It looked exactly like a scroll view stuck in the wrong place, and it was a refresh that had not finished. It never showed on a simulator, where there is no model and both jobs return on their first step.
+
+So the gesture is the fetching and the grouping, which is what a reader means by a refresh and is bounded by the network's own timeouts. The model's work carries on behind it : those are resumable jobs, the window follows the store, and each headline appears as it is written.
+
 **The gesture writes, and reads nothing back.** SwiftUI holds the refresh control out until the work the gesture started returns, and retracts it afterwards. Replacing the page's content as the last thing before returning has the scroll view begin that retraction against content it has never laid out : the space left for the spinner is never reclaimed, and the page stays wedged down by exactly its height with the large title still open, which is how it was reported.
 
 So a pull fetches and rebuilds, and touches nothing the window is showing. The window follows the store, waits for the gesture to be over and the control to have had time to retract, and then reads itself back. Nothing moves while anything is holding the page down.
