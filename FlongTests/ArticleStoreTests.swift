@@ -117,6 +117,53 @@ struct ArticleStoreTests {
         #expect(counts[second.id] == 1)
     }
 
+    // MARK: - The shape of a week
+
+    @Test("Arrivals are counted in the reader's own days")
+    func dailyCounts() async throws {
+        let calendar = Calendar.current
+        let feed = try await feed("https://a.example.com/f.xml")
+        let today = calendar.startOfDay(for: now)
+        let yesterday = try #require(calendar.date(byAdding: .day, value: -1, to: today))
+        let lastWeek = try #require(calendar.date(byAdding: .day, value: -8, to: today))
+
+        // Every article at noon, so that no timezone this suite is run in
+        // moves one of them into the day next door.
+        for (day, titles) in [(today, ["a", "b", "c"]), (yesterday, ["d"]), (lastWeek, ["e", "f"])] {
+            for title in titles {
+                try await add(title, feed: feed, published: day.addingTimeInterval(3600 * 12))
+            }
+        }
+
+        let counts = try await articles.dailyCounts(.all, now: now)
+
+        #expect(counts[today] == 3)
+        #expect(counts[yesterday] == 1)
+        #expect(counts[lastWeek] == 2)
+        // A day nothing came in on is absent rather than zero : the chart fills
+        // the week itself, and a query that invented rows would have to know
+        // how far back to invent them.
+        #expect(counts[try #require(calendar.date(byAdding: .day, value: -2, to: today))] == nil)
+    }
+
+    @Test("What the list never shows is never counted either")
+    func dailyCountsMatchTheList() async throws {
+        let calendar = Calendar.current
+        let feed = try await feed("https://a.example.com/f.xml")
+        let today = calendar.startOfDay(for: now)
+        let noon = today.addingTimeInterval(3600 * 12)
+
+        try await add("kept", feed: feed, published: noon)
+        try await add("read", feed: feed, published: noon, isRead: true)
+        try await add("hidden", feed: feed, published: noon, isHidden: true)
+
+        // A bar taller than the list under it is a bar that lies, so the
+        // counts pass through exactly the view the list was built from.
+        #expect(try await articles.dailyCounts(.all, now: now)[today] == 2)
+        #expect(try await articles.dailyCounts(.unread, now: now)[today] == 1)
+        #expect(try await articles.dailyCounts(.starred, now: now)[today] == nil)
+    }
+
     // MARK: - Reading and starring
 
     @Test("Reading and starring take effect at once")
