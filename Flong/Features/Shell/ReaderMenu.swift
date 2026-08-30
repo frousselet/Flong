@@ -21,6 +21,10 @@ import SwiftUI
 /// Not an account. There is no account, nothing here belongs to anyone but the
 /// person holding the device, and the face on the button is the reader's own
 /// picture rather than a sign that they are signed in to something.
+///
+/// The sources are not in it. They were, and they were the one thing in it a
+/// reader opens often : a thing opened often is a button, not a line in a menu.
+/// They sit in the opposite corner instead, where ``SourcesButton`` puts them.
 struct ReaderMenu: View {
     let model: AppModel
     let open: (Route) -> Void
@@ -42,12 +46,6 @@ struct ReaderMenu: View {
             }
 
             Divider()
-
-            Button {
-                open(.sources)
-            } label: {
-                Label("Sources", systemImage: "square.stack")
-            }
 
             Button {
                 open(.topics)
@@ -111,5 +109,41 @@ struct ReaderMark: View {
         .frame(width: side, height: side)
         .clipShape(.circle)
         .accessibilityHidden(true)
+    }
+}
+
+/// The way to the sources, in the corner opposite the reader's own menu.
+///
+/// One press rather than two. Everything else the menu holds is opened once in
+/// a while and reasoned about ; the sources are opened to add a feed, to read
+/// one on its own, or to see what the machinery is doing, which is often
+/// enough to be worth a corner of its own.
+///
+/// The three sections a reader reads in carry it. Search does not : its bar
+/// belongs to the field, and a reader who is searching is not organizing.
+struct SourcesButton: View {
+    let open: (Route) -> Void
+
+    var body: some View {
+        Button {
+            open(.sources)
+        } label: {
+            Label("Sources", systemImage: "square.stack")
+        }
+    }
+}
+
+nonisolated extension ToolbarItemPlacement {
+    /// The corner opposite the reader's own menu.
+    ///
+    /// The two platforms name it differently and neither will answer to the
+    /// other's name : `topBarLeading` is declared on macOS and marked
+    /// unavailable there, and a Mac window's leading edge is `navigation`.
+    static var sectionLeading: ToolbarItemPlacement {
+        #if os(iOS)
+            .topBarLeading
+        #else
+            .navigation
+        #endif
     }
 }

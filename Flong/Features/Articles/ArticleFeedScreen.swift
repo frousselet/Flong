@@ -93,6 +93,11 @@ struct ArticleFeedScreen: View {
         // where you are without ever saying it was worth a line.
         .navigationTitle(title)
         .toolbar {
+            if let menu {
+                ToolbarItem(placement: .sectionLeading) {
+                    SourcesButton(open: menu)
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 if let menu {
                     ReaderMenu(model: model, open: menu)
