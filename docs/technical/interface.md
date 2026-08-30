@@ -41,7 +41,9 @@ On macOS the same five sections become a sidebar, through `tabViewStyle(.sidebar
 
 An editorial page without pictures is a page of grey, and a page where every picture is the same size is a list. So there is a hierarchy of exactly one : **the first story runs its picture across the column**, in a band rather than a square, above a larger headline ; everything below it keeps its picture to a square at the side. That is how a front page has said what matters for two centuries, and it costs one line of code to say it.
 
-Sixteen by nine across a column of six hundred and eighty points is a picture four hundred points tall, which is one story per screen and a front page that says nothing at all. The band is `Editorial.bandAspect`, two point two to one : the same picture, and the rest of the page given back.
+Every picture is shown at three by two, lead and thumbnail alike. That is what a camera takes and therefore what a publisher's picture already is : any other ratio is a crop, and a crop is a decision about somebody else's photograph. One ratio for the whole page rather than a band above and squares beside, since a column whose pictures are all the same shape has a rhythm and one whose pictures each have their own does not.
+
+It is `Editorial.pictureAspect`, named once. Across a column of six hundred and eighty points a lead runs to four hundred and fifty, which is most of an iPad screen : the trade is fewer stories at a glance in exchange for pictures nobody has cropped.
 
 Beside a picture on a phone the facts line runs out of room, and a line that wraps to hyphenate `rédac-tions` is worse than a line that says less. `ViewThatFits` drops the sparkline first, then the article count : what survives is who is talking and when they last did, which is the irreducible part.
 
