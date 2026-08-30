@@ -841,16 +841,6 @@
         }
       }
     },
-    "Happening now" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "En cours"
-          }
-        }
-      }
-    },
     "Header %@" : {
       "localizations" : {
         "fr" : {
@@ -957,6 +947,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "A fonctionné %@"
+          }
+        }
+      }
+    },
+    "Live stories" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fils actifs"
           }
         }
       }

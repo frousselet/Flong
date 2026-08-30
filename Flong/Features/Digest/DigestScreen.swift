@@ -99,7 +99,10 @@ struct DigestScreen: View {
             header {
                 HStack(spacing: 7) {
                     LiveDot()
-                    Text("Happening now")
+                    // The dot's own colour at the quiet end of its pulse : the
+                    // dot is the loud thing and the word is what it means, so
+                    // the pair reads as one mark rather than as two red things.
+                    Text("Live stories").foregroundStyle(LiveDot.quietTint)
                 }
             }
             ForEach(model.digest.live) { story in
