@@ -532,6 +532,16 @@
         }
       }
     },
+    "Fetching the full article": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Récupération de l'article complet"
+          }
+        }
+      }
+    },
     "Fetching your feeds": {
       "localizations": {
         "fr": {
@@ -919,6 +929,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "Partager"
+          }
+        }
+      }
+    },
+    "Show the full article": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher l'article complet"
+          }
+        }
+      }
+    },
+    "Show what the feed sent": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher ce qu'a envoyé le flux"
           }
         }
       }

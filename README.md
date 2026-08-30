@@ -12,6 +12,8 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **Stream and library are two different things.** The stream is a disposable cache, rebuildable at any time from the sources, purged by age and volume. The library is what you chose to keep : its content is frozen at that moment, so it survives the article disappearing from its feed, and it is never purged.
 
+**A truncated article is completed from its page.** Most feeds send a standfirst and a link. Open the article and Flong fetches the page behind it, once, keeps what it finds beside what the feed sent, and lets you read either.
+
 **Search is genuinely indexed.** A full-text index over the whole local corpus, a query language with operators, and semantic search over the library through Spotlight.
 
 **Enrichment happens on the device.** Classification, tagging and summaries come from the system model, in your own language whatever language the articles are in, and no article content is sent anywhere.
@@ -99,6 +101,7 @@ The interface is authored in English and translated to French. All strings live 
 | [`docs/technical/feed-identity.md`](docs/technical/feed-identity.md) | How a feed is identified, and what happens when the same address is subscribed twice |
 | [`docs/technical/opml.md`](docs/technical/opml.md) | What the OPML import reads, and how it copes with a malformed file |
 | [`docs/technical/html.md`](docs/technical/html.md) | How feed HTML is parsed, and the whitelist it is reduced to |
+| [`docs/technical/extraction.md`](docs/technical/extraction.md) | How the rest of a truncated article is fetched from its page |
 | [`docs/technical/feed-formats.md`](docs/technical/feed-formats.md) | The formats Flong reads, and what it does with a broken one |
 | [`docs/technical/fetching.md`](docs/technical/fetching.md) | How feeds are asked for, and how publishers are treated |
 | [`docs/technical/ingestion.md`](docs/technical/ingestion.md) | What happens between a fetched feed and the store, and what bounds it |

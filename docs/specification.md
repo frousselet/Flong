@@ -80,7 +80,7 @@ A single application, shared code, distinct interface layers per platform.
 | `Fetcher` | outgoing requests, HTTP conditionality, politeness, scheduling |
 | `Parser` | RSS, Atom, JSON Feed, h-feed, normalization |
 | `Sanitizer` | whitelist-based HTML sanitization |
-| `Extractor` | full-text extraction, reader mode |
+| `Extractor` | full-text extraction, reader mode. `docs/technical/extraction.md` |
 | `Store` | SQLite through GRDB, migrations, purge |
 | `Indexer` | FTS5 for the stream, Core Spotlight for the library |
 | `Search` | The query language, and its compilation to SQL |
