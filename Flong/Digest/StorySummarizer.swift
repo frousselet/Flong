@@ -110,7 +110,11 @@ nonisolated struct StorySummarizer: Sendable {
         guard OnDeviceModel.isAvailable, !articles.isEmpty else { return fallback }
 
         do {
-            let session = LanguageModelSession(instructions: instructions)
+            let session = LanguageModelSession(model: OnDeviceModel.model(), instructions: instructions)
+            // Free, and the one place it buys anything : the assets load while
+            // the prompt is being measured below, which is a real await rather
+            // than a wait invented to give this something to overlap with.
+            session.prewarm()
             // The language is said twice, in the instructions and again beside
             // the articles. A small model answers in the language of the words
             // nearest its answer, and three English headlines are nearer than
@@ -128,7 +132,7 @@ nonisolated struct StorySummarizer: Sendable {
             // bounded by the six articles and the two hundred and forty
             // characters each that go into it.
             if #available(iOS 26.4, macOS 26.4, *) {
-                let model = SystemLanguageModel.default
+                let model = OnDeviceModel.model()
                 let cost = try await model.tokenCount(for: prompt)
 
                 guard cost + Self.reservedTokens < model.contextSize else {
@@ -137,7 +141,11 @@ nonisolated struct StorySummarizer: Sendable {
                 }
             }
 
-            let response = try await session.respond(to: prompt, generating: GeneratedBrief.self)
+            let response = try await session.respond(
+                to: prompt,
+                generating: GeneratedBrief.self,
+                options: OnDeviceModel.options(maximumTokens: Self.reservedTokens)
+            )
             let generated = response.content
 
             let title = generated.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -164,7 +172,12 @@ nonisolated struct StorySummarizer: Sendable {
                 )
             }
 
-            guard Self.isWritten(in: locale, title: title, summary: summary) else {
+            // Only when the reader's language is what was asked for. A model
+            // that does not write it is asked for the articles' language
+            // instead, deliberately, and demanding the reader's language of an
+            // answer nobody asked in that language rejected every brief and
+            // left the whole page wearing its articles' own headlines.
+            guard !OnDeviceModel.writes(locale) || Self.isWritten(in: locale, title: title, summary: summary) else {
                 // Asked once more, in the same session so the model can see what
                 // it just wrote. Measured : the first answer comes back in the
                 // language of the articles about half the time whatever the
@@ -219,11 +232,17 @@ nonisolated struct StorySummarizer: Sendable {
         -> StoryBrief
     {
         do {
-            let response = try await session.respond(to: complaint, generating: GeneratedBrief.self)
+            let response = try await session.respond(
+                to: complaint,
+                generating: GeneratedBrief.self,
+                options: OnDeviceModel.options(maximumTokens: Self.reservedTokens)
+            )
             let title = response.content.title.trimmingCharacters(in: .whitespacesAndNewlines)
             let summary = response.content.summary.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            guard !title.isEmpty, Self.isWritten(in: locale, title: title, summary: summary) else {
+            guard !title.isEmpty,
+                !OnDeviceModel.writes(locale) || Self.isWritten(in: locale, title: title, summary: summary)
+            else {
                 Log.enrich.notice("A brief came back wrong twice and was left to its article")
                 return fallback.asked(in: locale)
             }

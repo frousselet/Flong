@@ -74,6 +74,15 @@ nonisolated struct TopicNamer: Sendable {
     /// What the model picks when the vocabulary has nothing for this story.
     static let noneOfThese = "None of these"
 
+    /// What a filing answer is allowed to cost.
+    ///
+    /// Two short labels chosen from a list. The cap is loose enough that a
+    /// structured answer is never cut off in the middle, which would come back
+    /// as a `decodingFailure` and read as a refusal.
+    static let filingTokens = 128
+    /// A field is one or two words, and the check that follows rejects more.
+    static let namingTokens = 64
+
     let locale: Locale
 
     init(locale: Locale = .current) {
@@ -101,8 +110,15 @@ nonisolated struct TopicNamer: Sendable {
 
         do {
             let schema = try Self.schema(for: vocabulary)
-            let session = LanguageModelSession(instructions: instructions)
-            let response = try await session.respond(to: Self.prompt(headline, summary: summary), schema: schema)
+            // The general model, and not `contentTagging`, which looks like the
+            // obvious choice and was measured to be worse. See
+            // ``OnDeviceModel/model(for:)``.
+            let session = LanguageModelSession(model: OnDeviceModel.model(), instructions: instructions)
+            let response = try await session.respond(
+                to: Self.prompt(headline, summary: summary),
+                schema: schema,
+                options: OnDeviceModel.options(maximumTokens: Self.filingTokens)
+            )
 
             let chosen = try response.content.value([String].self, forProperty: "subjects")
             OnDeviceModel.succeeded()
@@ -126,6 +142,9 @@ nonisolated struct TopicNamer: Sendable {
 
         do {
             let session = LanguageModelSession(
+                // Naming is writing, not tagging : the general model, which is
+                // the one that writes the reader's language.
+                model: OnDeviceModel.model(),
                 instructions: """
                     You name the field of interest a news headline belongs to.
                     A field is what a section of a newspaper is called : it outlives any one story.
@@ -140,7 +159,11 @@ nonisolated struct TopicNamer: Sendable {
                 \(OnDeviceModel.languageReminder(for: locale))
                 """
 
-            var response = try await session.respond(to: asked, generating: GeneratedTopic.self)
+            var response = try await session.respond(
+                to: asked,
+                generating: GeneratedTopic.self,
+                options: OnDeviceModel.options(maximumTokens: Self.namingTokens)
+            )
             var name = response.content.name.trimmingCharacters(in: .whitespacesAndNewlines)
 
             // Measured : asked once, it answers with the headline about half
@@ -148,7 +171,8 @@ nonisolated struct TopicNamer: Sendable {
             if !Self.isField(name, of: headline) {
                 response = try await session.respond(
                     to: "That is the story, not the field it belongs to. Answer with the field.",
-                    generating: GeneratedTopic.self
+                    generating: GeneratedTopic.self,
+                    options: OnDeviceModel.options(maximumTokens: Self.namingTokens)
                 )
                 name = response.content.name.trimmingCharacters(in: .whitespacesAndNewlines)
             }

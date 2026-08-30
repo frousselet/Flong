@@ -422,6 +422,10 @@ Constraints built in from the start :
 
 In practice, classification and tagging fit the budget in a single pass, and summarizing a long article takes two.
 
+**The framework gives the on-device model and nothing else.** There is no cloud, server or remote option in its interface : Apple's own features route to Private Cloud Compute, an application's own prompts cannot. That happens to agree with section 3, which would not have it either.
+
+What the framework does offer is used, and set in one place : the permissive content-transformation guardrails, since what is asked for is a transformation of articles the reader already receives and the default set refuses a great deal of ordinary news ; greedy sampling, so a rebuild does not rewrite a page the reader was reading ; a cap on the answer ; and the locale check, which decides what language to ask for rather than whether to ask. The tuned `contentTagging` model was measured against the general one for filing and is worse at it, which `docs/technical/digest.md` records.
+
 Anything produced automatically is flagged as such in the interface and in exports.
 
 **What the model writes is written in the reader's language**, not in the language of the articles. Someone watching a subject follows the press that covers it, whatever it is written in, and a digest half in one language and half in another is one the reader has to translate themselves. The articles keep their own language ; only the headline and the line above them are written. A language the model does not support falls back to the articles' own, since a model asked for a language it does not speak answers in a mixture of the two.
