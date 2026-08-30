@@ -221,6 +221,46 @@
         }
       }
     },
+    "%lld new subjects" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld new subject"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld new subjects"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld nouveau thème"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld nouveaux thèmes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld results" : {
       "localizations" : {
         "en" : {
@@ -982,6 +1022,26 @@
         }
       }
     },
+    "New subject" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau thème"
+          }
+        }
+      }
+    },
+    "New subjects" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveaux thèmes"
+          }
+        }
+      }
+    },
     "No feed was found at this address." : {
       "localizations" : {
         "fr" : {
@@ -1093,6 +1153,26 @@
         }
       }
     },
+    "Notifications" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications"
+          }
+        }
+      }
+    },
+    "Notifications are turned off for Flong in the system settings, so nothing here can be switched on until they are allowed again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les notifications sont désactivées pour Flong dans les réglages système : rien ici ne peut être activé tant qu'elles ne sont pas autorisées à nouveau."
+          }
+        }
+      }
+    },
     "OK" : {
       "localizations" : {
         "fr" : {
@@ -1109,6 +1189,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrir dans le navigateur"
+          }
+        }
+      }
+    },
+    "Open the system settings" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir les réglages système"
           }
         }
       }
@@ -1585,6 +1675,16 @@
         }
       }
     },
+    "The model reads your front page and sorts it into subjects. Flong can tell you when it finds one it has never used before, which is usually a subject the press has just started covering." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le modèle lit votre une et la trie en thèmes. Flong peut vous prévenir lorsqu'il en trouve un qu'il n'avait jamais utilisé, ce qui est en général un thème que la presse vient de se mettre à couvrir."
+          }
+        }
+      }
+    },
     "The rest" : {
       "localizations" : {
         "fr" : {
@@ -1721,6 +1821,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En attente d'iCloud"
+          }
+        }
+      }
+    },
+    "What Flong tells you" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que Flong vous signale"
           }
         }
       }

@@ -113,6 +113,7 @@ The interface is authored in English and translated to French. All strings live 
 | [`docs/technical/search.md`](docs/technical/search.md) | The index, the query language, and why nothing typed into it is ever run |
 | [`docs/technical/marks.md`](docs/technical/marks.md) | What a mark is, why the library went, and what Spotlight is told |
 | [`docs/technical/sync.md`](docs/technical/sync.md) | What travels between devices, what never does, and why the record budget shapes it |
+| [`docs/technical/notifications.md`](docs/technical/notifications.md) | What Flong may interrupt you for, and the rules it interrupts you under |
 | [`docs/technical/background.md`](docs/technical/background.md) | How long work survives being interrupted, and how the marked articles are searched by meaning |
 | [`docs/technical/digest.md`](docs/technical/digest.md) | How articles become stories, and why not with the vectors |
 | [`docs/technical/interface.md`](docs/technical/interface.md) | How the interface is set, where Liquid Glass is allowed, and what was rejected |

@@ -59,6 +59,12 @@ struct ReaderMenu: View {
                 Label("Subscribed sites", systemImage: "key")
             }
 
+            Button {
+                open(.notifications)
+            } label: {
+                Label("Notifications", systemImage: "bell")
+            }
+
             Divider()
 
             Button {

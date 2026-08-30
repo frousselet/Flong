@@ -22,6 +22,7 @@ nonisolated enum Route: Hashable {
     case profile
     case topics
     case subscribedSites
+    case notifications
 }
 
 /// Which part of the application the reader is in.
@@ -138,6 +139,30 @@ struct AppShell: View {
             Task { await model.importOPML(from: url) }
         }
         .task {
+            // Before anything else that could take a while : a notification
+            // tapped from a cold start has been waiting since before the
+            // window existed, and the reader is looking at the wrong page
+            // until it is claimed.
+            NotificationRouter.shared.listen { subject in
+                section = .digest
+                digestPath = []
+                model.digestTopic = .named(subject)
+            }
+
+            // The background tasks were registered while the application
+            // launched, before there was a window or a model to do the work.
+            // This is where they are given one. Without it both tasks run and
+            // call into nothing, which is what they had been doing.
+            FlongApp.work.set(
+                refresh: { @MainActor in await model.backgroundRefresh() },
+                process: { @MainActor in await model.backgroundProcessing() }
+            )
+            BackgroundScheduler.schedule()
+
+            // A window that opens in the background has no phase change to
+            // learn from, and `onChange` only fires on a change.
+            model.isReading = scenePhase == .active
+
             await model.load()
             await model.rebuildDigest()
             await model.startSync()
@@ -145,7 +170,17 @@ struct AppShell: View {
             await model.refreshDue()
         }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
+            // What the reader is looking at decides whether Flong may
+            // interrupt them about something on that very page.
+            model.isReading = phase == .active
+
+            guard phase == .active else {
+                // Asked for on the way out, which is when iOS wants it : a task
+                // is submitted for an application that has stopped, and the
+                // request is replaced rather than duplicated.
+                BackgroundScheduler.schedule()
+                return
+            }
             Task { await model.refreshDue() }
         }
         .alert(
@@ -216,6 +251,9 @@ struct AppShell: View {
 
         case .subscribedSites:
             SubscribedSitesScreen(model: model)
+
+        case .notifications:
+            NotificationsScreen(model: model)
         }
     }
 

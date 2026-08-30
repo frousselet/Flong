@@ -12,6 +12,7 @@
 import Foundation
 import OSLog
 import SwiftUI
+import UserNotifications
 
 @main
 struct FlongApp: App {
@@ -41,6 +42,12 @@ struct FlongApp: App {
             refresh: { await FlongApp.work.refresh() },
             process: { await FlongApp.work.process() }
         )
+
+        // Same deadline, different reason : a notification tapped from a cold
+        // start is handed over once, to whoever is the delegate by the time
+        // launching finishes, and dropped if nobody is. Setting it asks for
+        // nothing and prompts for nothing.
+        UNUserNotificationCenter.current().delegate = NotificationRouter.shared
     }
 
     var body: some Scene {
