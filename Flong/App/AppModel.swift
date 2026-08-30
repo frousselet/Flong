@@ -105,6 +105,16 @@ final class AppModel {
     /// How many articles arrived on each day of the view being shown, keyed by
     /// the local day. What the chart above the stream is drawn from.
     private(set) var dailyCounts: [Date: Int] = [:]
+
+    /// The squares on the collections page.
+    private(set) var collections: [LibraryCollection] = []
+
+    /// What is in the collection the reader has opened.
+    ///
+    /// Held here rather than in the screen alone so that opening one of them
+    /// knows it came from the library : an article the window cannot place is
+    /// looked for in the stream, where a kept copy is not.
+    private(set) var collectionArticles: [ArticleSummary] = []
     private(set) var article: Article?
     /// Whether the page an article lives at is being fetched, so the reader is
     /// told rather than left wondering why the text is short.
@@ -734,6 +744,24 @@ final class AppModel {
         }
     }
 
+    // MARK: - Collections
+
+    func loadCollections() async {
+        do {
+            collections = try await library.collections()
+        } catch {
+            Log.store.error("The collections could not be read : \(error, privacy: .public)")
+        }
+    }
+
+    func loadCollection(_ kind: LibraryCollection.Kind) async {
+        do {
+            collectionArticles = try await library.summaries(in: kind)
+        } catch {
+            Log.store.error("A collection could not be read : \(error, privacy: .public)")
+        }
+    }
+
     /// Opens an article, wherever it was tapped.
     func open(article id: UUID) async {
         selectedArticle = id
@@ -746,7 +774,7 @@ final class AppModel {
             return
         }
 
-        let known = summaries + storyArticles.values.flatMap { $0 } + looseArticles
+        let known = summaries + storyArticles.values.flatMap { $0 } + looseArticles + collectionArticles
         let origin = known.first { $0.id == selectedArticle }?.origin ?? .stream
 
         do {

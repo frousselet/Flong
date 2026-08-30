@@ -50,9 +50,56 @@ struct StoreTests {
             applied == [
                 "v1.model", "v2.search", "v3.readStates", "v4.stories", "v5.covers", "v6.topics",
                 "v7.briefLanguage", "v8.recordTags", "v9.askAgain", "v10.topicPreferences",
-                "v11.severalTopics", "v12.duplicates", "v13.keyWhatIsAlreadyHere", "v14.vocabulary", "v15.askedOnce",
+                "v11.severalTopics", "v12.duplicates", "v13.keyWhatIsAlreadyHere", "v14.vocabulary",
+                "v15.askedOnce", "v16.whyItWasKept",
             ]
         )
+    }
+
+    @Test("The migration that froze the star carries over what was already starred")
+    func starIsCarriedOver() throws {
+        let queue = try DatabaseQueue()
+        // The schema as it stood before the star was written on the copy.
+        try AppDatabase.migrator.migrate(queue, upTo: "v15.askedOnce")
+
+        let feed = UUID.v7()
+        let starred = UUID.v7()
+        let plain = UUID.v7()
+        try queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO feed (id, url, title, folder, created_at) VALUES (?, ?, ?, NULL, ?)",
+                arguments: [feed, "https://a.example.com/f.xml", "A", Date()]
+            )
+            for (id, isStarred) in [(starred, true), (plain, false)] {
+                try db.execute(
+                    sql: """
+                        INSERT INTO entry (id, feed_id, guid, title, received_at, is_starred)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                    arguments: [id, feed, "urn:\(id)", "Title", Date(), isStarred]
+                )
+                try db.execute(
+                    sql: """
+                        INSERT INTO library_item (id, entry_id, guid, title, promoted_at)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                    arguments: [UUID.v7(), id, "urn:\(id)", "Title", Date()]
+                )
+            }
+        }
+
+        try AppDatabase.migrator.migrate(queue)
+
+        // A reader who starred things before the update finds them in their
+        // favourites afterwards, which is the whole reason the migration
+        // backfills rather than starting the column empty.
+        let carried = try queue.read { db in
+            try UUID.fetchAll(
+                db,
+                sql: "SELECT entry_id FROM library_item WHERE starred_at IS NOT NULL"
+            )
+        }
+        #expect(carried == [starred])
     }
 
     @Test("A feed, an article and its body round trip with every column filled")

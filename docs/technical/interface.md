@@ -109,6 +109,18 @@ So the strip stands on one piece of glass, shaped like the pills the front page 
 
 **Pinned is not the same as in front.** A section header pinned in a lazy stack is drawn under the rows unless it is lifted, and a headline crossing the chart was drawn on top of it.
 
+## Collections, in squares
+
+What the reader kept is shown as a grid and not as a line. A list is right for things read one after another, which is what the stream is ; what was kept is not read in order, it is gone back to, and going back to something means finding it. A square carries a picture, and a picture is found faster than a line of type. It is the shape Photos gives the same idea, which means a reader has met it before.
+
+**The page is in three parts, and their order is the argument.** What the reader marked comes first and wears no heading, a heading over two squares everybody has being a heading that says nothing : favourites is what they starred, notes is what they wrote on. Then what they made themselves, under their own name, which draws nothing until there is something. Then the months, which fall out of when a copy was kept and cost nobody any tidying.
+
+**Everything a square knows, it knows from the copy.** A kept article points at the article it came from with `ON DELETE SET NULL`, so anything asked of that row is an answer that disappears the day retention runs. Starring lived on the stream row alone, which meant a collection of favourites would have emptied itself on the first purge : the star is written on the copy now, and the migration that added it carried over what was already starred. The library exists precisely so that what was kept survives its source, and a collection is not allowed to be the exception.
+
+**Grouping by newsroom was tried and taken out.** It made a band of squares nobody had asked for, between the two the reader had made and the months : a page of squares is a page a reader scans, and a scan is spoiled by the row that is there because it could be.
+
+**A square is square.** Everything else on the page is set at three by two, which is the shape a photograph arrives in. A grid is a different argument : equal cells are what let the eye run down it, and a square is the only shape that stays equal in both directions. The mark of what the square holds is drawn under the picture rather than instead of it, so a cover that is slow or that never answers leaves no hole in the grid.
+
 ## The reader's menu
 
 One button in the same corner of every section, holding what the reader has decided. It sat in the digest alone at first, which made it the digest's menu rather than the reader's : what it holds belongs to the person and not to the page, and a thing that belongs to the person is in the same place wherever they are.

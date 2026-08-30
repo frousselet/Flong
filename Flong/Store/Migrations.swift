@@ -101,6 +101,29 @@ nonisolated extension AppDatabase {
             }
         }
 
+        // Why a kept article was kept, written on the copy rather than read
+        // back off the article it came from.
+        //
+        // Starring lived on the stream row alone, and a library item points at
+        // that row with `ON DELETE SET NULL` : the day retention purges the
+        // article, a starred item quietly stops being starred. The library
+        // exists precisely so that what was kept survives its source, and a
+        // collection of favourites that empties itself on a purge is the
+        // clearest possible way to break that promise.
+        //
+        // Backfilled from the stream while the rows are still there.
+        migrator.registerMigration("v16.whyItWasKept") { db in
+            try db.alter(table: "library_item") { table in
+                table.add(column: "starred_at", .datetime)
+            }
+            try db.execute(
+                sql: """
+                    UPDATE library_item SET starred_at = promoted_at
+                    WHERE entry_id IN (SELECT id FROM entry WHERE is_starred = 1)
+                    """
+            )
+        }
+
         return migrator
     }
 

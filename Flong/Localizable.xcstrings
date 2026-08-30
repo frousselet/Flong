@@ -538,6 +538,26 @@
         }
       }
     },
+    "By month" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par mois"
+          }
+        }
+      }
+    },
+    "By source" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par source"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "localizations" : {
         "fr" : {
@@ -869,6 +889,17 @@
         }
       }
     },
+    "My collections" : {
+      "comment" : "The band of squares the reader made deliberately",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mes collections"
+          }
+        }
+      }
+    },
     "No feed was found at this address." : {
       "localizations" : {
         "fr" : {
@@ -919,6 +950,17 @@
         }
       }
     },
+    "Notes" : {
+      "comment" : "The collection of articles the reader wrote something on",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notes"
+          }
+        }
+      }
+    },
     "Nothing has been filed under this subject yet." : {
       "localizations" : {
         "fr" : {
@@ -945,6 +987,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rien pour l'instant"
+          }
+        }
+      }
+    },
+    "Nothing kept yet" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien de conservé"
           }
         }
       }
@@ -1245,6 +1297,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sources"
+          }
+        }
+      }
+    },
+    "Star an article, or write a note on one, and it is kept here for good." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mettez un article en favori, ou écrivez une note dessus, et il est conservé ici pour de bon."
           }
         }
       }
