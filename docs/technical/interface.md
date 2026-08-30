@@ -133,6 +133,8 @@ Notes and the months are in neither menu. An article joins notes by being writte
 
 **A square is square.** Everything else on the page is set at three by two, which is the shape a photograph arrives in. A grid is a different argument : equal cells are what let the eye run down it, and a square is the only shape that stays equal in both directions. The mark of what the square holds is drawn under the picture rather than instead of it, so a cover that is slow or that never answers leaves no hole in the grid.
 
+**A heading takes the colour of the mark beside it.** The live band is the one place on the page with a colour of its own, and the dot and the word are one mark : the word is set in the dot's colour at the quiet end of its pulse, so the dot stays the loud half and the pair reads as one thing. Both come from `LiveDot`, named rather than written twice, since two literals that happen to agree today are two literals that stop agreeing the first time one of them is changed.
+
 ## The reader's menu
 
 One button in the same corner of every section, holding what the reader has decided. It sat in the digest alone at first, which made it the digest's menu rather than the reader's : what it holds belongs to the person and not to the page, and a thing that belongs to the person is in the same place wherever they are.

@@ -70,15 +70,33 @@ nonisolated extension View {
 /// and one that is moving has a moving dot. It stops entirely when the reader
 /// has asked for less motion.
 struct LiveDot: View {
+    /// The colour of the dot, and of anything that names it.
+    ///
+    /// Named rather than written twice : a heading beside the dot has to be the
+    /// dot's own colour, and two literals that happen to agree today are two
+    /// literals that stop agreeing the first time one of them is changed.
+    static let tint = Color.red
+
+    /// How faint the dot goes at the bottom of its pulse.
+    ///
+    /// A heading beside it takes this rather than the full colour : the dot is
+    /// the loud thing and the word is what it means, so the word sits at the
+    /// quiet end of the same breath and the pair reads as one mark rather than
+    /// as two red things competing.
+    static let faded = 0.55
+
+    /// The colour a heading beside the dot is set in.
+    static var quietTint: Color { tint.opacity(faded) }
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isPulsing = false
 
     var body: some View {
         Circle()
-            .fill(.red)
+            .fill(Self.tint)
             .frame(width: 7, height: 7)
             .scaleEffect(isPulsing ? 1.35 : 1)
-            .opacity(isPulsing ? 0.55 : 1)
+            .opacity(isPulsing ? Self.faded : 1)
             .animation(
                 reduceMotion ? nil : .easeInOut(duration: 1.1).repeatForever(autoreverses: true),
                 value: isPulsing
