@@ -48,6 +48,14 @@ nonisolated final class ImageStore: Sendable {
     /// back into view runs its task again, so one broken favicon in a list is
     /// one fetch and one decode per appearance, and one line in the console
     /// each time. A cache rather than a set, so it empties itself.
+    ///
+    /// **Only what will never be a picture goes in here.** It used to take
+    /// anything that failed to decode, and a download cut short fails to decode
+    /// : a picture whose bytes were truncated once, which is what happens when
+    /// sixty feeds and their photographs are fetched at the same moment, was
+    /// refused for the rest of the process. Nothing cleared it but quitting the
+    /// application, which is exactly how it was reported : the lead story's
+    /// photograph missing until a relaunch.
     private let refused = NSCache<NSString, NSNumber>()
     private let session: URLSession
     private static let log = Logger(subsystem: "com.rslt.Flong", category: "images")
@@ -110,37 +118,67 @@ nonisolated final class ImageStore: Sendable {
             Self.log.notice("Picture too large, ignored : \(data.count, privacy: .public) bytes")
             return nil
         }
-        guard let image = Self.thumbnail(from: data, maximumPixels: maximumPixels) else {
+        switch Self.decode(data, maximumPixels: maximumPixels) {
+        case .picture(let image):
+            memory.setObject(Cached(image), forKey: key)
+            return image
+
+        case .notAPicture:
             refused.setObject(1, forKey: url.absoluteString as NSString)
             return nil
-        }
 
-        memory.setObject(Cached(image), forKey: key)
-        return image
+        case .cutShort:
+            // Worth asking for again : what arrived was the beginning of a
+            // picture, and the next attempt may get the rest of it.
+            return nil
+        }
     }
 
-    /// Whether there is a picture in there at all.
+    /// What a set of bytes turned out to be.
+    private enum Decoded {
+        case picture(CGImage)
+        /// Bytes that are not a picture and will not become one however often
+        /// they are asked for : a redirect page, an address that was never a
+        /// picture, a file whose data is broken.
+        case notAPicture
+        /// The beginning of a picture. A download cut short leaves a source of
+        /// the right type and not enough of it.
+        case cutShort
+    }
+
+    /// Whether a source that will not decode is one worth asking for again.
     ///
-    /// A source is made from any bytes at all and says nothing about it :
-    /// asking such a one for a thumbnail is what puts
-    /// `failed to create thumbnail [-50]` in the reader's console, once per
-    /// attempt, with the type printed as `n/a` because there is not one. A
-    /// server answering a redirect page, or an address that was never a
-    /// picture, lands here.
+    /// **The status is what tells the two apart, and conflating them is what
+    /// lost the pictures.** A source is made from any bytes at all and says
+    /// nothing about it : asking such a one for a thumbnail is what puts
+    /// `failed to create thumbnail [-50]` in the reader's console, with the
+    /// type printed as `n/a` because there is not one. A redirect page or an
+    /// address that was never a picture lands there and is never worth asking
+    /// for again.
     ///
-    /// The status matters as much as the type : a download cut short leaves a
-    /// source of the right type and not enough of it, which fails the same way
-    /// and just as loudly.
-    private static func holdsAPicture(_ source: CGImageSource) -> Bool {
-        CGImageSourceGetType(source) != nil
-            && CGImageSourceGetCount(source) > 0
-            && CGImageSourceGetStatus(source) == .statusComplete
+    /// A download cut short fails in exactly the same place and is the opposite
+    /// case : the bytes are the beginning of a real picture, and the next
+    /// attempt may well get the rest. Refusing those was how one busy moment,
+    /// sixty feeds and their photographs arriving at once, cost a story its
+    /// photograph for the whole life of the process.
+    private static func isWorthAskingAgain(_ status: CGImageSourceStatus) -> Bool {
+        switch status {
+        case .statusIncomplete, .statusReadingHeader, .statusUnexpectedEOF: true
+        default: false
+        }
     }
 
     /// The encoded bytes, decoded once, at the size they are needed.
-    private static func thumbnail(from data: Data, maximumPixels: Int) -> CGImage? {
+    private static func decode(_ data: Data, maximumPixels: Int) -> Decoded {
         let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary)
-        guard let source, Self.holdsAPicture(source) else { return nil }
+        guard let source, CGImageSourceGetType(source) != nil, CGImageSourceGetCount(source) > 0 else {
+            return .notAPicture
+        }
+
+        let status = CGImageSourceGetStatus(source)
+        guard status == .statusComplete else {
+            return isWorthAskingAgain(status) ? .cutShort : .notAPicture
+        }
 
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -150,7 +188,12 @@ nonisolated final class ImageStore: Sendable {
             kCGImageSourceShouldCacheImmediately: true,
             kCGImageSourceThumbnailMaxPixelSize: maximumPixels,
         ]
-        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
+            // Complete, typed, and still unusable : the file is broken rather
+            // than half here, and asking again would break the same way.
+            return .notAPicture
+        }
+        return .picture(image)
     }
 }
 
