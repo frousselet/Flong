@@ -155,7 +155,26 @@ struct DigestScreen: View {
 
     @ViewBuilder
     private var stories: some View {
-        if !model.digest.live.isEmpty {
+        // **The page and its lead are read once, together.**
+        //
+        // The lead was worked out by a computed property the row closure
+        // called. A `LazyVStack` calls that closure when it gets round to
+        // building the row, which can be long after the page was laid out and
+        // outside the pass that tracks what the page depends on : the row then
+        // compared a story from the array it had been handed with a lead
+        // worked out from whatever the store held at that later moment. After
+        // a refresh the two disagreed, every row answered `false`, the page
+        // ran without a lead at all, and nothing ever put it back, since
+        // nothing had recorded that the row depended on the lead.
+        //
+        // Read here, into a value the closures capture, the two cannot come
+        // apart : the story is from this array and the lead is from the same
+        // read of the same page.
+        let live = model.digest.live
+        let rest = model.digest.stories
+        let lead = live.first?.id ?? rest.first?.id
+
+        if !live.isEmpty {
             header {
                 HStack(spacing: 7) {
                     LiveDot()
@@ -165,12 +184,12 @@ struct DigestScreen: View {
                     Text("Live stories").foregroundStyle(LiveDot.quietTint)
                 }
             }
-            ForEach(model.digest.live) { story in
-                row(story)
+            ForEach(live) { story in
+                row(story, isLead: story.id == lead)
             }
         }
 
-        if !model.digest.stories.isEmpty {
+        if !rest.isEmpty {
             // Not "Front page" : that is what the pill above already says, and
             // a page does not need to name itself twice.
             header {
@@ -179,8 +198,8 @@ struct DigestScreen: View {
                 case .named(let topic): Text(verbatim: topic)
                 }
             }
-            ForEach(model.digest.stories) { story in
-                row(story)
+            ForEach(rest) { story in
+                row(story, isLead: story.id == lead)
             }
         }
 
@@ -203,19 +222,20 @@ struct DigestScreen: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func row(_ story: DigestStory) -> some View {
-        StoryRow(story: story, isLead: story.id == leadID, zoom: zoom) {
-            open(.story(story.id))
-        }
-    }
-
     /// The first story on the page runs its picture across the column.
     ///
     /// A page where every story is the same size is a list, and a list makes the
     /// reader do the ranking the digest exists to do. One lead, and the rest set
     /// smaller, is how a front page has said what matters for two centuries.
-    private var leadID: UUID? {
-        model.digest.live.first?.id ?? model.digest.stories.first?.id
+    ///
+    /// Which one that is arrives as an argument rather than being worked out
+    /// here : ``stories`` reads the page and its lead in one go, and a row that
+    /// asked the store again would be asking at a moment of the layout's
+    /// choosing.
+    private func row(_ story: DigestStory, isLead: Bool) -> some View {
+        StoryRow(story: story, isLead: isLead, zoom: zoom) {
+            open(.story(story.id))
+        }
     }
 
     /// An empty page, an empty subject and an empty account are three
