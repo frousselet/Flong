@@ -294,14 +294,69 @@ nonisolated extension AppDatabase {
         //
         // The old column stays and stays true. Reading it is how this is
         // backfilled, and a reader's own subject is still their own.
+        // The values are written out rather than taken from `TopicKind`, which
+        // no longer has a case for `smart` : a shipped migration describes what
+        // a store went through and may not change its meaning because the type
+        // above it did.
         migrator.registerMigration("v21.threeKindsOfSubject") { db in
             try db.alter(table: "topic") { table in
-                table.add(column: "kind", .text).notNull().defaults(to: TopicKind.smart.rawValue)
+                table.add(column: "kind", .text).notNull().defaults(to: "smart")
             }
+            try db.execute(sql: "UPDATE topic SET kind = ? WHERE is_own = 1", arguments: ["own"])
+        }
+
+        // The model may no longer name a subject.
+        //
+        // What it had already named is the question this answers. Those names
+        // were a drift of near synonyms of the sections that existed anyway, in
+        // whichever language the articles happened to be written in, and the
+        // catalogue is fifty names deep now rather than thirteen.
+        //
+        // **A subject the reader spoke about becomes theirs.** They pressed it
+        // up or down, so it is a name they had an opinion about, and a
+        // preference nobody can find is a preference nobody can undo.
+        // Everything else goes.
+        //
+        // **A filing goes with the subject it names.** `story_topic` has no key
+        // on `topic`, so a filing left behind is a pill the reader can see on
+        // the front page and cannot find, cannot manage and cannot remove.
+        //
+        // **And a story left under nothing is asked about again.** It was
+        // answered by a vocabulary that no longer exists, so the answer no
+        // longer stands ; without this it would keep its stamp and never be
+        // filed again, which is the fault `docs/technical/digest.md` records.
+        migrator.registerMigration("v22.twoKindsOfSubject") { db in
             try db.execute(
-                sql: "UPDATE topic SET kind = ? WHERE is_own = 1",
-                arguments: [TopicKind.own.rawValue]
+                sql: """
+                    UPDATE topic SET kind = 'own', is_own = 1
+                    WHERE kind = 'smart' AND name IN (SELECT name FROM topic_preference)
+                    """
             )
+            try db.execute(
+                sql: "DELETE FROM story_topic WHERE name IN (SELECT name FROM topic WHERE kind = 'smart')"
+            )
+            try db.execute(sql: "DELETE FROM topic WHERE kind = 'smart'")
+            try db.execute(
+                sql: """
+                    UPDATE story SET topics_asked_at = NULL
+                    WHERE topics_asked_at IS NOT NULL
+                      AND id NOT IN (SELECT story_id FROM story_topic)
+                    """
+            )
+
+            // The column still defaulted to a value that no longer names
+            // anything, which is a trap for whoever next writes raw SQL against
+            // this table. SQLite cannot alter a default, so the table is built
+            // again ; it holds tens of rows.
+            try db.create(table: "topic_rebuilt") { table in
+                table.primaryKey("name", .text)
+                table.column("is_own", .boolean).notNull().defaults(to: false)
+                table.column("created_at", .datetime).notNull()
+                table.column("kind", .text).notNull().defaults(to: "standard")
+            }
+            try db.execute(sql: "INSERT INTO topic_rebuilt SELECT name, is_own, created_at, kind FROM topic")
+            try db.drop(table: "topic")
+            try db.rename(table: "topic_rebuilt", to: "topic")
         }
 
         return migrator

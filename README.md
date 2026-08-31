@@ -12,7 +12,7 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **Every article you have ever received stays, and so does what you said about it.** There is one notion of an article and no second copy of anything. Star one, write on one, file one in a collection, and that mark is carried on the article itself : it follows you to your other devices, and an article carrying one is never purged, whatever you ask the store to free.
 
-**Sources you pay for stay readable.** A per-subscriber feed address, HTTP Basic or a token, kept in the keychain. For a site whose articles sit behind a wall, sign in on its own page and Flong fetches the rest as you — it never holds your password.
+**Sources you pay for stay readable.** A per-subscriber feed address, HTTP Basic or a token, kept in the keychain. For a site whose articles sit behind a wall, sign in on its own page and Flong fetches the rest as you : it never holds your password.
 
 **A truncated article is completed from its page.** Most feeds send a standfirst and a link. An article opens on what its feed sent ; ask for the whole one and Flong fetches the page behind it, once, and keeps what it finds beside the feed's version.
 
@@ -28,7 +28,7 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 | ---------- | --------- | ------- |
 | ![The digest on iPad](docs/images/digest-ipad.png) | ![The page narrowed to one subject](docs/images/topic-ipad.png) | ![A story on iPad](docs/images/story-ipad.png) |
 
-The pills are the subjects the system model found across the page, pinned at its head. Tapping one narrows the page to it ; the others stay, so there is always a way back. A long press says more of this, or less of this, and the page reorders itself.
+The pills are the subjects the system model filed the page under, pinned at its head. Tapping one narrows the page to it ; the others stay, so there is always a way back. A long press says more of this, or less of this, and the page reorders itself.
 
 | An article | Stream | Sources |
 | ---------- | ---- | ------- |

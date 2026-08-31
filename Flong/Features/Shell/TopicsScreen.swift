@@ -27,29 +27,22 @@ struct TopicsScreen: View {
 
     var body: some View {
         List {
-            // Three bands, in the order a reader meets them : the sections
-            // they already knew before opening this, then the ones they wrote,
-            // then what the model made of their own page. A band with nothing
-            // in it is not drawn at all, heading included.
+            // Two bands, in the order a reader meets them : the ones they
+            // wrote, then the sections they already knew before opening this.
+            // There was a third, what the model had named itself ; it names
+            // nothing now. A band with nothing in it is not drawn at all,
+            // heading included.
             group(
                 .own,
                 titled: Text("Your own subjects"),
-                saying: Text("Yours to add and to remove. The model reaches for them as readily as its own.")
+                saying: Text("Yours to add and to remove. The model reaches for them as readily as the sections.")
             )
 
             group(
                 .standard,
                 titled: Text("Standard subjects"),
                 saying: Text(
-                    "The sections every reader has. The model files each story under one of these or one of yours, and then adds what it found the story is actually about."
-                )
-            )
-
-            group(
-                .smart,
-                titled: Text("Found by the model"),
-                saying: Text(
-                    "What the model named itself, beside the section it filed the story under."
+                    "The sections every reader has. The model files each story under one or two of these, or of yours, and can write none of its own."
                 )
             )
 
@@ -79,7 +72,7 @@ struct TopicsScreen: View {
             Button("Add") { Task { await model.addTopic(name) } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The model files stories under the subjects you have, and reaches for yours as readily as its own.")
+            Text("The model files stories under the subjects you have, and can write none of its own.")
         }
         #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -89,7 +82,10 @@ struct TopicsScreen: View {
                 ContentUnavailableView {
                     Label("No subjects yet", systemImage: "square.stack.3d.up")
                 } description: {
-                    Text(OnDeviceModel.absence ?? "Subjects appear once the model has read a page of stories.")
+                    Text(
+                        OnDeviceModel.absence
+                            ?? "Subjects appear once the model has read a page of stories. Yours can be added at any time."
+                    )
                 }
             }
         }
@@ -116,14 +112,7 @@ struct TopicsScreen: View {
     private func row(_ topic: TopicPreferences.Known) -> some View {
         let content = HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                // The model's own wear its mark, here as on the page : a
-                // standard section and one the reader wrote are things they
-                // decided, and this is the model's reading of their page.
-                if topic.kind == .smart {
-                    Text(Image(systemName: "sparkles")) + Text(verbatim: " ") + Text(verbatim: topic.name)
-                } else {
-                    Text(verbatim: topic.name)
-                }
+                Text(verbatim: topic.name)
                 // The band above says whose it is, so the line under the name
                 // says only how much of the page it covers.
                 Text("\(topic.stories) stories")

@@ -420,7 +420,7 @@ struct ExclusiveRefreshTests {
         )
     }
 
-    @Test("A second catch-up while one is running is refused, not queued")
+    @Test("A catch-up nobody watched stands aside for one already running")
     func concurrentCatchUps() async throws {
         try await subscriptions.subscribe(
             to: Subscription(url: server.url.appending(path: "f.xml"), title: "F")
@@ -434,12 +434,23 @@ struct ExclusiveRefreshTests {
         // publishers the same question at the same second, each unaware of the
         // other. What a publisher sees is what this is about.
         async let first: Void = model.catchUp(.reader)
-        async let second: Void = model.catchUp(.clock)
-        _ = await (first, second)
+        await started()
+        await model.catchUp(.clock)
+        await first
 
         #expect(server.requests.count == 1)
         // And the gate is given back, so the next one is not refused for ever.
         #expect(!model.isRefreshing)
+    }
+
+    /// Waits until the pass that was just started has actually taken the gate.
+    ///
+    /// Two `async let`s start in whichever order the runtime chooses, and which
+    /// of them takes the gate first is the whole of what these tests are about.
+    private func started() async {
+        for _ in 0..<1000 where !model.isRefreshing {
+            await Task.yield()
+        }
     }
 
     @Test("The reader's command waits its turn rather than being refused in silence")
@@ -451,8 +462,9 @@ struct ExclusiveRefreshTests {
         defer { server.reset() }
 
         async let pass: Void = model.backgroundProcessing()
-        async let asked: Void = model.refreshAll()
-        _ = await (pass, asked)
+        await started()
+        await model.refreshAll()
+        await pass
 
         // Standing aside is right for a clock tick, which nobody watched. It is
         // wrong for a command or a gesture : the reader made a deliberate

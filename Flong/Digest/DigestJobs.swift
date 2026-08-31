@@ -24,10 +24,9 @@ import OSLog
 /// the subjects drift, and a preference the reader attached to a name that no
 /// longer exists is a preference silently thrown away.
 ///
-/// One story per call, each against the vocabulary the reader already has. A
-/// story that fits nothing in it gets one new subject, folded against the
-/// vocabulary before it is kept, so a second spelling of something that exists
-/// is not a second subject.
+/// One story per call, each against the vocabulary the reader already has,
+/// which is the seeded catalogue of sections plus whatever they wrote. The
+/// model adds nothing to it.
 ///
 /// Re-reading what is already filed is what `rewrite` is for, and it is the
 /// reader who asks for it.
@@ -94,10 +93,9 @@ nonisolated struct FileStoriesJob: ResumableJob {
         // Read once, and allowed to throw. It was read afresh inside the loop
         // and its failure swallowed, so a read that went wrong put the model in
         // front of an empty list and every story of the batch was stamped as
-        // answered by a question that was never put. The vocabulary the model
-        // chooses from does not change while a batch runs : what a filing adds
-        // is a subject of the model's own, and those are deliberately never
-        // shown back to it.
+        // answered by a question that was never put. Nothing a filing does
+        // changes the vocabulary, so once per batch is once too often rather
+        // than too few.
         let settled = try await preferences.settled()
         guard !settled.isEmpty else {
             Log.enrich.notice("No subject to file a story under yet, so nothing was asked")
@@ -109,27 +107,18 @@ nonisolated struct FileStoriesJob: ResumableJob {
         for story in stories {
             guard OnDeviceModel.isAvailable else { break }
 
-            // **Two passes, and they ask different questions.** The first files
-            // the story under something a reader recognizes, from the sections
-            // every newspaper has and whatever they wrote themselves. The
-            // second lets the model name what the story is actually about.
-            // `Politique` and `Réforme des retraites` are both true of one
-            // story, the first says what kind of news it is and the second
-            // says what it is, and a page wants both.
-            var filed: [String]
+            // **One pass, and one question.** There were two : the story was
+            // filed under something a reader recognizes, and then the model was
+            // let name what the story was actually about. What came of the
+            // second was a drift of near synonyms of the first, in whichever
+            // language the articles happened to be in. The catalogue of
+            // sections is fifty names deep now, which is what the second pass
+            // was really reaching for.
+            let filed: [String]
 
             switch await namer.file(story.title, summary: story.summary, into: settled) {
             case .chosen(let chosen):
                 filed = chosen
-
-                // And then one of the model's own, beside it. Folded against
-                // the whole vocabulary before it is kept, so a second spelling
-                // of something that exists is not a second subject.
-                if let proposed = await namer.newSubject(for: story.title, summary: story.summary, besides: settled),
-                    let smart = try? await preferences.record(proposed), !filed.contains(smart)
-                {
-                    filed.append(smart)
-                }
 
             case .declined:
                 // The model will not write about this story, and will not next

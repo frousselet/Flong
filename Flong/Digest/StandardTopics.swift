@@ -13,40 +13,127 @@ import Foundation
 
 /// The sections a newspaper has always had.
 ///
-/// **A vocabulary the reader does not have to build.** The model used to start
-/// with nothing and name every subject itself, so the first weeks of a library
-/// were a drift of near-synonyms and the reader had nothing to hold an opinion
-/// about until the drift settled. These are there from the first launch : the
-/// names any reader already knows, because every paper and every news
-/// application has used them for a century.
+/// **A vocabulary the reader does not have to build, and the only one the model
+/// may use.** The model used to name subjects of its own when nothing it was
+/// shown fitted, and the first weeks of a library were a drift of near
+/// synonyms : `Science` beside `Sciences`, `Sports` beside `Sport`, the English
+/// word for a section the reader already had. It names nothing now. What exists
+/// is this catalogue and whatever the reader writes themselves, and a story is
+/// filed under one or two of those or under nothing.
+///
+/// **Fifty, because the model cannot invent past the end of the list.** Thirteen
+/// was a set of desks and everything finer landed on the nearest one ; a gap in
+/// a list nothing may go outside of is a story misfiled for ever. Fifty is
+/// enough that most stories meet something exact, and few enough that a reader
+/// can hold an opinion about each name.
+///
+/// **`Société` and `Culture` are last on purpose.** They are the two that sort
+/// nothing, and they are kept because they are the fallbacks and because
+/// thirteen years of stores already carry them. The model reads the list in
+/// order and is told to prefer the most exact subject that fits, so it should
+/// meet them after everything that says something.
+///
+/// **The names are English here and French in the catalogue.** The catalogue's
+/// source language is English, so an English key with a French translation is
+/// the way round it is meant to be ; it was the other way about, which made
+/// every section a French word hard-coded in Swift.
 ///
 /// **They are seeded and then ordinary.** Nothing keeps them apart afterwards
 /// except that the reader may not delete them : a story is filed under one the
 /// same way it is filed under any other, and a preference attached to one works
-/// the same. What they buy is a page that reads sensibly on its first day.
+/// the same.
 ///
 /// **Stored in the reader's language, like everything else the model writes.**
 /// A subject is a string in the store, and the model is shown strings and
 /// answers with them ; a key resolved at each draw would have to be resolved
 /// for the model too, which would mean translating what it answers back. The
-/// cost is the one the model's own subjects already carry : a reader who
-/// changes language keeps the names they had.
+/// cost is that a reader who changes language keeps the names they had.
 nonisolated enum StandardTopics {
     /// The list, in the order a page would print them.
     static let all: [LocalizedStringResource] = [
-        "Politique",
+        // Public life
+        "Politics",
         "International",
-        "Économie",
-        "Société",
-        "Écologie",
-        "Sciences",
-        "Technologie",
-        "Santé",
-        "Culture",
-        "Sport",
-        "Éducation",
+        "European Union",
+        "Elections",
+        "Defence",
         "Justice",
-        "Médias",
+        "Immigration",
+        "Human rights",
+        "Local news",
+
+        // Money and work
+        "Economy",
+        "Business",
+        "Employment",
+        "Finance",
+        "Consumer",
+        "Housing",
+        "Agriculture",
+        "Industry",
+        "Energy",
+        "Transport",
+
+        // Living
+        "Education",
+        "Health",
+        "Food",
+        "Religion",
+        "Crime",
+        "Environment",
+        "Climate",
+        "Weather",
+
+        // Science and technology
+        "Science",
+        "Technology",
+        "Artificial intelligence",
+        "Software",
+        "Cybersecurity",
+        "Privacy",
+        "Social media",
+        "Telecoms",
+        "Space",
+        "Travel",
+
+        // Culture
+        "Media",
+        "Cinema",
+        "TV series",
+        "Music",
+        "Books",
+        "Art",
+        "Architecture",
+        "Fashion",
+        "Video games",
+        "History",
+
+        // Sport, and the two that sort nothing
+        "Sport",
+        "Society",
+        "Culture",
+    ]
+
+    /// Sections that have been renamed, as the name they had and the name they
+    /// have.
+    ///
+    /// **A section is known by its name and by nothing else.** `Topic.name`,
+    /// `story_topic.name` and `topic_preference.name` are all the resolved
+    /// string, so renaming one without moving the other two leaves the stories
+    /// filed under a name that no longer exists and the reader's opinion
+    /// attached to it.
+    ///
+    /// It is done at seeding rather than in a migration because the stored name
+    /// is in the reader's language, and a migration runs before anything has
+    /// asked what that language is.
+    ///
+    /// `Écologie` is the one that forced this. In French it names the political
+    /// movement first, so a story about the party filed under it rather than
+    /// under `Politique` ; and in English the same key was translated `Climate`,
+    /// which would have folded a whole ecology backlog into the narrower
+    /// `Climat` this catalogue adds beside it.
+    static let renamed: [(was: LocalizedStringResource, now: LocalizedStringResource)] = [
+        (was: "Écologie", now: "Environment")
     ]
 
     /// The names as this reader reads them.
@@ -54,40 +141,10 @@ nonisolated enum StandardTopics {
         resolve(all, in: locale)
     }
 
-    /// The words that name the news itself rather than a field of it.
-    ///
-    /// **`Actualité` is the failure this exists for.** It is true of every
-    /// story on the page, so filing under it sorts nothing and a pill wearing
-    /// it is a pill that says `everything`. A subject earns its place by
-    /// telling one story apart from the rest, and a word that would fit every
-    /// article ever published cannot do that whatever else is true of it.
-    ///
-    /// The same argument as the one that rules a headline : every word has to
-    /// carry information, and `Le numérique en question` carries none. This is
-    /// that rule applied to a single word, where it is at its sharpest.
-    ///
-    /// Whole names only, folded. `Actualité internationale` is narrower than
-    /// the page and is left alone ; it is `Actualité` on its own that says
-    /// nothing.
-    static let namesForNewsItself: [LocalizedStringResource] = [
-        "Actualité",
-        "Actualités",
-        "Informations",
-        "Divers",
-        "Général",
-        "Résumé",
-        "Titres",
-        "Sujets",
-    ]
-
-    /// The words for news in general, as this reader reads them and as the
-    /// catalogue's own language spells them.
-    ///
-    /// Both, because a model asked for French answers in English often enough
-    /// to be worth the second list, and a subject that says nothing says
-    /// nothing in either language.
-    static func generalNames(for locale: Locale = .current) -> [String] {
-        resolve(namesForNewsItself, in: locale) + resolve(namesForNewsItself, in: Locale(identifier: "en"))
+    /// The renamings as this reader reads them, old name and new.
+    static func renamings(for locale: Locale = .current) -> [(String, String)] {
+        renamed.map { (resolve([$0.was], in: locale)[0], resolve([$0.now], in: locale)[0]) }
+            .filter { $0.0 != $0.1 }
     }
 
     private static func resolve(_ names: [LocalizedStringResource], in locale: Locale) -> [String] {
