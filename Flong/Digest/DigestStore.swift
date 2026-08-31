@@ -77,6 +77,11 @@ nonisolated struct DigestStory: Identifiable, Hashable, Sendable {
     let isLive: Bool
     /// The picture of the most recent article that has one.
     let imageURL: URL?
+    /// The room whose article that picture came with.
+    ///
+    /// A story is several rooms and the picture is one room's, so the marks
+    /// beside the headline do not answer which. The page credits it.
+    let imageCredit: String?
     /// The subjects the model put it under, which may be none and may be
     /// several : a story is rarely about one thing.
     let topics: [String]
@@ -386,6 +391,11 @@ nonisolated struct DigestStore: Sendable {
             marks.append(FeedMark(room: room))
         }
 
+        // The newest article that has a picture, kept whole : the page shows
+        // the picture and says which room it came with, and the two must be
+        // the same article or the credit is a lie.
+        let pictured = members.sorted { $0.date > $1.date }.first { $0.imageURL != nil }
+
         return DigestStory(
             id: story.id,
             title: story.title,
@@ -400,7 +410,8 @@ nonisolated struct DigestStore: Sendable {
             isLive: isLive,
             // The latest article to carry a picture, since a story is shown for
             // where it has got to rather than for where it started.
-            imageURL: members.sorted { $0.date > $1.date }.lazy.compactMap(\.imageURL).first,
+            imageURL: pictured?.imageURL,
+            imageCredit: pictured.map(Self.room(of:)),
             topics: topics
         )
     }

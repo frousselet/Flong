@@ -22,7 +22,7 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **Enrichment happens on the device.** Classification, tagging and summaries come from the system model, in your own language whatever language the articles are in, and no article content is sent anywhere.
 
-**It is set like a page, not like a control panel.** One column at a time, held to a readable measure, serif headlines, hairline rules, no cards and no boxes. Liquid Glass stays in the navigation layer, where Apple puts it, and never in the content.
+**It is set like a page, not like a control panel.** One column at a time, held to a readable measure, serif headlines, hairline rules, no cards and no boxes. Liquid Glass stays in the navigation layer, where Apple puts it, apart from the subject pills and the credit in the corner of a picture.
 
 ## Screenshots
 

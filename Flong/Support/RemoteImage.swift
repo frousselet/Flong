@@ -208,8 +208,119 @@ nonisolated final class ImageStore: Sendable {
 /// worse than no photograph, and a page of them looks broken. The picture is
 /// decorative and hidden from VoiceOver : feeds almost never carry alternative
 /// text, and reading a headline out twice helps nobody.
+/// Who a picture came with, set inside it.
+///
+/// **A picture on the page belongs to somebody, and the page says who.** Only
+/// the address is ever stored : the file stays the publisher's and is asked for
+/// from their own server when a screen shows it, so the least a screen owes
+/// them is a line saying whose it is. A story is several rooms and the picture
+/// is one room's, which the marks beside the headline do not answer.
+///
+/// **The name and nothing else.** A caption was set under the picture first,
+/// reading `Image via Le Monde`, and it cost a line of the page under every
+/// picture on it to say a thing a name already says : a name in the corner of a
+/// photograph is a credit by the oldest convention there is, and nobody has to
+/// be told what it is doing there. The words survive as the accessibility
+/// label, where there is no corner to put a name in.
+///
+/// **And never a byline.** What Flong knows is the article the picture arrived
+/// with, and nothing else : the publisher may have credited an agency, a
+/// photographer or nobody at all, and none of that reaches a feed. This says
+/// where the picture came from and makes no claim about who made it.
+///
+/// **On glass, which is the one place in the content it is allowed.** Text laid
+/// straight over a photograph is unreadable on half the photographs there are,
+/// and the usual answer is a scrim, which is a dark band across a picture the
+/// reader came to look at. The pill is the size of the name, it takes what is
+/// under it and keeps the picture whole around it. It is a handful per screen
+/// rather than one per row, which is what the hairline edge of a picture
+/// refused glass for.
+struct PictureCredit: View {
+    /// How large the pill is drawn.
+    ///
+    /// **Two sizes, and not one scaled down.** A credit is set against the
+    /// picture it belongs to, not against the page : the same pill that reads
+    /// as a caption in the corner of a lead running the whole measure is a
+    /// label stuck across the corner of a ninety-six point thumbnail. What has
+    /// to stay constant is the share of the picture it takes, which means the
+    /// pill and the type inside it both come down together.
+    enum Size {
+        /// A picture running the whole measure : the lead, and a story page.
+        case full
+        /// A picture beside a story or an article, ninety-six points wide.
+        case compact
+
+        /// A text style where there is room for one, and a fixed size where
+        /// there is not.
+        ///
+        /// The lead runs the whole measure, so its credit grows with the
+        /// reader's type size like everything else on the page. A thumbnail is
+        /// ninety-six points wide whatever the type size, so a pill that grew
+        /// inside it would end up being the picture : what a reader who cannot
+        /// read nine points needs there is the name read out, and the
+        /// accessibility label is where it is.
+        var font: Font {
+            switch self {
+            case .full: .caption2
+            case .compact: .system(size: 9)
+            }
+        }
+
+        /// How much of the pill is air around the name.
+        var padding: (horizontal: CGFloat, vertical: CGFloat) {
+            switch self {
+            case .full: (7, 3)
+            case .compact: (5, 2)
+            }
+        }
+
+        /// How far the pill sits in from the corner of the picture.
+        var inset: CGFloat {
+            switch self {
+            case .full: 5
+            case .compact: 4
+            }
+        }
+    }
+
+    /// The publisher whose article the picture came with.
+    let domain: String?
+    var size = Size.full
+
+    @Environment(\.publishers) private var publishers
+
+    @ViewBuilder
+    var body: some View {
+        if let domain {
+            let name = publishers[domain]?.name ?? domain
+
+            // Verbatim : a publisher's name is either an address or something
+            // the reader wrote, and neither is translated.
+            //
+            // **One line, shrunk to fit, and never cut.** A credit ending in
+            // `theguard…` credits nobody. Wrapping was tried : two lines of it
+            // fill most of a thumbnail and break the name across a hyphen, so
+            // the pill ends up being the picture. Shrinking is what is left,
+            // and at the compact size it is reached only by a name longer than
+            // any address, which a thumbnail cannot hold legibly by any means.
+            Text(verbatim: name)
+                .font(size.font)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .padding(.horizontal, size.padding.horizontal)
+                .padding(.vertical, size.padding.vertical)
+                .glassEffect(.regular, in: .capsule)
+                .padding(size.inset)
+                .accessibilityLabel(Text("Picture via \(name)"))
+        }
+    }
+}
+
 struct RemoteImage: View {
     let url: URL?
+    /// The publisher whose article the picture came with, credited in the
+    /// corner of it. Drawn only where there is a picture to credit.
+    var credit: String?
     /// A fixed side, for a picture that must be square whatever it holds :
     /// a source's own mark, which is square by every convention there is.
     var side: CGFloat?
@@ -255,13 +366,26 @@ struct RemoteImage: View {
     var body: some View {
         Group {
             if let image {
+                // The picture is decorative and hidden from VoiceOver ; the
+                // credit over it is not, being the only place the attribution
+                // is written at all.
                 framed(Image(decorative: image, scale: displayScale).resizable().scaledToFill())
+                    .accessibilityHidden(true)
+                    .overlay(alignment: .bottomTrailing) {
+                        PictureCredit(domain: credit, size: creditSize)
+                    }
             } else if isLoading, url != nil {
                 framed(Rectangle().fill(.quaternary))
+                    .accessibilityHidden(true)
             }
         }
-        .accessibilityHidden(true)
         .task(id: url) { await load() }
+    }
+
+    /// How large the credit is drawn : the picture's own size decides it, so a
+    /// call site cannot ask for a lead's caption on a thumbnail.
+    private var creditSize: PictureCredit.Size {
+        (width ?? side) == nil ? .full : .compact
     }
 
     @ViewBuilder

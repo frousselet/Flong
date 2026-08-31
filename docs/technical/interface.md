@@ -31,7 +31,11 @@ Apple's guidance for the 2026 material is explicit : glass is the layer that flo
 
 Flong broke it once. A hand-rolled floating bar in `safeAreaBar(edge: .bottom)`, drawn with `glassEffect`, collided on iPhone with the system search field, which is also glass : two blurred capsules overlapping, each refracting the other. The fix was not to tune the material but to delete the bar. The sections are a system `TabView`, the search tab carries `role: .search` so the system puts search where the system puts search, and `tabBarMinimizeBehavior(.onScrollDown)` gets the bar out of the way when the reader scrolls into something.
 
-The application draws glass in exactly one place of its own : the subject pills at the top of the digest. That is the same rule, not an exception to it. A pill is a control floating over the page, which is the layer the material is for, and the row sits in the content and scrolls away with it rather than pinning itself under the tab bar, where it would be glass directly under glass.
+The application draws glass of its own in two kinds of place, and both are the same rule rather than exceptions to it.
+
+**The subject pills at the top of the digest** are controls floating over the page, which is the layer the material is for, and the row sits in the content and scrolls away with it rather than pinning itself under the tab bar, where it would be glass directly under glass.
+
+**The credit in the corner of a picture** is the other case, and it is not a control. It is the one thing on the page that has to stay readable over an image nobody chose, and text laid straight on a photograph is unreadable on half the photographs there are. The usual answer is a scrim, which is a dark band across a picture the reader came to look at ; a pill the size of a name takes what is under it and leaves the picture whole around it. It is a handful per screen rather than one per row, which is what the hairline edge of a picture refused glass for.
 
 Everywhere else the glass on screen is the system's.
 
@@ -66,6 +70,22 @@ On the digest the mark stands **in place of the count of rooms**. `4 rédactions
 Three addresses are tried, in order : **what one of its feeds states**, since the publisher chose it ; **`apple-touch-icon.png`**, a well-known path, square by convention and large enough to stay crisp where a sixteen pixel favicon would not ; and **`favicon.ico`**, the oldest well-known path and still the most widely served, since browsers ask for it whether a page mentions it or not. The well-known ones hang off the root of the site, never off the page a feed happens to point at.
 
 Nothing is asked for until a row is on screen, and what comes back is kept on disk, so a publisher costs one request rather than one per appearance. One that answers none of the three wears the generic mark : a list must keep its column of marks whether a publisher serves one or not, which is the one place a picture does not simply vanish when it fails.
+
+## Every picture is credited
+
+**A picture on the page belongs to somebody, and the page says who.** Only the address is ever stored : the file stays the publisher's and is asked for from their own server when a screen shows it, so the least a screen owes them is a name saying whose it is. A story is several rooms and the picture is one room's, which the marks beside the headline do not answer.
+
+**The name, in the corner of the picture, on a pill of glass.** A caption was set under the picture first, reading `Image via Le Monde`, and it cost a line of the page under every picture on it to say what a name already says : a name in the corner of a photograph is a credit by the oldest convention there is, and nobody has to be told what it is doing there. The words survive as the accessibility label, where there is no corner to put a name in.
+
+**Never a byline.** What Flong knows is the article the picture arrived with, and nothing else : the publisher may have credited an agency, a photographer or nobody at all, and none of that reaches a feed. A credit reading `Photo Le Monde` would attribute the picture to whoever happened to run it, which is a thing nobody here knows.
+
+**Two sizes, and not one scaled down.** A credit is set against the picture it belongs to and not against the page : the pill that reads as a caption in the corner of a lead running the whole measure is a label stuck across the corner of a ninety-six point thumbnail. What stays constant is the share of the picture it takes, so the pill and the type inside it come down together — eleven points and nine, and the air around the name with them.
+
+The lead's is a text style and grows with the reader's type size like everything else on the page. The thumbnail's is a fixed nine points, and that is the one place a fixed size is right : the picture is ninety-six points wide whatever the type size, so a pill that grew inside it would end up being the picture. What a reader who cannot read nine points needs there is the name read out, and the accessibility label is where it is.
+
+**One line, and never cut.** A credit ending in `theguard…` credits nobody. Wrapping was tried and two lines fill most of a thumbnail and break the name across a hyphen, so the pill ends up being the picture that way too. Shrinking is what is left, and at the compact size it is reached only by a name longer than any address, which a thumbnail cannot hold legibly by any means.
+
+It is shown at both sizes and on the story page, since a credit paid on the lead and withheld from the rest would be a courtesy shown to whichever publisher happened to be first that morning, and one that lasted only as long as a glance. **An article row carries none**, and does not need one : the row names the publisher under its own headline and the picture is that article's own, so a pill would say it twice.
 
 ## Motion that says something
 

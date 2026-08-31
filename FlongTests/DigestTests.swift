@@ -218,6 +218,23 @@ struct DigestTests {
 
         // The most recent picture, not the first one the story ever had.
         #expect(story.imageURL?.absoluteString == "https://example.com/latest.jpg")
+
+        // And it is credited to the room whose article that picture came with,
+        // which is not the first room to have covered the story : the picture
+        // and its credit have to be the same article or the credit is a lie.
+        #expect(story.imageCredit == feeds["L'Agence"]?.domain)
+        #expect(story.imageCredit != story.feedMarks.first?.room)
+    }
+
+    @Test("A story with no picture credits nothing")
+    func noCoverNoCredit() async throws {
+        try await StoryBuilder(database).build(now: now)
+
+        let digest = try await service.digest(now: now)
+        let story = try #require((digest.live + digest.stories).first { $0.articleCount == 4 })
+
+        #expect(story.imageURL == nil)
+        #expect(story.imageCredit == nil)
     }
 
     @Test("Building twice changes nothing")
