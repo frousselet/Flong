@@ -155,13 +155,80 @@ nonisolated struct TopicPreferences: Sendable {
     /// Idempotent, and folded like everything else : a reader who had already
     /// written `Écologie` themselves keeps theirs, and the standard one is not
     /// added beside it.
-    func seedStandards(_ names: [String] = StandardTopics.names(), at date: Date = Date()) async throws {
+    ///
+    /// **A name the model coined first becomes the section, rather than
+    /// blocking it.** The fold used to skip whatever already existed, whoever
+    /// had made it. On a store where the model had already named a story
+    /// `Politique` or `Technologie` for itself, those two names stayed the
+    /// model's own : ``settled()`` shows the model only the standard sections
+    /// and the reader's own, so the model was never offered `Politique` again
+    /// and nothing could ever be filed under it. Two of the thirteen sections
+    /// were missing from the vocabulary and held nothing, for good.
+    ///
+    /// A section the reader wrote themselves stays theirs. It is theirs to
+    /// delete, which a standard one is not, and taking that away would be
+    /// taking something from them.
+    ///
+    /// - Returns: whether the vocabulary changed, which is what tells the
+    ///   caller the stories filed against the old one deserve another look.
+    @discardableResult
+    func seedStandards(_ names: [String] = StandardTopics.names(), at date: Date = Date()) async throws -> Bool {
         try await database.writer.write { db in
+            var changed = false
+
             for name in names {
-                guard try Self.folded(name, in: db) == nil else { continue }
-                try Topic(name: name, kind: .standard, createdAt: date).insert(db)
+                guard let existing = try Self.folded(name, in: db) else {
+                    try Topic(name: name, kind: .standard, createdAt: date).insert(db)
+                    changed = true
+                    continue
+                }
+
+                let kind = try String.fetchOne(
+                    db,
+                    sql: "SELECT kind FROM topic WHERE name = ?",
+                    arguments: [existing]
+                )
+                guard kind == TopicKind.smart.rawValue else { continue }
+
+                try db.execute(
+                    sql: "UPDATE topic SET kind = ?, is_own = 0 WHERE name = ?",
+                    arguments: [TopicKind.standard.rawValue, existing]
+                )
+                changed = true
             }
+
+            guard changed else { return false }
+            try Self.reopenStoriesUnderNoSection(db)
+            return true
         }
+    }
+
+    /// Asks again about the stories the vocabulary has caught up with.
+    ///
+    /// A story is asked about once and stamped as asked, which is right :
+    /// asking again would get the same answer. It stops being right when the
+    /// answer was decided by a vocabulary that has since changed. A story filed
+    /// before the sections existed was shown nothing to choose from and was
+    /// stamped all the same, so seeding them changed nothing for a reader
+    /// already using Flong : the sections were dead names holding nothing, the
+    /// page kept the model's older drift, and there was no gesture anywhere
+    /// that could put it right.
+    ///
+    /// Only the ones under no section and none of the reader's own. A story
+    /// already filed under something settled keeps it : it was asked a question
+    /// the vocabulary could answer, and the answer stands.
+    private static func reopenStoriesUnderNoSection(_ db: Database) throws {
+        try db.execute(
+            sql: """
+                UPDATE story SET topics_asked_at = NULL
+                WHERE topics_asked_at IS NOT NULL
+                  AND id NOT IN (
+                      SELECT s.story_id FROM story_topic s
+                      JOIN topic t ON t.name = s.name
+                      WHERE t.kind IN ('standard', 'own')
+                  )
+                """
+        )
     }
 
     /// The subjects the reader wrote themselves.

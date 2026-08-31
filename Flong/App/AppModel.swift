@@ -858,6 +858,11 @@ final class AppModel {
     /// just arrived rather than on what was here this morning ; iCloud comes
     /// last, so what goes out is the whole of it.
     func backgroundProcessing() async {
+        // Whatever made the model fail hours ago is worth trying again now :
+        // the assets may have finished downloading, the reader may have
+        // switched Apple Intelligence on, a rate limit has certainly lifted.
+        OnDeviceModel.reconsider()
+
         let summary = await refresher.refreshAll()
         Log.fetch.notice("Full pass : \(summary.newArticles) new articles from \(summary.refreshed) feeds")
 

@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import FoundationModels
 import GRDB
 import NaturalLanguage
 import Testing
@@ -651,9 +652,32 @@ struct DigestTests {
             try Int.fetchOne(db, sql: "SELECT COUNT(DISTINCT story_id) FROM story_topic") ?? 0
         }
 
-        // Everything but what is already filed, on a machine with a model ;
-        // nothing at all on one without, since there is nothing it could do.
-        #expect(left == (OnDeviceModel.isAvailable ? stories - filed : 0))
+        // Everything but what is already filed, whether this machine has a
+        // model or not. It answered nought without one, so a backlog waiting
+        // for Apple Intelligence to finish downloading looked exactly like no
+        // backlog at all and the interface had nothing it could say about the
+        // wait. Whether anything can be done about the queue is `step()`'s
+        // business, not the count's.
+        #expect(left == stories - filed)
+    }
+
+    @Test("A story is not stamped as asked when there was nothing to ask about")
+    func nothingIsStampedWithoutAVocabulary() async throws {
+        try await StoryBuilder(database).build(now: now)
+        // The state migration v21 left behind : every subject marked as the
+        // model's own, so `settled()` is empty and the model is shown nothing.
+        try await database.writer.write { db in
+            try db.execute(sql: "UPDATE topic SET kind = ?", arguments: [TopicKind.smart.rawValue])
+        }
+
+        let before = try await FileStoriesJob(database, now: now).remaining()
+        #expect(before > 0)
+
+        _ = try await FileStoriesJob(database, now: now).step()
+
+        // Still waiting, and not stamped : the queue survives a vocabulary that
+        // has not been seeded yet, and empties once it has.
+        #expect(try await FileStoriesJob(database, now: now).remaining() == before)
     }
 
     @Test("A story the model cannot file does not block the ones behind it")
@@ -1133,17 +1157,21 @@ struct ModelFailureTests {
 
     // MARK: - A filing that never happened
 
-    @Test("A vocabulary with nothing in it is an answer, not a failure")
+    @Test("A vocabulary with nothing in it is no answer at all")
     func emptyVocabulary() async {
         let namer = TopicNamer(locale: Locale(identifier: "fr_FR"))
 
-        // Nothing to choose from is the same answer as nothing fits, reached
-        // without asking : the caller goes on to have a subject named.
-        guard case .chosen(let chosen) = await namer.file("Une réforme", summary: nil, into: []) else {
-            Issue.record("An empty vocabulary should be an answer")
+        // It used to come back as the model having considered the story and
+        // placed it under nothing, so the caller stamped it as asked and never
+        // came back to it. Nothing had been asked. A migration that left every
+        // existing subject marked as the model's own emptied this list for one
+        // run, and a whole page was stamped as answered by a question nobody
+        // ever put : the standard sections were seeded an hour later and not
+        // one story could ever be filed under them.
+        guard case .unusable = await namer.file("Une réforme", summary: nil, into: []) else {
+            Issue.record("An empty vocabulary is a question that was never asked")
             return
         }
-        #expect(chosen.isEmpty)
     }
 }
 
@@ -1181,6 +1209,60 @@ struct TopicKindTests {
         #expect(known.first { $0.name == "Écologie" } == nil)
     }
 
+    @Test("A section the model happened to name first becomes the section")
+    func seedingPromotes() async throws {
+        // What the reader's own store looked like : the model had coined
+        // `Technologie` for a story before the sections were ever seeded, so
+        // the fold skipped it and the section stayed the model's own. It was
+        // therefore never in `settled()`, never shown to the model, and nothing
+        // could ever be filed under it.
+        try await topics.record("Technologie", at: now)
+        let changed = try await topics.seedStandards(["Politique", "Technologie"], at: now)
+
+        #expect(changed)
+        let known = try await topics.known()
+        #expect(known.count == 2)
+        #expect(known.first { $0.name == "Technologie" }?.kind == .standard)
+        #expect(try await topics.settled().sorted() == ["Politique", "Technologie"])
+    }
+
+    @Test("Seeding the sections asks again about the stories that were shown none")
+    func seedingReopens() async throws {
+        let asked = now.addingTimeInterval(-3600)
+        let unfiled = UUID.v7(at: now)
+        let filed = UUID.v7(at: now)
+
+        try await database.writer.write { db in
+            for (id, title) in [(unfiled, "Sans thématique"), (filed, "Déjà classé")] {
+                try Story(id: id, title: title, firstAt: now, lastAt: now, updatedAt: now).insert(db)
+                try db.execute(
+                    sql: "UPDATE story SET topics_asked_at = ? WHERE id = ?",
+                    arguments: [asked, id]
+                )
+            }
+            try Topic(name: "Cybersécurité", kind: .smart, createdAt: now).insert(db)
+            try StoryTopic(storyID: unfiled, name: "Cybersécurité").insert(db)
+        }
+        // One story already under something the reader will recognize.
+        try await topics.seedStandards(["Politique"], at: now)
+        try await database.writer.write { db in
+            try StoryTopic(storyID: filed, name: "Politique").insert(db)
+            try db.execute(sql: "UPDATE story SET topics_asked_at = ? WHERE id = ?", arguments: [asked, filed])
+        }
+
+        try await topics.seedStandards(["Politique", "Économie"], at: now)
+
+        let stamps = try await database.writer.read { db in
+            try Row.fetchAll(db, sql: "SELECT id, topics_asked_at FROM story")
+                .reduce(into: [UUID: Date?]()) { $0[$1["id"] as UUID] = $1["topics_asked_at"] as Date? }
+        }
+        // The one under nothing a reader recognizes is asked again. The one
+        // already filed under a section keeps its answer : it was asked a
+        // question the vocabulary could answer.
+        #expect(stamps[unfiled] == .some(nil))
+        #expect(stamps[filed] ?? nil != nil)
+    }
+
     @Test("The model chooses from the settled subjects and never from its own")
     func settled() async throws {
         try await topics.seedStandards(["Politique"], at: now)
@@ -1215,5 +1297,77 @@ struct TopicKindTests {
         try await topics.add("Typographie", at: now.addingTimeInterval(60))
 
         #expect(try await topics.settled().first == "Typographie")
+    }
+}
+
+/// When the model is left alone, and when it is asked again.
+///
+/// The model failing is ordinary : the assets are still downloading, Apple
+/// Intelligence is off, a backgrounded application has been rate-limited. What
+/// matters is that none of those is permanent, and that giving up on the model
+/// is therefore never permanent either.
+@Suite("Giving up on the model, and coming back to it", .serialized)
+struct ModelPatienceTests {
+    init() { OnDeviceModel.reconsider() }
+
+    private func refuse(_ error: LanguageModelSession.GenerationError, times: Int, at moment: Date) {
+        for _ in 0..<times { OnDeviceModel.refused(error, now: moment) }
+    }
+
+    @Test("Three failures of the model itself are enough to leave it alone")
+    func givesUp() {
+        let now = Date()
+        refuse(.assetsUnavailable(.init(debugDescription: "")), times: 3, at: now)
+
+        #expect(OnDeviceModel.hasGivenUp(now: now))
+    }
+
+    @Test("It is asked again once the pause is over")
+    func comesBack() {
+        let now = Date()
+        refuse(.assetsUnavailable(.init(debugDescription: "")), times: 3, at: now)
+
+        // It was a one-way latch : nothing cleared the count but a success, and
+        // no success is possible while every caller asks whether the model is
+        // available first. Three failures and the model was off for the life of
+        // the process, which on a Mac is days.
+        #expect(!OnDeviceModel.hasGivenUp(now: now.addingTimeInterval(OnDeviceModel.refusalPause + 1)))
+    }
+
+    @Test("A model that is merely busy is not a model to give up on")
+    func busyIsNotBroken() {
+        let now = Date()
+        // A backgrounded application's sessions are rate-limited hard, and
+        // three of those used to silence the model for the rest of the process:
+        // that is a night spent writing headlines and filing no subjects.
+        refuse(.rateLimited(.init(debugDescription: "")), times: 10, at: now)
+
+        #expect(!OnDeviceModel.hasGivenUp(now: now))
+        // Still no answer about this story, so nothing is stamped as answered.
+        #expect(
+            OnDeviceModel.isTheModelItself(
+                LanguageModelSession.GenerationError.rateLimited(.init(debugDescription: ""))))
+    }
+
+    @Test("A story the model will not write about does not count against it")
+    func oneStoryIsNotTheModel() {
+        let now = Date()
+        refuse(.guardrailViolation(.init(debugDescription: "")), times: 10, at: now)
+
+        // A page of security advisories trips the guardrail on some of its
+        // stories and not others, and counting those would silence the model
+        // for every story after them.
+        #expect(!OnDeviceModel.hasGivenUp(now: now))
+    }
+
+    @Test("A success in between clears what came before it")
+    func successForgives() {
+        let now = Date()
+        refuse(.assetsUnavailable(.init(debugDescription: "")), times: 2, at: now)
+        OnDeviceModel.succeeded()
+        OnDeviceModel.refused(
+            LanguageModelSession.GenerationError.assetsUnavailable(.init(debugDescription: "")), now: now)
+
+        #expect(!OnDeviceModel.hasGivenUp(now: now))
     }
 }

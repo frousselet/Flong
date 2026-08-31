@@ -196,6 +196,10 @@ struct AppShell: View {
                 BackgroundScheduler.schedule()
                 return
             }
+            // A reader who has just switched Apple Intelligence on, or whose
+            // assets have finished downloading, is a reader whose model is
+            // worth asking again.
+            OnDeviceModel.reconsider()
             // Asked again in case the observation could not be started : it is
             // a no-op while the window is already following the store.
             model.keepUp()

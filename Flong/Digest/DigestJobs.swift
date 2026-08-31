@@ -45,8 +45,14 @@ nonisolated struct FileStoriesJob: ResumableJob {
         self.since = now.addingTimeInterval(-DigestStore.window)
     }
 
+    /// How many stories are waiting to be filed.
+    ///
+    /// **The true count, whether the model can be asked or not.** It answered
+    /// nought without one, so a backlog of stories waiting for Apple
+    /// Intelligence to finish downloading was indistinguishable from no backlog
+    /// at all, and the interface had nothing it could say about the wait.
+    /// Whether anything can be done about the queue is ``step()``'s business.
     func remaining() async throws -> Int {
-        guard OnDeviceModel.isAvailable else { return 0 }
         let since = self.since
 
         return try await database.writer.read { db in
@@ -84,6 +90,20 @@ nonisolated struct FileStoriesJob: ResumableJob {
 
         let preferences = TopicPreferences(database)
         let namer = TopicNamer(locale: locale)
+
+        // Read once, and allowed to throw. It was read afresh inside the loop
+        // and its failure swallowed, so a read that went wrong put the model in
+        // front of an empty list and every story of the batch was stamped as
+        // answered by a question that was never put. The vocabulary the model
+        // chooses from does not change while a batch runs : what a filing adds
+        // is a subject of the model's own, and those are deliberately never
+        // shown back to it.
+        let settled = try await preferences.settled()
+        guard !settled.isEmpty else {
+            Log.enrich.notice("No subject to file a story under yet, so nothing was asked")
+            return 0
+        }
+
         var asked = 0
 
         for story in stories {
@@ -96,7 +116,6 @@ nonisolated struct FileStoriesJob: ResumableJob {
             // `Politique` and `Réforme des retraites` are both true of one
             // story, the first says what kind of news it is and the second
             // says what it is, and a page wants both.
-            let settled = (try? await preferences.settled()) ?? []
             var filed: [String]
 
             switch await namer.file(story.title, summary: story.summary, into: settled) {
