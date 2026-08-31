@@ -30,9 +30,14 @@ struct DigestScreen: View {
 
     /// Where the page is, so it can be put back after a pull.
     @State private var position = ScrollPosition()
-    /// How far down the page is, for deciding whether putting it back is a
-    /// kindness or an interruption.
-    @State private var offset: CGFloat = 0
+    /// Whether the page is still near its top, for deciding whether putting it
+    /// back after a pull is a kindness or an interruption.
+    ///
+    /// **A flag and not a measurement.** It held the offset itself, which
+    /// changes every frame of every scroll, so the whole page was rebuilt
+    /// continuously while the reader's thumb was on it, and rebuilt hardest
+    /// during the one gesture that must not be disturbed.
+    @State private var isNearTop = true
     /// Whether the gesture's work is still running.
     @State private var isPulling = false
 
@@ -59,10 +64,10 @@ struct DigestScreen: View {
             .padding(.bottom, 90)
         }
         .scrollPosition($position)
-        .onScrollGeometryChange(for: CGFloat.self) { geometry in
-            geometry.contentOffset.y + geometry.contentInsets.top
-        } action: { _, y in
-            offset = y
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top < Self.stillAtTheTop
+        } action: { _, near in
+            isNearTop = near
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         // The date is the title of the page, where a newspaper puts it. Not the
@@ -124,7 +129,7 @@ struct DigestScreen: View {
         // something ; hauling them back would be the application taking the
         // page away from them.
         .onChange(of: isPulling) { _, pulling in
-            guard !pulling, offset < Self.stillAtTheTop else { return }
+            guard !pulling, isNearTop else { return }
 
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(150))

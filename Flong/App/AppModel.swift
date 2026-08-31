@@ -103,6 +103,13 @@ nonisolated enum CatchUp: Hashable, Sendable {
     /// a reader's devices from becoming a burden on three hundred publishers.
     var asksEveryFeed: Bool { self == .reader || self == .pull }
 
+    /// Whether a reader made a deliberate movement and is watching for it.
+    ///
+    /// One of these waits its turn rather than standing aside : a refusal
+    /// nobody can see is, from where they are sitting, an application that did
+    /// nothing when they asked.
+    var isAskedFor: Bool { self == .reader || self == .pull }
+
     /// Whether nobody is waiting, and the reader's data plan is therefore not
     /// to be spent.
     var sparingly: Bool { self == .background }
@@ -308,8 +315,26 @@ final class AppModel {
     ///
     /// Being observable, it is also what greys the reader's own `Refresh` while
     /// anything is running, so the command cannot start a second one either.
+    /// How long something the reader asked for waits its turn.
+    ///
+    /// **A gesture is not refused in silence.** Standing aside is right for a
+    /// clock tick, which nobody watched and which comes round again in five
+    /// minutes. It is wrong for a pull : the reader made a deliberate movement,
+    /// the control comes straight back out, and as far as they can tell nothing
+    /// happened at all. So a refresh they asked for waits for the one already
+    /// running and then takes its turn, and the control stays out for as long
+    /// as there is work, which is what they were watching for.
+    static let patienceOfAGesture = Duration.seconds(30)
+
     @discardableResult
-    private func exclusively(_ name: StaticString, _ work: () async -> Void) async -> Bool {
+    private func exclusively(_ name: StaticString, waiting: Bool = false, _ work: () async -> Void) async -> Bool {
+        if isRefreshing, waiting {
+            let until = ContinuousClock.now + AppModel.patienceOfAGesture
+            while isRefreshing, ContinuousClock.now < until, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(150))
+            }
+        }
+
         guard !isRefreshing else {
             Log.fetch.info("\(name, privacy: .public) stood aside for a refresh already running")
             return false
@@ -1670,7 +1695,9 @@ final class AppModel {
     /// that ran while the window was away, and the reader is looking at the page
     /// now.
     func catchUp(_ reason: CatchUp, until deadline: Date? = nil) async {
-        await exclusively("A catch-up") { await self.catchingUp(reason, until: deadline) }
+        await exclusively("A catch-up", waiting: reason.isAskedFor) {
+            await self.catchingUp(reason, until: deadline)
+        }
     }
 
     private func catchingUp(_ reason: CatchUp, until deadline: Date?) async {

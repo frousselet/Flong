@@ -442,8 +442,8 @@ struct ExclusiveRefreshTests {
         #expect(!model.isRefreshing)
     }
 
-    @Test("The reader's command stands aside for a pass already running")
-    func commandStandsAside() async throws {
+    @Test("The reader's command waits its turn rather than being refused in silence")
+    func commandWaitsItsTurn() async throws {
         try await subscriptions.subscribe(
             to: Subscription(url: server.url.appending(path: "g.xml"), title: "G")
         )
@@ -454,8 +454,39 @@ struct ExclusiveRefreshTests {
         async let asked: Void = model.refreshAll()
         _ = await (pass, asked)
 
-        #expect(server.requests.count == 1)
+        // Standing aside is right for a clock tick, which nobody watched. It is
+        // wrong for a command or a gesture : the reader made a deliberate
+        // movement, and a refusal they cannot see is an application that did
+        // nothing when they asked. So both passes happen, one after the other.
+        #expect(server.requests.count == 2)
         #expect(!model.isRefreshing)
+    }
+
+    @Test("Two passes still never overlap, however they were asked for")
+    func neverTogether() async throws {
+        for name in ["h", "i"] {
+            try await subscriptions.subscribe(
+                to: Subscription(url: server.url.appending(path: "\(name).xml"), title: name)
+            )
+        }
+
+        // Each request answers only once the one before it has been answered,
+        // so two passes running together would be seen here as an overlap.
+        let overlapped = Locked(false)
+        let inFlight = Locked(0)
+        server.install { _ in
+            inFlight.write { $0 += 1 }
+            if inFlight.value > FeedRefresh.concurrency { overlapped.write { $0 = true } }
+            inFlight.write { $0 -= 1 }
+            return StubResponse(statusCode: 304)
+        }
+        defer { server.reset() }
+
+        async let pass: Void = model.backgroundProcessing()
+        async let asked: Void = model.refreshAll()
+        _ = await (pass, asked)
+
+        #expect(!overlapped.value)
     }
 }
 
