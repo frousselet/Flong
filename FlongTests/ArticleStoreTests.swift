@@ -222,7 +222,7 @@ struct ArticleStoreTests {
         // The word itself is whatever language the device is in, so what is
         // checked is that there is one, under the right glyph, in front of the
         // right date.
-        #expect(page.contains("<span class=\"pill\"><span class=\"glyph published\"></span><span class=\"said\">"))
+        #expect(page.contains("<span class=\"moment\"><span class=\"glyph published\"></span><span class=\"said\">"))
         #expect(page.contains(" </span>\(now.formatted(date: .long, time: .shortened))</span>"))
         // The shape is cut once for every article there will ever be, so the
         // page carries the rule that holds it.

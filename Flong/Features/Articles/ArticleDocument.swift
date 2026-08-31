@@ -183,36 +183,41 @@ nonisolated enum ArticleDocument {
 
         var lines: [String] = []
 
-        // The first line is where it came from and when they ran it. Both are
-        // facts about the piece as a whole, and the date is the shortest thing
-        // a reader checks, so it sits where the eye already is.
-        var first: [String] = []
-
+        // Who ran it, on the first line and alone on it.
         let source = publisher ?? article.domain ?? article.feedTitle
-        if !source.isEmpty { first.append(pill(source, wearing: mark)) }
+        if !source.isEmpty { lines.append("<div class=\"line\">\(pill(source, wearing: mark))</div>") }
 
+        // Then who wrote it. The names alone : a pill under the paper that ran
+        // it, holding a person's name, is a byline, and a word in front of it
+        // would be the page explaining a shape that explains itself.
+        let people = self.people(in: article.author ?? "")
+        if !people.isEmpty {
+            let pills = people.map { pill($0, wearing: portraits[$0]) }.joined()
+            lines.append("<div class=\"line\">\(pills)</div>")
+        }
+
+        // Then when, on the page rather than on pills.
+        //
+        // **They were pills and it was too many pills.** A pill is what the
+        // application uses to say *somebody* : this publisher, this writer, the
+        // source of this photograph. A date is not somebody, and putting it in
+        // the same shape put a newspaper, two journalists and two timestamps on
+        // an equal footing at the head of every article, three lines of
+        // capsules before a word of it. So the dates come out and lie on the
+        // page, under the people, in the muted grey the rest of the byline was
+        // always in.
+        var moments: [String] = []
         if let date = article.publishedAt {
-            first.append(moment(date, kind: .published))
+            moments.append(moment(date, kind: .published))
         }
         // Said in full here, beside the publication rather than instead of it :
         // the page has room for both, and a reader who has opened the article
         // is the one who wants to know exactly what changed when. The list has
         // room for one and shows whichever is the later.
         if let updated = article.updatedAt {
-            first.append(moment(updated, kind: .revised))
+            moments.append(moment(updated, kind: .revised))
         }
-
-        if !first.isEmpty { lines.append("<div class=\"line\">\(first.joined())</div>") }
-
-        // The second line is who wrote it. The names alone : a pill under the
-        // paper that ran it, holding a person's name, is a byline, and a word
-        // in front of it would be the page explaining a shape that explains
-        // itself.
-        let people = self.people(in: article.author ?? "")
-        if !people.isEmpty {
-            let pills = people.map { pill($0, wearing: portraits[$0]) }.joined()
-            lines.append("<div class=\"line\">\(pills)</div>")
-        }
+        if !moments.isEmpty { lines.append("<div class=\"line\">\(moments.joined())</div>") }
 
         // The mark, and the colour the mark averages to. How much of that
         // colour the pill takes is the stylesheet's business and the same for
@@ -269,12 +274,12 @@ nonisolated enum ArticleDocument {
         }
     }
 
-    /// One of the article's dates, on a pill, under the glyph that says which.
+    /// One of the article's dates, under the glyph that says which.
     private static func moment(_ date: Date, kind: Moment) -> String {
         let said = HTMLEntities.escape(kind.said)
         let written = HTMLEntities.escape(date.formatted(date: .long, time: .shortened))
         return """
-            <span class="pill"><span class="glyph \(kind.name)"></span>\
+            <span class="moment"><span class="glyph \(kind.name)"></span>\
             <span class="said">\(said) </span>\(written)</span>
             """
     }
@@ -409,8 +414,11 @@ nonisolated enum ArticleDocument {
         /* Cut out of the text colour rather than printed in one, so a glyph
            follows the appearance, the pill's own tint and the reader's type
            size without knowing about any of them. */
-        .pill .glyph {
-          width: 1em; height: 1em; margin-right: -1px; flex: none;
+        /* A date and its glyph, held together so the line may wrap between the
+           two dates and never between a date and the glyph that says which. */
+        .moment { display: inline-flex; align-items: center; gap: 5px; }
+        .glyph {
+          width: 1em; height: 1em; flex: none;
           background: currentColor; opacity: 0.75;
           -webkit-mask: var(--glyph) center / contain no-repeat;
           mask: var(--glyph) center / contain no-repeat;
