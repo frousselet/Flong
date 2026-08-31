@@ -20,7 +20,6 @@ nonisolated enum Route: Hashable {
     case sources
     case collection(ArticleCollection.Kind)
     case profile
-    case topics
     case subscribedSites
 }
 
@@ -274,9 +273,6 @@ struct AppShell: View {
 
         case .profile:
             ProfileScreen(model: model)
-
-        case .topics:
-            TopicsScreen(model: model)
 
         case .subscribedSites:
             SubscribedSitesScreen(model: model)

@@ -119,13 +119,15 @@ nonisolated enum CatchUp: Hashable, Sendable {
 
     /// Whether the page is replaced before the catch-up returns.
     ///
-    /// **Not under a pull.** SwiftUI holds the refresh control out until the
-    /// gesture's work returns, so replacing the page's content as the last
-    /// thing before returning has the scroll view begin its retraction against
-    /// content it has never laid out. The window follows the store, and the
-    /// watcher deliberately waits for a refresh to be over before it reads
-    /// back, so the page arrives a moment later with the control out of the
-    /// way.
+    /// **Not under a pull, and not because the pull wants the page less.**
+    /// SwiftUI holds the refresh control out until the gesture's work returns,
+    /// so replacing the page's content as the last thing before returning has
+    /// the scroll view begin its retraction against content it has never laid
+    /// out. It was left to the watcher that follows the store, which reads back
+    /// only when a change reaches it : a gesture that asked for the page and
+    /// got it only if something happened to be written is not the command in
+    /// the menu by another name. `DigestScreen` asks for the same read-back
+    /// itself, a beat after the control has gone.
     var readsBackAtOnce: Bool { self != .pull }
 
     /// Whether this is a moment to run the on-device model.

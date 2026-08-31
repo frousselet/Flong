@@ -67,6 +67,9 @@ struct CollectionsScreen: View {
                 SourcesButton(open: menu)
             }
             ToolbarItem(placement: .sectionLeading) {
+                TopicsButton(model: model)
+            }
+            ToolbarItem(placement: .sectionLeading) {
                 NotificationsButton(model: model)
             }
             // Beside the sources rather than opposite them : the leading corner
