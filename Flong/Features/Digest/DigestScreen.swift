@@ -71,15 +71,21 @@ struct DigestScreen: View {
                 ReaderMenu(model: model, open: open)
             }
         }
-        // **No pull, on any page.** The page keeps itself up to date : it
-        // follows the store, so anything that arrives reaches it, and a clock
-        // asks the publishers what politeness allows. A pull on top of that
-        // buys nothing and costs something, because a gesture that is always
-        // there invites being used, and a reader pulling a wire every few
-        // seconds is a reader made anxious by their own reader.
+        // **The pull, on the front page and nowhere else.** The page does keep
+        // itself up to date : it follows the store, so anything that arrives
+        // reaches it, and a clock asks the publishers what politeness allows.
+        // The gesture is not how the page keeps up ; it is how a reader says
+        // now rather than soon, and it is the gesture every reader already
+        // reaches for on the page they open first. The wire needs none : it is
+        // a list of what has arrived, and what arrives reaches it on its own.
         //
-        // Asking is still possible and now takes a deliberate act, in the
-        // reader's own menu, where the other things they ask for live.
+        // It fetches every feed and groups what arrived, and it ends there. The
+        // model's work carries on behind it, and the page is read back once the
+        // control has retracted rather than under it.
+        //
+        // A Mac has no pull and keeps `⌘R` in the reader's own menu, which is
+        // where the command lives on every platform.
+        .refreshable { await model.pullToRefresh() }
         // Not while something is being brought in. `Nothing has come in yet`
         // over a page that is at that moment fetching sixty feeds is untrue,
         // and it is untrue at the one moment the reader is most likely to be
@@ -674,10 +680,11 @@ private struct PillShape: ViewModifier {
 /// had not changed yet and gave no sign that it was about to. The only place
 /// that said anything was a footer buried in the sources list.
 ///
-/// **It is not a control, and there is nothing here to pull.** There is no pull
-/// on any page of this application, and a strip at the top of a scroll view is
-/// exactly the shape of one, so it takes no gesture at all : it says what is
-/// being brought in, how far along it is, and then it goes.
+/// **It is not a control, and there is nothing here to pull.** The pull belongs
+/// to the scroll view and is a deliberate reach ; a strip that reported progress
+/// and also answered to a finger would be two gestures in the same place, and
+/// the reader could not tell which one they had. So it takes no gesture at all :
+/// it says what is being brought in, how far along it is, and then it goes.
 ///
 /// It lives inside the pinned header rather than in the safe area, for the same
 /// reason the pills do : a bar in the safe area lays itself out under the large
@@ -707,8 +714,8 @@ private struct ActivityLine: View {
         // because each one carries its own glass.
         .background(.background)
         .frame(maxWidth: .infinity, alignment: .leading)
-        // Nothing here answers to a finger. A strip at the top of a scroll view
-        // that did would be a pull to refresh by another name.
+        // Nothing here answers to a finger : the pull underneath it is the
+        // gesture, and two in one place is one the reader cannot aim.
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(phase.title))

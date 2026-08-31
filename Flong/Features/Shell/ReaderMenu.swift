@@ -67,11 +67,11 @@ struct ReaderMenu: View {
 
             Divider()
 
-            // The only way to ask for a refresh, and deliberately a deliberate
-            // one. There is no pull anywhere : a gesture that is always under
-            // the thumb invites being used, and a reader refreshing a wire
-            // every few seconds is a reader their own reader has made anxious.
-            // The page keeps itself up to date without being asked.
+            // Asking for a refresh from anywhere in the application, and the
+            // only way to ask on a Mac, which has no pull. The front page has
+            // the gesture as well ; this is the same work, reachable from the
+            // sections that do not. The page keeps itself up to date without
+            // either of them.
             Button {
                 Task { await model.refreshAll() }
             } label: {
@@ -84,9 +84,11 @@ struct ReaderMenu: View {
                 // A development command, and only there. The engine decides
                 // when to send and when to fetch and is right far more often
                 // than a button would be : this is for watching an exchange
-                // happen on demand while something is being built. It queues
-                // every record this device holds, which is the repair path and
-                // is expensive, and that is why it does not ship.
+                // happen on demand while something is being built. It forgets
+                // the change tokens, the tags the server gave each record and
+                // the archives already read, then sends and fetches the whole
+                // of the zone, which is the repair path and spends the record
+                // budget of section 7 in one go. That is why it does not ship.
                 Button {
                     Task { await model.forceSynchronization() }
                 } label: {

@@ -153,7 +153,13 @@ A region rather than a value : what is wanted is the news that something moved, 
 
 **Fetching and showing are one thing, and used to be two.** The clock, the background refresh and the return to the foreground all fetched ; only a cold launch, the menu command and the nightly pass ever grouped what had arrived into stories. So a window left open watched its sidebar counts move and `The rest` grow while the front page itself sat unchanged, and a reader whose reader was plainly working still had to ask it by hand for the one thing they opened it for. Every automatic trigger goes through one entry point now, which fetches, groups and reads the page back ; grouping is a single query when there is nothing to group, so it costs a fraction of the fetching that has just happened.
 
-**There is no pull, on any page.** The page keeps itself up to date : it follows the store, so anything that arrives reaches it, and a clock asks the publishers what politeness allows. A pull on top of that buys nothing and costs something. A gesture that is always under the thumb invites being used, and a reader pulling a wire every few seconds is a reader their own reader has made anxious. That is the argument that settled it, and it is a better one than the mechanics.
+**The pull is back, on the front page and nowhere else.** It was removed on the argument that the page keeps itself up to date and that a gesture always under the thumb invites being used. The page does keep itself up to date, and that argument was about the wrong thing : the gesture is not how the page keeps up, it is how a reader says *now* rather than *soon*. The clock is five minutes, politeness may defer beyond it, Low Power Mode and an expensive network both suppress the background pass deliberately, and iOS may grant no background slot for hours. It is also the gesture every reader already reaches for on the page they open first, and refusing it on principle asks them to learn a menu instead.
+
+One place is enough, and the front page is where a reader is when they wonder. The wire has none : it is a list of what has arrived, and what arrives reaches it on its own. A Mac has no pull at all and keeps `⌘R` in the reader's own menu.
+
+**The gesture is the fetching and the grouping, and it ends there.** Every feed, because they asked, and the grouping with it : pulling a page down means *show me what there is now*, and fetching without grouping would answer with a longer tail and the same stories. The model's work carries on behind it, a headline written and a subject filed for every new story being one call apiece and seconds each, and a spinner held out for minutes is a refresh that looks stuck.
+
+**The page is read back once the control has retracted, not under it.** SwiftUI holds the control out until the gesture's work returns, so replacing the content as the last thing before returning has the scroll view begin its retraction against content it has never laid out. The window follows the store, and the watcher already waits for a refresh to be over before it reads back, so the page arrives a moment later with the control out of the way.
 
 The mechanics were bad too. SwiftUI holds the refresh control out until the work the gesture started returns, and the control's space was not always reclaimed when it retracted : the page stayed pushed down by exactly its height, with the large title still open, until anything at all touched the screen and forced a layout. Four attempts at the cause missed, and none of them could be reproduced on a simulator, where a synthesised drag never engages the control at all. Removing the gesture removes the fault with it, which is a poor way to fix a bug and a fine way to remove a feature that was not wanted.
 
@@ -163,7 +169,8 @@ The mechanics were bad too. SwiftUI holds the refresh control out until the work
 
 It names the phase rather than reporting a percentage of nothing in particular : fetching the feeds, grouping what arrived, writing the headlines, filing the subjects, indexing what was kept, synchronizing with iCloud, exchanging with the other devices, tidying up. Four of those are resumable jobs that already work out how much is left after every batch and threw the number away, so those four carry a real count and the bar fills ; the rest run the bar indeterminate, which is honest.
 
-**It is not a control and takes no gesture.** There is no pull on any page, and a strip at the top of a scroll view is exactly the shape of one, so it answers to nothing at all.
+**It is not a control and takes no gesture.** The pull belongs to the scroll view and is a deliberate reach ; a strip that reported progress and also answered to a finger would be two gestures in the same place, and the reader could not tell which one they had.
+
 
 **It is in the pinned header, with the pills, not in the safe area.** For the reason recorded twice already in this file : a bar in the safe area lays itself out under the large title and draws itself somewhere else entirely. Being pinned, it stays where the reader can see it while they scroll, which is what "at the top of the page" has to mean on a page that scrolls. It is inside the editorial column like everything else, so it is held to the measure on a wide Mac window. It carries the page's own ground, since the stories pass behind a pinned header and the pills get away with it only because each one carries its own glass.
 
@@ -175,7 +182,7 @@ Under Reduce Motion the indeterminate bar is a still tinted rule rather than one
 
 **The sources list keeps what a reader has to act on.** A full iCloud, a refusal, the offer to finish an import now : none of those belongs in a strip that disappears. Both places read the same phase, so they cannot come to describe one pass differently.
 
-**Asking is still possible, and now takes a deliberate act.** `Actualiser` sits in the reader's own menu, beside the other things they ask for, and keeps its `⌘R` on a Mac. It fetches every feed and groups what arrived ; the model's work carries on behind it, since those are resumable jobs and each headline appears as it is written.
+**Asking without the gesture is still possible.** `Actualiser` sits in the reader's own menu, beside the other things they ask for, keeps its `⌘R`, and is the only way on a Mac. It does what the pull does : every feed, and the grouping with it.
 
 ## Pictures, and the marks beside them
 
@@ -207,7 +214,7 @@ One button in the same corner of every section, holding what the reader has deci
 
 It is still not an account. There is no account and nothing to sign in to, and the face on the button is the reader's own picture rather than a sign that they are signed in to something. It is called `Réglages` in French.
 
-It holds the subjects, the sites the reader is signed in to, the notices, and `Actualiser`, which is the only way to ask for a refresh now that no page has a pull.
+It holds the subjects, the sites the reader is signed in to, the notices, and `Actualiser`, which asks for a refresh from anywhere in the application and is the only way to ask on a Mac.
 
 It also holds `Forcer la synchronisation`, under `#if DEBUG` and nowhere else. The engine decides when to send and when to fetch and is right far more often than a button would be ; what that command is for is watching an exchange happen on demand while something is being built. It queues every record this device holds, which is the repair path and costs a few thousand records against a budget of three thousand, and that is why it does not ship.
 
@@ -259,7 +266,7 @@ The offset is what is asked, not the rows : a row is a landmark and this is a qu
 
 It is a large title like every other section's, so it shrinks into the bar as the reader scrolls into the page. It is spelled the way the reader's language spells it, with only its first letter raised : French writes `samedi 29 août`, and capitalizing every word would give `Samedi 29 Août`. It is read at each render rather than held, so a page left open overnight is not still yesterday's.
 
-There is no refresh button and no pull. The page refreshes itself on returning to the foreground, on the store changing, and on the five-minute clock. Asking now is `Actualiser` in the reader's own menu, on every platform, and a Mac keeps its `⌘R`.
+There is no refresh button. The page refreshes itself on returning to the foreground, on the store changing, and on the five-minute clock ; a pull says now rather than soon, and `Actualiser` in the reader's own menu does the same for a Mac, which has no pull.
 
 ## Subjects, not periods
 
