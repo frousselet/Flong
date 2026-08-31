@@ -303,3 +303,104 @@ struct AppModelTests {
         #expect(model.isEmpty)
     }
 }
+
+/// What the front page says the machinery is doing.
+///
+/// The page said nothing about any of it : a pass that fetched three hundred
+/// feeds, wrote sixty headlines and exchanged with iCloud was, to the reader, a
+/// page that changed under them for no stated reason.
+@Suite("What the page says is happening")
+struct WorkPhaseTests {
+    @Test("A count is shown only once there is one to show")
+    func counts() {
+        // Nought of nought is a job that has not said yet, not a job with
+        // nothing to do : the bar runs rather than showing itself full.
+        #expect(WorkPhase.fetching(done: 0, total: 0).count == nil)
+        #expect(WorkPhase.grouping.count == nil)
+        #expect(WorkPhase.synchronizing.count == nil)
+
+        let count = WorkPhase.fetching(done: 3, total: 12).count
+        #expect(count?.done == 3)
+        #expect(count?.total == 12)
+    }
+
+    @Test("The bar never runs backwards")
+    func monotonic() {
+        // A resumable job works its total out afresh after every batch, as what
+        // it has done plus what is left, so articles arriving mid-pass raise
+        // it. Taken at face value the bar retreats, which reads as the
+        // application undoing itself.
+        let phase = WorkPhase.filing(done: 8, total: 20).advanced(done: 9, total: 12)
+
+        #expect(phase.count?.total == 20)
+        #expect(phase.count?.done == 9)
+    }
+
+    @Test("A count past its total is held to it")
+    func clamped() {
+        #expect(WorkPhase.writing(done: 30, total: 12).count?.done == 12)
+    }
+
+    @Test("A phase that carries no count ignores one")
+    func countlessPhases() {
+        #expect(WorkPhase.grouping.advanced(done: 4, total: 9) == .grouping)
+        #expect(WorkPhase.tidying.advanced(done: 4, total: 9) == .tidying)
+    }
+
+    @Test("A batch moving on is told from a different phase taking the line")
+    func kinds() {
+        #expect(WorkPhase.fetching(done: 1, total: 2).isSameKind(as: .fetching(done: 9, total: 9)))
+        #expect(!WorkPhase.fetching(done: 1, total: 2).isSameKind(as: .filing(done: 1, total: 2)))
+        #expect(WorkPhase.tidying.isSameKind(as: .tidying))
+    }
+}
+
+/// The two floors that keep the line from flickering.
+@Suite("When the activity line appears, and when it goes", .serialized)
+@MainActor
+struct ActivityTimingTests {
+    private let model: AppModel
+
+    init() throws {
+        model = AppModel(database: try AppDatabase.inMemory())
+    }
+
+    @Test("Work that is over before it could be read is never shown at all")
+    func tooShortToShow() async throws {
+        model.show(.fetching(done: 0, total: 0))
+        model.show(nil)
+
+        // A catch-up that finds nothing due returns in a few milliseconds, and
+        // a line that appeared and left inside one frame is a flicker rather
+        // than information.
+        try await Task.sleep(for: AppModel.workAppearsAfter * 3)
+        #expect(model.work == nil)
+    }
+
+    @Test("Work that lasts is shown, and shown long enough to read")
+    func longEnoughToRead() async throws {
+        model.show(.grouping)
+        // Not yet : nothing shorter than the first floor is seen at all.
+        #expect(model.work == nil)
+
+        try await Task.sleep(for: AppModel.workAppearsAfter * 3)
+        #expect(model.work == .grouping)
+
+        // The same fault the other way : a line that appeared for good reason
+        // and left before it could be read told the reader nothing.
+        model.show(nil)
+        #expect(model.work == .grouping)
+
+        try await Task.sleep(for: AppModel.workStaysFor * 2)
+        #expect(model.work == nil)
+    }
+
+    @Test("The words are the phase the work has reached, not the one it started")
+    func showsThePhaseReached() async throws {
+        model.show(.fetching(done: 0, total: 0))
+        model.show(.grouping)
+
+        try await Task.sleep(for: AppModel.workAppearsAfter * 3)
+        #expect(model.work == .grouping)
+    }
+}

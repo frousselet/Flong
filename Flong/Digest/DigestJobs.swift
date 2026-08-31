@@ -313,8 +313,11 @@ nonisolated struct DigestService: Sendable {
     /// Names and summarizes. Slow, and what the screen does not wait for : a
     /// story with no headline of its own still has its article's.
     @discardableResult
-    func brief(until deadline: Date? = nil) async -> Int {
-        await JobRunner(BriefStoriesJob(database)).run(until: deadline).done
+    func brief(
+        until deadline: Date? = nil,
+        onProgress: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
+    ) async -> Int {
+        await JobRunner(BriefStoriesJob(database)).run(until: deadline, onProgress: onProgress).done
     }
 
     /// How long one turn of the model's work is given when nobody named a
@@ -341,24 +344,38 @@ nonisolated struct DigestService: Sendable {
     /// A slice each, in turn, until there is nothing left to do or no time left
     /// to do it in. Neither half can starve the other, and both stop cleanly on
     /// a batch that changed nothing.
-    func enrich(until deadline: Date? = nil, now: Date = Date()) async {
+    func enrich(
+        until deadline: Date? = nil,
+        now: Date = Date(),
+        onWriting: @escaping @Sendable (Int, Int) -> Void = { _, _ in },
+        onFiling: @escaping @Sendable (Int, Int) -> Void = { _, _ in },
+        onPhase: @Sendable (WorkPhase) -> Void = { _ in }
+    ) async {
         let end = deadline ?? Date().addingTimeInterval(Self.enrichmentTurn)
 
         while !Task.isCancelled, Date() < end {
+            onPhase(.writing(done: 0, total: 0))
             let slice = min(Date().addingTimeInterval(Self.enrichmentSlice), end)
-            let written = await brief(until: slice)
+            let written = await brief(until: slice, onProgress: onWriting)
 
+            onPhase(.filing(done: 0, total: 0))
             let next = min(Date().addingTimeInterval(Self.enrichmentSlice), end)
-            let filed = await nameTopics(until: next, now: now)
+            let filed = await nameTopics(until: next, now: now, onProgress: onFiling)
 
             guard written > 0 || filed > 0 else { break }
         }
     }
 
     @discardableResult
-    func rebuild(until deadline: Date? = nil, now: Date = Date()) async -> StoryBuilder.Summary {
+    func rebuild(
+        until deadline: Date? = nil,
+        now: Date = Date(),
+        onWriting: @escaping @Sendable (Int, Int) -> Void = { _, _ in },
+        onFiling: @escaping @Sendable (Int, Int) -> Void = { _, _ in },
+        onPhase: @Sendable (WorkPhase) -> Void = { _ in }
+    ) async -> StoryBuilder.Summary {
         let summary = await buildStories(now: now)
-        await enrich(until: deadline, now: now)
+        await enrich(until: deadline, now: now, onWriting: onWriting, onFiling: onFiling, onPhase: onPhase)
         return summary
     }
 
@@ -369,8 +386,13 @@ nonisolated struct DigestService: Sendable {
     /// page brings in more than twelve between two openings. It runs until the
     /// backlog is empty, the time runs out, or the model gives up.
     @discardableResult
-    func nameTopics(until deadline: Date? = nil, now: Date = Date()) async -> Int {
-        await JobRunner(FileStoriesJob(database, locale: locale, now: now)).run(until: deadline).done
+    func nameTopics(
+        until deadline: Date? = nil,
+        now: Date = Date(),
+        onProgress: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
+    ) async -> Int {
+        await JobRunner(FileStoriesJob(database, locale: locale, now: now))
+            .run(until: deadline, onProgress: onProgress).done
     }
 
     func digest(_ topic: DigestTopic = .frontPage, now: Date = Date()) async throws -> Digest {

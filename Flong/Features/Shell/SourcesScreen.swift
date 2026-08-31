@@ -94,6 +94,19 @@ struct SourcesScreen: View {
     /// the one section a reader opens when they want to know what the
     /// application is up to, and a permanent bar under the reading would be one
     /// more thing between them and the article.
+    ///
+    /// **The front page says it too now, and that is not the bar this refuses.**
+    /// What is refused here is something permanent, under the reading, saying
+    /// nothing most of the time. ``ActivityLine`` is at the head of the front
+    /// page, exists only while a phase is actually running, and goes the moment
+    /// it is over. A reader reported not knowing whether the page in front of
+    /// them was current, which is a question this screen could only answer if
+    /// they thought to come and ask it.
+    ///
+    /// What is said in both places comes from the same ``WorkPhase``, so the two
+    /// cannot come to describe one pass differently. What stays here alone is
+    /// what the reader has to act on : a full iCloud, a refusal, the offer to
+    /// finish an import now. None of that belongs in a strip that disappears.
     @ViewBuilder
     private var status: some View {
         if model.hasOutstandingWork || Self.isWorthSaying(model.syncStatus) {

@@ -92,7 +92,8 @@ nonisolated struct FeedRefresh: Sendable {
     func refreshDue(
         now: Date = Date(),
         sparingly: Bool = false,
-        until deadline: Date? = nil
+        until deadline: Date? = nil,
+        onProgress: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
     ) async -> RefreshSummary {
         let device = DeviceStagger.deviceIdentifier()
         let feeds = (try? await allFeeds()) ?? []
@@ -108,14 +109,17 @@ nonisolated struct FeedRefresh: Sendable {
             .sorted { $0.1 > $1.1 }
             .map(\.0)
 
-        return await refresh(due, sparingly: sparingly, until: deadline)
+        return await refresh(due, sparingly: sparingly, until: deadline, onProgress: onProgress)
     }
 
     /// Refreshes every feed, due or not, which is what asking for a refresh
     /// means.
-    func refreshAll(until deadline: Date? = nil) async -> RefreshSummary {
+    func refreshAll(
+        until deadline: Date? = nil,
+        onProgress: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
+    ) async -> RefreshSummary {
         let feeds = (try? await allFeeds()) ?? []
-        return await refresh(feeds.filter { $0.quarantinedAt == nil }, until: deadline)
+        return await refresh(feeds.filter { $0.quarantinedAt == nil }, until: deadline, onProgress: onProgress)
     }
 
     /// Refreshes a list of feeds, in the order given, for as long as it is
@@ -135,9 +139,11 @@ nonisolated struct FeedRefresh: Sendable {
     func refresh(
         _ feeds: [Feed],
         sparingly: Bool = false,
-        until deadline: Date? = nil
+        until deadline: Date? = nil,
+        onProgress: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
     ) async -> RefreshSummary {
         guard !feeds.isEmpty else { return RefreshSummary() }
+        let total = feeds.count
 
         return await withTaskGroup(of: RefreshResult.self) { group in
             var iterator = feeds.makeIterator()
@@ -149,8 +155,15 @@ nonisolated struct FeedRefresh: Sendable {
             }
 
             var summary = RefreshSummary()
+            var done = 0
             for await result in group {
                 summary.add(result)
+                done += 1
+                // A parameter and never a stored property, so this stays a
+                // `Sendable` struct that captures nothing. The consumer loop is
+                // serial, so it is never called against itself, and it is
+                // synchronous, so waiting on it cannot slow the fetching.
+                onProgress(done, total)
 
                 guard !Task.isCancelled, deadline.map({ Date() < $0 }) ?? true else { continue }
                 if let feed = iterator.next() {

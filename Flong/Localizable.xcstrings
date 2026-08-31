@@ -261,6 +261,16 @@
         }
       }
     },
+    "%lld of %lld" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld sur %lld"
+          }
+        }
+      }
+    },
     "%lld results" : {
       "localizations" : {
         "en" : {
@@ -774,6 +784,26 @@
         }
       }
     },
+    "Exchanging with your other devices" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échange avec vos autres appareils"
+          }
+        }
+      }
+    },
+    "Fetching the feeds" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récupération des flux"
+          }
+        }
+      }
+    },
     "Fetching the full article" : {
       "localizations" : {
         "fr" : {
@@ -790,6 +820,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Récupération de vos flux"
+          }
+        }
+      }
+    },
+    "Filing the subjects" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Classement par thématique"
           }
         }
       }
@@ -925,6 +965,16 @@
         }
       }
     },
+    "Grouping what arrived" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Regroupement des articles"
+          }
+        }
+      }
+    },
     "Header %@" : {
       "localizations" : {
         "fr" : {
@@ -991,6 +1041,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Import terminé"
+          }
+        }
+      }
+    },
+    "In progress" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En cours"
+          }
+        }
+      }
+    },
+    "Indexing what you kept" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indexation de vos articles"
           }
         }
       }
@@ -1847,6 +1917,16 @@
         }
       }
     },
+    "Synchronizing with iCloud" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisation avec iCloud"
+          }
+        }
+      }
+    },
     "Technologie" : {
       "localizations" : {
         "en" : {
@@ -2014,6 +2094,16 @@
         }
       }
     },
+    "Tidying up" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rangement"
+          }
+        }
+      }
+    },
     "Today" : {
       "localizations" : {
         "fr" : {
@@ -2101,6 +2191,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Des mots, ou une requête : title:, author:, tag:, is:unread, after:2026-01."
+          }
+        }
+      }
+    },
+    "Writing the headlines" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rédaction des titres"
           }
         }
       }

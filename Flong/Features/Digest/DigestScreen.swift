@@ -38,7 +38,14 @@ struct DigestScreen: View {
                 Section {
                     stories
                 } header: {
-                    topics
+                    VStack(alignment: .leading, spacing: 0) {
+                        topics
+                        if let phase = model.currentWork {
+                            ActivityLine(phase: phase)
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                        }
+                    }
+                    .animation(.snappy(duration: 0.28), value: model.currentWork)
                 }
             }
             .editorialColumn()
@@ -73,8 +80,12 @@ struct DigestScreen: View {
         //
         // Asking is still possible and now takes a deliberate act, in the
         // reader's own menu, where the other things they ask for live.
+        // Not while something is being brought in. `Nothing has come in yet`
+        // over a page that is at that moment fetching sixty feeds is untrue,
+        // and it is untrue at the one moment the reader is most likely to be
+        // looking : the first launch after an import.
         .overlay {
-            if model.digest.isEmpty {
+            if model.digest.isEmpty, model.currentWork == nil {
                 empty
             }
         }
@@ -652,5 +663,95 @@ private struct PillShape: ViewModifier {
             )
             .glassEffectID(topic, in: namespace)
             .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
+    }
+}
+
+/// What the machinery is doing, said in one line over a rule that fills.
+///
+/// **The page said nothing about any of it.** A pass that fetched three hundred
+/// feeds, wrote sixty headlines and exchanged with iCloud was, to the reader,
+/// a page that changed under them for no stated reason, or worse, a page that
+/// had not changed yet and gave no sign that it was about to. The only place
+/// that said anything was a footer buried in the sources list.
+///
+/// **It is not a control, and there is nothing here to pull.** There is no pull
+/// on any page of this application, and a strip at the top of a scroll view is
+/// exactly the shape of one, so it takes no gesture at all : it says what is
+/// being brought in, how far along it is, and then it goes.
+///
+/// It lives inside the pinned header rather than in the safe area, for the same
+/// reason the pills do : a bar in the safe area lays itself out under the large
+/// title and draws itself somewhere else entirely. Being pinned, it stays where
+/// the reader can see it while they scroll, which is what `at the top of the
+/// page` has to mean on a page that scrolls.
+private struct ActivityLine: View {
+    let phase: WorkPhase
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            // The count is dropped before the words are : what is happening
+            // matters more than how far along it is, and at the largest type
+            // sizes there is room for one of the two.
+            ViewThatFits(in: .horizontal) {
+                line(withCount: true)
+                line(withCount: false)
+            }
+            bar
+        }
+        .padding(.top, 4)
+        .padding(.bottom, Editorial.tightRhythm)
+        // The page's own ground under it. The header is pinned, so the stories
+        // pass behind whatever is in it, and the pills get away with it only
+        // because each one carries its own glass.
+        .background(.background)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // Nothing here answers to a finger. A strip at the top of a scroll view
+        // that did would be a pull to refresh by another name.
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(phase.title))
+        .accessibilityValue(value)
+        // So VoiceOver does not read every batch out as it lands.
+        .accessibilityAddTraits(.updatesFrequently)
+    }
+
+    private func line(withCount: Bool) -> some View {
+        HStack(spacing: 8) {
+            Text(phase.title)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 6)
+            if withCount, let count = phase.count {
+                Text("\(count.done) of \(count.total)")
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+        }
+        .font(Editorial.metadata)
+        .foregroundStyle(.secondary)
+    }
+
+    /// A rule that fills, which is the page's own idiom : the stories are
+    /// separated by rules, and this is one of them saying how far along it is
+    /// by how much of it is inked.
+    @ViewBuilder
+    private var bar: some View {
+        if let count = phase.count {
+            ProgressView(value: Double(count.done), total: Double(max(count.total, 1)))
+                .progressViewStyle(.linear)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: count.done)
+        } else if reduceMotion {
+            // A bar that runs for ever is motion for its own sake, and the line
+            // above has already said what is happening.
+            Capsule().fill(.tint.opacity(0.35)).frame(height: 3)
+        } else {
+            ProgressView().progressViewStyle(.linear)
+        }
+    }
+
+    private var value: Text {
+        guard let count = phase.count else { return Text("In progress") }
+        return Text("\(count.done) of \(count.total)")
     }
 }
