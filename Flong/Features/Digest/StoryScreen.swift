@@ -207,6 +207,27 @@ struct ArticleScreen: View {
         model.publisher(of: article.domain)
     }
 
+    /// The publisher's mark and the colour it averages to.
+    ///
+    /// **The colour is looked for at every address the mark might have come
+    /// from, and the page is given one.** A view asks for the three candidates
+    /// in turn and stops at the first that answers, so the address that
+    /// actually produced the mark in the list is not always the one a page
+    /// with no second try is handed. Asking each of them for a colour finds
+    /// whichever it was.
+    ///
+    /// Nothing is fetched here. What has been decoded has a colour, and what
+    /// has not leaves the pill its neutral grey rather than making an article
+    /// wait on a favicon.
+    private func mark(of identity: SourceIdentity?) -> ArticleDocument.Picture? {
+        guard let address = SourceIcon.mark(for: identity) else { return nil }
+        let tint = SourceIcon.candidates(for: identity)
+            .lazy
+            .compactMap { ImageStore.shared.tint(at: $0) }
+            .first
+        return ArticleDocument.Picture(address: address, tint: tint)
+    }
+
     var body: some View {
         // **A view of its own, over the page it was opened from.** It was
         // pushed onto the stack of whichever section the reader was in, which
@@ -226,7 +247,7 @@ struct ArticleScreen: View {
                         html: ArticleDocument.html(
                             for: article,
                             publisher: publisher(of: article)?.name ?? article.domain ?? article.feedTitle,
-                            mark: SourceIcon.mark(for: publisher(of: article)),
+                            mark: mark(of: publisher(of: article)),
                             showing: showing
                         ),
                         runsUnderTheBar: hasHeadPicture

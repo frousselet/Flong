@@ -203,10 +203,17 @@ struct ArticleStoreTests {
         let page = ArticleDocument.html(
             for: article,
             publisher: "Le Monde",
-            mark: URL(string: "https://www.lemonde.fr/favicon.ico")
+            mark: ArticleDocument.Picture(
+                address: URL(string: "https://www.lemonde.fr/favicon.ico")!,
+                tint: Tint(red: 1, green: 0, blue: 0.2)
+            )
         )
-        #expect(page.contains("<span class=\"pill\"><span class=\"mark m0\"></span>Le Monde</span>"))
-        #expect(page.contains(".pill .m0 { background-image: url(\"https://www.lemonde.fr/favicon.ico\"); }"))
+        #expect(page.contains("<span class=\"pill p0\"><span class=\"mark\"></span>Le Monde</span>"))
+        #expect(page.contains(".pill.p0 .mark { background-image: url(\"https://www.lemonde.fr/favicon.ico\"); }"))
+
+        // The pill wears a wash of whatever its mark averages to. How much of
+        // it is the stylesheet's business, so the rule says only which colour.
+        #expect(page.contains(".pill.p0 { --tint: 255 0 51; }"))
 
         // Where it came from and when on the first line, who wrote it on the
         // second : a person was in a run of punctuation between two timestamps,
@@ -257,17 +264,23 @@ struct ArticleStoreTests {
         let page = ArticleDocument.html(
             for: article,
             publisher: "Example",
-            mark: URL(string: "https://example.com/favicon.ico"),
-            portraits: ["Paul Rey": URL(string: "https://example.com/paul.jpg")!]
+            mark: ArticleDocument.Picture(address: URL(string: "https://example.com/favicon.ico")!),
+            portraits: [
+                "Paul Rey": ArticleDocument.Picture(address: URL(string: "https://example.com/paul.jpg")!)
+            ]
         )
 
         // Numbered as they are met : the publisher, then whoever has a picture.
-        #expect(page.contains("<span class=\"mark m0\"></span>Example"))
+        #expect(page.contains("<span class=\"pill p0\"><span class=\"mark\"></span>Example"))
         #expect(page.contains("<span class=\"pill\">Claire Ancelin</span>"))
-        #expect(page.contains("<span class=\"mark m1\"></span>Paul Rey"))
-        #expect(page.contains(".pill .m0 { background-image: url(\"https://example.com/favicon.ico\"); }"))
-        #expect(page.contains(".pill .m1 { background-image: url(\"https://example.com/paul.jpg\"); }"))
-        #expect(!page.contains("m2"))
+        #expect(page.contains("<span class=\"pill p1\"><span class=\"mark\"></span>Paul Rey"))
+        #expect(page.contains(".pill.p0 .mark { background-image: url(\"https://example.com/favicon.ico\"); }"))
+        #expect(page.contains(".pill.p1 .mark { background-image: url(\"https://example.com/paul.jpg\"); }"))
+        #expect(!page.contains("class=\"pill p2\""))
+
+        // A mark nobody has decoded yet leaves the pill the neutral grey the
+        // stylesheet falls back to, rather than a colour guessed at.
+        #expect(!page.contains("{ --tint:"))
     }
 
     @Test("An address cannot close the rule it is written into")
@@ -284,9 +297,9 @@ struct ArticleStoreTests {
         let page = ArticleDocument.html(
             for: article,
             publisher: "Example",
-            mark: URL(string: "https://example.com/a%22.ico")
+            mark: ArticleDocument.Picture(address: URL(string: "https://example.com/a%22.ico")!)
         )
-        #expect(page.contains(".pill .m0 { background-image: url(\"https://example.com/a%22.ico\"); }"))
+        #expect(page.contains(".pill.p0 .mark { background-image: url(\"https://example.com/a%22.ico\"); }"))
         #expect(!page.contains("a\".ico"))
     }
 

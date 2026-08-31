@@ -32,6 +32,19 @@ nonisolated enum ArticleDocument {
     /// - Parameter publisher: who published it, as the application names them
     ///   everywhere else : the group rather than the feed it arrived through.
     ///   The feed's own title stands in only where the publisher is unknown.
+    /// A picture a pill wears, and the colour that picture averages to.
+    ///
+    /// The two travel together because one comes from the other : the colour is
+    /// worked out from the pixels of the mark when they are decoded, so there
+    /// is no such thing as a tint without a picture, and a signature carrying
+    /// them apart would be a signature able to say there is.
+    nonisolated struct Picture: Hashable, Sendable {
+        let address: URL
+        /// Nothing where the mark has not been decoded on this device yet. The
+        /// pill wears the neutral grey then, rather than waiting to know.
+        var tint: Tint?
+    }
+
     /// - Parameter mark: the publisher's own mark, to set in the pill in front
     ///   of their name. One address and no second try : see ``SourceIcon/mark(for:)``.
     /// - Parameter portraits: a picture for a person who is credited, by the
@@ -47,8 +60,8 @@ nonisolated enum ArticleDocument {
     static func html(
         for article: Article,
         publisher: String? = nil,
-        mark: URL? = nil,
-        portraits: [String: URL] = [:],
+        mark: Picture? = nil,
+        portraits: [String: Picture] = [:],
         showing body: Body = .page
     ) -> String {
         let credits = byline(of: article, publisher: publisher, mark: mark, portraits: portraits)
@@ -143,26 +156,28 @@ nonisolated enum ArticleDocument {
     private static func byline(
         of article: Article,
         publisher: String?,
-        mark: URL?,
-        portraits: [String: URL]
+        mark: Picture?,
+        portraits: [String: Picture]
     ) -> (rows: String, rules: String) {
-        // Numbered as they are met, since each picture needs a selector of its
-        // own and the address itself stays in the stylesheet rather than going
-        // into an attribute, where it would be escaped twice for one gain of
-        // nothing.
-        var pictures: [URL] = []
+        // Numbered as they are met, since each picture needs selectors of its
+        // own and both the address and the colour stay in the stylesheet rather
+        // than going into an attribute, where they would be escaped twice for
+        // one gain of nothing.
+        var pictures: [Picture] = []
 
-        func pill(_ name: String, wearing picture: URL?) -> String {
-            var stamp = ""
+        func pill(_ name: String, wearing picture: Picture?) -> String {
             // The mark's own box is dropped when there is no picture to put in
             // it, since scripting is off and nothing in the page can notice one
             // that failed : a box kept for a picture that never arrives is a
             // hole in front of the name for the whole life of the page.
-            if let picture {
-                pictures.append(picture)
-                stamp = "<span class=\"mark m\(pictures.count - 1)\"></span>"
+            guard let picture else {
+                return "<span class=\"pill\">\(HTMLEntities.escape(name))</span>"
             }
-            return "<span class=\"pill\">\(stamp)\(HTMLEntities.escape(name))</span>"
+
+            pictures.append(picture)
+            let index = pictures.count - 1
+            return
+                "<span class=\"pill p\(index)\"><span class=\"mark\"></span>\(HTMLEntities.escape(name))</span>"
         }
 
         var lines: [String] = []
@@ -202,8 +217,15 @@ nonisolated enum ArticleDocument {
             lines.append("<div class=\"line\">\(pills)</div>")
         }
 
+        // The mark, and the colour the mark averages to. How much of that
+        // colour the pill takes is the stylesheet's business and the same for
+        // every pill ; all a generated rule says is which colour it is.
         let rules = pictures.enumerated()
-            .map { ".pill .m\($0.offset) { background-image: url(\"\(address($0.element))\"); }" }
+            .flatMap { index, picture -> [String] in
+                var rules = [".pill.p\(index) .mark { background-image: url(\"\(address(picture.address))\"); }"]
+                if let tint = picture.tint { rules.append(".pill.p\(index) { --tint: \(tint.channels); }") }
+                return rules
+            }
             .joined(separator: "\n")
 
         return (lines.joined(), rules)
@@ -267,12 +289,16 @@ nonisolated enum ArticleDocument {
           color-scheme: light dark;
           --text: #1c1c1e; --muted: #6c6c70; --rule: #d8d8dc; --link: #0b6bcb;
           --voice: -apple-system, system-ui, sans-serif;
-          --glass: rgba(120, 120, 128, 0.12);
         }
         @media (prefers-color-scheme: dark) {
           :root {
             --text: #f2f2f7; --muted: #9c9ca1; --rule: #3a3a3c; --link: #6fb2ff;
-            --glass: rgba(120, 120, 128, 0.24);
+          }
+          /* More of the colour on a dark page : the same wash that reads as a
+             tint over paper is all but gone over black. */
+          .pill {
+            background: rgb(var(--tint, 120 120 128) / 30%);
+            box-shadow: inset 0 0 0 0.5px rgb(var(--tint, 120 120 128) / 45%);
           }
         }
         body {
@@ -302,14 +328,20 @@ nonisolated enum ArticleDocument {
         .byline .line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
         /* The pill the picture credits already use. It takes the colour of what
            is under it, which on this page is paper and over a picture is the
-           picture. */
+           picture.
+
+           And a tint of whoever it names, where their mark has been decoded
+           and averaged : the amount is decided here, once, so a generated rule
+           has only to say which colour. A neutral grey stands in for a pill
+           whose mark is not known, which is also every pill that has none. */
         .pill {
           display: inline-flex; align-items: center; gap: 6px;
           padding: 3px 10px; border-radius: 999px;
-          color: var(--text); background: var(--glass);
+          color: var(--text);
+          background: rgb(var(--tint, 120 120 128) / 18%);
           -webkit-backdrop-filter: blur(20px) saturate(180%);
           backdrop-filter: blur(20px) saturate(180%);
-          box-shadow: inset 0 0 0 0.5px var(--rule);
+          box-shadow: inset 0 0 0 0.5px rgb(var(--tint, 120 120 128) / 35%);
         }
         /* Round and ringed, as the marks are everywhere else, and tucked into
            the padding so the pill sits no taller for having one. */

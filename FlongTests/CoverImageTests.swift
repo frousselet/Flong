@@ -9,6 +9,7 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //
 
+import CoreGraphics
 import Foundation
 import Testing
 
@@ -176,6 +177,48 @@ struct CoverImageTests {
     @Test("A source with nowhere to look for a mark is not looked for")
     func iconWithNothingToGoOn() {
         #expect(SourceIcon.candidates(stated: nil, site: nil).isEmpty)
+    }
+
+    @Test("A logo on nothing averages to the logo, not to a pale ghost of it")
+    func theColourAMarkAveragesTo() throws {
+        // A quarter of the square red and the rest transparent, which is the
+        // shape of a great many favicons.
+        let image = try #require(
+            square { context in
+                context.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
+                context.fill(CGRect(x: 0, y: 0, width: 4, height: 4))
+            })
+
+        let tint = try #require(ImageStore.average(of: image))
+
+        // Red, and not a quarter of red. A pixel composited over nothing comes
+        // back premultiplied, and dividing the alpha back out is what tells
+        // the colour of the logo from the amount of the square it covers.
+        #expect(tint.red > 0.95)
+        #expect(tint.green < 0.05)
+        #expect(tint.blue < 0.05)
+        #expect(tint.channels == "255 0 0")
+
+        // A square with nothing in it has no colour, and says so rather than
+        // answering black.
+        #expect(ImageStore.average(of: try #require(square { _ in })) == nil)
+    }
+
+    /// An eight by eight square of transparency, with whatever is drawn on it.
+    private func square(_ draw: (CGContext) -> Void) -> CGImage? {
+        let context = CGContext(
+            data: nil,
+            width: 8,
+            height: 8,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+        guard let context else { return nil }
+        context.clear(CGRect(x: 0, y: 0, width: 8, height: 8))
+        draw(context)
+        return context.makeImage()
     }
 
     @Test("Where there is one go at the mark, the order changes")

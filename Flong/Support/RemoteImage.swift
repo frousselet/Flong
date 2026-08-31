@@ -25,6 +25,27 @@ import os
 /// of magnitude cheaper in memory.
 ///
 /// The politeness of `docs/technical/fetching.md` applies here too : the same
+/// The one colour a picture averages to.
+///
+/// Channels rather than a `Color` : it is worked out in Core Graphics, cached
+/// off the main actor and written into a stylesheet, and none of those three
+/// wants a view's colour type.
+nonisolated struct Tint: Hashable, Sendable {
+    let red: Double
+    let green: Double
+    let blue: Double
+
+    /// The three channels as CSS writes them, ready to be given an alpha.
+    ///
+    /// Space separated and without the function around them, so that one rule
+    /// in the stylesheet can decide how much of the colour to use and a
+    /// generated rule has only to say which colour it is.
+    var channels: String {
+        func byte(_ value: Double) -> Int { Int((value * 255).rounded()) }
+        return "\(byte(red)) \(byte(green)) \(byte(blue))"
+    }
+}
+
 /// identifying user agent, a body cap, and a disk cache so a picture already
 /// seen is never asked for twice.
 nonisolated final class ImageStore: Sendable {
@@ -41,6 +62,20 @@ nonisolated final class ImageStore: Sendable {
     }
 
     private let memory = NSCache<NSString, Cached>()
+
+    /// The average colour of each mark, by the address it came from.
+    ///
+    /// Keyed by address alone, where the pictures are keyed by address and
+    /// size : a mark asked for at thirteen points and at seventeen is two
+    /// entries there and one colour here, which is the point, since what is
+    /// wanted is the colour of the publisher rather than of a thumbnail.
+    private let tints = NSCache<NSString, TintBox>()
+
+    /// A colour in a cache, which takes objects and not values.
+    private final class TintBox: @unchecked Sendable {
+        let tint: Tint
+        init(_ tint: Tint) { self.tint = tint }
+    }
 
     /// Addresses that answered with something that is not a picture.
     ///
@@ -79,6 +114,7 @@ nonisolated final class ImageStore: Sendable {
         // megabytes, and the system empties this under pressure anyway.
         memory.countLimit = 400
         refused.countLimit = 500
+        tints.countLimit = 400
     }
 
     /// The picture at that address, decoded no larger than it will be drawn.
@@ -121,6 +157,16 @@ nonisolated final class ImageStore: Sendable {
         switch Self.decode(data, maximumPixels: maximumPixels) {
         case .picture(let image):
             memory.setObject(Cached(image), forKey: key)
+            // Worked out here, once, while the pixels are already in hand.
+            //
+            // **For a mark and not for a photograph.** A logo is a few dozen
+            // pixels and its average is a resample of nothing ; a photograph
+            // asked for at the width of a phone is a real one, it is done for
+            // every picture in a list a reader scrolls through, and nothing
+            // wants the average colour of a photograph.
+            if maximumPixels <= Self.markPixels, let tint = Self.average(of: image) {
+                tints.setObject(TintBox(tint), forKey: url.absoluteString as NSString)
+            }
             return image
 
         case .notAPicture:
@@ -132,6 +178,68 @@ nonisolated final class ImageStore: Sendable {
             // picture, and the next attempt may get the rest of it.
             return nil
         }
+    }
+
+    /// Where a mark stops and a photograph starts, in pixels.
+    static let markPixels = 128
+
+    /// The average colour of the mark at that address, if one has been decoded.
+    ///
+    /// **It answers from what is held and never fetches.** The colour dresses a
+    /// pill that is drawn the moment an article opens, and a pill that waited
+    /// on the network to know what colour to be would be an article waiting on
+    /// a favicon. The mark of the publisher whose article is being opened was
+    /// almost certainly decoded a moment ago, by the row the reader pressed to
+    /// open it ; where it was not, the pill wears the neutral grey and nothing
+    /// is late.
+    func tint(at url: URL) -> Tint? {
+        guard HTTPURL.isFetchable(url) else { return nil }
+        return tints.object(forKey: HTTPURL.secured(url).absoluteString as NSString)?.tint
+    }
+
+    /// The one colour a picture averages to.
+    ///
+    /// Drawn into a single pixel, which is the whole of it : Core Graphics
+    /// resamples on the way down and the result is the mean of the picture.
+    ///
+    /// **Transparency is divided back out.** A favicon is a logo on nothing as
+    /// often as not, and a pixel that has been composited over a transparent
+    /// ground comes back premultiplied : a red logo covering a fifth of its
+    /// square averages to a fifth of red, which is a very pale pink rather than
+    /// red. Dividing by the alpha gives the colour of what was actually drawn,
+    /// which is the logo. A square with nothing in it at all has no colour, and
+    /// says so.
+    static func average(of image: CGImage) -> Tint? {
+        var pixel: [UInt8] = [0, 0, 0, 0]
+        let bitmap = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+
+        let drawn = pixel.withUnsafeMutableBytes { bytes -> Bool in
+            guard
+                let context = CGContext(
+                    data: bytes.baseAddress,
+                    width: 1,
+                    height: 1,
+                    bitsPerComponent: 8,
+                    bytesPerRow: 4,
+                    space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: bitmap
+                )
+            else { return false }
+
+            context.interpolationQuality = .medium
+            context.draw(image, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            return true
+        }
+        guard drawn else { return nil }
+
+        let alpha = Double(pixel[3]) / 255
+        guard alpha > 0.05 else { return nil }
+
+        return Tint(
+            red: min(Double(pixel[0]) / 255 / alpha, 1),
+            green: min(Double(pixel[1]) / 255 / alpha, 1),
+            blue: min(Double(pixel[2]) / 255 / alpha, 1)
+        )
     }
 
     /// What a set of bytes turned out to be.
