@@ -140,6 +140,9 @@ struct ArticleFeedScreen: View {
                 ToolbarItem(placement: .sectionLeading) {
                     SourcesButton(open: menu)
                 }
+                ToolbarItem(placement: .sectionLeading) {
+                    NotificationsButton(model: model)
+                }
             }
             ToolbarItem(placement: .primaryAction) {
                 if let menu {

@@ -8,6 +8,12 @@ There is no server, so there is nobody to send a notification. Every one of thes
 
 The `aps-environment` entitlement is there for `CKSyncEngine`, which uses a silent push to say that another device changed something. Nothing that arrives that way is ever shown to the reader.
 
+## Where the switches are
+
+A panel from the bottom, opened by the bell beside the sources, in the leading corner of every section a reader reads in. It was a line in the reader's menu leading to a screen of its own, and one switch does not want two presses and a way back : a reader who turns a notice on is answering a question and going back to what they were reading, which is still behind the panel while they answer.
+
+There is no master switch. A list of two switches with a third above them that overrules both is a list where nobody is sure what is on, and the system already has that switch, in the place a reader looks for it.
+
 ## Permission is asked when the reader asks
 
 Every switch starts off, and turning one on is what asks the system. A prompt at first launch is a prompt about something the reader has not seen yet, which is how an application gets refused permanently for a feature that would have been welcome later.

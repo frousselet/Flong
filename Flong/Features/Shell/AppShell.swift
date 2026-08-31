@@ -22,7 +22,6 @@ nonisolated enum Route: Hashable {
     case profile
     case topics
     case subscribedSites
-    case notifications
 }
 
 /// Which part of the application the reader is in.
@@ -281,9 +280,6 @@ struct AppShell: View {
 
         case .subscribedSites:
             SubscribedSitesScreen(model: model)
-
-        case .notifications:
-            NotificationsScreen(model: model)
         }
     }
 

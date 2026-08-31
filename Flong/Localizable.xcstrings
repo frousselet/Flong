@@ -382,16 +382,6 @@
         }
       }
     },
-    "A story is several articles, from several newsrooms, about one thing. Flong can tell you when a new one opens, which is the moment the press starts covering something." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Un fil, c'est plusieurs articles, de plusieurs rédactions, sur une même chose. Flong peut vous prévenir lorsqu'un nouveau s'ouvre, c'est-à-dire au moment où la presse se met à couvrir quelque chose."
-          }
-        }
-      }
-    },
     "A subscription platform gives each subscriber an address nobody else has. Kept in the keychain, never in the database, and never in an export." : {
       "localizations" : {
         "fr" : {
@@ -827,6 +817,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Veille"
+          }
+        }
+      }
+    },
+    "Done" : {
+      "comment" : "Closes the notifications panel",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminé"
           }
         }
       }
@@ -2545,16 +2546,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Météo"
-          }
-        }
-      }
-    },
-    "What Flong tells you" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce que Flong vous signale"
           }
         }
       }
