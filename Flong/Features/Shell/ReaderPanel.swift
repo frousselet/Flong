@@ -51,6 +51,7 @@ struct ReaderPanel: View {
     @Bindable var model: AppModel
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
 
     @State private var isNotAnImage = false
     @State private var isAddingSite = false
@@ -72,6 +73,7 @@ struct ReaderPanel: View {
             Form {
                 face
                 name
+                appearance
                 sites
 
                 #if DEBUG
@@ -81,6 +83,7 @@ struct ReaderPanel: View {
                 dangerZone
             }
             .scrollContentBackground(.hidden)
+            .themedRows()
             #if os(macOS)
                 .formStyle(.grouped)
             #endif
@@ -125,6 +128,7 @@ struct ReaderPanel: View {
             }
         }
         .task { await model.loadSubscribedSites() }
+        .themed()
     }
 
     /// The way out on the platform that needs one, and nothing else.
@@ -223,6 +227,48 @@ struct ReaderPanel: View {
         }
     }
 
+    // MARK: - How the application is set
+
+    /// The three answers to what a page is.
+    ///
+    /// **It is in this panel because a theme is about the reader.** Everything
+    /// under this face is what belongs to the person rather than to the page,
+    /// and which face they want to read in is exactly that : it follows them to
+    /// their next device, like their name and like the body an article opens
+    /// on, and it says nothing about any feed they follow.
+    ///
+    /// **Each name is set in its own theme's headline face.** A list of three
+    /// words in one face is a list that asks the reader to remember what
+    /// `Solarized` looked like ; a list where each word is drawn in the face it
+    /// will give them is a specimen, and choosing from a specimen takes no
+    /// memory at all. The line under each says what the colours do, which is
+    /// the half a specimen cannot show inside one row.
+    private var appearance: some View {
+        Section {
+            Picker(selection: $model.theme) {
+                ForEach(Theme.allCases) { candidate in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(candidate.name)
+                            .font(candidate.headline(.body))
+                        Text(candidate.explanation)
+                            .font(candidate.metadata)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
+                    .tag(candidate)
+                }
+            } label: {
+                Text("Theme")
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        } header: {
+            Text("Appearance")
+        } footer: {
+            Text("Carried to your other devices, like everything else you choose here.")
+        }
+    }
+
     // MARK: - The sites they pay for
 
     /// The sites a reader pays for, and the sessions that prove it.
@@ -274,7 +320,7 @@ struct ReaderPanel: View {
                     Text("Signed in \(site.signedInAt, format: .relative(presentation: .named))")
                 }
             }
-            .font(Editorial.metadata)
+            .font(theme.metadata)
             .foregroundStyle(.secondary)
         }
         .swipeActions {

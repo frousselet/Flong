@@ -22,7 +22,9 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **Enrichment happens on the device.** Classification, tagging and summaries come from the system model, in your own language whatever language the articles are in, and no article content is sent anywhere.
 
-**It is set like a page, not like a control panel.** One column at a time, held to a readable measure, serif headlines, hairline rules, no cards and no boxes. Liquid Glass stays in the navigation layer, where Apple puts it, apart from the subject pills and the credit in the corner of a picture.
+**It is set like a page, not like a control panel.** One column at a time, held to a readable measure, hairline rules, no cards and no boxes. Liquid Glass stays in the navigation layer, where Apple puts it, apart from the subject pills and the credit in the corner of a picture.
+
+**Three themes, and they reach everything.** `Défaut` is the system's own colours set throughout in sans serif ; `Papier` sets headlines in serif on warm paper with the contrast pulled back ; `Solarized` is Ethan Schoonover's palette with headlines in monospace. Each states both appearances and follows the device, the rendered article included. The choice is made under your own face in the reader's panel, and it follows you to your other devices.
 
 ## Screenshots
 

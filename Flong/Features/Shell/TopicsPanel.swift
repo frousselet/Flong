@@ -42,6 +42,7 @@ struct TopicsPanel: View {
     let model: AppModel
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
 
     @State private var isAdding = false
     @State private var name = ""
@@ -51,6 +52,7 @@ struct TopicsPanel: View {
             head
             subjects
         }
+        .themed()
         .presentationDetents([.height(Panel.tall), .large])
         .presentationDragIndicator(.visible)
         .alert("Add a subject", isPresented: $isAdding) {
@@ -68,7 +70,7 @@ struct TopicsPanel: View {
     private var head: some View {
         HStack(spacing: 14) {
             Text("Subjects")
-                .font(Editorial.headline(.title3))
+                .font(theme.headline(.title3))
 
             Spacer(minLength: 8)
 
@@ -120,6 +122,7 @@ struct TopicsPanel: View {
             }
         }
         .scrollContentBackground(.hidden)
+        .themedRows()
         .overlay {
             if model.knownTopics.isEmpty {
                 ContentUnavailableView {
@@ -158,7 +161,7 @@ struct TopicsPanel: View {
                 // The band above says whose it is, so the line under the name
                 // says only how much of the page it covers.
                 Text("\(topic.stories) stories")
-                    .font(Editorial.metadata)
+                    .font(theme.metadata)
                     .foregroundStyle(.secondary)
             }
 

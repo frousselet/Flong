@@ -216,6 +216,18 @@ final class AppModel {
             preferences.articleBody = articleBody
         }
     }
+
+    /// How the application is set : the faces and the colours the reader chose.
+    ///
+    /// Kept beside the body an article opens on, in the same store and for the
+    /// same reason : it is a decision about themselves rather than about a
+    /// device, and it follows them to the next one.
+    var theme = Theme.standard {
+        didSet {
+            guard theme != oldValue else { return }
+            preferences.theme = theme
+        }
+    }
     // MARK: - What the reader is told
 
     /// Whether the reader wants to hear when a story opens.
@@ -662,6 +674,7 @@ final class AppModel {
         self.preferences = preferences
         self.announcer = announcer
         self.articleBody = preferences.articleBody
+        self.theme = preferences.theme
         self.wantsNewStoryNotices = preferences.wantsNewStoryNotices
         self.firstName = preferences.firstName
         self.lastName = preferences.lastName
@@ -834,6 +847,7 @@ final class AppModel {
         // Another device may have changed them while this one was away.
         preferences.synchronize()
         articleBody = preferences.articleBody
+        theme = preferences.theme
         loadProfile()
         await countOutstandingWork()
     }
@@ -1416,6 +1430,7 @@ final class AppModel {
         lastName = ""
         setPicture(nil)
         articleBody = .feed
+        theme = .standard
         wantsNewStoryNotices = false
         preferences.forgetEverything()
 

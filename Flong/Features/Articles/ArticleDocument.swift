@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 /// Builds the page an article is displayed as.
 ///
@@ -57,12 +58,18 @@ nonisolated enum ArticleDocument {
     ///   page, a Micropub author, or the reader's own choosing. Whichever of
     ///   those arrives, what it has to hand over is this, and the page already
     ///   knows what to do with it.
+    /// - Parameter theme: how the reader has asked the application to be set.
+    ///   The article is a page of Flong and not a page of the web : it is set
+    ///   in the same faces and printed on the same paper as the screen it was
+    ///   opened from, or a reader who chose warm paper gets it everywhere but
+    ///   in the one place they actually read.
     static func html(
         for article: Article,
         publisher: String? = nil,
         mark: Picture? = nil,
         portraits: [String: Picture] = [:],
-        showing body: Body = .page
+        showing body: Body = .page,
+        theme: Theme = .standard
     ) -> String {
         let credits = byline(of: article, publisher: publisher, mark: mark, portraits: portraits)
         let chosen = (body == .page ? article.extractedHTML : nil) ?? article.bodyHTML ?? ""
@@ -74,7 +81,7 @@ nonisolated enum ArticleDocument {
             <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-            <style>\(stylesheet)</style>
+            <style>\(stylesheet(for: theme))</style>
             <style>\(glyphs)</style>
             <style>\(credits.rules)</style>
             </head>
@@ -350,26 +357,50 @@ nonisolated enum ArticleDocument {
             .replacingOccurrences(of: "\r", with: "")
     }
 
-    /// Deliberately small : an article is text, and the reader's own settings
-    /// decide the rest once section 10 typography arrives.
-    private static let stylesheet = """
+    /// The six colours of one appearance, as a stylesheet declares them.
+    ///
+    /// The same six ``Palette`` holds, spelled once here rather than at each of
+    /// the two places a theme states them : the light block and the dark one
+    /// differ in their values and never in which values there are, and a
+    /// stylesheet that listed them twice by hand is a stylesheet where one
+    /// appearance quietly keeps a colour the other dropped.
+    private static func variables(of palette: Palette) -> String {
+        """
+        --text: \(palette.ink.css); --muted: \(palette.muted.css); --rule: \(palette.rule.css);
+        --link: \(palette.accent.css);
+        /* The page's own colour, which a pill is mixed into rather than laid
+           over : a solid fill has to know what it is solid against. */
+        --paper: \(palette.paper.css);
+        /* Half of the separator, which is what the pictures on the front page
+           keep for their edge : enough to say where the edge is, never enough
+           to be the thing one looks at. */
+        --edge: \(palette.edge.css);
+        """
+    }
+
+    /// Deliberately small : an article is text, and what decides the rest is
+    /// the theme the reader chose, which is the whole of what this takes.
+    ///
+    /// **Both appearances, always, whichever the device is in.** A stylesheet
+    /// cannot be rebuilt when the reader turns the lights off : the page is in
+    /// a web view that was handed a document, and `prefers-color-scheme` is
+    /// what lets that one document be right in either. So a theme states its
+    /// light and its dark here together, and the browser picks.
+    private static func stylesheet(for theme: Theme) -> String {
+        """
         :root {
           color-scheme: light dark;
-          --text: #1c1c1e; --muted: #6c6c70; --rule: #d8d8dc; --link: #0b6bcb;
-          --voice: -apple-system, system-ui, sans-serif;
-          /* The page's own colour, which a pill is mixed into rather than laid
-             over : a solid fill has to know what it is solid against. */
-          --paper: #ffffff;
-          /* Half of the separator, which is what the pictures on the front page
-             keep for their edge : enough to say where the edge is, never enough
-             to be the thing one looks at. */
-          --edge: rgba(60, 60, 67, 0.15);
+          \(variables(of: theme.palette(in: .light)))
+          /* The application's own voice, as against the article's : a byline, a
+             caption, a date. Sans in every theme, which is what keeps what the
+             page says apart from what the application says about it. */
+          --voice: \(Theme.sansStack);
+          --headline: \(theme.pageHeadline);
+          --body: \(theme.pageBody);
         }
         @media (prefers-color-scheme: dark) {
           :root {
-            --text: #f2f2f7; --muted: #9c9ca1; --rule: #3a3a3c; --link: #6fb2ff;
-            --paper: #000000;
-            --edge: rgba(84, 84, 88, 0.33);
+            \(variables(of: theme.palette(in: .dark)))
           }
           /* More of the colour on a dark page : the same amount that reads as a
              tint against paper is all but gone against black. */
@@ -377,11 +408,17 @@ nonisolated enum ArticleDocument {
             background: color-mix(in srgb, rgb(var(--tint, 120 120 128)) 26%, var(--paper));
           }
         }
+        \(page)
+        """
+    }
+
+    /// Everything about the page that no theme changes.
+    private static let page = """
         body {
           margin: 0; padding: 0;
           /* The shorthand carries Dynamic Type ; the family after it carries the
-             voice. Serif for what was written, as everywhere else. */
-          font: -apple-system-body; font-family: ui-serif, "New York", Georgia, serif;
+             voice, which is the theme's to decide. */
+          font: -apple-system-body; font-family: var(--body);
           line-height: 1.55; color: var(--text); background: var(--paper);
           -webkit-text-size-adjust: 100%; overflow-wrap: break-word;
         }
@@ -392,6 +429,11 @@ nonisolated enum ArticleDocument {
            shape gives it. */
         .lead { margin: 0; }
         .lead img { display: block; width: 100%; height: auto; }
+        /* The headline, and the headings the publisher wrote inside the piece,
+           in the theme's own headline face : they are the same kind of thing,
+           and a page whose title is monospace and whose subheadings are not is
+           a page set in two themes. */
+        h1, h2, h3, h4 { font-family: var(--headline); }
         h1 { font-size: 1.6em; line-height: 1.25; margin: 0 0 8px; }
         h2, h3, h4 { line-height: 1.3; margin: 1.4em 0 0.4em; }
         /* What the application says about the article, rather than the article. */

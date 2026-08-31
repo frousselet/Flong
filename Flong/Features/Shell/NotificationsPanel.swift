@@ -42,6 +42,8 @@ struct NotificationsPanel: View {
     let model: AppModel
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var scheme
 
     private var isRefused: Bool {
         model.notificationStatus == .denied
@@ -74,7 +76,10 @@ struct NotificationsPanel: View {
             .disabled(isRefused)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(.background.secondary, in: .rect(cornerRadius: 14))
+            // The theme's own row, one shade off its paper, rather than the
+            // system's secondary background : a grey card is the right card
+            // under the standard theme and a foreign one on warm paper.
+            .background(theme.surface(in: scheme), in: .rect(cornerRadius: 14))
 
             if isRefused {
                 refusal
@@ -83,6 +88,7 @@ struct NotificationsPanel: View {
         .padding(.horizontal, 20)
         .padding(.top, 20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .themed()
         .presentationDetents([.height(height)])
         .presentationDragIndicator(.visible)
         .task { await model.refreshNotificationStatus() }
@@ -92,7 +98,7 @@ struct NotificationsPanel: View {
     private var head: some View {
         HStack(spacing: 14) {
             Text("Notifications")
-                .font(Editorial.headline(.title3))
+                .font(theme.headline(.title3))
 
             Spacer(minLength: 8)
 

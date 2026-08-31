@@ -18,12 +18,48 @@ So the digest is set as an editor would set a page :
 | ----- | ----- | --- |
 | `measure` | 680 pt | The column stops there whatever the window does. A line of text past about 80 characters is a line the eye loses. |
 | `rhythm` / `tightRhythm` | 28 / 10 pt | Two spacings, used everywhere, so the page has a pulse rather than forty arbitrary gaps. |
-| `headline` | system serif, semibold | Serif for what was written, sans for what the application says about it. The two voices stay apart without a single line of chrome. |
-| `metadata` | caption, tertiary | The facts under a story are for the reader who asks, not for the one who scans. |
+| `headline` | the theme's own face, semibold | One voice for what was written, another for what the application says about it. The two stay apart without a single line of chrome. |
+| `metadata` | caption, sans, tertiary | The facts under a story are for the reader who asks, not for the one who scans. Sans in every theme, so the application's voice never wears the headline's face. |
 
-They live in `Flong/Support/Editorial.swift`. A screen that needs a fifth spacing value is a screen that has gone wrong.
+The measures live in `Flong/Support/Editorial.swift` and the faces in `Flong/Support/Theme.swift`. A screen that needs a fifth spacing value is a screen that has gone wrong.
 
 Section headers are uppercase, kerned, secondary, and a hairline rule sits above each row. That is the whole vocabulary. No card, no box, no shadow, no glass in the content.
+
+## Three themes, and what a theme reaches
+
+The headline face used to be serif and nothing else, which was a decision about what a page is, taken on the reader's behalf. It is now one of three, and the three are opinions rather than permutations of a typeface menu :
+
+| Theme | Faces | Paper |
+| ----- | ----- | ----- |
+| `Défaut` | Sans throughout | The system's own |
+| `Papier` | Serif headlines and standfirsts | Warm cream, warm near-black at night, every colour pulled back from the contrast a screen defaults to |
+| `Solarized` | Monospace headlines over a sans body | base3 and base03, with base01 and base1 for the ink |
+
+**Three, and three is the number.** Past three they stop being opinions. Each says something the other two do not, and each says it in the two halves a theme has : what it is set in, and what it is printed on.
+
+**The face is the loud half.** A reader can name a theme's colours after a while ; they tell the face apart in the first second, and it is what says whether this is a place where things are read or a place where things are managed. So the panel sets each theme's name in that theme's own headline face : a list of three words in one face asks the reader to remember what `Solarized` looked like, and a specimen asks them to remember nothing. The line under each name says what the colours do, which is the half a row cannot show.
+
+**The metadata is sans in all three.** It is the application's own voice, and a theme that set it in the headline's face would have thrown away the one distinction the typography exists to make. A monospace caption under every story would also be the loudest quiet thing on the page.
+
+**`Défaut` states no colours at all, and that is what it means.** It is the system's appearance, so it is left to the system : a theme that restated the system's colours as literals is a theme that stops following them the first time the system changes one, or the reader turns the contrast up. `Theme.paints` is what says so, and the painting modifier does nothing under it. The one place `Défaut` does state its six colours is the rendered article, which is a web page and has no system colours to inherit ; they are the values the stylesheet has always carried.
+
+**Light and dark are not themes.** Each of the three states both appearances and follows the device, which is why `Palette` is asked for one appearance at a time and why a test refuses a theme whose two papers are the same colour. The rendered article states both at once, in a `prefers-color-scheme` block : the web view is handed a document and cannot be handed another one when the reader turns the lights off.
+
+### Where it is painted
+
+The theme goes into the environment once, at the outermost modifier of the window, so that every sheet, alert and panel is inside it. The order is the whole of it : a modifier written later is the outer one, and a value reaches what is inside it, so the painting written outside the value that says what to paint reads the default for ever.
+
+The paper itself is laid in three places, and each is a place the system would otherwise lay its own :
+
+- **Inside each navigation stack**, on the page rather than around the tab view. A navigation stack draws the system's background behind whatever it is showing, so a colour painted on the window outside it changed every face and left the page white.
+- **At the root of every sheet.** A sheet inherits the environment and therefore knows its theme, but it is a surface of its own : a background on the window behind one stays on the window behind it.
+- **On the rows of a list**, by `themedRows()`, said on the list itself. A row's ground is the one thing a form's surroundings cannot state on its behalf, and the system's white card on warm paper is the brightest thing on the screen and the only thing in the panel out of theme.
+
+The ink is set once, as the foreground style, and everything follows from it : a view asking for `.secondary` is asking for less of whatever the ink is, so the whole application follows without a screen having heard of a palette.
+
+### What a theme does not reach
+
+**The navigation layer stays the system's**, which is the same rule as the one above about Liquid Glass. A section's large title and the tab bar's labels are drawn by the system and take the system's colour ; neither `foregroundStyle` nor a styled `Text` passed to `navigationTitle` reaches them, and the only thing that would is a global appearance proxy, which is mutable state shared with every bar in the process, does not answer to a theme changed while the application is running, and has no macOS counterpart. So the dateline over the front page is the system's black on `Papier`'s cream, deliberately, and the application's own page begins underneath it.
 
 ## Liquid Glass belongs to the navigation layer
 
@@ -374,7 +410,9 @@ It is still not an account. There is no account and nothing to sign in to, and t
 
 **It was a menu and is a panel**, the fourth of them, built like the three in the other corner : untitled, closed by a flick, over the page rather than in front of it. A menu of lines leading to screens was the wrong shape for what was behind them, a name and a face and the sites the reader pays for being things they set and come straight back from.
 
-It holds the reader's face and name, the sites they are signed in to, and, in a build being worked on, the command that makes the exchange with iCloud happen on demand. `Actualiser` is gone with the menu ; the page keeps itself up to date, which is what this document has said all along.
+It holds the reader's face and name, how the application is set, the sites they are signed in to, and, in a build being worked on, the command that makes the exchange with iCloud happen on demand.
+
+**The theme is chosen here because a theme is about the reader.** Which face they want to read in is not a fact about any feed they follow : it follows them to their next device, like their name and like the body an article opens on, and it belongs under their own face for the same reason those do. `Actualiser` is gone with the menu ; the page keeps itself up to date, which is what this document has said all along.
 
 **The notices and the subjects came out of it.** Not because they are opened often, which they are not, but because of the shape of what a reader does in them : they say one thing about the page they are looking at and go back to reading it. Two presses to reach a whole screen with a way back on it is the wrong shape for that, however rarely it is done. Both stand beside the sources in the leading corner now, and all three open panels over the page.
 

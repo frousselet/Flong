@@ -153,12 +153,14 @@ struct AppShell: View {
         // from is still there when they put the article down.
         .sheet(item: $reading) { article in
             zoomed(ArticleScreen(model: model, articleID: article.id), from: article.id)
+                .themed()
         }
         .sheet(isPresented: $isAddingFeed) {
             AddFeedView(
                 add: { address in await model.addFeed(at: address) },
                 addPrivate: { address in await model.addPrivateFeed(at: address) }
             )
+            .themed()
         }
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: OPMLDocument.types) { result in
             guard case .success(let url) = result else { return }
@@ -253,6 +255,18 @@ struct AppShell: View {
         } message: { failure in
             Text(failure.message)
         }
+        // **The theme is painted here and stated after it.** A face is asked for
+        // by every screen and a paper by every screen that scrolls, and neither
+        // is a thing to hand down through four initializers.
+        //
+        // The order is the whole of it. A modifier written later is the outer
+        // one, and an environment value reaches what is inside it : stating the
+        // theme last is what puts every sheet, every alert and the painting
+        // itself inside it. Written the other way round, the thing doing the
+        // painting sits outside the value that says what to paint, and reads
+        // the default for ever.
+        .themed()
+        .environment(\.theme, model.theme)
     }
 
     /// One stack per section, so going back means going back where the reader
@@ -275,11 +289,21 @@ struct AppShell: View {
         }
     }
 
+    /// One stack per section, each page in it painted in the reader's theme.
+    ///
+    /// **The paper is laid inside the stack and not around it.** A navigation
+    /// stack draws the system's own background behind whatever it is showing,
+    /// and a colour painted on the window outside the tab view is a colour
+    /// behind that : the theme changed every face and every piece of type and
+    /// left the page it was all printed on white. Painted on the page itself,
+    /// it covers the one thing that was covering it.
     private func stack(_ path: Binding<[Route]>, @ViewBuilder root: () -> some View) -> some View {
         NavigationStack(path: path) {
             root()
+                .themed()
                 .navigationDestination(for: Route.self) { route in
                     destination(route, path: path)
+                        .themed()
                 }
         }
     }

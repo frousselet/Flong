@@ -23,6 +23,8 @@ struct SearchScreen: View {
     var menu: ((Route) -> Void)?
     let open: (UUID) -> Void
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
@@ -70,7 +72,7 @@ struct SearchScreen: View {
         .safeAreaInset(edge: .bottom) {
             if model.isShowingResults, !model.summaries.isEmpty {
                 Text("\(model.summaries.count) results")
-                    .font(Editorial.metadata)
+                    .font(theme.metadata)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)

@@ -283,7 +283,17 @@ A secret URL is treated as a secret in its own right : masked in the interface, 
 
 **Media** : playback of audio and video enclosures, podcast feeds with playback position, background playback and Control Center commands.
 
-**Typography** : control over typeface, size, leading and column width, light, dark and sepia themes.
+**Typography** : **amended**. This asked for control over typeface, size, leading and column width, and light, dark and sepia themes. What is built is **three themes**, chosen once and applied to the whole application rather than to the article alone, since a reader who asked to read on warm paper did not mean only inside an article :
+
+| Theme | Faces | Colours |
+| ----- | ----- | ------- |
+| `Défaut` | Sans serif throughout | The system's own, which it states none of |
+| `Papier` | Serif headlines, serif standfirst | Warm paper, with the contrast pulled back |
+| `Solarized` | Monospace headlines, sans body | Ethan Schoonover's palette |
+
+Light and dark stay the system's answer rather than becoming themes of their own, so each of the three states both and follows the device. Sepia is `Papier` under another name. The choice is carried between the reader's devices by the iCloud key-value store, like the body an article opens on, and never by a CloudKit record.
+
+Size is Dynamic Type and belongs to the system. Leading and column width are not offered : the measure is one of the decisions the page makes rather than one it asks the reader about. `docs/technical/interface.md` records what a theme reaches and what stays the system's.
 
 ---
 

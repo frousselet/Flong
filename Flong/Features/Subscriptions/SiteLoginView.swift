@@ -37,6 +37,7 @@ struct SiteLoginView: View {
     @State private var page = LoginPage()
     @State private var isCapturing = false
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
 
     var body: some View {
         NavigationStack {
@@ -59,7 +60,7 @@ struct SiteLoginView: View {
                     Text(
                         "Sign in on the site as you normally would, then say so. Flong keeps the session, never a password."
                     )
-                    .font(Editorial.metadata)
+                    .font(theme.metadata)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 22)

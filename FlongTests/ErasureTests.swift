@@ -88,6 +88,7 @@ struct ErasureTests {
         store.firstName = "Ada"
         store.lastName = "Lovelace"
         store.articleBody = .page
+        store.theme = .solarized
         store.wantsNewStoryNotices = true
         store.storiesAnnouncedAt = Date()
         let device = store.device
@@ -98,6 +99,7 @@ struct ErasureTests {
         #expect(store.lastName.isEmpty)
         #expect(store.picture == nil)
         #expect(store.articleBody == .feed)
+        #expect(store.theme == .standard)
         #expect(!store.wantsNewStoryNotices)
         #expect(store.storiesAnnouncedAt == nil)
         // The identifier goes too, and the next one asked for is a new one.

@@ -46,6 +46,7 @@ struct SourcesPanel: View {
     let open: (SidebarItem.Kind) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
 
     /// The publisher whose name is being written, and what is being written.
     @State private var renaming: String?
@@ -79,6 +80,7 @@ struct SourcesPanel: View {
                 status
             }
             .scrollContentBackground(.hidden)
+            .themedRows()
             .overlay {
                 if model.isEmpty {
                     ContentUnavailableView {
@@ -121,11 +123,13 @@ struct SourcesPanel: View {
                 add: { address in await model.addFeed(at: address) },
                 addPrivate: { address in await model.addPrivateFeed(at: address) }
             )
+            .themed()
         }
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: OPMLDocument.types) { result in
             guard case .success(let url) = result else { return }
             Task { await model.importOPML(from: url) }
         }
+        .themed()
     }
 
     /// What the panel is, the two ways to add a source, and the way out on the
@@ -133,7 +137,7 @@ struct SourcesPanel: View {
     private var head: some View {
         HStack(spacing: 14) {
             Text("Sources")
-                .font(Editorial.headline(.title3))
+                .font(theme.headline(.title3))
 
             Spacer(minLength: 8)
 
@@ -357,7 +361,7 @@ struct SourcesPanel: View {
             // a column would be a column of blanks.
             if item.isFavourite {
                 Image(systemName: "star.fill")
-                    .font(Editorial.metadata)
+                    .font(theme.metadata)
                     .foregroundStyle(.yellow)
                     .accessibilityLabel(Text("Favourite source"))
             }
@@ -368,7 +372,7 @@ struct SourcesPanel: View {
             // count is the size of the corpus answering nothing.
             if item.articleCount > 0 {
                 Text(item.articleCount, format: .number)
-                    .font(Editorial.metadata)
+                    .font(theme.metadata)
                     .foregroundStyle(.secondary)
             }
         }
