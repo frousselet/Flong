@@ -1502,6 +1502,26 @@
         }
       }
     },
+    "Published %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publié %@"
+          }
+        }
+      }
+    },
+    "Received %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reçu %@"
+          }
+        }
+      }
+    },
     "Refresh" : {
       "localizations" : {
         "fr" : {
@@ -2249,6 +2269,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sans titre"
+          }
+        }
+      }
+    },
+    "updated" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "modifié"
+          }
+        }
+      }
+    },
+    "updated %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "modifié %@"
           }
         }
       }

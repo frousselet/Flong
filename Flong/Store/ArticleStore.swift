@@ -23,7 +23,21 @@ nonisolated struct ArticleSummary: Identifiable, Hashable, Sendable, FetchableRe
     let title: String
     let excerpt: String?
     let author: String?
+    /// When the article says it was published, or when it reached this device
+    /// if it says nothing.
     let date: Date
+    /// Whether that date is the publisher's own.
+    ///
+    /// **Some feeds date nothing.** `Le Parisien` states a build date for the
+    /// channel and none for any of its items, so a hundred of its articles have
+    /// only the moment they were pulled to sort by. That is the honest answer
+    /// and there is no other, but it must not be shown as though the publisher
+    /// had said it : a row reading `il y a 2 heures` about an article nobody
+    /// dated is telling the reader something nobody knows.
+    let isDated: Bool
+    /// When the publisher last changed it, where they say so and it is later
+    /// than the publication.
+    let updatedAt: Date?
     var isRead: Bool
     var isStarred: Bool
     let hasMedia: Bool
@@ -35,6 +49,21 @@ nonisolated struct ArticleSummary: Identifiable, Hashable, Sendable, FetchableRe
     let feedIconURL: URL?
     let feedSiteURL: URL?
 
+    /// When an article was last changed, where that is later than when it was
+    /// published and by more than a moment.
+    static func meaningfulUpdate(of entry: Entry) -> Date? {
+        guard let updated = entry.updatedAt else { return nil }
+        guard let published = entry.publishedAt else { return updated }
+        return updated.timeIntervalSince(published) >= ArticleSummary.worthCalling ? updated : nil
+    }
+
+    /// How much later an update has to be before it is worth saying.
+    ///
+    /// A minute. A publisher who stamps the two within seconds of each other
+    /// has published, not updated, and a row that said `modifié` about every
+    /// article would say nothing at all.
+    static let worthCalling: TimeInterval = 60
+
     init(row: Row) {
         id = row["id"]
         feedID = row["feed_id"]
@@ -42,6 +71,18 @@ nonisolated struct ArticleSummary: Identifiable, Hashable, Sendable, FetchableRe
         title = row["title"]
         excerpt = row["excerpt"]
         author = row["author"]
+        isDated = (row["published_at"] as Date?) != nil
+
+        // Only when it is later than the publication and by more than a moment.
+        // A publisher who stamps both at the same second, or who republishes a
+        // feed without changing anything, has not updated the article, and a
+        // row saying so about every article says nothing.
+        let published = row["published_at"] as Date?
+        let updated = row["updated_at"] as Date?
+        updatedAt = updated.flatMap { moment in
+            guard let published else { return moment }
+            return moment.timeIntervalSince(published) >= ArticleSummary.worthCalling ? moment : nil
+        }
         date = row["date"]
         isRead = row["is_read"] ?? true
         isStarred = row["is_starred"] ?? true
@@ -63,6 +104,8 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
     let author: String?
     let url: URL?
     let publishedAt: Date?
+    /// When the publisher last changed it, where they say so.
+    let updatedAt: Date?
     let language: String?
     var isRead: Bool
     var isStarred: Bool
@@ -82,6 +125,7 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
         author: String? = nil,
         url: URL? = nil,
         publishedAt: Date? = nil,
+        updatedAt: Date? = nil,
         language: String? = nil,
         isRead: Bool = true,
         isStarred: Bool = false,
@@ -95,6 +139,7 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
         self.author = author
         self.url = url
         self.publishedAt = publishedAt
+        self.updatedAt = updatedAt
         self.language = language
         self.isRead = isRead
         self.isStarred = isStarred
@@ -152,6 +197,7 @@ nonisolated struct ArticleStore: Sendable {
                e.is_read, e.is_starred, e.has_media, e.image_url,
                f.icon_url, f.site_url, f.url AS feed_url,
                COALESCE(e.published_at, e.received_at) AS date,
+               e.published_at AS published_at, e.updated_at AS updated_at,
                f.title AS feed_title
         """
 
@@ -238,6 +284,7 @@ nonisolated struct ArticleStore: Sendable {
                 author: entry.author,
                 url: entry.url,
                 publishedAt: entry.publishedAt,
+                updatedAt: ArticleSummary.meaningfulUpdate(of: entry),
                 language: entry.language,
                 isRead: entry.isRead,
                 isStarred: entry.isStarred,

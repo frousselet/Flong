@@ -671,8 +671,7 @@ struct ArticleRow: View {
                         Text(verbatim: article.feedTitle)
                             .lineLimit(1)
                             .padding(.trailing, 2)
-                        Text(article.date, format: .relative(presentation: .numeric))
-                            .lineLimit(1)
+                        ArticleMoment(article: article)
                         if article.isStarred {
                             Image(systemName: "star.fill")
                                 .foregroundStyle(.yellow)

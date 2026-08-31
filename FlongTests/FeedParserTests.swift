@@ -220,6 +220,42 @@ struct FeedDatesTests {
 
     @Test("A date that means nothing stays nothing")
     func nonsense() {
+        // Real feeds, and two spellings the formats did not cover.
+        //
+        // `senat.fr` writes no space after the weekday's comma, and
+        // `cert.europa.eu` names a European zone that a POSIX locale has never
+        // heard of. Both left an article with no date, which sorts it on the
+        // day it arrived : a hundred and thirty of them in one store, wearing
+        // the moment they were pulled as though it were the moment they were
+        // written.
+        // The comma with nothing after it reads as the same instant as the one
+        // written properly.
+        #expect(
+            FeedDates.date(from: "Fri,28 Aug 2026 01:03:20 GMT")
+                == FeedDates.date(from: "Fri, 28 Aug 2026 01:03:20 GMT")
+        )
+
+        // And a European zone is the offset it stands for, summer time
+        // included : seventeen o'clock in Brussels is fifteen in London.
+        #expect(
+            FeedDates.date(from: "Mon, 03 Aug 2026 17:00:00 CEST")
+                == FeedDates.date(from: "Mon, 03 Aug 2026 15:00:00 GMT")
+        )
+        #expect(
+            FeedDates.date(from: "Mon, 03 Aug 2026 17:00:00 CET")
+                == FeedDates.date(from: "Mon, 03 Aug 2026 16:00:00 GMT")
+        )
+
+        // `CEST` is never read as `CET` with a letter left over.
+        #expect(
+            FeedDates.date(from: "Mon, 03 Aug 2026 17:00:00 CEST")
+                != FeedDates.date(from: "Mon, 03 Aug 2026 17:00:00 CET"))
+
+        // Ambiguous by nature, so left alone : Indian, Irish and Israeli
+        // standard time are three different offsets, and a wrong date sorts an
+        // article into the wrong week.
+        #expect(FeedDates.date(from: "Mon, 03 Aug 2026 17:00:00 IST") == nil)
+
         #expect(FeedDates.date(from: "") == nil)
         #expect(FeedDates.date(from: "soon") == nil)
     }
