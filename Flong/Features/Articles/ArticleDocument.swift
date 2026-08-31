@@ -217,7 +217,7 @@ nonisolated enum ArticleDocument {
         if let updated = article.updatedAt {
             moments.append(moment(updated, kind: .revised))
         }
-        if !moments.isEmpty { lines.append("<div class=\"line\">\(moments.joined())</div>") }
+        if !moments.isEmpty { lines.append("<div class=\"line when\">\(moments.joined())</div>") }
 
         // The mark, and the colour the mark averages to. How much of that
         // colour the pill takes is the stylesheet's business and the same for
@@ -394,6 +394,12 @@ nonisolated enum ArticleDocument {
         }
         .byline:empty { display: none; margin: 0; }
         .byline .line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+        /* The dates stand a little off the names above them : they are the one
+           line of the three that is not a row of pills, and the gap that
+           separates two rows of pills is not enough to separate a row of them
+           from something else. Only where there is something above to stand off
+           from. */
+        .byline .line + .when { margin-top: 6px; }
         /* The pill the picture credits already use. It takes the colour of what
            is under it, which on this page is paper and over a picture is the
            picture.
