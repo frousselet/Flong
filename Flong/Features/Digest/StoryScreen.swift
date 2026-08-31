@@ -221,7 +221,8 @@ struct ArticleScreen: View {
             Group {
                 if let article = model.article, article.id == articleID {
                     ArticleWebView(
-                        html: ArticleDocument.html(for: article, publisher: publisher(of: article), showing: showing)
+                        html: ArticleDocument.html(for: article, publisher: publisher(of: article), showing: showing),
+                        runsUnderTheBar: hasHeadPicture
                     )
                     .toolbar { toolbar(for: article) }
                     .overlay(alignment: .bottom) {
