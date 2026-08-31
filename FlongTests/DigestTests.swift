@@ -1270,6 +1270,34 @@ struct ModelFailureTests {
         #expect(StorySummarizer.isShort("L'étude de l'impact de l'ozone sur l'agriculture d'altitude l'an prochain"))
     }
 
+    @Test("A standfirst stops being one somewhere past a paragraph")
+    func standfirstLength() {
+        // A chapeau of one or two sentences runs to about twenty-five or forty
+        // words. The ceiling is generous on purpose : what it is for is the
+        // model that writes a paragraph, and rejecting a good standfirst of
+        // forty-two words costs the reader a real line for nothing.
+        #expect(
+            StorySummarizer.isBrief(
+                "Le ministère décale la rentrée à la mi-août dans trois académies pilotes, contre l'avis des syndicats."
+            )
+        )
+        #expect(StorySummarizer.isBrief(String(repeating: "mot ", count: StorySummarizer.maximumSummaryWords)))
+        #expect(!StorySummarizer.isBrief(String(repeating: "mot ", count: StorySummarizer.maximumSummaryWords + 1)))
+    }
+
+    @Test("Naming somebody does not make a standfirst too long")
+    func abbreviationsDoNotSplitIt() {
+        // Counted in words rather than sentences on purpose : a sentence
+        // tokenizer splits `M. Dupont` in two, and a standfirst rejected for
+        // naming somebody is a worse outcome than one that ran to three.
+        #expect(StorySummarizer.isBrief("M. Dupont a signé l'arrêté. Mme Martin s'y oppose. Le Conseil tranchera."))
+    }
+
+    @Test("A story with no standfirst at all is not too long")
+    func nothingIsBriefEnough() {
+        #expect(StorySummarizer.isBrief(""))
+    }
+
     @Test("A standfirst that says the headline again has said nothing")
     func standfirstMustAdd() {
         let title = "La rentrée avancée à la mi-août"
