@@ -80,6 +80,8 @@ What it really held, once the frozen text stopped being wanted, was the reader's
 
 **Group of sources** : every feed one publisher serves, keyed by the host they share, which is the same host the digest counts as a room. It is worked out from the addresses and stored nowhere, so there is no group to make, none to keep in step and none left empty. The reader may write a name over one, and that name is the only thing about a group that is kept.
 
+The group is also **who an article is shown to be from**, everywhere it is shown : the name and the favicon on an article row, at the head of an article and in the system index are the publisher's and never the feed's. A favicon is a property of a site, so it is asked for once per group rather than once per desk.
+
 **Folder** : *removed*. A feed carried the path of a folder it sat in, and no screen ever let a reader make one, rename one or take one away : the only folders that existed came out of an imported OPML file, so what the column really held was somebody else's filing, inherited and untendable. Grouping by publisher answers the question a list of two hundred sources actually raises, costs the reader nothing and is right the moment a subscription lands.
 
 **Favourite source** : a publisher the reader singled out. It is not a starred article and it makes none : the star stays a judgement about an article, this is a judgement about who wrote it, and the two fill different squares on the collections page.
@@ -515,6 +517,8 @@ Views the sidebar was also to list, today, starred, tags, saved queries and indi
 
 Every source sits under a heading, the ones alone under theirs included. A list where some rows are grouped and others are loose is a list where the reader cannot tell in advance where a source will be, and the heading is the only place a group is acted on : it opens a menu holding the naming and the whole of that publisher's articles.
 
+The mark of a publisher stands once, at the head of its group, and the rows under it are desks with names and nothing more.
+
 A source can be made a **favourite**, which is the reader saying this publisher is one of theirs. It is not the star an article wears : it stars nothing, it reorders nothing, and it changes nothing the front page ranks. It marks the row, and it fills a square on the collections page beside the starred articles, where the two are plainly different things.
 
 The digest, a story and an article are set as a page rather than as a control panel : one column held to a readable measure, serif headlines, hairline rules, no cards and no boxes. Liquid Glass appears only in the navigation layer, which is the system's own bar, and never in the content. `docs/technical/interface.md` records the design and what was rejected.
@@ -525,7 +529,9 @@ The digest, a story and an article are set as a page rather than as a control pa
 
 ### List
 
-Adjustable density, a one- to three-line excerpt, an optional thumbnail, a feed indicator, optional mark-as-read on scroll, configurable swipe gestures, multiple selection and batch actions.
+Adjustable density, a one- to three-line excerpt, an optional thumbnail, the publisher an article came from, optional mark-as-read on scroll, configurable swipe gestures, multiple selection and batch actions.
+
+**The publisher and not the feed.** A row says `Le Monde`, whichever of its desks the article arrived through, and wears the one mark that paper drew. A reader following three desks of one paper was meeting three names down one page and having to work out that they were one paper ; which desk it was is a detail of how the paper publishes, and it stays in the sources list where a subscription is managed.
 
 The picture an article carries is taken from the feed, or failing that from the first picture in the body, and only its address is stored : the file stays the publisher's and is asked for when a screen shows it. `docs/technical/ingestion.md` records the order, `docs/technical/interface.md` how the page uses it.
 

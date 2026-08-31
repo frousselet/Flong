@@ -29,8 +29,11 @@ nonisolated enum ArticleDocument {
         case page
     }
 
-    static func html(for article: Article, showing body: Body = .page) -> String {
-        let byline = byline(of: article)
+    /// - Parameter publisher: who published it, as the application names them
+    ///   everywhere else : the group rather than the feed it arrived through.
+    ///   The feed's own title stands in only where the publisher is unknown.
+    static func html(for article: Article, publisher: String? = nil, showing body: Body = .page) -> String {
+        let byline = byline(of: article, publisher: publisher)
         let markup = (body == .page ? article.extractedHTML : nil) ?? article.bodyHTML ?? ""
 
         return """
@@ -52,8 +55,9 @@ nonisolated enum ArticleDocument {
             """
     }
 
-    private static func byline(of article: Article) -> String {
-        var parts = article.feedTitle.isEmpty ? [] : [article.feedTitle]
+    private static func byline(of article: Article, publisher: String?) -> String {
+        let source = publisher ?? article.domain ?? article.feedTitle
+        var parts = source.isEmpty ? [] : [source]
         if let author = article.author, !author.isEmpty {
             parts.append(String(localized: "By \(author)"))
         }

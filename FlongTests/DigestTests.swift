@@ -957,9 +957,14 @@ struct DigestTests {
 
         #expect(story.feedCount == 4)
         #expect(story.feedMarks.count == DigestStore.namedFeeds)
-        #expect(Set(story.feedMarks.map(\.title)) == Set(Corpus.calendar.map(\.feed)))
+
+        // A mark is a room and not a feed, so what the page shows is the host
+        // each article came from : the name and the picture beside it belong
+        // to the publisher and are looked up, never carried on the story.
+        let rooms = Set(Corpus.calendar.compactMap { feeds[$0.feed]?.domain })
+        #expect(Set(story.feedMarks.map(\.room)) == rooms)
         // In the order the rooms picked it up.
-        #expect(story.feedMarks.first?.title == "Le Quotidien")
+        #expect(story.feedMarks.first?.room == feeds["Le Quotidien"]?.domain)
     }
 
     @Test("A paper running a story in two of its sections is one room")

@@ -140,7 +140,7 @@ struct StoryScreen: View {
             // into opens on what they tapped.
             HStack(spacing: 3) {
                 ForEach(story.feedMarks) { mark in
-                    FeedIconView(stated: mark.iconURL, site: mark.siteURL, side: 15)
+                    SourceStamp(domain: mark.room, side: 15, showsName: false)
                 }
                 if story.feedCount > story.feedMarks.count {
                     Text(verbatim: "+\(story.feedCount - story.feedMarks.count)")
@@ -182,30 +182,45 @@ struct ArticleScreen: View {
     @State private var pageGaveNothing = false
     @State private var signingIn = false
 
+    /// Who published it, as every list that led here already said.
+    ///
+    /// The publisher rather than the feed : `Le Monde` and not
+    /// `Le Monde - Sport`. The address stands in while the subscriptions are
+    /// being read, and the feed's own title only for an article whose feed has
+    /// gone from under it.
+    private func publisher(of article: Article) -> String {
+        model.publisher(of: article.domain)?.name ?? article.domain ?? article.feedTitle
+    }
+
     var body: some View {
         Group {
             if let article = model.article, article.id == articleID {
-                ArticleWebView(html: ArticleDocument.html(for: article, showing: showing))
-                    .ignoresSafeArea(edges: .bottom)
-                    .toolbar { toolbar(for: article) }
-                    .navigationTitle(Text(verbatim: article.feedTitle))
-                    #if os(iOS)
-                        .navigationBarTitleDisplayMode(.inline)
-                    #endif
-                    .overlay(alignment: .bottom) {
-                        if model.isFetchingFullText {
-                            fetching
+                ArticleWebView(
+                    html: ArticleDocument.html(for: article, publisher: publisher(of: article), showing: showing)
+                )
+                .ignoresSafeArea(edges: .bottom)
+                .toolbar { toolbar(for: article) }
+                // The publisher, not the desk : a reader who opened a piece
+                // from `Le Monde - Sport` is reading Le Monde, and the page
+                // that says so agrees with every row that led them here.
+                .navigationTitle(Text(verbatim: publisher(of: article)))
+                #if os(iOS)
+                    .navigationBarTitleDisplayMode(.inline)
+                #endif
+                .overlay(alignment: .bottom) {
+                    if model.isFetchingFullText {
+                        fetching
+                    }
+                }
+                .sheet(isPresented: $signingIn) {
+                    if let host = article.url.flatMap(FeedURL.room(of:)) {
+                        SiteLoginView(host: host) { cookies in
+                            await model.saveSession(for: host, cookies: cookies)
+                            // Signed in : ask the page again, as them.
+                            await showFullArticle()
                         }
                     }
-                    .sheet(isPresented: $signingIn) {
-                        if let host = article.url.flatMap(FeedURL.room(of:)) {
-                            SiteLoginView(host: host) { cookies in
-                                await model.saveSession(for: host, cookies: cookies)
-                                // Signed in : ask the page again, as them.
-                                await showFullArticle()
-                            }
-                        }
-                    }
+                }
             } else {
                 ProgressView()
             }

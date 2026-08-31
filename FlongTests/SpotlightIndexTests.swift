@@ -33,6 +33,7 @@ struct SpotlightIndexTests {
             url: URL(string: "https://example.com/1"),
             author: "Camille Dupuis",
             feedTitle: "Le Quotidien",
+            domain: "lequotidien.example.com",
             publishedAt: now.addingTimeInterval(-3600),
             markedAt: now
         )
@@ -48,7 +49,9 @@ struct SpotlightIndexTests {
         #expect(searchable.domainIdentifier == SpotlightIndex.domain)
         #expect(attributes.title == "Une réforme du calendrier")
         #expect(attributes.authorNames == ["Camille Dupuis"])
-        #expect(attributes.contentSources == ["Le Quotidien"])
+        // Nothing known about the publisher yet, so the address stands in : it
+        // is a name, and the feed's own title is the last resort.
+        #expect(attributes.contentSources == ["lequotidien.example.com"])
         #expect(attributes.contentURL == item.url)
         #expect(attributes.contentCreationDate == item.publishedAt)
     }
@@ -63,6 +66,26 @@ struct SpotlightIndexTests {
         #expect((attributes.contentDescription?.count ?? 0) <= 300)
         #expect(attributes.textContent == item.plainText)
         #expect((attributes.textContent?.count ?? 0) > 300)
+    }
+
+    @Test("The system search names a source the way the application does")
+    func publisherNamesTheSource() throws {
+        let identity = SourceIdentity(
+            domain: "lequotidien.example.com",
+            name: "Le Quotidien",
+            iconURL: nil,
+            siteURL: URL(string: "https://lequotidien.example.com")
+        )
+
+        let attributes = SpotlightIndex.searchableItem(
+            for: item(),
+            publishedBy: ["lequotidien.example.com": identity]
+        ).attributeSet
+
+        // The publisher rather than the desk : an article that arrived through
+        // `Le Quotidien - Sport` was published by Le Quotidien, and Spotlight
+        // must not disagree with every row in the application.
+        #expect(attributes.contentSources == ["Le Quotidien"])
     }
 
     @Test("What a purge never takes, Spotlight never expires")

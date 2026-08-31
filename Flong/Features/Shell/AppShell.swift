@@ -128,6 +128,10 @@ struct AppShell: View {
         #else
             .tabViewStyle(.sidebarAdaptable)
         #endif
+        // Who an article came from is asked by every row of every list, and it
+        // is one answer per publisher rather than one per feed. Injected once,
+        // here, so no screen has to carry it down to the row that draws it.
+        .environment(\.publishers, model.publishers)
         .sheet(isPresented: $isAddingFeed) {
             AddFeedView(
                 add: { address in await model.addFeed(at: address) },

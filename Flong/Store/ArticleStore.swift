@@ -44,10 +44,12 @@ nonisolated struct ArticleSummary: Identifiable, Hashable, Sendable, FetchableRe
     let url: URL?
     /// The article's picture, when it has one.
     let imageURL: URL?
-    /// Where the source keeps its mark, and where the source itself is, for
-    /// the well-known paths a mark also lives at.
-    let feedIconURL: URL?
-    let feedSiteURL: URL?
+    /// The publisher the article came from, which is what a row shows.
+    ///
+    /// Its name and its mark are looked up rather than carried here : they
+    /// belong to the group and not to the feed, and a reader who renames a
+    /// publisher must not have to wait for five hundred rows to be read again.
+    let domain: String?
 
     /// When an article was last changed, where that is later than when it was
     /// published and by more than a moment.
@@ -89,10 +91,10 @@ nonisolated struct ArticleSummary: Identifiable, Hashable, Sendable, FetchableRe
         hasMedia = row["has_media"] ?? false
         url = (row["url"] as String?).flatMap(URL.init(string:))
         imageURL = (row["image_url"] as String?).flatMap(URL.init(string:))
-        feedIconURL = (row["icon_url"] as String?).flatMap(URL.init(string:))
-        feedSiteURL =
-            (row["site_url"] as String?).flatMap(URL.init(string:))
-            ?? (row["feed_url"] as String?).flatMap(URL.init(string:))
+        domain = FeedURL.publisher(
+            site: (row["site_url"] as String?).flatMap(URL.init(string:)),
+            feed: (row["feed_url"] as String?).flatMap(URL.init(string:))
+        )
     }
 }
 
@@ -101,6 +103,8 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
     let id: UUID
     let title: String
     let feedTitle: String
+    /// The publisher it came from, whose name is what the page is headed with.
+    let domain: String?
     let author: String?
     let url: URL?
     let publishedAt: Date?
@@ -122,6 +126,7 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
         id: UUID,
         title: String,
         feedTitle: String,
+        domain: String? = nil,
         author: String? = nil,
         url: URL? = nil,
         publishedAt: Date? = nil,
@@ -136,6 +141,7 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
         self.id = id
         self.title = title
         self.feedTitle = feedTitle
+        self.domain = domain
         self.author = author
         self.url = url
         self.publishedAt = publishedAt
@@ -193,7 +199,7 @@ nonisolated struct ArticleStore: Sendable {
     static let columns = """
         SELECT e.id, e.feed_id, e.title, e.excerpt, e.author, e.url,
                e.is_read, e.is_starred, e.has_media, e.image_url,
-               f.icon_url, f.site_url, f.url AS feed_url,
+               f.site_url, f.url AS feed_url,
                COALESCE(e.published_at, e.received_at) AS date,
                e.published_at AS published_at, e.updated_at AS updated_at,
                f.title AS feed_title
@@ -279,6 +285,7 @@ nonisolated struct ArticleStore: Sendable {
                 id: entry.id,
                 title: entry.title,
                 feedTitle: feed.title,
+                domain: feed.domain,
                 author: entry.author,
                 url: entry.url,
                 publishedAt: entry.publishedAt,
@@ -477,6 +484,9 @@ nonisolated struct ArticleStore: Sendable {
         var url: URL?
         var author: String?
         var feedTitle: String?
+        /// The publisher it came from, so the system index names an article's
+        /// source the way the application does.
+        var domain: String?
         var publishedAt: Date?
         var markedAt: Date
     }
@@ -494,7 +504,8 @@ nonisolated struct ArticleStore: Sendable {
                 db,
                 sql: """
                     SELECT e.id AS id, e.title AS title, b.plain_text AS plain_text, e.url AS url,
-                           e.author AS author, f.title AS feed_title, e.published_at AS published_at,
+                           e.author AS author, f.title AS feed_title, f.site_url AS site_url,
+                           f.url AS feed_url, e.published_at AS published_at,
                            e.received_at AS received_at
                     FROM entry e
                     JOIN feed f ON f.id = e.feed_id
@@ -514,6 +525,10 @@ nonisolated struct ArticleStore: Sendable {
                     url: (row["url"] as String?).flatMap(URL.init(string:)),
                     author: row["author"],
                     feedTitle: row["feed_title"],
+                    domain: FeedURL.publisher(
+                        site: (row["site_url"] as String?).flatMap(URL.init(string:)),
+                        feed: (row["feed_url"] as String?).flatMap(URL.init(string:))
+                    ),
                     publishedAt: row["published_at"],
                     markedAt: row["received_at"]
                 )

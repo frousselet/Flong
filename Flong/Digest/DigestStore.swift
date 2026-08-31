@@ -43,13 +43,15 @@ nonisolated enum DigestTopic: Hashable, Sendable, Identifiable {
 ///
 /// A mark rather than a name : four names are a line of text nobody reads,
 /// four marks are a glance.
+///
+/// It carries the room and nothing else. The mark and the name belong to the
+/// publisher rather than to the feed the article happened to arrive through,
+/// so the page looks them up in ``SourceIdentity`` and a story covered by two
+/// desks of one paper draws one mark, not two of the same picture.
 nonisolated struct FeedMark: Hashable, Sendable, Identifiable {
-    let title: String
     /// The newsroom it belongs to, which is its host rather than its feed : a
     /// paper with a feed per desk is one room, however many feeds are followed.
     let room: String
-    let iconURL: URL?
-    let siteURL: URL?
 
     var id: String { room }
 }
@@ -113,8 +115,8 @@ nonisolated struct Digest: Hashable, Sendable {
 private struct StoryArticle {
     let storyID: UUID
     let feedTitle: String
-    let feedIconURL: URL?
     let feedSiteURL: URL?
+    let feedURL: URL?
     let date: Date
     let imageURL: URL?
 }
@@ -169,7 +171,7 @@ nonisolated struct DigestStore: Sendable {
                 db,
                 sql: """
                     SELECT m.story_id AS story_id, f.title AS feed_title,
-                           f.icon_url AS icon_url, COALESCE(f.site_url, f.url) AS site_url,
+                           f.site_url AS site_url, f.url AS feed_url,
                            e.image_url AS image_url,
                            COALESCE(e.published_at, e.received_at) AS date
                     FROM story_member m
@@ -183,8 +185,8 @@ nonisolated struct DigestStore: Sendable {
                 StoryArticle(
                     storyID: row["story_id"],
                     feedTitle: row["feed_title"],
-                    feedIconURL: (row["icon_url"] as String?).flatMap(URL.init(string:)),
                     feedSiteURL: (row["site_url"] as String?).flatMap(URL.init(string:)),
+                    feedURL: (row["feed_url"] as String?).flatMap(URL.init(string:)),
                     date: row["date"],
                     imageURL: (row["image_url"] as String?).flatMap(URL.init(string:))
                 )
@@ -323,7 +325,7 @@ nonisolated struct DigestStore: Sendable {
                 db,
                 sql: """
                     SELECT m.story_id AS story_id, f.title AS feed_title,
-                           COALESCE(f.site_url, f.url) AS site_url,
+                           f.site_url AS site_url, f.url AS feed_url,
                            COALESCE(e.published_at, e.received_at) AS date
                     FROM story_member m
                     JOIN entry e ON e.id = m.entry_id
@@ -339,8 +341,11 @@ nonisolated struct DigestStore: Sendable {
             var rooms: [UUID: [String]] = [:]
             var counts: [UUID: Int] = [:]
             for row in members {
-                let site = (row["site_url"] as String?).flatMap(URL.init(string:))
-                let room = FeedURL.room(of: site) ?? (row["feed_title"] as String)
+                let room =
+                    FeedURL.publisher(
+                        site: (row["site_url"] as String?).flatMap(URL.init(string:)),
+                        feed: (row["feed_url"] as String?).flatMap(URL.init(string:))
+                    ) ?? (row["feed_title"] as String)
                 let id = row["story_id"] as UUID
                 counts[id, default: 0] += 1
                 guard !(rooms[id] ?? []).contains(room) else { continue }
@@ -378,14 +383,7 @@ nonisolated struct DigestStore: Sendable {
         for member in members.sorted(by: { $0.date < $1.date }) {
             let room = Self.room(of: member)
             guard !marks.contains(where: { $0.room == room }) else { continue }
-            marks.append(
-                FeedMark(
-                    title: member.feedTitle,
-                    room: room,
-                    iconURL: member.feedIconURL,
-                    siteURL: member.feedSiteURL
-                )
-            )
+            marks.append(FeedMark(room: room))
         }
 
         return DigestStory(
@@ -410,7 +408,7 @@ nonisolated struct DigestStore: Sendable {
     /// The newsroom an article came from, or its feed when it has no address
     /// worth reading a host out of.
     private static func room(of member: StoryArticle) -> String {
-        FeedURL.room(of: member.feedSiteURL) ?? member.feedTitle
+        FeedURL.publisher(site: member.feedSiteURL, feed: member.feedURL) ?? member.feedTitle
     }
 
     /// The subjects on a page : what the reader asked for first, then the one

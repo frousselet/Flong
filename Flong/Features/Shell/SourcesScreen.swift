@@ -237,9 +237,11 @@ struct SourcesScreen: View {
             }
         } label: {
             HStack(spacing: 4) {
-                // Verbatim : this is either an address or a name the reader
-                // wrote, and neither is translated.
-                Text(verbatim: group.title ?? "")
+                // The mark stands here and nowhere else in the list. It belongs
+                // to the publisher, so six desks of one paper are one favicon
+                // shown once, rather than one column saying the same thing six
+                // times over.
+                SourceStamp(domain: domain(of: group), side: 16)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .semibold))
                 Spacer(minLength: 8)
@@ -282,40 +284,47 @@ struct SourcesScreen: View {
         if case .group(let domain) = group.kind { domain } else { nil }
     }
 
+    @ViewBuilder
     private func row(_ item: SidebarItem) -> some View {
         Button {
             open(item.kind)
         } label: {
-            Label {
-                HStack {
-                    title(of: item)
-                    // The mark of a favourite source, where a reader reads the
-                    // name : it is a property of this source and not a column
-                    // of its own, and a column would be a column of blanks.
-                    if item.isFavourite {
-                        Image(systemName: "star.fill")
-                            .font(Editorial.metadata)
-                            .foregroundStyle(.yellow)
-                            .accessibilityLabel(Text("Favourite source"))
-                    }
-                    Spacer(minLength: 8)
-                    if item.unreadCount > 0 {
-                        Text(item.unreadCount, format: .number)
-                            .font(Editorial.metadata)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } icon: {
-                // A feed wears its own mark ; the views above it are the
-                // application's own and wear the application's symbols.
-                if case .feed = item.kind {
-                    FeedIconView(stated: item.iconURL, site: item.siteURL)
-                } else {
+            // A source wears no mark of its own. The mark is the publisher's
+            // and stands once, at the head of the group ; a row here is a desk
+            // of that publisher, and the views above are the application's own
+            // and wear the application's symbols.
+            if case .feed = item.kind {
+                line(of: item)
+            } else {
+                Label {
+                    line(of: item)
+                } icon: {
                     Image(systemName: Self.icon(of: item.kind))
                 }
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private func line(of item: SidebarItem) -> some View {
+        HStack {
+            title(of: item)
+            // The mark of a favourite source, where a reader reads the name :
+            // it is a property of this source and not a column of its own, and
+            // a column would be a column of blanks.
+            if item.isFavourite {
+                Image(systemName: "star.fill")
+                    .font(Editorial.metadata)
+                    .foregroundStyle(.yellow)
+                    .accessibilityLabel(Text("Favourite source"))
+            }
+            Spacer(minLength: 8)
+            if item.unreadCount > 0 {
+                Text(item.unreadCount, format: .number)
+                    .font(Editorial.metadata)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     @ViewBuilder

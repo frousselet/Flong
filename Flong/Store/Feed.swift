@@ -132,7 +132,7 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
     /// not six, whether the question is asked by a front page counting who is
     /// covering a story or by a list deciding which rows belong together.
     var domain: String {
-        FeedURL.room(of: siteURL) ?? FeedURL.room(of: url) ?? url.absoluteString
+        FeedURL.publisher(site: siteURL, feed: url) ?? url.absoluteString
     }
 
     /// The share of fetches the server answered with a 304, the health indicator
