@@ -67,10 +67,15 @@ nonisolated enum ArticleDocument {
     /// it, which is what the width is for : a picture inset inside the column
     /// with a bar of its own above it would be a photograph with a shelf on it.
     ///
-    /// Three by two, cropped rather than fitted. It is the ratio every other
-    /// picture in the application is shown at, and a head that took whatever
-    /// shape the publisher's file happened to be would be a page whose first
-    /// screen is a different height every time.
+    /// **Its own height, and no crop.** Every other picture in the application
+    /// is shown at three by two, which is what makes a list of them read as a
+    /// column ; a page is not a list, and it is the only place a photograph is
+    /// looked at rather than glanced at. A portrait cropped to a landscape box
+    /// on the one screen where there is room for it is a crop made for nothing.
+    ///
+    /// It also means the head takes no room until there is something to put in
+    /// it : a box reserved at a ratio is a box that is empty while the picture
+    /// loads and stays empty if it never arrives.
     private static func lead(of article: Article) -> String {
         guard let address = article.imageURL, HTTPURL.isFetchable(address) else { return "" }
         let source = HTMLEntities.escape(address.absoluteString)
@@ -141,10 +146,10 @@ nonisolated enum ArticleDocument {
         /* The measure lives here rather than on the body, so that the picture
            at the head can run the whole width while the words do not. */
         .column { margin: 0 auto; padding: 16px; max-width: 42em; }
-        /* Cropped to the ratio every other picture is shown at, and drawn edge
-           to edge under the controls. */
+        /* Edge to edge, under the controls, and at whatever height its own
+           shape gives it. */
         .lead { margin: 0; }
-        .lead img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; }
+        .lead img { display: block; width: 100%; height: auto; }
         h1 { font-size: 1.6em; line-height: 1.25; margin: 0 0 8px; }
         h2, h3, h4 { line-height: 1.3; margin: 1.4em 0 0.4em; }
         /* What the application says about the article, rather than the article. */

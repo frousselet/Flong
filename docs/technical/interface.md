@@ -298,7 +298,9 @@ An alignment guide was tried first, holding the whole text block to the left and
 
 It carries a navigation stack of its own, for the bar the controls hang off. That stack leads nowhere : what is on it is the article.
 
-**It opens on the picture the row was carrying.** The article's own picture runs across the head of the page, above the headline, edge to edge and under the controls : the reader tapped a row with that photograph on it, and the page they land on opens on the same one. Three by two and cropped rather than fitted, which is the ratio every other picture in the application is shown at, so the first screen of an article is the same height whatever shape the publisher's file happened to be.
+**It opens on the picture the row was carrying.** The article's own picture runs across the head of the page, above the headline, edge to edge and under the controls : the reader tapped a row with that photograph on it, and the page they land on opens on the same one.
+
+**At its own height, and not cropped.** Every other picture in the application is shown at three by two, which is what makes a list of them read as a column ; a page is not a list, and it is the only place a photograph is looked at rather than glanced at. A portrait cropped to a landscape box on the one screen with room for it is a crop made for nothing. It also means the head takes no room until there is something to put in it : a box reserved at a ratio is a box that is empty while the picture loads, and stays empty if it never arrives.
 
 The controls float over it. They are already on glass of the system's own, which is what keeps them legible over a photograph ; a band of paper behind them would be a shelf bolted across the picture. **The bar carries no title**, and cannot : plain type over somebody's photograph is unreadable on half the photographs there are. The publisher is named in the byline under the headline, where the page says it in its own voice.
 
