@@ -34,7 +34,7 @@ struct StoreTests {
         let expected: Set<String> = [
             "feed", "entry", "entry_body", "tag", "tag_binding",
             "rule", "saved_query", "read_state_block", "sync_state", "sync_record", "entry_fts", "story",
-            "story_member", "story_topic", "topic_preference", "topic",
+            "story_member", "story_topic", "topic_preference", "topic", "source_name",
         ]
         #expect(expected.isSubset(of: tables))
     }
@@ -53,9 +53,66 @@ struct StoreTests {
                 "v11.severalTopics", "v12.duplicates", "v13.keyWhatIsAlreadyHere", "v14.vocabulary",
                 "v15.askedOnce", "v16.whyItWasKept", "v17.archiveLedger", "v18.oneArticle",
                 "v19.marksThatArriveFirst", "v20.secureThePictures", "v21.threeKindsOfSubject",
-                "v22.twoKindsOfSubject",
+                "v22.twoKindsOfSubject", "v23.publishersRatherThanFolders",
             ]
         )
+    }
+
+    @Test("The folders go, and what a source is now is worked out rather than filed")
+    func foldersAreGone() throws {
+        let queue = try DatabaseQueue()
+        // The schema as it stood while a feed still carried somebody else's
+        // filing.
+        try AppDatabase.migrator.migrate(queue, upTo: "v22.twoKindsOfSubject")
+
+        let id = UUID.v7()
+        try queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO feed (id, url, title, folder, created_at) VALUES (?, ?, ?, ?, ?)",
+                arguments: [id, "https://www.lemonde.fr/rss/une.xml", "Le Monde", "Presse/Quotidiens", Date()]
+            )
+        }
+
+        try AppDatabase.migrator.migrate(queue)
+
+        let columns = try queue.read { db in try db.columns(in: "feed").map(\.name) }
+        #expect(!columns.contains("folder"))
+        #expect(columns.contains("is_favourite"))
+
+        // The subscription itself survives the column going, and lands in the
+        // group its own address puts it in.
+        let feed = try #require(try queue.read { db in try Feed.fetchOne(db, key: id) })
+        #expect(feed.title == "Le Monde")
+        #expect(feed.domain == "lemonde.fr")
+        #expect(!feed.isFavourite)
+    }
+
+    @Test("A name written over a publisher round trips with every column filled")
+    func sourceNameRoundTrips() throws {
+        let database = try AppDatabase.inMemory()
+        let name = SourceName(
+            domain: "lemonde.fr",
+            name: "Le Monde",
+            createdAt: Date(timeIntervalSince1970: 1_756_000_000)
+        )
+
+        try database.writer.write { db in try name.insert(db) }
+        let read = try database.writer.read { db in try SourceName.fetchOne(db, key: name.id) }
+
+        #expect(read == name)
+    }
+
+    @Test("One publisher is named once")
+    func oneNamePerPublisher() throws {
+        let database = try AppDatabase.inMemory()
+
+        try database.writer.write { db in try SourceName(domain: "lemonde.fr", name: "Le Monde").insert(db) }
+
+        #expect(throws: DatabaseError.self) {
+            try database.writer.write { db in
+                try SourceName(domain: "lemonde.fr", name: "Le Monde encore").insert(db)
+            }
+        }
     }
 
     @Test("The migration that folded the library in carries the marks onto the articles")
@@ -164,7 +221,6 @@ struct StoreTests {
             siteURL: URL(string: "https://example.com"),
             iconURL: URL(string: "https://example.com/icon.png"),
             title: "Example",
-            folder: "veille/ios",
             language: "en",
             etag: "\"686897696a7c876b7e\"",
             lastModified: "Fri, 29 Aug 2026 10:00:00 GMT",
@@ -179,6 +235,7 @@ struct StoreTests {
             refreshInterval: 900,
             readerModeEnabled: true,
             loadsImages: false,
+            isFavourite: true,
             createdAt: date.addingTimeInterval(-86400)
         )
         let entry = Entry(

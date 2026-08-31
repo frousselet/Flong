@@ -30,11 +30,10 @@ struct SearchTests {
 
         let subscriptions = SubscriptionStore(database)
         press = try await subscriptions.subscribe(
-            to: Subscription(address: "https://quotidien.example.com/f.xml", title: "Le Quotidien", folder: "Presse")
+            to: Subscription(address: "https://quotidien.example.com/f.xml", title: "Le Quotidien")
         ).feed
         tech = try await subscriptions.subscribe(
-            to: Subscription(
-                address: "https://swift.example.dev/f.xml", title: "Swift au quotidien", folder: "Veille/iOS")
+            to: Subscription(address: "https://swift.example.dev/f.xml", title: "Swift au quotidien")
         ).feed
 
         try await add(
@@ -165,15 +164,31 @@ struct SearchTests {
         #expect(try await search("lang:en-GB") == ["Concurrency, one year on"])
     }
 
-    @Test("A feed, a site and a folder all narrow it to where it came from")
+    @Test("A feed and a site narrow it to where an article came from")
     func places() async throws {
         // Both feeds are called something "quotidien", and both answer.
         #expect(try await search("feed:quotidien").count == 3)
         #expect(try await search("feed:\"Le Quotidien\"") == ["Une réforme du calendrier scolaire"])
         #expect(try await search("site:swift.example.dev").count == 2)
-        #expect(try await search("tag:Veille").count == 2)
-        #expect(try await search("tag:Veille/iOS").count == 2)
-        #expect(try await search("tag:Presse") == ["Une réforme du calendrier scolaire"])
+    }
+
+    @Test("A tag narrows it to what the reader filed, and to nothing else")
+    func tags() async throws {
+        let collections = CollectionStore(database)
+        let summaries = try await articles.summaries(.all, now: now)
+        let filed = try #require(summaries.first { $0.title == "Une réforme du calendrier scolaire" })
+
+        _ = try await collections.create("Presse")
+        try await collections.add([filed.id], to: "Presse")
+
+        #expect(try await search("tag:collection/Presse") == ["Une réforme du calendrier scolaire"])
+        // A tag answers for everything below it, which is what makes
+        // `collection` the whole shelf.
+        #expect(try await search("tag:collection") == ["Une réforme du calendrier scolaire"])
+
+        // A source is no longer filed anywhere. It belongs to the publisher
+        // serving it, and `feed:` and `site:` are what ask about that.
+        #expect(try await search("tag:quotidien.example.com").isEmpty)
     }
 
     @Test("A date keeps a search to a period")
@@ -190,10 +205,11 @@ struct SearchTests {
     func combining() async throws {
         #expect(try await search("calendrier -macros") == ["Une réforme du calendrier scolaire"])
         #expect(try await search("(macros OR réforme) is:unread").count == 1)
-        // In that folder, what is unread is in English and what is French has
+        // In that feed, what is unread is in English and what is French has
         // been read.
-        #expect(try await search("tag:Veille is:unread lang:fr").isEmpty)
-        #expect(try await search("tag:Presse is:unread lang:fr") == ["Une réforme du calendrier scolaire"])
+        #expect(try await search("feed:\"Swift au quotidien\" is:unread lang:fr").isEmpty)
+        #expect(
+            try await search("feed:\"Le Quotidien\" is:unread lang:fr") == ["Une réforme du calendrier scolaire"])
         #expect(try await search("author:martin -is:read") == ["Concurrency, one year on"])
     }
 

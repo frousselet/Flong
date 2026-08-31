@@ -32,7 +32,7 @@ Words next to each other are joined by an implicit `AND`, which is what everyone
 | time | `after:2026-01`, `before:2026-08-25`, `age:<7d`, `age:>2w` |
 | logic | `AND`, `OR`, `NOT`, brackets, `"a phrase"`, `-` or `!` to exclude, `*` to match a prefix |
 
-`tag:` also matches the folder a feed is filed under, since a folder is a view over a root tag.
+`tag:` matches a tag and everything under it, so `tag:collection` answers for every collection the reader made. It used to match the folder a feed was filed under as well, since a folder was a view over a root tag ; there are no folders, and a source belongs to the publisher serving it rather than to a filing, so `feed:` and `site:` are what narrow a search to where an article came from.
 
 **The parser never fails.** A bracket that closes nothing, an `OR` with nothing after it, a field name with no value, an unterminated quote : each has a reading that keeps the rest of the query working. A search field that refuses to search is worse than one that searches for something slightly different from what was meant, and refusing the whole query would leave the reader with neither results nor an explanation.
 

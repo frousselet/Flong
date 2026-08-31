@@ -22,7 +22,6 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
         case siteURL = "site_url"
         case iconURL = "icon_url"
         case title
-        case folder
         case language
         case etag
         case lastModified = "last_modified"
@@ -37,6 +36,7 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
         case refreshInterval = "refresh_interval"
         case readerModeEnabled = "reader_mode_enabled"
         case loadsImages = "loads_images"
+        case isFavourite = "is_favourite"
         case createdAt = "created_at"
     }
 
@@ -45,7 +45,6 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
     var siteURL: URL?
     var iconURL: URL?
     var title: String
-    var folder: String?
     var language: String?
 
     /// Conditional request state, replayed on the next fetch.
@@ -67,6 +66,15 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
 
     var readerModeEnabled: Bool
     var loadsImages: Bool
+
+    /// Whether the reader singled this source out.
+    ///
+    /// It says nothing about the articles underneath : a source in the
+    /// favourites is a publisher the reader wants near the top of their own
+    /// list, and starring an article stays a judgement about that article. The
+    /// two are deliberately unconnected, and ``ArticleCollection`` keeps a
+    /// square for each so neither is mistaken for the other.
+    var isFavourite: Bool
     var createdAt: Date
 
     init(
@@ -75,7 +83,6 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
         siteURL: URL? = nil,
         iconURL: URL? = nil,
         title: String,
-        folder: String? = nil,
         language: String? = nil,
         etag: String? = nil,
         lastModified: String? = nil,
@@ -90,6 +97,7 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
         refreshInterval: TimeInterval? = nil,
         readerModeEnabled: Bool = false,
         loadsImages: Bool = true,
+        isFavourite: Bool = false,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -97,7 +105,6 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
         self.siteURL = siteURL
         self.iconURL = iconURL
         self.title = title
-        self.folder = folder
         self.language = language
         self.etag = etag
         self.lastModified = lastModified
@@ -112,7 +119,20 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
         self.refreshInterval = refreshInterval
         self.readerModeEnabled = readerModeEnabled
         self.loadsImages = loadsImages
+        self.isFavourite = isFavourite
         self.createdAt = createdAt
+    }
+
+    /// The publisher this source belongs to, which is what the sources list
+    /// groups by.
+    ///
+    /// The host of the site, or of the feed when the site is unknown : the
+    /// same value ``FeedURL/room(of:)`` computes for the digest, and for the
+    /// same reason. A paper that publishes a feed per desk is one publisher,
+    /// not six, whether the question is asked by a front page counting who is
+    /// covering a story or by a list deciding which rows belong together.
+    var domain: String {
+        FeedURL.room(of: siteURL) ?? FeedURL.room(of: url) ?? url.absoluteString
     }
 
     /// The share of fetches the server answered with a 304, the health indicator
@@ -128,7 +148,7 @@ nonisolated extension Feed {
         static let id = Column(CodingKeys.id)
         static let url = Column(CodingKeys.url)
         static let title = Column(CodingKeys.title)
-        static let folder = Column(CodingKeys.folder)
+        static let isFavourite = Column(CodingKeys.isFavourite)
     }
 }
 

@@ -150,6 +150,8 @@ Three kinds of entry share one array :
 
 Folders and labels share the `user/-/label/` prefix, so `type` is the only thing separating them. Keeping the entries typed `folder` is the correct rule, and treating untyped entries as folders would wrongly pick up the built-in states.
 
+**A folder is read and not kept.** Flong has none : a source belongs to the publisher serving it, which its own address already says, so a folder is only ever used to find the subscriptions inside it. An article label is a different matter and does travel, since it is something the reader said about an article. `docs/technical/feed-identity.md` records what replaced the folders and why.
+
 ### subscription/list
 
 `{"subscriptions": [{id, title, categories: [{id, label}], url, htmlUrl, iconUrl, "frss:priority"}]}`

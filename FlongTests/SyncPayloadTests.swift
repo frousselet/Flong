@@ -92,7 +92,7 @@ struct SyncRecordsTests {
             url: URL(string: "https://feeds.example.com/f.xml")!,
             siteURL: URL(string: "https://example.com"),
             title: "Le Quotidien",
-            folder: "Presse",
+            isFavourite: true,
             createdAt: now
         )
 
@@ -101,8 +101,33 @@ struct SyncRecordsTests {
 
         #expect(subscription.url == feed.url)
         #expect(subscription.title == "Le Quotidien")
-        #expect(subscription.folder == "Presse")
         #expect(subscription.siteURL == feed.siteURL)
+        #expect(SyncRecords.isFavourite(from: record) == true)
+    }
+
+    @Test("A record written before favourites existed says nothing rather than no")
+    func favouriteIsUnstatedOnAnOlderRecord() throws {
+        let record = CKRecord(
+            recordType: SyncRecords.RecordType.feed,
+            recordID: CKRecord.ID(recordName: "feed-1", zoneID: zone)
+        )
+        record["url"] = "https://feeds.example.com/f.xml"
+        record["title"] = "Le Quotidien"
+
+        #expect(SyncRecords.isFavourite(from: record) == nil)
+    }
+
+    @Test("The name a reader wrote over a publisher survives the wire")
+    func sourceNameRoundTrip() throws {
+        let written = SourceName(domain: "lemonde.fr", name: "Le Monde", createdAt: now)
+
+        let record = SyncRecords.record(for: written, in: zone)
+        let read = try #require(SyncRecords.sourceName(from: record))
+
+        #expect(read.domain == "lemonde.fr")
+        #expect(read.name == "Le Monde")
+        #expect(read.createdAt == now)
+        #expect(record.recordID.recordName == SyncRecords.name(forSourceNamedDomain: "lemonde.fr"))
     }
 
     @Test("What a feed knows about its own fetching stays at home")
@@ -224,7 +249,7 @@ struct SyncPayloadTests {
         let second = try Device(zone: zone)
 
         let feed = try await first.subscriptions.subscribe(
-            to: Subscription(address: "https://feeds.example.com/f.xml", title: "Le Quotidien", folder: "Presse")
+            to: Subscription(address: "https://feeds.example.com/f.xml", title: "Le Quotidien")
         ).feed
         let kept = try await first.add("urn:1", to: feed, title: "Une réforme", published: now)
         try await first.add("urn:2", to: feed, title: "Autre chose", published: now)
@@ -245,7 +270,6 @@ struct SyncPayloadTests {
         #expect(applied.markedArticles == 1)
 
         #expect(try await second.subscriptions.feeds().map(\.title) == ["Le Quotidien"])
-        #expect(try await second.subscriptions.feeds().first?.folder == "Presse")
         // And the stream arrives with it, whole : the reader keeps everything
         // on every device, which is what section 7 was amended to say.
         #expect(try await second.articles.count(.all, now: now) == 2)
@@ -272,6 +296,60 @@ struct SyncPayloadTests {
         // stream can travel without the count going to a hundred thousand.
         #expect(records.count == 2)
         #expect(blocks.count == 1)
+    }
+
+    @Test("A favourite source and a publisher's name reach the other device")
+    func favouritesAndNamesTravel() async throws {
+        let first = try Device(zone: zone)
+        let second = try Device(zone: zone)
+
+        let feed = try await first.subscriptions.subscribe(
+            to: Subscription(address: "https://www.lemonde.fr/rss/une.xml", title: "À la une")
+        ).feed
+        try await first.subscriptions.setFavourite(feed.id, true)
+        try await first.subscriptions.rename(domain: "lemonde.fr", to: "Le Monde")
+
+        _ = try await second.payload.apply(try await first.payload.everything())
+
+        #expect(try await second.subscriptions.feeds().first?.isFavourite == true)
+        #expect(try await second.subscriptions.groups().map(\.title) == ["Le Monde"])
+    }
+
+    @Test("A favourite taken back on one device is taken back on the other")
+    func unfavouritingTravels() async throws {
+        let first = try Device(zone: zone)
+        let second = try Device(zone: zone)
+
+        let feed = try await first.subscriptions.subscribe(
+            to: Subscription(address: "https://www.lemonde.fr/rss/une.xml", title: "À la une")
+        ).feed
+        try await first.subscriptions.setFavourite(feed.id, true)
+        _ = try await second.payload.apply(try await first.payload.everything())
+
+        // The upsert never overwrites what is already followed, so this is the
+        // case that would silently keep the star on the second device.
+        try await first.subscriptions.setFavourite(feed.id, false)
+        _ = try await second.payload.apply(try await first.payload.everything())
+
+        #expect(try await second.subscriptions.feeds().first?.isFavourite == false)
+    }
+
+    @Test("A publisher called by its address again is called that on the other device too")
+    func clearedNamesTravel() async throws {
+        let first = try Device(zone: zone)
+        let second = try Device(zone: zone)
+
+        try await first.subscriptions.subscribe(
+            to: Subscription(address: "https://www.lemonde.fr/rss/une.xml", title: "À la une"))
+        try await first.subscriptions.rename(domain: "lemonde.fr", to: "Le Monde")
+        _ = try await second.payload.apply(try await first.payload.everything())
+
+        try await first.subscriptions.rename(domain: "lemonde.fr", to: nil)
+        let removed = try await second.payload.apply(
+            deletions: [SyncRecords.name(forSourceNamedDomain: "lemonde.fr")])
+
+        #expect(removed.removed == 1)
+        #expect(try await second.subscriptions.groups().map(\.title) == ["lemonde.fr"])
     }
 
     @Test("A day too big for one record is cut into as many as it needs")

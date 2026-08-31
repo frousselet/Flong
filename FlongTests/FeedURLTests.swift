@@ -75,37 +75,8 @@ struct FeedURLTests {
     }
 }
 
-@Suite("Folder path")
-struct FolderPathTests {
-    @Test(
-        "A path is trimmed down to its components",
-        arguments: [
-            ("Tech", "Tech"),
-            ("/Tech/iOS/", "Tech/iOS"),
-            ("Tech//iOS", "Tech/iOS"),
-            (" Tech / iOS ", "Tech/iOS"),
-        ]
-    )
-    func normalization(raw: String, expected: String) {
-        #expect(FolderPath.normalized(raw) == expected)
-    }
-
-    @Test("A path holding nothing is no folder at all")
-    func emptyPaths() {
-        #expect(FolderPath.normalized(nil) == nil)
-        #expect(FolderPath.normalized("") == nil)
-        #expect(FolderPath.normalized("  /  / ") == nil)
-    }
-
-    @Test("A folder knows its name and the folders above it")
-    func nameAndAncestors() {
-        #expect(FolderPath.name(of: "Tech/iOS/SwiftUI") == "SwiftUI")
-        #expect(FolderPath.ancestors(of: "Tech/iOS/SwiftUI") == ["Tech", "Tech/iOS"])
-        #expect(FolderPath.ancestors(of: "Tech").isEmpty)
-    }
-
-    // MARK: - Newsrooms
-
+@Suite("Newsrooms")
+struct NewsroomTests {
     @Test("A paper with a feed per desk is one newsroom")
     func rooms() {
         let society = URL(string: "https://www.leparisien.fr/societe/rss.xml")

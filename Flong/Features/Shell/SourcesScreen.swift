@@ -13,18 +13,42 @@ import SwiftUI
 
 /// Where the sources live now.
 ///
-/// A folder tree is something a reader touches when they are organizing, which
-/// is rarely, so it does not deserve a permanent column beside what they are
-/// reading, which is always. It does not deserve a section of the tab bar
+/// A list of sources is something a reader touches when they are organizing,
+/// which is rarely, so it does not deserve a permanent column beside what they
+/// are reading, which is always. It does not deserve a section of the tab bar
 /// either, for the same reason : the bar names the places there are to read,
 /// and this is not one of them. It is reached from the reader's own menu, with
 /// the rest of what they have decided, and the rest of the window is the
 /// article.
+///
+/// **The sources are grouped by publisher, and there is nothing to make.** It
+/// used to be a folder tree, which nothing in Flong ever let a reader build :
+/// the only folders that existed came out of somebody else's OPML file, so the
+/// organization was inherited and could not be tended. A publisher is worked
+/// out from the address a source is served at, so it is right the moment a
+/// subscription lands, it cannot go stale, and there is no empty group left
+/// behind when the last of its feeds goes.
+///
+/// **Every source is under a heading, including the ones alone under theirs.**
+/// A list where some rows sit under a publisher and others sit loose is a list
+/// where the reader cannot tell in advance where a source will be, and a
+/// heading over one row costs a line to say something true. The heading is also
+/// the only place a group is acted on, so a group of one has to have one.
+///
+/// **A favourite source is marked and nothing more.** It is the reader saying
+/// this publisher is one of theirs ; it does not star an article, does not
+/// reorder the list and does not change what the front page ranks. What it does
+/// is fill a square on the collections page, beside the starred articles, where
+/// the two are plainly different things.
 struct SourcesScreen: View {
     let model: AppModel
     @Binding var isAddingFeed: Bool
     @Binding var isChoosingFile: Bool
     let open: (SidebarItem.Kind) -> Void
+
+    /// The publisher whose name is being written, and what is being written.
+    @State private var renaming: String?
+    @State private var renamed = ""
 
     var body: some View {
         Group {
@@ -35,20 +59,37 @@ struct SourcesScreen: View {
                     }
                 }
 
-                if !model.feedItems.isEmpty {
+                ForEach(model.sourceGroups) { group in
                     Section {
-                        ForEach(model.feedItems) { item in
-                            row(item)
-                            ForEach(item.children) { child in
-                                row(child).padding(.leading, 16)
-                            }
+                        ForEach(group.children) { source in
+                            row(source)
+                                .swipeActions(edge: .leading) { favouriting(source) }
+                                .contextMenu { favouriting(source) }
                         }
                     } header: {
-                        Text("Subscriptions")
+                        heading(of: group)
                     }
                 }
 
                 status
+            }
+            .alert(
+                Text("Rename"),
+                isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } }),
+                presenting: renaming
+            ) { domain in
+                TextField("Name", text: $renamed)
+                Button("Cancel", role: .cancel) {}
+                Button("Rename") {
+                    let name = renamed
+                    Task { await model.renameGroup(domain, to: name) }
+                }
+            } message: { domain in
+                // Verbatim : an address is the same address in every language.
+                Text(
+                    "The sources stay where they are. Leave it empty to call it \(domain) again.",
+                    comment: "The address of a publisher, such as lemonde.fr"
+                )
             }
             .navigationTitle(Text("Sources"))
             .toolbar {
@@ -175,6 +216,72 @@ struct SourcesScreen: View {
         }
     }
 
+    /// The head of a group, which is also the only place a group is acted on.
+    ///
+    /// The heading is the control rather than carrying one : a button beside
+    /// every heading in a list of two hundred sources is two hundred buttons
+    /// saying the same thing, and a heading that opens is one thing the reader
+    /// learns once. The chevron is what says it opens at all.
+    private func heading(of group: SidebarItem) -> some View {
+        Menu {
+            Button {
+                renamed = group.title ?? ""
+                renaming = domain(of: group)
+            } label: {
+                Label("Rename", systemImage: "pencil")
+            }
+            Button {
+                open(group.kind)
+            } label: {
+                Label("All articles", systemImage: "tray.full")
+            }
+        } label: {
+            HStack(spacing: 4) {
+                // Verbatim : this is either an address or a name the reader
+                // wrote, and neither is translated.
+                Text(verbatim: group.title ?? "")
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                Spacer(minLength: 8)
+                if group.unreadCount > 0 {
+                    Text(group.unreadCount, format: .number)
+                }
+            }
+            .contentShape(.rect)
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        // A heading is set in capitals by the list, and a publisher's name is
+        // not a label : `LE MONDE` is shouting, and `LEMONDE.FR` is an address
+        // nobody writes that way.
+        .textCase(nil)
+    }
+
+    /// Singling a source out, in the words the collections page uses for it.
+    ///
+    /// The same words in the swipe and in the long press, since they are one
+    /// action reached two ways, and never the words the star on an article
+    /// wears : a reader who is told they are adding to their favourites in both
+    /// places has been told the two are one thing, and they are not.
+    @ViewBuilder
+    private func favouriting(_ source: SidebarItem) -> some View {
+        Button {
+            guard case .feed(let id) = source.kind else { return }
+            Task { await model.setFavourite(id, !source.isFavourite) }
+        } label: {
+            Label(
+                source.isFavourite ? "Remove from favourite sources" : "Add to favourite sources",
+                systemImage: source.isFavourite ? "star.slash" : "star"
+            )
+        }
+        .tint(.yellow)
+    }
+
+    private func domain(of group: SidebarItem) -> String? {
+        if case .group(let domain) = group.kind { domain } else { nil }
+    }
+
     private func row(_ item: SidebarItem) -> some View {
         Button {
             open(item.kind)
@@ -182,6 +289,15 @@ struct SourcesScreen: View {
             Label {
                 HStack {
                     title(of: item)
+                    // The mark of a favourite source, where a reader reads the
+                    // name : it is a property of this source and not a column
+                    // of its own, and a column would be a column of blanks.
+                    if item.isFavourite {
+                        Image(systemName: "star.fill")
+                            .font(Editorial.metadata)
+                            .foregroundStyle(.yellow)
+                            .accessibilityLabel(Text("Favourite source"))
+                    }
                     Spacer(minLength: 8)
                     if item.unreadCount > 0 {
                         Text(item.unreadCount, format: .number)
@@ -208,9 +324,9 @@ struct SourcesScreen: View {
         case .digest: Text("Digest")
         case .unread: Text("Unread")
         case .today: Text("Today")
-        case .starred: Text("Starred")
+        case .starred: Text("Starred articles")
         case .all: Text("All articles")
-        case .folder, .feed: Text(verbatim: item.title ?? "")
+        case .group, .feed: Text(verbatim: item.title ?? "")
         }
     }
 
@@ -221,8 +337,7 @@ struct SourcesScreen: View {
         case .today: "sun.max"
         case .starred: "star"
         case .all: "tray.full"
-        case .folder: "folder"
-        case .feed: "dot.radiowaves.up.forward"
+        case .group, .feed: "dot.radiowaves.up.forward"
         }
     }
 }

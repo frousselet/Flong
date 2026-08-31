@@ -20,7 +20,7 @@ struct OPMLReaderTests {
         try OPMLReader.read(Data(opml.utf8))
     }
 
-    @Test("A file keeps its title, its folders and its feeds")
+    @Test("A file keeps its title, and every feed at every level of it")
     func standardFile() throws {
         let document = try read(
             """
@@ -50,7 +50,6 @@ struct OPMLReaderTests {
                 "https://feeds.example.com/2.xml",
                 "https://feeds.example.com/3.xml",
             ])
-        #expect(feeds.map(\.folder) == ["Tech", "Tech/iOS", nil])
         #expect(feeds[0].title == "Example")
         #expect(feeds[0].siteAddress == "https://example.com")
     }
@@ -97,8 +96,8 @@ struct OPMLReaderTests {
         #expect(document.feeds.first?.title == "Preferred")
     }
 
-    @Test("A category stands in for a folder in a flat file")
-    func categoryAsFolder() throws {
+    @Test("A folder outline is descended and not kept")
+    func nestingIsWalkedThrough() throws {
         let document = try read(
             """
             <opml><body>
@@ -110,9 +109,16 @@ struct OPMLReaderTests {
             """
         )
 
-        // Nesting is the stronger signal : a category only fills in for a feed
-        // no folder holds.
-        #expect(document.feeds.map(\.folder) == ["Tech/iOS", "Nested"])
+        // A folder outline carries no address of its own, so it is not a feed ;
+        // what it holds is, at whatever depth, and neither the nesting nor the
+        // `category` attribute survives the reading. Flong groups sources by
+        // the publisher serving them, which their own address already says.
+        #expect(
+            document.feeds.map(\.address) == [
+                "https://feeds.example.com/1.xml",
+                "https://feeds.example.com/2.xml",
+            ])
+        #expect(document.feeds.map(\.title) == ["Filed", "Inside"])
     }
 
     @Test("A bare ampersand does not lose the file")

@@ -10,7 +10,8 @@ CloudKit degrades on record count and change throughput, not on bytes. Around th
 
 | What | How many | Why that many |
 | ---- | -------- | ------------- |
-| feeds | a few hundred | one per subscription |
+| feeds | a few hundred | one per subscription, carrying whether the reader singled it out |
+| publisher names | a few dozen at most | one per group the reader actually named. A group nobody renamed writes nothing |
 | marks | one to two thousand | one per marked article : starred, annotation, collections, vector |
 | read-state blocks | a few dozen | **one per month**, over every feed |
 | catch-up headers | a few hundred, sliding | one per feed and per day, over thirty days |
@@ -19,7 +20,9 @@ One record per article would be more than a hundred thousand over the same perio
 
 ## Names are derived, never local
 
-Every record is named after **what it is about** : a digest of the feed address, or of the feed address and the article's identity. Two devices that star the same article compute the same name and write the same record, so CloudKit sees one row and not two. A name derived from a local identifier would give every device its own copy of everything.
+Every record is named after **what it is about** : a digest of the feed address, of the publisher's own address, or of the feed address and the article's identity. Two devices that star the same article compute the same name and write the same record, so CloudKit sees one row and not two. A name derived from a local identifier would give every device its own copy of everything.
+
+Names are digests, so they cannot be read backwards. A deletion arriving for `source-…` is matched by walking the handful of names the reader wrote, exactly as `feed-…` is matched by walking the feeds.
 
 ## A list that may be empty is written as data
 
@@ -114,6 +117,10 @@ The development environment invents the schema as it goes : the first save of a 
 
 Production does not. It takes the schema it was given, and a save carrying a field it has never heard of is refused. **TestFlight and the App Store use production**, so the schema has to be deployed from the CloudKit console before the first build that leaves this machine, not after.
 
-The part that catches people is the second time. Adding a field later is invisible in development and fatal in production until it is deployed again : the console's *Deploy Schema Changes* is not a one-off. Anything that changes what `SyncRecords` writes, or adds a record type, is a change to redeploy. The `Mark` record type is the most recent of those, and the `LibraryItem` type it replaces is dead : a production schema is additive only, so it can never be removed, only left unused.
+The part that catches people is the second time. Adding a field later is invisible in development and fatal in production until it is deployed again : the console's *Deploy Schema Changes* is not a one-off. Anything that changes what `SyncRecords` writes, or adds a record type, is a change to redeploy. `SourceName` is the most recent of those, along with the `isFavourite` field on `Feed` ; the `folder` field that field replaces is dead, and so is the `LibraryItem` type, since a production schema is additive only and nothing in it can ever be removed, only left unused.
+
+**A field that has never been written is not `no`.** `Feed.isFavourite` is read back as an optional : a record written by a version that had no favourites carries nothing, and reading nothing as `false` would have the first device to see an old record unstar every source on every other one. Nothing said means nothing was said.
+
+**What arrives from iCloud is not an import.** `SubscriptionStore.upsert` completes a feed and never overwrites it, which is right for a re-imported OPML file and wrong for a record : a favourite set on another device is the later word on the matter, so `SyncPayload` applies it over the upsert rather than through it.
 
 `SyncRecords` is the only description of the schema there is. There is no separate declaration to keep in step, deliberately, since two descriptions of one thing are one description and one lie.

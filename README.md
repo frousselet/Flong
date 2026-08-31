@@ -12,6 +12,8 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **Every article you have ever received stays, and so does what you said about it.** There is one notion of an article and no second copy of anything. Star one, write on one, file one in a collection, and that mark is carried on the article itself : it follows you to your other devices, and an article carrying one is never purged, whatever you ask the store to free.
 
+**Your sources are grouped by publisher, and there is nothing to file.** A paper with a feed per desk is one heading, worked out from the address it serves them at, so the list is organized the moment you subscribe and never goes stale. Call a publisher what you call it rather than what its address says, and make one a favourite when it is one of yours : a favourite source is not a starred article, and the two sit as separate squares in your collections.
+
 **Sources you pay for stay readable.** A per-subscriber feed address, HTTP Basic or a token, kept in the keychain. For a site whose articles sit behind a wall, sign in on its own page and Flong fetches the rest as you : it never holds your password.
 
 **A truncated article is completed from its page.** Most feeds send a standfirst and a link. An article opens on what its feed sent ; ask for the whole one and Flong fetches the page behind it, once, and keeps what it finds beside the feed's version.
@@ -89,7 +91,7 @@ No data leaves the device, apart from the private CloudKit database, the request
 
 ## Other services
 
-Flong is not a client for any service. FreshRSS, Miniflux, Feedbin and Feedly are supported as one-shot import sources only : subscriptions, folders, labels, stars and read states are retrieved once, after which Flong runs on its own.
+Flong is not a client for any service. FreshRSS, Miniflux, Feedbin and Feedly are supported as one-shot import sources only : subscriptions, labels, stars and read states are retrieved once, after which Flong runs on its own. Their folders are read for the subscriptions inside them and not kept, since Flong groups sources by the publisher serving them.
 
 ## Localization
 

@@ -156,7 +156,10 @@ nonisolated enum ArticleFilter: Hashable, Sendable {
     case starred
     case today
     case feed(UUID)
-    case folder(String)
+    /// Every feed of one publisher, which is what a group of the sources list
+    /// shows. The members are passed rather than the address : the grouping is
+    /// worked out from the feeds themselves and never stored on a row.
+    case feeds([UUID])
 
     /// The condition and its arguments, as SQL.
     fileprivate func condition(now: Date) -> (String, StatementArguments) {
@@ -166,18 +169,13 @@ nonisolated enum ArticleFilter: Hashable, Sendable {
         case .starred: ("e.is_starred = 1", [])
         case .today: ("COALESCE(e.published_at, e.received_at) >= ?", [Calendar.current.startOfDay(for: now)])
         case .feed(let id): ("e.feed_id = ?", [id])
-        case .folder(let path): ("(f.folder = ? OR f.folder LIKE ? ESCAPE '\\')", [path, Self.prefix(of: path)])
+        case .feeds(let ids):
+            // A group with nothing in it is not a group, but a view can outlive
+            // the last of its feeds by a moment, and `IN ()` is not SQL.
+            ids.isEmpty
+                ? ("0", [])
+                : ("e.feed_id IN (\(databaseQuestionMarks(count: ids.count)))", StatementArguments(ids))
         }
-    }
-
-    /// A folder holds what is filed under it and under its subfolders.
-    private static func prefix(of path: String) -> String {
-        let escaped =
-            path
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "%", with: "\\%")
-            .replacingOccurrences(of: "_", with: "\\_")
-        return escaped + "/%"
     }
 }
 
@@ -410,6 +408,10 @@ nonisolated struct ArticleStore: Sendable {
         let counted: [Counted] = try await database.writer.read { db in
             let deliberate: [(ArticleCollection.BuiltIn, String, String)] = [
                 (.starred, "e.is_starred = 1", "i.is_starred = 1"),
+                // Next to the star, and deliberately : the two are different
+                // judgements, and a page that showed them apart would leave the
+                // reader to work out that they are not the same one.
+                (.favouriteSources, Self.fromAFavouriteSource("e"), Self.fromAFavouriteSource("i")),
                 (.annotated, "COALESCE(e.annotation, '') <> ''", "COALESCE(i.annotation, '') <> ''"),
             ]
             return try deliberate.compactMap { kind, condition, ofTheCover in
@@ -429,6 +431,15 @@ nonisolated struct ArticleStore: Sendable {
         }
 
         return counted.map { ArticleCollection(kind: .builtIn($0.kind), count: $0.count, cover: $0.cover) }
+    }
+
+    /// Articles served by a publisher the reader singled out.
+    ///
+    /// A subquery rather than a join : the two callers below count over `entry`
+    /// alone, and a condition that needed `feed` at the other end of a join
+    /// could not be dropped into either of them.
+    private static func fromAFavouriteSource(_ table: String) -> String {
+        "\(table).feed_id IN (SELECT id FROM feed WHERE is_favourite = 1)"
     }
 
     /// What is in one collection of the first two natures, newest first.
@@ -520,6 +531,7 @@ nonisolated struct ArticleStore: Sendable {
         switch kind {
         case .builtIn(.starred): ("e.is_starred = 1", [])
         case .builtIn(.annotated): ("COALESCE(e.annotation, '') <> ''", [])
+        case .builtIn(.favouriteSources): (Self.fromAFavouriteSource("e"), [])
         case .made(let name):
             (
                 """

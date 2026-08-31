@@ -1,6 +1,6 @@
 # OPML import
 
-An OPML file is how a reader leaves the service they were on. Flong reads one, follows what it holds, and keeps the folder tree it describes. It is a one-shot operation : nothing links Flong to where the file came from.
+An OPML file is how a reader leaves the service they were on. Flong reads one and follows every feed it holds, at whatever depth. It is a one-shot operation : nothing links Flong to where the file came from.
 
 ## What is read
 
@@ -9,18 +9,18 @@ An OPML file is how a reader leaves the service they were on. Flong reads one, f
 | `xmlUrl` | the feed address | The only attribute that makes an outline a feed. |
 | `title`, `text` | the title | `title` wins. OPML 2.0 requires `text`, and exporters fill both as often as not. |
 | `htmlUrl` | the site address | Canonicalized, and dropped rather than fought over when it makes no sense. |
-| `category` | the folder | Only for a feed no outline nests. See below. |
+| `category` | nothing | |
 | `type` | nothing | |
 
 Attribute names are matched without regard to case : `xmlUrl`, `xmlurl` and `XMLURL` all appear in files that are otherwise valid.
 
 `type` is deliberately ignored. Exporters write `type="rss"` on Atom feeds, `type="link"` on ordinary feeds, or leave it out, so it carries no information. An outline is a feed when it has an address, and a folder when it has children.
 
-## Folders
+## The nesting is walked, and not kept
 
-Nesting is the folder tree : an outline without an address contributes its title as a path component, so a feed two levels down lands in `Tech/iOS`.
+An exported file files its feeds into folders. Flong has none : a source belongs to the publisher serving it, and that is worked out from its own address, so there is no filing to carry over. Every level of the tree is descended and only the addresses at the bottom of it come back, which is why a feed three folders deep is followed exactly as one at the root is.
 
-A flat file gets a second chance through `category`, which OPML 2.0 defines as a comma separated list of slash delimited paths. The first path is used, normalized like any folder. Nesting always wins : `category` only fills in for a feed no outline holds.
+`category` goes with it. OPML 2.0 defines it as a comma separated list of slash delimited paths, and it was read as a folder for a feed no outline nested ; it names nothing Flong keeps now, so it is not read at all. `docs/technical/feed-identity.md` records what replaced the folders and why.
 
 ## Tolerance
 
@@ -51,7 +51,7 @@ An address carrying a password lands in `skipped`, since section 9 of the specif
 
 Importing the same file twice adds nothing : addresses are canonicalized before they are matched, so `feed://Example.com/rss` and `https://example.com:443/rss` are the same subscription, inside one file and between two imports.
 
-A second import never overwrites a title the reader changed or a folder they moved a feed to. It only fills in what is still empty, as `docs/technical/feed-identity.md` sets out.
+A second import never overwrites a title the reader changed, a source they made a favourite or a name they wrote over a publisher. It only fills in what is still empty, as `docs/technical/feed-identity.md` sets out.
 
 ## What is not there yet
 

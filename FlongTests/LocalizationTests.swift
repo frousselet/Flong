@@ -33,6 +33,28 @@ struct LocalizationTests {
         #expect(String(localized: "Your profile", locale: french) == "Votre profil")
     }
 
+    @Test("The two kinds of favourite are told apart in French too")
+    func favourites() {
+        // `Favoris` was enough while the star was the only one of them. Beside
+        // a favourite source it is not, and neither square may be called it.
+        #expect(String(localized: "Starred articles", locale: french) == "Articles favoris")
+        #expect(String(localized: "Favourite sources", locale: french) == "Sources favorites")
+        #expect(String(localized: "Add to favourite sources", locale: french) == "Ajouter aux sources favorites")
+        #expect(String(localized: "Remove from favourite sources", locale: french) == "Retirer des sources favorites")
+        #expect(String(localized: "Favourite source", locale: french) == "Source favorite")
+    }
+
+    @Test("Naming a publisher says which one it is putting back")
+    func namingAPublisher() {
+        let french = String(
+            localized: "The sources stay where they are. Leave it empty to call it \("lemonde.fr") again.",
+            locale: self.french
+        )
+
+        #expect(french.hasPrefix("Les sources ne bougent pas."))
+        #expect(french.hasSuffix("lemonde.fr."))
+    }
+
     @Test("Every phase the front page can be showing has its French")
     func workPhases() {
         let phases = WorkPhase.allCases

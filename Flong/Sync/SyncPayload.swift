@@ -61,6 +61,9 @@ nonisolated struct SyncPayload: Sendable {
         for feed in try await subscriptions.feeds() {
             records.append(SyncRecords.record(for: feed, in: zone))
         }
+        for name in try await subscriptions.names() {
+            records.append(SyncRecords.record(for: name, in: zone))
+        }
         for mark in try await marks.all() where !mark.isEmpty {
             records.append(SyncRecords.record(for: mark, in: zone))
         }
@@ -92,6 +95,10 @@ nonisolated struct SyncPayload: Sendable {
         for feed in try await subscriptions.feeds() {
             let name = SyncRecords.name(forFeed: feed.url)
             if names.contains(name) { records[name] = SyncRecords.record(for: feed, in: zone) }
+        }
+        for written in try await subscriptions.names() {
+            let name = SyncRecords.name(forSourceNamedDomain: written.domain)
+            if names.contains(name) { records[name] = SyncRecords.record(for: written, in: zone) }
         }
         for mark in try await marks.all() {
             let name = SyncRecords.name(forMarkWithGUID: mark.guid, feedURL: URL(string: mark.feedURL))
@@ -173,6 +180,8 @@ nonisolated struct SyncPayload: Sendable {
     /// What applying a batch came to.
     nonisolated struct Applied: Hashable, Sendable {
         var feeds = 0
+        /// Publishers another device gave a name to.
+        var sourceNames = 0
         /// Articles another device said something about : starred, wrote on,
         /// or filed.
         var markedArticles = 0
@@ -182,7 +191,8 @@ nonisolated struct SyncPayload: Sendable {
         var removed = 0
 
         var isEmpty: Bool {
-            feeds == 0 && markedArticles == 0 && readArticles == 0 && caughtUp == 0 && removed == 0
+            feeds == 0 && sourceNames == 0 && markedArticles == 0 && readArticles == 0 && caughtUp == 0
+                && removed == 0
         }
     }
 
@@ -199,7 +209,22 @@ nonisolated struct SyncPayload: Sendable {
             switch record.recordType {
             case SyncRecords.RecordType.feed:
                 guard let subscription = SyncRecords.subscription(from: record) else { continue }
-                if try await subscriptions.subscribe(to: subscription).isNew { applied.feeds += 1 }
+                let followed = try await subscriptions.subscribe(to: subscription)
+                if followed.isNew { applied.feeds += 1 }
+
+                // The upsert completes a feed and never overwrites it, which is
+                // right for an import and wrong here : a favourite the reader
+                // set on another device is the later word on the matter, and
+                // one that never travelled would be a decision the reader made
+                // and then watched disappear.
+                if let favourite = SyncRecords.isFavourite(from: record), favourite != followed.feed.isFavourite {
+                    try await subscriptions.setFavourite(followed.feed.id, favourite)
+                }
+
+            case SyncRecords.RecordType.sourceName:
+                guard let written = SyncRecords.sourceName(from: record) else { continue }
+                try await subscriptions.rename(domain: written.domain, to: written.name)
+                applied.sourceNames += 1
 
             case SyncRecords.RecordType.mark:
                 guard let mark = SyncRecords.mark(from: record) else { continue }
@@ -246,10 +271,25 @@ nonisolated struct SyncPayload: Sendable {
                 if try await unsubscribe(named: name) { applied.removed += 1 }
             } else if name.hasPrefix("mark-") {
                 if try await unmark(named: name) { applied.removed += 1 }
+            } else if name.hasPrefix("source-") {
+                if try await forgetSourceName(named: name) { applied.removed += 1 }
             }
         }
 
         return applied
+    }
+
+    /// Takes back the name another device stopped calling a publisher by.
+    ///
+    /// Names are digests, so the domain is found by walking the handful of
+    /// names the reader wrote rather than read back out of the record name.
+    private func forgetSourceName(named name: String) async throws -> Bool {
+        let written = try await subscriptions.names()
+        guard let match = written.first(where: { SyncRecords.name(forSourceNamedDomain: $0.domain) == name })
+        else { return false }
+
+        try await subscriptions.rename(domain: match.domain, to: nil)
+        return true
     }
 
     private func unsubscribe(named name: String) async throws -> Bool {
