@@ -66,6 +66,9 @@ struct CollectionsScreen: View {
             ToolbarItem(placement: .sectionLeading) {
                 SourcesButton(open: menu)
             }
+            ToolbarItem(placement: .sectionLeading) {
+                NotificationsButton(model: model)
+            }
             // Beside the sources rather than opposite them : the leading corner
             // is where this page is acted on, and the trailing one belongs to
             // the reader's own menu in every section.

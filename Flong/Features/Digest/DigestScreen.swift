@@ -84,6 +84,9 @@ struct DigestScreen: View {
             ToolbarItem(placement: .sectionLeading) {
                 SourcesButton(open: open)
             }
+            ToolbarItem(placement: .sectionLeading) {
+                NotificationsButton(model: model)
+            }
             ToolbarItem(placement: .primaryAction) {
                 ReaderMenu(model: model, open: open)
             }

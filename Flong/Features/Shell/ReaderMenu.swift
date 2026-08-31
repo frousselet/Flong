@@ -25,6 +25,12 @@ import SwiftUI
 /// The sources are not in it. They were, and they were the one thing in it a
 /// reader opens often : a thing opened often is a button, not a line in a menu.
 /// They sit in the opposite corner instead, where ``SourcesButton`` puts them.
+///
+/// The notices are not in it either, and for the other half of the same reason.
+/// They are not opened often, but what a reader does when they open them is
+/// answer one question and go back to reading, which a line in a menu leading
+/// to a whole screen is a poor shape for. ``NotificationsButton`` stands beside
+/// the sources and opens a panel over the page.
 struct ReaderMenu: View {
     let model: AppModel
     let open: (Route) -> Void
@@ -57,12 +63,6 @@ struct ReaderMenu: View {
                 open(.subscribedSites)
             } label: {
                 Label("Subscribed sites", systemImage: "key")
-            }
-
-            Button {
-                open(.notifications)
-            } label: {
-                Label("Notifications", systemImage: "bell")
             }
 
             Divider()
@@ -157,6 +157,34 @@ struct SourcesButton: View {
             open(.sources)
         } label: {
             Label("Sources", systemImage: "square.stack")
+        }
+    }
+}
+
+/// The way to what Flong may interrupt the reader for, beside the sources.
+///
+/// **It was a line in the reader's menu and is a button now.** Not because it
+/// is opened often, which it is not, but because of the shape of what a reader
+/// does there : they answer one question about being interrupted and go back to
+/// reading. Two presses to reach a whole screen with a way back on it is the
+/// wrong shape for that, however rarely it is done.
+///
+/// It carries the panel itself rather than a route. Everything else in the
+/// leading corner leads somewhere and comes back ; this opens over the page and
+/// closes onto it, so there is nothing for a navigation stack to hold.
+struct NotificationsButton: View {
+    let model: AppModel
+
+    @State private var isOpen = false
+
+    var body: some View {
+        Button {
+            isOpen = true
+        } label: {
+            Label("Notifications", systemImage: "bell")
+        }
+        .sheet(isPresented: $isOpen) {
+            NotificationsPanel(model: model)
         }
     }
 }

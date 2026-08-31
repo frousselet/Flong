@@ -272,13 +272,23 @@ An alignment guide was tried first, holding the whole text block to the left and
 
 `@concurrent` on the fetch is what takes it back to the pool. It never showed on a simulator, where a Mac decodes a photograph faster than a frame lasts ; it shows on a phone. The lesson is worth keeping rather than the fix : under approachable concurrency, `nonisolated` no longer means off the main actor, and anything expensive a view awaits has to say so.
 
+## The notices, in a panel
+
+**A short sheet from the bottom, and no longer a page.** One switch does not want a navigation stack, a title bar and a way back : the reader came to answer a question about being interrupted, and the page they were reading is still behind the panel while they answer it. It goes with a flick, or with the button a Mac needs, since a Mac sheet cannot be flicked away and one way out on both platforms is one thing to learn rather than two.
+
+Its height is fixed rather than half the screen : a sheet at `.medium` for one switch is a great deal of nothing under it. The one thing that makes it taller is a refusal, which adds a line saying why nothing there can be turned on and the way to the system settings.
+
+**It says nothing it does not have to.** It carried a heading, `Ce que Flong vous signale`, over a single switch : a heading over one thing names the list it is heading, and a list of one does not need naming. Under the switch was a paragraph explaining what a story is, to a reader who reaches this panel from a page made of them. What is left is the switch and its own name, which is what they came to set.
+
 ## The reader's menu
 
 One button in the same corner of every section, holding what the reader has decided. It sat in the digest alone at first, which made it the digest's menu rather than the reader's : what it holds belongs to the person and not to the page, and a thing that belongs to the person is in the same place wherever they are.
 
 It is still not an account. There is no account and nothing to sign in to, and the face on the button is the reader's own picture rather than a sign that they are signed in to something. It is called `Réglages` in French.
 
-It holds the subjects, the sites the reader is signed in to, the notices, and `Actualiser`, which asks for a refresh from anywhere in the application and is the only way to ask on a Mac.
+It holds the subjects, the sites the reader is signed in to, and `Actualiser`, which asks for a refresh from anywhere in the application and is the only way to ask on a Mac.
+
+**The notices came out of it.** Not because they are opened often, which they are not, but because of the shape of what a reader does there : they answer one question about being interrupted and go back to reading. Two presses to reach a whole screen with a way back on it is the wrong shape for that, however rarely it is done. The bell stands beside the sources in the leading corner and opens a panel over the page, which the next section sets out.
 
 It also holds `Forcer la synchronisation`, under `#if DEBUG` and nowhere else. The engine decides when to send and when to fetch and is right far more often than a button would be ; what that command is for is watching an exchange happen on demand while something is being built. It queues every record this device holds, which is the repair path and costs a few thousand records against a budget of three thousand, and that is why it does not ship.
 
