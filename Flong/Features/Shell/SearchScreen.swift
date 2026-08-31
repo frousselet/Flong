@@ -42,7 +42,7 @@ struct SearchScreen: View {
         .toolbar {
             if let menu {
                 ToolbarItem(placement: .primaryAction) {
-                    ReaderMenu(model: model, open: menu)
+                    ReaderButton(model: model)
                 }
             }
         }

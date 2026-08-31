@@ -1,5 +1,5 @@
 //
-//  ReaderMenu.swift
+//  ReaderButton.swift
 //  Flong
 //
 //  Created by François Rousselet on 30/08/2026.
@@ -11,7 +11,7 @@
 
 import SwiftUI
 
-/// The reader's own menu, in the same corner of every section.
+/// The reader's own panel, in the same corner of every section.
 ///
 /// It used to sit in the digest alone, which made it the digest's menu rather
 /// than the reader's : what it holds belongs to the person and not to the page,
@@ -22,79 +22,28 @@ import SwiftUI
 /// person holding the device, and the face on the button is the reader's own
 /// picture rather than a sign that they are signed in to something.
 ///
-/// The sources are not in it. They were, and they were the one thing in it a
-/// reader opens often : a thing opened often is a button, not a line in a menu.
-/// They sit in the opposite corner instead, where ``SourcesButton`` puts them.
+/// **It was a menu and is a panel now**, like the three in the other corner. A
+/// menu of lines leading to screens is the wrong shape for what is behind them:
+/// a name and a face, and the sites the reader pays for, are things they set
+/// and come straight back from. ``ReaderPanel`` is what it opens.
 ///
-/// The notices are not in it either, nor the subjects, and for the other half
-/// of the same reason. Neither is opened often, but what a reader does in both
-/// is said about the page they are looking at : they answer one question, or
-/// nudge a subject and watch the page take it, and go back to reading. A line
-/// in a menu leading to a whole screen is a poor shape for that, however rarely
-/// it is done. ``NotificationsButton`` and ``TopicsButton`` stand beside the
-/// sources and open panels over the page.
-struct ReaderMenu: View {
+/// The sources are not in it, nor the subjects, nor the notices. They belong to
+/// the page rather than to the person, and they have a corner of their own.
+struct ReaderButton: View {
     let model: AppModel
-    let open: (Route) -> Void
+
+    @State private var isOpen = false
 
     var body: some View {
-        Menu {
-            Button {
-                open(.profile)
-            } label: {
-                Label {
-                    if let name = model.name {
-                        Text(verbatim: name)
-                    } else {
-                        Text("Your profile")
-                    }
-                } icon: {
-                    Image(systemName: "person.crop.circle")
-                }
-            }
-
-            Divider()
-
-            Button {
-                open(.subscribedSites)
-            } label: {
-                Label("Subscribed sites", systemImage: "key")
-            }
-
-            Divider()
-
-            // Asking for a refresh from anywhere in the application, and the
-            // only way to ask on a Mac, which has no pull. The front page has
-            // the gesture as well ; this is the same work, reachable from the
-            // sections that do not. The page keeps itself up to date without
-            // either of them.
-            Button {
-                Task { await model.refreshAll() }
-            } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
-            }
-            .keyboardShortcut("r", modifiers: .command)
-            .disabled(model.isRefreshing)
-
-            #if DEBUG
-                // A development command, and only there. The engine decides
-                // when to send and when to fetch and is right far more often
-                // than a button would be : this is for watching an exchange
-                // happen on demand while something is being built. It forgets
-                // the change tokens, the tags the server gave each record and
-                // the archives already read, then sends and fetches the whole
-                // of the zone, which is the repair path and spends the record
-                // budget of section 7 in one go. That is why it does not ship.
-                Button {
-                    Task { await model.forceSynchronization() }
-                } label: {
-                    Label("Force a synchronization", systemImage: "arrow.trianglehead.2.clockwise")
-                }
-            #endif
+        Button {
+            isOpen = true
         } label: {
             ReaderMark(model: model)
         }
         .accessibilityLabel(Text("Settings"))
+        .sheet(isPresented: $isOpen) {
+            ReaderPanel(model: model)
+        }
     }
 }
 

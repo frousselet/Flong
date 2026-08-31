@@ -39,7 +39,7 @@ They are sorted by how overdue each one is **against its own rhythm**. A daily f
 
 ## What a background pass will not spend
 
-**Nothing runs in Low Power Mode.** The reader has told the system to stop doing things they did not ask for, and a feed reader waking the radio on its own is exactly such a thing. What they did ask for still works : opening Flong refreshes, and `Actualiser` in the reader's own menu refreshes.
+**Nothing runs in Low Power Mode.** The reader has told the system to stop doing things they did not ask for, and a feed reader waking the radio on its own is exactly such a thing. What they did ask for still works : opening Flong refreshes, and so does a pull on the front page.
 
 **A background refresh does not go over an expensive network.** `allowsExpensiveNetworkAccess` is false for a pass nobody is waiting for, so a reader on cellular data or tethering from their phone is not spending it on feeds they have not asked to see. `URLSession` refuses such a request rather than falling back, which is the right answer : the feed is asked again on the next pass, over the Wi-Fi they will be on by then.
 

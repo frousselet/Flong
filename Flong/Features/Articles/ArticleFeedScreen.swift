@@ -149,7 +149,7 @@ struct ArticleFeedScreen: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 if let menu {
-                    ReaderMenu(model: model, open: menu)
+                    ReaderButton(model: model)
                 } else {
                     Button {
                         Task { await model.markAllRead() }

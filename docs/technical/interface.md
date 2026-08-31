@@ -205,7 +205,7 @@ A region rather than a value : what is wanted is the news that something moved, 
 
 **The pull is back, on the front page and nowhere else.** It was removed on the argument that the page keeps itself up to date and that a gesture always under the thumb invites being used. The page does keep itself up to date, and that argument was about the wrong thing : the gesture is not how the page keeps up, it is how a reader says *now* rather than *soon*. The clock is five minutes, politeness may defer beyond it, Low Power Mode and an expensive network both suppress the background pass deliberately, and iOS may grant no background slot for hours. It is also the gesture every reader already reaches for on the page they open first, and refusing it on principle asks them to learn a menu instead.
 
-One place is enough, and the front page is where a reader is when they wonder. The wire has none : it is a list of what has arrived, and what arrives reaches it on its own. A Mac has no pull at all and keeps `⌘R` in the reader's own menu.
+One place is enough, and the front page is where a reader is when they wonder. The wire has none : it is a list of what has arrived, and what arrives reaches it on its own. A Mac has no pull at all, and no command either since the command came out of the reader's menu : it keeps up through the clock, the full pass at rest, and the watcher that follows the store.
 
 **The gesture is the fetching and the grouping, and it ends there.** Every feed, because they asked, and the grouping with it : pulling a page down means *show me what there is now*, and fetching without grouping would answer with a longer tail and the same stories. The model's work carries on behind it, a headline written and a subject filed for every new story being one call apiece and seconds each, and a spinner held out for minutes is a refresh that looks stuck.
 
@@ -254,9 +254,9 @@ Under Reduce Motion the indeterminate bar is a still tinted rule rather than one
 
 **The sources list keeps what a reader has to act on.** A full iCloud, a refusal, the offer to finish an import now : none of those belongs in a strip that disappears. Both places read the same phase, so they cannot come to describe one pass differently.
 
-**Asking without the gesture is still possible.** `Actualiser` sits in the reader's own menu, beside the other things they ask for, keeps its `⌘R`, and is the only way on a Mac. It does what the pull does : every feed, and the grouping with it.
+**Asking without the gesture is no longer possible.** `Actualiser` sat in the reader's own menu with its `⌘R` and was the only way on a Mac ; it is gone with the menu it was a line in. What is left is what the page does anyway : the clock while a window is open, the full pass at rest on the mains, and the watcher that follows the store. That is the position this document has argued from the start, and it is now the whole of it, with the consequence stated plainly : a Mac cannot be told to fetch by hand at all.
 
-**The gesture is UIKit's control, not `refreshable`.** SwiftUI draws a pull-to-refresh for a `List` ; on a `ScrollView` the modifier is accepted and unreliable, and on this one, a lazy stack with a pinned header, a scroll position binding and an edge effect, no control was drawn at all. A reader pulling a page that does not flinch, while the same work runs perfectly from the menu, is one of the two paths never being called. `PullToRefresh` sits in the content, walks up to the scroll view it is inside, and hands it a `UIRefreshControl` : the control every application that needs this on a scroll view ends up reaching for.
+**The gesture is UIKit's control, not `refreshable`.** SwiftUI draws a pull-to-refresh for a `List` ; on a `ScrollView` the modifier is accepted and unreliable, and on this one, a lazy stack with a pinned header, a scroll position binding and an edge effect, no control was drawn at all. A reader pulling a page that does not flinch, while the same work ran perfectly from the command the menu then held, is one of the two paths never being called. `PullToRefresh` sits in the content, walks up to the scroll view it is inside, and hands it a `UIRefreshControl` : the control every application that needs this on a scroll view ends up reaching for.
 
 It taps under the finger when it takes. The control emits nothing of its own, the system's own lists add theirs and SwiftUI's modifier added one, so a page that borrows the control borrows that too : a gesture that answers with a picture and nothing felt is a gesture the reader is not sure they made.
 
@@ -312,17 +312,19 @@ Its height is fixed rather than half the screen : a sheet at `.medium` for one s
 
 **It says nothing it does not have to.** It carried a heading, `Ce que Flong vous signale`, over a single switch : a heading over one thing names the list it is heading, and a list of one does not need naming. Under the switch was a paragraph explaining what a story is, to a reader who reaches this panel from a page made of them. What is left is the switch and its own name, which is what they came to set.
 
-## The reader's menu
+## The reader's panel
 
-One button in the same corner of every section, holding what the reader has decided. It sat in the digest alone at first, which made it the digest's menu rather than the reader's : what it holds belongs to the person and not to the page, and a thing that belongs to the person is in the same place wherever they are.
+One button in the same corner of every section, holding what belongs to the reader. It sat in the digest alone at first, which made it the digest's menu rather than the reader's : what it holds belongs to the person and not to the page, and a thing that belongs to the person is in the same place wherever they are.
 
 It is still not an account. There is no account and nothing to sign in to, and the face on the button is the reader's own picture rather than a sign that they are signed in to something. It is called `Réglages` in French.
 
-It holds the reader's own profile, the sites they are signed in to, and `Actualiser`, which asks for a refresh from anywhere in the application and is the only way to ask on a Mac.
+**It was a menu and is a panel**, the fourth of them, built like the three in the other corner : untitled, closed by a flick, over the page rather than in front of it. A menu of lines leading to screens was the wrong shape for what was behind them, a name and a face and the sites the reader pays for being things they set and come straight back from.
+
+It holds the reader's face and name, the sites they are signed in to, and, in a build being worked on, the command that makes the exchange with iCloud happen on demand. `Actualiser` is gone with the menu ; the page keeps itself up to date, which is what this document has said all along.
 
 **The notices and the subjects came out of it.** Not because they are opened often, which they are not, but because of the shape of what a reader does in them : they say one thing about the page they are looking at and go back to reading it. Two presses to reach a whole screen with a way back on it is the wrong shape for that, however rarely it is done. Both stand beside the sources in the leading corner now, and all three open panels over the page.
 
-It also holds `Forcer la synchronisation`, under `#if DEBUG` and nowhere else. The engine decides when to send and when to fetch and is right far more often than a button would be ; what that command is for is watching an exchange happen on demand while something is being built. It queues every record this device holds, which is the repair path and costs a few thousand records against a budget of three thousand, and that is why it does not ship.
+It holds `Forcer la synchronisation`, under `#if DEBUG` and nowhere else. The engine decides when to send and when to fetch and is right far more often than a button would be ; what that command is for is watching an exchange happen on demand while something is being built. It queues every record this device holds, which is the repair path and costs a few thousand records against a budget of three thousand, and that is why it does not ship.
 
 The command to write the digest again was here and is gone, replaced by that one. Nothing in the interface asks the model to re-read a page it has already read : stories already filed are never re-read, which is what makes the page stable.
 
@@ -372,7 +374,7 @@ The offset is what is asked, not the rows : a row is a landmark and this is a qu
 
 It is a large title like every other section's, so it shrinks into the bar as the reader scrolls into the page. It is spelled the way the reader's language spells it, with only its first letter raised : French writes `samedi 29 août`, and capitalizing every word would give `Samedi 29 Août`. It is read at each render rather than held, so a page left open overnight is not still yesterday's.
 
-There is no refresh button. The page refreshes itself on returning to the foreground, on the store changing, and on the five-minute clock ; a pull says now rather than soon, and `Actualiser` in the reader's own menu does the same for a Mac, which has no pull.
+There is no refresh button. The page refreshes itself on returning to the foreground, on the store changing, and on the five-minute clock ; a pull says now rather than soon on a phone, and a Mac has neither, which is the position this page has argued from the start.
 
 ## Subjects, not periods
 

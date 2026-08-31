@@ -21,8 +21,9 @@ import SwiftUI
 /// SwiftUI draws its own control for a `List` ; on a `ScrollView` the modifier
 /// is accepted and unreliable, and on this one, a lazy stack with a pinned
 /// header, a scroll position binding and an edge effect, no control ever
-/// appeared. The reader pulled and the page did not flinch, while `Actualiser`,
-/// which asks the model for exactly the same work, has always worked. That is
+/// appeared. The reader pulled and the page did not flinch, while the command
+/// in the menu, which asked the model for exactly the same work, always did.
+/// That is
 /// the whole of the difference the reader was seeing : one of the two was never
 /// being called.
 ///
@@ -37,8 +38,10 @@ import SwiftUI
 /// page that borrows the control borrows that too : a gesture that answers with
 /// a picture and nothing felt is a gesture the reader is not sure they made.
 ///
-/// iOS only. A Mac has no pull, and `Actualiser` in the reader's own menu is
-/// what asks there, as it always was.
+/// iOS only. A Mac has no pull and, since the command came out of the reader's
+/// menu, nothing there asks by hand at all : it keeps up through the clock
+/// while a window sits open, the full pass at rest on the mains, and the
+/// watcher that follows the store.
 struct PullToRefresh: View {
     /// What the gesture asks for. The control spins until it returns.
     let action: @MainActor () async -> Void

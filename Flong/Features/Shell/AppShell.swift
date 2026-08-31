@@ -18,8 +18,6 @@ nonisolated enum Route: Hashable {
     case article(UUID)
     case view(SidebarItem.Kind)
     case collection(ArticleCollection.Kind)
-    case profile
-    case subscribedSites
 }
 
 /// Which part of the application the reader is in.
@@ -265,11 +263,6 @@ struct AppShell: View {
         case .collection(let kind):
             CollectionScreen(model: model, kind: kind) { path.wrappedValue.append(.article($0)) }
 
-        case .profile:
-            ProfileScreen(model: model)
-
-        case .subscribedSites:
-            SubscribedSitesScreen(model: model)
         }
     }
 
