@@ -699,19 +699,20 @@ private struct ActivityLine: View {
     let work: WorkPlan?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// The height the band keeps for itself, which follows the type size since
-    /// what sits in it is one line of type over a rule.
+
+    /// How tall the band is while there is something in it.
     ///
-    /// Held to what the content actually needs. The rubric under it carries
-    /// `Editorial.rhythm` of its own, so a band with padding to spare leaves a
-    /// hand's width of nothing between the dateline and the first story.
-    @ScaledMetric(relativeTo: .caption) private var reserved: CGFloat = 42
+    /// It follows the type size, since what sits in it is one line of type over
+    /// a rule inside a capsule. Nought the rest of the time : a place kept
+    /// permanently is a hand's width of nothing under the subjects on every
+    /// page, for a line that is there a few seconds an hour.
+    @ScaledMetric(relativeTo: .caption) private var open: CGFloat = 40
+
+    /// What the band is worth right now.
+    private var height: CGFloat { work == nil ? 0 : open }
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            // The reserved place. It draws nothing and it never moves.
-            Color.clear
-
+        ZStack(alignment: .bottom) {
             if let work {
                 content(work)
                     // Glass of its own, like the pills above it, rather than a
@@ -724,12 +725,22 @@ private struct ActivityLine: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 7)
                     .glassEffect(.regular, in: .capsule)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .leading)))
+                    .transition(.opacity)
             }
         }
-        .frame(height: reserved, alignment: .bottom)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .animation(.snappy(duration: 0.28), value: work)
+        // **It takes the room it needs and gives it back.** A place kept for it
+        // whether or not anything is happening is quiet under the subjects on
+        // every page ; a row that simply appears moves the whole page under the
+        // reader's thumb. So the band grows into its height and shrinks out of
+        // it, over a third of a second, which is a page making room rather than
+        // a page jumping. The height is what is animated rather than the row's
+        // presence, since a pinned header measuring a child that has just been
+        // inserted lands on the answer a frame late and that frame is the jolt.
+        .frame(height: height, alignment: .bottom)
+        .clipped()
+        .animation(reduceMotion ? nil : .snappy(duration: 0.32), value: height)
+        .animation(.snappy(duration: 0.28), value: work?.phase)
         // Nothing here answers to a finger : the pull underneath it is the
         // gesture, and two in one place is one the reader cannot aim.
         .allowsHitTesting(false)
