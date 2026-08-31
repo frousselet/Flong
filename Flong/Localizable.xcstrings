@@ -456,6 +456,16 @@
         }
       }
     },
+    "Add to favourite sources" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter aux sources favorites"
+          }
+        }
+      }
+    },
     "Add to favourites" : {
       "localizations" : {
         "fr" : {
@@ -944,6 +954,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mode"
+          }
+        }
+      }
+    },
+    "Favourite source" : {
+      "comment" : "Said of a source the reader singled out, beside its name",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source favorite"
+          }
+        }
+      }
+    },
+    "Favourite sources" : {
+      "comment" : "The collection of the articles served by a publisher the reader singled out",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sources favorites"
           }
         }
       }
@@ -1701,6 +1733,16 @@
         }
       }
     },
+    "Remove from favourite sources" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer des sources favorites"
+          }
+        }
+      }
+    },
     "Remove from favourites" : {
       "localizations" : {
         "fr" : {
@@ -2031,12 +2073,12 @@
         }
       }
     },
-    "Star an article, or write a note on one, and it is kept here for good." : {
+    "Star an article, write a note on one, or choose a favourite source, and it shows up here." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mettez un article en favori, ou écrivez une note dessus, et il est conservé ici pour de bon."
+            "value" : "Mettez un article en favori, écrivez une note dessus ou choisissez une source favorite, et cela apparaît ici."
           }
         }
       }
@@ -2047,6 +2089,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Favoris"
+          }
+        }
+      }
+    },
+    "Starred articles" : {
+      "comment" : "The collection of the articles the reader starred",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Articles favoris"
           }
         }
       }
@@ -2139,16 +2192,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sites abonnés"
-          }
-        }
-      }
-    },
-    "Subscriptions" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Abonnements"
           }
         }
       }
@@ -2269,6 +2312,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les rubriques que tout lecteur connaît. Le modèle classe chaque fil sous une ou deux d'entre elles, ou des vôtres, et n'en écrit aucune lui-même."
+          }
+        }
+      }
+    },
+    "The sources stay where they are. Leave it empty to call it %@ again." : {
+      "comment" : "The address of a publisher, such as lemonde.fr",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les sources ne bougent pas. Laissez le champ vide pour l’appeler de nouveau %@."
           }
         }
       }

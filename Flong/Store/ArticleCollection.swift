@@ -19,9 +19,11 @@ import Foundation
 /// records becomes a hundred thousand.
 ///
 /// - A **built-in** one is a question every reader's articles answer about
-///   themselves. Favourites is the state of one article, yes or no, and that
-///   state is what travels : the collection itself is not a thing that exists
-///   anywhere, it is what the answers add up to.
+///   themselves. Starred articles is the state of one article, yes or no, and
+///   that state is what travels : the collection itself is not a thing that
+///   exists anywhere, it is what the answers add up to. Favourite sources asks
+///   the question of the publisher instead, and the answer is no less the
+///   reader's for being written a row further out.
 /// - A **made** one is filled article by article, and the pair of the two is
 ///   what travels : this article, in that collection. It rides on the article's
 ///   own record, so a filing costs a field and not a record.
@@ -41,12 +43,22 @@ nonisolated struct ArticleCollection: Identifiable, Hashable, Sendable {
 
     /// The ones that are not made and cannot be unmade.
     ///
-    /// Each is a column on an article rather than a list of anything, which is
-    /// why there is no adding to one : an article joins the favourites by being
-    /// starred and the notes by being written on.
+    /// Each is a column rather than a list of anything, which is why there is
+    /// no adding to one : an article joins the starred by being starred, the
+    /// notes by being written on, and the favourite sources by having been
+    /// published by a source the reader singled out.
+    ///
+    /// **Favourite sources is not a second name for the star**, and the two
+    /// squares sit side by side so that it cannot be read as one. Starring an
+    /// article is a judgement about that article ; making a source a favourite
+    /// is a judgement about the publisher, and it never stars anything. A
+    /// reader who follows `lemonde.fr` closely and has starred four of its
+    /// pieces has one square holding a morning's worth and another holding
+    /// four, which is exactly the distinction.
     nonisolated enum BuiltIn: String, Hashable, Sendable, CaseIterable {
         case starred
         case annotated
+        case favouriteSources
     }
 
     var kind: Kind

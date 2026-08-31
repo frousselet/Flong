@@ -64,28 +64,94 @@ struct AppModelTests {
 
     // MARK: - The sidebar
 
-    @Test("The sidebar holds the fixed views, then the folders, then the loose feeds")
+    @Test("The sidebar holds the fixed views, then one group per publisher")
     func sidebar() async throws {
-        let filed = try await subscriptions.subscribe(
-            to: Subscription(address: "https://a.example.com/f.xml", title: "Filed", folder: "Presse")
+        let une = try await subscriptions.subscribe(
+            to: Subscription(address: "https://www.lemonde.fr/rss/une.xml", title: "À la une")
         ).feed
-        let loose = try await subscriptions.subscribe(
-            to: Subscription(address: "https://b.example.com/f.xml", title: "Loose")
+        let sport = try await subscriptions.subscribe(
+            to: Subscription(address: "https://lemonde.fr/rss/sport.xml", title: "Sport")
+        ).feed
+        let blog = try await subscriptions.subscribe(
+            to: Subscription(address: "https://blog.example.com/feed", title: "Un blog")
         ).feed
 
-        try await seed("one", feed: filed)
-        try await seed("two", feed: filed, isRead: true)
-        try await seed("three", feed: loose)
+        try await seed("one", feed: une)
+        try await seed("two", feed: une, isRead: true)
+        try await seed("three", feed: sport)
+        try await seed("four", feed: blog)
 
         await model.load()
 
         #expect(model.smartLists.map(\.kind) == [.digest, .unread, .today, .starred, .all])
-        #expect(model.smartLists.first { $0.kind == .unread }?.unreadCount == 2)
+        #expect(model.smartLists.first { $0.kind == .unread }?.unreadCount == 3)
 
-        #expect(model.feedItems.map(\.title) == ["Presse", "Loose"])
-        #expect(model.feedItems.first?.unreadCount == 1)
-        #expect(model.feedItems.first?.children.map(\.title) == ["Filed"])
+        // A paper with a feed per desk is one group ; a blog on a host of its
+        // own is another, and it gets a heading like everything else.
+        #expect(model.sourceGroups.map(\.kind) == [.group("blog.example.com"), .group("lemonde.fr")])
+
+        let paper = try #require(model.sourceGroups.last)
+        #expect(paper.title == "lemonde.fr")
+        #expect(paper.children.map(\.title) == ["À la une", "Sport"])
+        #expect(paper.unreadCount == 2)
         #expect(!model.isEmpty)
+    }
+
+    @Test("A group opens on the articles of its own sources")
+    func openingAGroup() async throws {
+        let une = try await subscriptions.subscribe(
+            to: Subscription(address: "https://www.lemonde.fr/rss/une.xml", title: "À la une")
+        ).feed
+        let blog = try await subscriptions.subscribe(
+            to: Subscription(address: "https://blog.example.com/feed", title: "Un blog")
+        ).feed
+
+        try await seed("Une réforme", feed: une)
+        try await seed("Un billet", feed: blog)
+        await model.load()
+
+        model.selection = .group("lemonde.fr")
+        await model.loadArticles()
+
+        #expect(model.summaries.map(\.title) == ["Une réforme"])
+    }
+
+    @Test("A name written over a publisher is what the group is called and where it files")
+    func namingAGroup() async throws {
+        try await subscriptions.subscribe(
+            to: Subscription(address: "https://www.lemonde.fr/rss/une.xml", title: "À la une"))
+        try await subscriptions.subscribe(
+            to: Subscription(address: "https://blog.example.com/feed", title: "Un blog"))
+        await model.load()
+
+        await model.renameGroup("lemonde.fr", to: "Le Monde")
+
+        #expect(model.sourceGroups.map(\.title) == ["blog.example.com", "Le Monde"])
+        // The group is keyed by the address, so the selection survives naming.
+        #expect(model.sourceGroups.map(\.kind) == [.group("blog.example.com"), .group("lemonde.fr")])
+
+        await model.renameGroup("lemonde.fr", to: "")
+        #expect(model.sourceGroups.map(\.title) == ["blog.example.com", "lemonde.fr"])
+    }
+
+    @Test("A favourite source is marked, and stars nothing")
+    func favouriteSources() async throws {
+        let feed = try await subscriptions.subscribe(
+            to: Subscription(address: "https://www.lemonde.fr/rss/une.xml", title: "À la une")
+        ).feed
+        try await seed("Une réforme", feed: feed)
+        await model.load()
+
+        await model.setFavourite(feed.id, true)
+
+        let source = try #require(model.sourceGroups.first?.children.first)
+        #expect(source.isFavourite)
+
+        // The square on the collections page fills, and the starred one does
+        // not : the two are different judgements.
+        let collections = model.collections.map(\.kind)
+        #expect(collections.contains(.builtIn(.favouriteSources)))
+        #expect(!collections.contains(.builtIn(.starred)))
     }
 
     @Test("Selecting a view changes what the list holds")
@@ -211,21 +277,24 @@ struct AppModelTests {
         #expect(!model.isShowingResults)
     }
 
-    @Test("Feed and folder names complete themselves")
+    @Test("Feed and tag names complete themselves")
     func suggestions() async throws {
         try await subscriptions.subscribe(
-            to: Subscription(address: "https://a.example.com/f.xml", title: "Le Quotidien", folder: "Presse")
+            to: Subscription(address: "https://a.example.com/f.xml", title: "Le Quotidien")
         )
         try await subscriptions.subscribe(
-            to: Subscription(address: "https://b.example.com/f.xml", title: "Swift", folder: "Veille/iOS")
+            to: Subscription(address: "https://b.example.com/f.xml", title: "Swift")
         )
+        await model.makeCollection(named: "Veille")
         await model.load()
 
         model.searchText = "feed:quot"
         #expect(model.searchSuggestions == ["feed:\"Le Quotidien\""])
 
+        // The tags there are to complete are the collections. A source is no
+        // longer filed under anything, so nothing about it answers to `tag:`.
         model.searchText = "réforme tag:vei"
-        #expect(model.searchSuggestions == ["réforme tag:Veille/iOS"])
+        #expect(model.searchSuggestions == ["réforme tag:collection/Veille"])
 
         model.searchText = "réforme"
         #expect(model.searchSuggestions.isEmpty)
@@ -242,7 +311,10 @@ struct AppModelTests {
         await model.addFeed(at: "window.example.com/feed.xml")
 
         #expect(model.failure == nil)
-        #expect(model.feedItems.map(\.title) == ["Example Weekly"])
+        // The feed is served at `window.example.com` and the site it belongs
+        // to is `example.com`, which is the publisher it files under.
+        #expect(model.sourceGroups.map(\.kind) == [.group("example.com")])
+        #expect(model.sourceGroups.first?.children.map(\.title) == ["Example Weekly"])
         #expect(model.summaries.count == 2)
         if case .feed = model.selection {} else { Issue.record("The new feed should be selected") }
     }
@@ -289,7 +361,10 @@ struct AppModelTests {
 
         #expect(model.report?.added == 1)
         #expect(model.report?.skipped.count == 1)
-        #expect(model.feedItems.map(\.title) == ["Tech"])
+        // The outline that held it is walked through, not kept : the group is
+        // the address the feed is served at.
+        #expect(model.sourceGroups.map(\.title) == ["window.example.com"])
+        #expect(model.sourceGroups.first?.children.map(\.title) == ["Example"])
     }
 
     @Test("A file that is not a subscription list is reported, not thrown")

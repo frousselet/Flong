@@ -59,9 +59,10 @@ nonisolated struct OPMLImport: Sendable {
 
     /// Follows every feed of an OPML file, in one transaction.
     ///
-    /// The folder tree of the file is preserved. A feed already followed keeps
-    /// the title and the folder it has, as `SubscriptionStore` documents : an
-    /// import completes what is there and never overwrites it.
+    /// The folder tree of the file is walked and not kept : Flong groups
+    /// sources by the publisher serving them, which its address already says.
+    /// A feed already followed keeps the title it has, as `SubscriptionStore`
+    /// documents : an import completes what is there and never overwrites it.
     func callAsFunction(_ data: Data) async throws -> OPMLImportReport {
         let document = try OPMLReader.read(data)
 
@@ -74,8 +75,7 @@ nonisolated struct OPMLImport: Sendable {
                     try Subscription(
                         address: feed.address,
                         title: feed.title,
-                        siteURL: feed.siteAddress.flatMap { try? FeedURL.canonical($0) },
-                        folder: feed.folder
+                        siteURL: feed.siteAddress.flatMap { try? FeedURL.canonical($0) }
                     )
                 )
             } catch {

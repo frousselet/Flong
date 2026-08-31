@@ -21,10 +21,17 @@ import SwiftUI
 ///
 /// **The page is in three parts, and the order of them is the argument.** What
 /// the reader marked comes first and wears no heading, because a heading over
-/// two squares everybody has is a heading that says nothing : favourites is
-/// what they starred and notes is what they wrote on. Then what they made
-/// themselves, under their own name. Then the months, which fall out of when a
-/// copy was kept and cost the reader nothing to maintain.
+/// squares everybody has is a heading that says nothing : starred articles is
+/// what they starred, favourite sources is who they singled out, and notes is
+/// what they wrote on. Then what they made themselves, under their own name.
+/// Then the months, which fall out of when a copy was kept and cost the reader
+/// nothing to maintain.
+///
+/// **The two favourites stand next to each other on purpose.** A star on an
+/// article and a favourite source are different judgements, and a reader who
+/// found them at opposite ends of the page would have to work out that they
+/// are not the same thing. Side by side, one holding a morning's arrivals and
+/// the other holding four pieces, they say it themselves.
 ///
 /// **A band with nothing in it is not drawn at all**, its heading included. A
 /// reader who has made no collections is not shown an empty shelf with a label
@@ -93,7 +100,7 @@ struct CollectionsScreen: View {
                 ContentUnavailableView {
                     Label("Nothing kept yet", systemImage: "folder")
                 } description: {
-                    Text("Star an article, or write a note on one, and it is kept here for good.")
+                    Text("Star an article, write a note on one, or choose a favourite source, and it shows up here.")
                 }
             }
         }
@@ -224,7 +231,8 @@ struct CollectionSquare: View {
 
     static func name(of kind: ArticleCollection.Kind) -> Text {
         switch kind {
-        case .builtIn(.starred): Text("Starred")
+        case .builtIn(.starred): Text("Starred articles")
+        case .builtIn(.favouriteSources): Text("Favourite sources")
         case .builtIn(.annotated): Text("Notes")
         case .made(let name), .dynamic(let name): Text(verbatim: name)
         }
@@ -233,6 +241,9 @@ struct CollectionSquare: View {
     private static func mark(of kind: ArticleCollection.Kind) -> String {
         switch kind {
         case .builtIn(.starred): "star"
+        // The mark a source wears everywhere else in the application, so the
+        // square beside the star is plainly about publishers and not articles.
+        case .builtIn(.favouriteSources): "dot.radiowaves.up.forward"
         case .builtIn(.annotated): "text.quote"
         case .made: "folder"
         // Described rather than filled, and the mark says which : a reader who

@@ -138,18 +138,23 @@ nonisolated enum QueryCompiler {
             return "e.language = ?"
 
         case .tag:
-            // A folder is a view over a root tag, so a feed filed under a path
-            // answers to it exactly as a tagged article does.
+            // A tag matches what is filed under it and under everything below
+            // it, so `tag:collection` answers for every collection there is.
+            //
+            // It no longer answers for the feed as well. A feed carried a
+            // folder, a folder was a view over a root tag, and the two shared
+            // this field ; the folders are gone, and a source now belongs to a
+            // publisher rather than to a filing. `feed:` and `site:` are what
+            // narrow a search to where an article came from.
             let path = term.value
             let below = contains(path + "/", anchored: true)
-            arguments.append(contentsOf: [path, below, path, below])
+            arguments.append(contentsOf: [path, below])
             return """
-                (EXISTS (
-                     SELECT 1 FROM tag_binding tb JOIN tag t ON t.id = tb.tag_id
-                     WHERE tb.target_kind = 'entry' AND tb.target_id = e.id
-                       AND (t.path = ? OR t.path LIKE ? ESCAPE '\\')
-                 )
-                 OR f.folder = ? OR f.folder LIKE ? ESCAPE '\\')
+                EXISTS (
+                    SELECT 1 FROM tag_binding tb JOIN tag t ON t.id = tb.tag_id
+                    WHERE tb.target_kind = 'entry' AND tb.target_id = e.id
+                      AND (t.path = ? OR t.path LIKE ? ESCAPE '\\')
+                )
                 """
 
         case .any, .title, .text, .author:

@@ -75,8 +75,7 @@ nonisolated enum OPMLReader {
                         title: Builder.attribute("title", of: attributes),
                         xmlURL: Builder.attribute("xmlUrl", of: attributes),
                         htmlURL: Builder.attribute("htmlUrl", of: attributes),
-                        type: Builder.attribute("type", of: attributes),
-                        category: Builder.attribute("category", of: attributes)
+                        type: Builder.attribute("type", of: attributes)
                     )
                 )
             default:

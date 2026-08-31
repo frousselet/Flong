@@ -76,7 +76,13 @@ An active iCloud account is required for synchronization, but not for operation 
 
 What it really held, once the frozen text stopped being wanted, was the reader's own marks. Those moved onto the article, which is where they had always belonged.
 
-**Tag** : a namespaced label, for example `veille/ios`, applicable to articles and to feeds. A folder is only a view over a root tag.
+**Tag** : a namespaced label, for example `collection/typographie`, applicable to articles. It used to apply to feeds as well, since a folder was a view over a root tag ; there are no folders, so it does not.
+
+**Group of sources** : every feed one publisher serves, keyed by the host they share, which is the same host the digest counts as a room. It is worked out from the addresses and stored nowhere, so there is no group to make, none to keep in step and none left empty. The reader may write a name over one, and that name is the only thing about a group that is kept.
+
+**Folder** : *removed*. A feed carried the path of a folder it sat in, and no screen ever let a reader make one, rename one or take one away : the only folders that existed came out of an imported OPML file, so what the column really held was somebody else's filing, inherited and untendable. Grouping by publisher answers the question a list of two hundred sources actually raises, costs the reader nothing and is right the moment a subscription lands.
+
+**Favourite source** : a publisher the reader singled out. It is not a starred article and it makes none : the star stays a judgement about an article, this is a judgement about who wrote it, and the two fill different squares on the collections page.
 
 **Rule** : a condition expressed in the query language, paired with a list of actions.
 
@@ -113,7 +119,8 @@ GRDB is the only external dependency, and it stays that way. A package is added 
 
 | Table | Contents |
 | ----- | -------- |
-| `feed` | canonical URL, title, folder, conditionality metadata (`etag`, `last_modified`), health, observed periodicity, local settings |
+| `feed` | canonical URL, title, whether the reader singled it out, conditionality metadata (`etag`, `last_modified`), health, observed periodicity, local settings |
+| `source_name` | what the reader calls one publisher. A row only where they wrote one : the groups themselves fall out of the addresses |
 | `entry` | article, stable identifier, metadata, read state, reception date, and the reader's own marks : starred, annotation, vector with its model identifier and revision |
 | `entry_body` | sanitized body, extracted body, normalized plain text |
 | `entry_fts` | FTS5 virtual table, contentless, kept in step by triggers |
@@ -140,7 +147,7 @@ This is the dominant design constraint. CloudKit degrades on record count and ch
 
 | Record type | Over three years | Contents |
 | ----------- | ---------------- | -------- |
-| feeds, folders, tags, rules, queries, settings | a few hundred | complete |
+| feeds, publisher names, tags, rules, queries, settings | a few hundred | complete |
 | marks | 1,000 to 2,500 | starred, annotation, collections, vector |
 | read-state blocks | a few dozen | compressed sets of fingerprints, one per month |
 | catch-up headers | a few hundred, sliding | metadata only |
@@ -374,7 +381,7 @@ Three natures, and what travels is different for each. That is not an implementa
 
 | Nature | What it is | What travels |
 | ------ | ---------- | ------------ |
-| **Built-in** | A question every reader's articles answer about themselves : favourites, notes | The state of one article, yes or no, on that article's own record |
+| **Built-in** | A question every reader's articles answer about themselves : starred articles, notes. Favourite sources asks it of the publisher instead, and the answer rides on the feed's record | The state of one article, yes or no, on that article's own record |
 | **Made** | Filled article by article | The pair, this article in that collection, as a field on the article's record |
 | **Dynamic** | Described rather than filled | The description, and never what answers it |
 
@@ -502,6 +509,14 @@ On macOS those same sections become a sidebar, drawn by the system for an adapta
 
 Views the sidebar was also to list, today, starred, tags, saved queries and individual feeds, are reached from the sources section rather than from a permanent column.
 
+### The sources
+
+**Amended : grouped by publisher, and there is nothing to make.** This was a folder tree, and no screen ever let a reader plant one : the only folders that existed came out of an imported OPML file. A group is every feed served from one address, worked out from the addresses themselves, so it is right the moment a subscription lands, it cannot go stale and it never survives the last of its feeds. The reader writes a name over one where the address is not the name they use, and that name is the only thing about a group that is stored.
+
+Every source sits under a heading, the ones alone under theirs included. A list where some rows are grouped and others are loose is a list where the reader cannot tell in advance where a source will be, and the heading is the only place a group is acted on : it opens a menu holding the naming and the whole of that publisher's articles.
+
+A source can be made a **favourite**, which is the reader saying this publisher is one of theirs. It is not the star an article wears : it stars nothing, it reorders nothing, and it changes nothing the front page ranks. It marks the row, and it fills a square on the collections page beside the starred articles, where the two are plainly different things.
+
 The digest, a story and an article are set as a page rather than as a control panel : one column held to a readable measure, serif headlines, hairline rules, no cards and no boxes. Liquid Glass appears only in the navigation layer, which is the system's own bar, and never in the content. `docs/technical/interface.md` records the design and what was rejected.
 
 ### The wire
@@ -561,9 +576,9 @@ This entry point is local to the machine ; it is neither remote nor available wi
 
 ## 19. Import, export, migration
 
-**OPML import**, including the common proprietary attributes, preserving the folder tree and tolerating malformed files.
+**OPML import**, including the common proprietary attributes, walking the nesting for every feed at the bottom of it and tolerating malformed files. The tree itself is not kept : a source belongs to the publisher serving it, which its own address already says.
 
-**Import from an existing service** : FreshRSS and Miniflux through their API, Feedbin and Feedly through theirs. Subscriptions, folders, labels, stars and read states are retrieved, after which Flong runs on its own. No permanent synchronization is kept with the origin service.
+**Import from an existing service** : FreshRSS and Miniflux through their API, Feedbin and Feedly through theirs. Subscriptions, labels, stars and read states are retrieved, after which Flong runs on its own. Folders are read for the subscriptions inside them and not kept, as an OPML file's tree is not. No permanent synchronization is kept with the origin service.
 
 **Query translation** from FreshRSS to the Flong language, with an explicit report of the expressions that could not be translated rather than a silent approximate conversion.
 

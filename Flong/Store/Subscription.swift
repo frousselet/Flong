@@ -15,8 +15,8 @@ import Foundation
 ///
 /// This is what an OPML file, a pasted address or the share extension produces,
 /// before the store knows whether it is already following it. Its URL is
-/// canonical and its folder path normalized by construction, so nothing further
-/// down has to remember to do either.
+/// canonical by construction, so nothing further down has to remember to make
+/// it so.
 nonisolated struct Subscription: Hashable, Sendable {
     /// The canonical feed URL, which is what identifies the feed.
     let url: URL
@@ -24,25 +24,21 @@ nonisolated struct Subscription: Hashable, Sendable {
     var title: String
     var siteURL: URL?
     var iconURL: URL?
-    /// The folder path, `nil` for a feed sitting outside any folder.
-    var folder: String?
 
     init(
         url: URL,
         title: String = "",
         siteURL: URL? = nil,
-        iconURL: URL? = nil,
-        folder: String? = nil
+        iconURL: URL? = nil
     ) throws(FeedURLError) {
-        try self.init(address: url.absoluteString, title: title, siteURL: siteURL, iconURL: iconURL, folder: folder)
+        try self.init(address: url.absoluteString, title: title, siteURL: siteURL, iconURL: iconURL)
     }
 
     init(
         address: String,
         title: String = "",
         siteURL: URL? = nil,
-        iconURL: URL? = nil,
-        folder: String? = nil
+        iconURL: URL? = nil
     ) throws(FeedURLError) {
         let url = try FeedURL.canonical(address)
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -51,7 +47,6 @@ nonisolated struct Subscription: Hashable, Sendable {
         self.title = title.isEmpty ? Subscription.fallbackTitle(for: url) : title
         self.siteURL = siteURL
         self.iconURL = iconURL
-        self.folder = FolderPath.normalized(folder)
     }
 
     /// What a feed is called when its source names it nothing.

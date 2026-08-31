@@ -22,7 +22,6 @@ nonisolated struct OPMLOutline: Hashable, Sendable {
     var xmlURL: String?
     var htmlURL: String?
     var type: String?
-    var category: String?
     var children: [OPMLOutline] = []
 
     /// What the outline is called. OPML 2.0 requires `text`, and exporters fill
@@ -41,12 +40,11 @@ nonisolated struct OPMLOutline: Hashable, Sendable {
     var isFeed: Bool { xmlURL?.isEmpty == false }
 }
 
-/// A feed read from an OPML file, with the folder its nesting puts it in.
+/// A feed read from an OPML file.
 nonisolated struct OPMLFeed: Hashable, Sendable {
     var address: String
     var title: String
     var siteAddress: String?
-    var folder: String?
 }
 
 /// The contents of an OPML file.
@@ -56,39 +54,32 @@ nonisolated struct OPMLDocument: Hashable, Sendable {
 
     /// Every feed of the document, depth first, in the order the file lists them.
     ///
-    /// The folder comes from the outlines a feed is nested under. When nothing
-    /// nests it, a `category` attribute is used instead : OPML 2.0 states it as
-    /// a comma separated list of slash delimited paths, and it is how several
-    /// services export a flat file.
+    /// **The nesting is walked and not kept.** An exported file files its feeds
+    /// into folders, and Flong no longer has any : a source belongs to the
+    /// publisher that serves it, which is worked out from its own address and
+    /// needs nobody's filing. What the tree is still good for is finding the
+    /// feeds at the bottom of it, so every level is descended and only the
+    /// addresses come back.
     var feeds: [OPMLFeed] {
         var feeds: [OPMLFeed] = []
-        collect(outlines, folder: [], into: &feeds)
+        collect(outlines, into: &feeds)
         return feeds
     }
 
-    private func collect(_ outlines: [OPMLOutline], folder: [String], into feeds: inout [OPMLFeed]) {
+    private func collect(_ outlines: [OPMLOutline], into feeds: inout [OPMLFeed]) {
         for outline in outlines {
             if outline.isFeed, let address = outline.xmlURL {
                 feeds.append(
                     OPMLFeed(
                         address: address,
                         title: outline.name ?? "",
-                        siteAddress: outline.htmlURL,
-                        folder: folder.isEmpty
-                            ? OPMLDocument.folder(fromCategory: outline.category)
-                            : folder.joined(separator: String(FolderPath.separator))
+                        siteAddress: outline.htmlURL
                     )
                 )
             }
 
             guard !outline.children.isEmpty else { continue }
-            let nested = outline.name.map { folder + [$0] } ?? folder
-            collect(outline.children, folder: nested, into: &feeds)
+            collect(outline.children, into: &feeds)
         }
-    }
-
-    private static func folder(fromCategory category: String?) -> String? {
-        guard let first = category?.split(separator: ",").first else { return nil }
-        return FolderPath.normalized(String(first))
     }
 }

@@ -29,6 +29,7 @@ nonisolated enum SyncRecords {
         static let feed = "Feed"
         static let mark = "Mark"
         static let readState = "ReadState"
+        static let sourceName = "SourceName"
         static let catchUp = "CatchUp"
         static let collections = "Collections"
     }
@@ -36,6 +37,9 @@ nonisolated enum SyncRecords {
     // MARK: - Names
 
     static func name(forFeed url: URL) -> String { "feed-" + digest(url.absoluteString) }
+
+    /// The name the reader gave one publisher.
+    static func name(forSourceNamedDomain domain: String) -> String { "source-" + digest(domain) }
 
     /// One marked article, named after the article and not after the device.
     ///
@@ -144,7 +148,7 @@ nonisolated enum SyncRecords {
         )
         record["url"] = feed.url.absoluteString
         record["title"] = feed.title
-        record["folder"] = feed.folder
+        record["isFavourite"] = feed.isFavourite ? 1 : 0
         record["siteURL"] = feed.siteURL?.absoluteString
         record["iconURL"] = feed.iconURL?.absoluteString
         record["createdAt"] = feed.createdAt
@@ -158,9 +162,49 @@ nonisolated enum SyncRecords {
             address: url,
             title: record["title"] as? String ?? "",
             siteURL: (record["siteURL"] as? String).flatMap(URL.init(string:)),
-            iconURL: (record["iconURL"] as? String).flatMap(URL.init(string:)),
-            folder: record["folder"] as? String
+            iconURL: (record["iconURL"] as? String).flatMap(URL.init(string:))
         )
+    }
+
+    /// Whether the record says the reader singled that source out.
+    ///
+    /// `nil` when the field is absent, which is what a record written before
+    /// favourites existed looks like. Nothing said is not the same as no, and
+    /// treating it as no would have the first device to read an old record
+    /// unstar every source on every other one.
+    static func isFavourite(from record: CKRecord) -> Bool? {
+        (record["isFavourite"] as? Int).map { $0 == 1 }
+    }
+
+    // MARK: - The names of publishers
+
+    /// What the reader calls one publisher.
+    ///
+    /// A record apiece, and only for the ones they actually named : the groups
+    /// themselves are worked out from the addresses of the feeds, so there is
+    /// nothing to send about the ones still called what they are. A reader
+    /// naming a few dozen spends a few dozen records of the budget of
+    /// section 7, where a record per group would spend one per publisher
+    /// followed.
+    static func record(for name: SourceName, in zone: CKRecordZone.ID) -> CKRecord {
+        let record = CKRecord(
+            recordType: RecordType.sourceName,
+            recordID: CKRecord.ID(recordName: self.name(forSourceNamedDomain: name.domain), zoneID: zone)
+        )
+        record["domain"] = name.domain
+        record["name"] = name.name
+        record["createdAt"] = name.createdAt
+        return record
+    }
+
+    static func sourceName(from record: CKRecord) -> SourceName? {
+        guard record.recordType == RecordType.sourceName,
+            let domain = record["domain"] as? String,
+            let name = record["name"] as? String,
+            !domain.isEmpty, !name.isEmpty
+        else { return nil }
+
+        return SourceName(domain: domain, name: name, createdAt: record["createdAt"] as? Date ?? Date())
     }
 
     // MARK: - The reader's marks

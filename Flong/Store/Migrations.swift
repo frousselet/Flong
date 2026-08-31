@@ -359,6 +359,39 @@ nonisolated extension AppDatabase {
             try db.rename(table: "topic_rebuilt", to: "topic")
         }
 
+        // The folders are gone, and the sources are grouped by publisher.
+        //
+        // **Nothing in Flong ever let a reader make a folder.** The only ones
+        // that existed came out of somebody else's OPML file, so the feature
+        // was a tree the reader inherited and could not tend : no screen
+        // created one, none renamed one, and the only way to be rid of one was
+        // to stop following everything in it. A column carrying somebody
+        // else's filing is not organization, it is a leftover.
+        //
+        // **The grouping that replaced it stores nothing**, which is the
+        // point. A group is the address its feeds share, so it is right the
+        // moment a subscription lands, it cannot go stale, and there is no
+        // empty one to clean up. The one thing that cannot be worked out is
+        // what the reader calls it, and that is the whole of `source_name`.
+        //
+        // A favourite source is the reader singling a publisher out. It is not
+        // a starred article and it never makes one : section 13 keeps the star
+        // a judgement about an article, and this is a judgement about who
+        // wrote it.
+        migrator.registerMigration("v23.publishersRatherThanFolders") { db in
+            try db.alter(table: "feed") { table in
+                table.drop(column: "folder")
+                table.add(column: "is_favourite", .boolean).notNull().defaults(to: false)
+            }
+
+            try db.create(table: "source_name") { table in
+                table.primaryKey("id", .blob)
+                table.column("domain", .text).notNull().unique()
+                table.column("name", .text).notNull()
+                table.column("created_at", .datetime).notNull()
+            }
+        }
+
         return migrator
     }
 

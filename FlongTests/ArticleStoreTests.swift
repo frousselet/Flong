@@ -131,16 +131,16 @@ struct ArticleStoreTests {
         return entry.id
     }
 
-    private func feed(_ address: String, folder: String? = nil, title: String = "Feed") async throws -> Feed {
-        try await subscriptions.subscribe(to: Subscription(address: address, title: title, folder: folder)).feed
+    private func feed(_ address: String, title: String = "Feed") async throws -> Feed {
+        try await subscriptions.subscribe(to: Subscription(address: address, title: title)).feed
     }
 
     // MARK: - Views
 
     @Test("A view holds what it says, newest first")
     func filtering() async throws {
-        let tech = try await feed("https://a.example.com/f.xml", folder: "Tech", title: "A")
-        let news = try await feed("https://b.example.com/f.xml", folder: "Tech/Daily", title: "B")
+        let tech = try await feed("https://a.example.com/f.xml", title: "A")
+        let news = try await feed("https://b.example.com/f.xml", title: "B")
         let loose = try await feed("https://c.example.com/f.xml", title: "C")
 
         try await add("old", feed: tech, published: now.addingTimeInterval(-86400 * 3), isRead: true)
@@ -154,7 +154,11 @@ struct ArticleStoreTests {
         #expect(try await articles.summaries(.unread, now: now).map(\.title) == ["today", "starred"])
         #expect(try await articles.summaries(.starred, now: now).map(\.title) == ["starred"])
         #expect(try await articles.summaries(.feed(tech.id), now: now).map(\.title) == ["old"])
-        #expect(try await articles.summaries(.folder("Tech"), now: now).map(\.title) == ["starred", "old"])
+        #expect(
+            try await articles.summaries(.feeds([tech.id, news.id]), now: now).map(\.title) == ["starred", "old"])
+        // A group whose last source has gone holds nothing, rather than
+        // everything, which is what an empty `IN` would have meant.
+        #expect(try await articles.summaries(.feeds([]), now: now).isEmpty)
         #expect(try await articles.summaries(.today, now: now).map(\.title) == ["today", "starred"])
     }
 
@@ -261,14 +265,14 @@ struct ArticleStoreTests {
 
     @Test("A whole view can be given up on")
     func markingAViewRead() async throws {
-        let tech = try await feed("https://a.example.com/f.xml", folder: "Tech")
+        let tech = try await feed("https://a.example.com/f.xml")
         let other = try await feed("https://b.example.com/f.xml")
 
         try await add("one", feed: tech, published: now)
         try await add("two", feed: tech, published: now)
         try await add("three", feed: other, published: now)
 
-        let marked = try await articles.markRead(.folder("Tech"), at: now, now: now)
+        let marked = try await articles.markRead(.feeds([tech.id]), at: now, now: now)
 
         #expect(marked == 2)
         #expect(try await articles.count(.unread, now: now) == 1)

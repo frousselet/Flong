@@ -27,21 +27,20 @@ struct SubscriptionStoreTests {
 
     // MARK: - Subscribing
 
-    @Test("Subscribing keeps the address, the title and the folder")
+    @Test("Subscribing keeps the address, the title and the site")
     func subscribing() async throws {
         let result = try await store.subscribe(
             to: Subscription(
                 address: "feeds.example.com/atom.xml",
                 title: "Example",
-                siteURL: URL(string: "https://example.com"),
-                folder: "/Tech/iOS/"
+                siteURL: URL(string: "https://example.com")
             )
         )
 
         #expect(result.isNew)
         #expect(result.feed.url.absoluteString == "https://feeds.example.com/atom.xml")
         #expect(result.feed.title == "Example")
-        #expect(result.feed.folder == "Tech/iOS")
+        #expect(!result.feed.isFavourite)
         let actual = try await store.count()
         #expect(actual == 1)
     }
@@ -70,22 +69,21 @@ struct SubscriptionStoreTests {
         let feed = try await store.subscribe(to: Subscription(address: address, title: "Example")).feed
 
         try await store.rename(feed.id, to: "My own name")
-        try await store.move(feed.id, toFolder: "Veille")
+        try await store.setFavourite(feed.id, true)
 
         let again = try await store.subscribe(
             to: Subscription(
                 address: address,
                 title: "Example",
-                siteURL: URL(string: "https://example.com"),
-                folder: "Tech"
+                siteURL: URL(string: "https://example.com")
             )
         )
 
-        // The reader's own naming and filing outrank a re-import, but a field
-        // still empty is worth filling.
+        // The reader's own naming outranks a re-import, and so does what they
+        // singled out, but a field still empty is worth filling.
         #expect(!again.isNew)
         #expect(again.feed.title == "My own name")
-        #expect(again.feed.folder == "Veille")
+        #expect(again.feed.isFavourite)
         #expect(again.feed.siteURL?.absoluteString == "https://example.com")
     }
 
@@ -138,33 +136,35 @@ struct SubscriptionStoreTests {
         #expect(titles == ["alpha", "Beta", "Écrans", "zeta"])
     }
 
-    @Test("A folder holds the feeds filed in it, and only those")
-    func feedsByFolder() async throws {
-        try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml", folder: "Tech"))
-        try await store.subscribe(to: Subscription(address: "https://feeds.example.com/2.xml", folder: "Tech/iOS"))
-        try await store.subscribe(to: Subscription(address: "https://feeds.example.com/3.xml"))
+    @Test("Every source sits under the publisher serving it")
+    func groupsFallOutOfTheAddresses() async throws {
+        try await store.subscribe(
+            to: Subscription(address: "https://www.leparisien.fr/societe/rss.xml", title: "Société"))
+        try await store.subscribe(
+            to: Subscription(address: "https://leparisien.fr/politique/rss.xml", title: "Politique"))
+        try await store.subscribe(to: Subscription(address: "https://blog.example.com/feed", title: "Un blog"))
 
-        let inTech = try await store.feeds(inFolder: "Tech")
-        let inIOS = try await store.feeds(inFolder: "/Tech/iOS")
-        let unfiled = try await store.feeds(inFolder: nil)
+        let groups = try await store.groups()
 
-        #expect(inTech.map(\.url.lastPathComponent) == ["1.xml"])
-        #expect(inIOS.map(\.url.lastPathComponent) == ["2.xml"])
-        #expect(unfiled.map(\.url.lastPathComponent) == ["3.xml"])
+        // A paper with a feed per desk is one publisher, and a blog on a host
+        // of its own is another : the same rule the digest counts rooms by.
+        #expect(groups.map(\.domain) == ["blog.example.com", "leparisien.fr"])
+        #expect(groups.first { $0.domain == "leparisien.fr" }?.feeds.map(\.title) == ["Politique", "Société"])
+        #expect(groups.allSatisfy { $0.name == nil })
     }
 
-    @Test("The folder list carries the levels no feed sits in")
-    func foldersIncludeTheirAncestors() async throws {
-        try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml", folder: "Tech/iOS"))
-        try await store.subscribe(to: Subscription(address: "https://feeds.example.com/2.xml", folder: "Tech/iOS"))
-        try await store.subscribe(to: Subscription(address: "https://feeds.example.com/3.xml", folder: "Presse"))
+    @Test("A group is named by the site, not by the address the feed is served at")
+    func groupsFollowTheSite() async throws {
+        try await store.subscribe(
+            to: Subscription(
+                address: "https://feedpress.example/lemonde.xml",
+                title: "Le Monde",
+                siteURL: URL(string: "https://www.lemonde.fr")
+            )
+        )
 
-        let folders = try await store.folders()
-
-        #expect(folders.map(\.path) == ["Presse", "Tech", "Tech/iOS"])
-        #expect(folders.first { $0.path == "Tech" }?.feedCount == 0)
-        #expect(folders.first { $0.path == "Tech/iOS" }?.feedCount == 2)
-        #expect(folders.first { $0.path == "Tech/iOS" }?.name == "iOS")
+        let groups = try await store.groups()
+        #expect(groups.map(\.domain) == ["lemonde.fr"])
     }
 
     @Test("A feed is found back from any spelling of its address")
@@ -212,35 +212,94 @@ struct SubscriptionStoreTests {
         #expect(actual == 0)
     }
 
-    // MARK: - Folders
+    // MARK: - Groups and favourites
 
-    @Test("Renaming a folder carries its subfolders along")
-    func renamingAFolder() async throws {
-        try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml", folder: "Tech"))
-        try await store.subscribe(to: Subscription(address: "https://feeds.example.com/2.xml", folder: "Tech/iOS"))
-        try await store.subscribe(to: Subscription(address: "https://feeds.example.com/3.xml", folder: "Presse"))
+    @Test("Naming a publisher writes a row, and only the ones named have one")
+    func namingAGroup() async throws {
+        try await store.subscribe(to: Subscription(address: "https://www.lemonde.fr/rss/une.xml"))
+        try await store.subscribe(to: Subscription(address: "https://blog.example.com/feed"))
 
-        let moved = try await store.renameFolder("Tech", to: "Veille")
+        let kept = try await store.rename(domain: "lemonde.fr", to: "  Le Monde  ")
 
-        #expect(moved == 2)
-        let folders = try await store.folders().map(\.path)
-        #expect(folders == ["Presse", "Veille", "Veille/iOS"])
+        #expect(kept == "Le Monde")
+        let names = try await store.names()
+        #expect(names.map(\.domain) == ["lemonde.fr"])
+
+        let groups = try await store.groups()
+        // Named, so it files under L rather than under the address it wears.
+        #expect(groups.map(\.title) == ["blog.example.com", "Le Monde"])
+        #expect(groups.first { $0.domain == "lemonde.fr" }?.name == "Le Monde")
     }
 
-    @Test("Removing a folder keeps its feeds")
-    func removingAFolder() async throws {
-        try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml", folder: "Tech"))
-        try await store.subscribe(to: Subscription(address: "https://feeds.example.com/2.xml", folder: "Tech/iOS"))
+    @Test("Naming a publisher again replaces the name rather than adding one")
+    func renamingAGroupTwice() async throws {
+        try await store.subscribe(to: Subscription(address: "https://www.lemonde.fr/rss/une.xml"))
 
-        let moved = try await store.removeFolder("Tech")
+        try await store.rename(domain: "lemonde.fr", to: "Le Monde")
+        try await store.rename(domain: "lemonde.fr", to: "Le Monde diplomatique")
 
-        #expect(moved == 2)
-        let count = try await store.count()
-        let unfiled = try await store.feeds(inFolder: nil)
-        let folders = try await store.folders()
+        let names = try await store.names()
+        #expect(names.count == 1)
+        #expect(names.first?.name == "Le Monde diplomatique")
+    }
 
-        #expect(count == 2)
-        #expect(unfiled.count == 1)
-        #expect(folders.map(\.path) == ["iOS"])
+    @Test("A name taken back leaves the group called by its address")
+    func clearingAName() async throws {
+        try await store.subscribe(to: Subscription(address: "https://www.lemonde.fr/rss/une.xml"))
+        try await store.rename(domain: "lemonde.fr", to: "Le Monde")
+
+        // Emptied, blank, or written out as the address again : three ways of
+        // saying the same thing, and none of them is a name.
+        for raw in [nil, "", "   ", "lemonde.fr"] {
+            let kept = try await store.rename(domain: "lemonde.fr", to: raw)
+            #expect(kept == nil)
+            let names = try await store.names()
+            #expect(names.isEmpty)
+            try await store.rename(domain: "lemonde.fr", to: "Le Monde")
+        }
+
+        let groups = try await store.groups()
+        #expect(groups.map(\.title) == ["Le Monde"])
+    }
+
+    @Test("Naming a publisher moves nothing")
+    func namingMovesNothing() async throws {
+        let feed = try await store.subscribe(to: Subscription(address: "https://www.lemonde.fr/rss/une.xml")).feed
+
+        try await store.rename(domain: "lemonde.fr", to: "Le Monde")
+
+        let stored = try #require(try await store.feed(id: feed.id))
+        #expect(stored.domain == "lemonde.fr")
+    }
+
+    @Test("A favourite source stars nothing")
+    func favouritingASource() async throws {
+        let feed = try await store.subscribe(to: Subscription(address: "https://www.lemonde.fr/rss/une.xml")).feed
+        try await database.writer.write { db in
+            try Entry(feedID: feed.id, guid: "urn:example:1", title: "Une réforme").insert(db)
+        }
+
+        try await store.setFavourite(feed.id, true)
+
+        #expect(try await store.feed(id: feed.id)?.isFavourite == true)
+        let starred = try await database.writer.read { db in
+            try Entry.fetchAll(db).filter(\.isStarred).count
+        }
+        #expect(starred == 0)
+
+        try await store.setFavourite(feed.id, false)
+        #expect(try await store.feed(id: feed.id)?.isFavourite == false)
+    }
+
+    @Test("A group knows whether the reader singled any of its sources out")
+    func groupsCarryTheFavourites() async throws {
+        let feed = try await store.subscribe(to: Subscription(address: "https://www.lemonde.fr/rss/une.xml")).feed
+        try await store.subscribe(to: Subscription(address: "https://blog.example.com/feed"))
+
+        try await store.setFavourite(feed.id, true)
+
+        let groups = try await store.groups()
+        #expect(groups.first { $0.domain == "lemonde.fr" }?.hasFavourite == true)
+        #expect(groups.first { $0.domain == "blog.example.com" }?.hasFavourite == false)
     }
 }

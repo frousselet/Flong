@@ -11,7 +11,7 @@
 
 import SwiftUI
 
-/// A plain list of articles : unread, a feed, a folder, everything.
+/// A plain list of articles : unread, a feed, a publisher, everything.
 ///
 /// The same column and the same rows as the front page. A view of the stream is
 /// not a different kind of place, it is the same place with a narrower question.
@@ -25,7 +25,7 @@ struct ArticleFeedScreen: View {
     var showsArrivals = false
     /// Where the reader's menu goes, when this screen is one a section opens on.
     ///
-    /// A pushed list is a feed, a folder or a view of the stream, and it keeps
+    /// A pushed list is a feed, a publisher or a view of the stream, and it keeps
     /// the command that belongs to it, which is giving up on the lot. A section
     /// the reader lands in keeps the menu instead : one button, one corner, the
     /// same in all four.
@@ -251,9 +251,9 @@ struct ArticleFeedScreen: View {
         case .digest: Text("Digest")
         case .unread: Text("Unread")
         case .today: Text("Today")
-        case .starred: Text("Starred")
+        case .starred: Text("Starred articles")
         case .all: Text("All articles")
-        case .folder(let path): Text(verbatim: FolderPath.name(of: path))
+        case .group(let domain): Text(verbatim: model.title(of: kind) ?? domain)
         case .feed: Text(verbatim: model.title(of: kind) ?? "")
         }
     }

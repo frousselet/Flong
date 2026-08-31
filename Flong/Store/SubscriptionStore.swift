@@ -17,18 +17,6 @@ nonisolated enum SubscriptionError: Error, Hashable, Sendable {
     case unknownFeed(UUID)
 }
 
-/// A folder, as the sidebar needs it.
-nonisolated struct Folder: Identifiable, Hashable, Sendable {
-    /// The full path, `Tech/iOS`.
-    let path: String
-    /// How many feeds sit in this exact folder, subfolders excluded.
-    let feedCount: Int
-
-    var id: String { path }
-    var name: String { FolderPath.name(of: path) }
-    var depth: Int { FolderPath.components(of: path).count }
-}
-
 /// What became of one subscription request.
 nonisolated struct SubscriptionResult: Hashable, Sendable {
     let feed: Feed
@@ -36,8 +24,8 @@ nonisolated struct SubscriptionResult: Hashable, Sendable {
     let isNew: Bool
 }
 
-/// The subscriptions : which feeds Flong follows, how they are called and where
-/// they sit.
+/// The subscriptions : which feeds Flong follows, how they are called and which
+/// publisher they belong to.
 ///
 /// Every write goes through one transaction, so an import of a thousand feeds
 /// either lands whole or not at all.
@@ -60,14 +48,6 @@ nonisolated struct SubscriptionStore: Sendable {
         }
     }
 
-    /// The feeds sitting in one exact folder, or outside any folder for `nil`.
-    func feeds(inFolder folder: String?) async throws -> [Feed] {
-        let folder = FolderPath.normalized(folder)
-        return try await database.writer.read { db in
-            try Feed.filter(Feed.Columns.folder == folder).orderedByTitle().fetchAll(db)
-        }
-    }
-
     func feed(id: UUID) async throws -> Feed? {
         try await database.writer.read { db in try Feed.fetchOne(db, key: id) }
     }
@@ -84,31 +64,39 @@ nonisolated struct SubscriptionStore: Sendable {
         try await database.writer.read { db in try Feed.fetchCount(db) }
     }
 
-    /// Every folder, including the ones no feed sits in directly.
+    /// Every publisher followed, with the sources it serves.
     ///
-    /// A feed in `Tech/iOS` implies `Tech`, which the sidebar has to draw even
-    /// though nothing is filed there. `feedCount` stays the direct count.
-    func folders() async throws -> [Folder] {
-        let stored = try await database.writer.read { db in
-            try Row.fetchAll(
-                db,
-                sql: "SELECT folder, COUNT(*) AS count FROM feed WHERE folder IS NOT NULL GROUP BY folder"
-            )
-            .map { (path: $0["folder"] as String, count: $0["count"] as Int) }
+    /// The grouping is worked out here rather than stored : a group is the
+    /// address its feeds share, so there is never a group without feeds and
+    /// never a feed without a group. Only the names the reader wrote are read
+    /// back off the disk.
+    func groups() async throws -> [SourceGroup] {
+        let (feeds, names) = try await database.writer.read { db in
+            (try Feed.all().orderedByTitle().fetchAll(db), try SourceName.fetchAll(db))
         }
+        return Self.groups(of: feeds, named: names)
+    }
 
-        var counts: [String: Int] = [:]
-        for folder in stored {
-            counts[folder.path, default: 0] += folder.count
-            for ancestor in FolderPath.ancestors(of: folder.path) where counts[ancestor] == nil {
-                counts[ancestor] = 0
-            }
+    /// The names the reader wrote, which is all a group ever stores.
+    func names() async throws -> [SourceName] {
+        try await database.writer.read { db in
+            try SourceName.order(SourceName.Columns.domain).fetchAll(db)
         }
+    }
 
-        return
-            counts
-            .map { Folder(path: $0.key, feedCount: $0.value) }
-            .sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+    func name(ofDomain domain: String) async throws -> SourceName? {
+        try await database.writer.read { db in
+            try SourceName.filter(SourceName.Columns.domain == domain).fetchOne(db)
+        }
+    }
+
+    /// The groups a set of feeds falls into, in the order a list shows them.
+    static func groups(of feeds: [Feed], named names: [SourceName]) -> [SourceGroup] {
+        let written = Dictionary(names.map { ($0.domain, $0.name) }, uniquingKeysWith: { first, _ in first })
+
+        return Dictionary(grouping: feeds, by: \.domain)
+            .map { SourceGroup(domain: $0.key, name: written[$0.key], feeds: $0.value) }
+            .sorted(by: SourceGroup.before)
     }
 
     // MARK: - Subscribing
@@ -133,8 +121,8 @@ nonisolated struct SubscriptionStore: Sendable {
     /// Adds a feed, or completes the one already there.
     ///
     /// An address already followed never overwrites what is stored : a title the
-    /// user changed, or a folder they moved the feed to, outranks whatever a
-    /// re-import carries. Only fields still empty are filled in.
+    /// user changed outranks whatever a re-import carries, and so does the
+    /// group they named it into. Only fields still empty are filled in.
     private static func upsert(_ subscription: Subscription, in db: Database) throws -> SubscriptionResult {
         if var feed = try Feed.filter(Feed.Columns.url == subscription.url).fetchOne(db) {
             var changed = false
@@ -145,10 +133,6 @@ nonisolated struct SubscriptionStore: Sendable {
             }
             if feed.iconURL == nil, subscription.iconURL != nil {
                 feed.iconURL = subscription.iconURL
-                changed = true
-            }
-            if feed.folder == nil, subscription.folder != nil {
-                feed.folder = subscription.folder
                 changed = true
             }
 
@@ -162,8 +146,7 @@ nonisolated struct SubscriptionStore: Sendable {
             url: subscription.url,
             siteURL: subscription.siteURL,
             iconURL: subscription.iconURL,
-            title: subscription.title,
-            folder: subscription.folder
+            title: subscription.title
         )
         try feed.insert(db)
         return SubscriptionResult(feed: feed, isNew: true)
@@ -179,10 +162,13 @@ nonisolated struct SubscriptionStore: Sendable {
         }
     }
 
-    /// Moves a feed to another folder, or out of every folder for `nil`.
-    func move(_ id: UUID, toFolder folder: String?) async throws {
-        let folder = FolderPath.normalized(folder)
-        try await update(id) { feed in feed.folder = folder }
+    /// Singles a source out, or stops.
+    ///
+    /// It says nothing whatever about the articles underneath : section 13 of
+    /// the specification keeps the star an article wears a judgement about that
+    /// article, and this is a judgement about the publisher.
+    func setFavourite(_ id: UUID, _ isFavourite: Bool) async throws {
+        try await update(id) { feed in feed.isFavourite = isFavourite }
     }
 
     /// Stops following a feed, which takes its articles and their bodies with it.
@@ -201,46 +187,36 @@ nonisolated struct SubscriptionStore: Sendable {
         }
     }
 
-    // MARK: - Folders
+    // MARK: - Groups
 
-    /// Renames a folder and every folder below it.
+    /// Names a publisher, or takes the name back off it.
     ///
-    /// Renaming `Tech` to `Veille` moves `Tech/iOS` to `Veille/iOS` too : a
-    /// folder is a path, and a path that no longer starts the same way would
-    /// leave its children orphaned.
+    /// **A group is never created and never removed**, so this writes the one
+    /// thing about it that is not already known. An empty name, or the address
+    /// written out again, is not a name : the row goes and the group is called
+    /// what it is, which is what lets a reader undo a renaming without having
+    /// to remember what the address was.
+    ///
+    /// The sources do not move. A group is where a feed already is, not
+    /// somewhere it was put.
     @discardableResult
-    func renameFolder(_ folder: String, to newFolder: String?) async throws -> Int {
-        guard let source = FolderPath.normalized(folder) else { return 0 }
-        let destination = FolderPath.normalized(newFolder)
+    func rename(domain: String, to raw: String?, at date: Date = Date()) async throws -> String? {
+        let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let kept = (trimmed?.isEmpty == false && trimmed != domain) ? trimmed : nil
 
-        return try await database.writer.write { db in
-            let feeds = try Feed.filter(Feed.Columns.folder != nil).fetchAll(db)
-            var moved = 0
-
-            for var feed in feeds {
-                guard let current = feed.folder, Self.folder(current, isInside: source) else { continue }
-
-                let suffix = FolderPath.components(of: current).dropFirst(FolderPath.components(of: source).count)
-                feed.folder = FolderPath.normalized(([destination].compactMap { $0 } + suffix).joined(separator: "/"))
-                try feed.update(db)
-                moved += 1
+        try await database.writer.write { db in
+            guard let kept else {
+                _ = try SourceName.filter(SourceName.Columns.domain == domain).deleteAll(db)
+                return
             }
-            return moved
+
+            if var written = try SourceName.filter(SourceName.Columns.domain == domain).fetchOne(db) {
+                written.name = kept
+                try written.update(db)
+            } else {
+                try SourceName(domain: domain, name: kept, createdAt: date).insert(db)
+            }
         }
-    }
-
-    /// Removes a folder.
-    ///
-    /// A folder holds nothing of its own, so removing one never removes a feed :
-    /// what sat directly in it moves outside every folder, and a subfolder
-    /// floats up one level with its feeds.
-    @discardableResult
-    func removeFolder(_ folder: String) async throws -> Int {
-        try await renameFolder(folder, to: nil)
-    }
-
-    /// Whether a path is that folder or sits below it.
-    private static func folder(_ path: String, isInside folder: String) -> Bool {
-        path == folder || path.hasPrefix(folder + String(FolderPath.separator))
+        return kept
     }
 }

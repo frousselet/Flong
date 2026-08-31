@@ -44,7 +44,7 @@ struct OPMLImportTests {
         """.utf8
     )
 
-    @Test("A file brings its feeds and its folder tree over")
+    @Test("A file brings every feed of its tree over, and none of its folders")
     func importing() async throws {
         let report = try await opml(Self.file)
 
@@ -54,7 +54,14 @@ struct OPMLImportTests {
 
         let feeds = try await store.feeds()
         #expect(feeds.map(\.title) == ["Example", "example.org", "Nested"])
-        #expect(try await store.folders().map(\.path) == ["Tech", "Tech/iOS"])
+
+        // The tree is walked for the addresses at the bottom of it and kept
+        // nowhere : the group of a source is the site it belongs to, or the
+        // host serving the feed when the file names no site.
+        let groups = try await store.groups()
+        #expect(groups.map(\.domain) == ["example.com", "example.org", "feeds.example.com"])
+        #expect(groups.first { $0.domain == "example.com" }?.feeds.map(\.title) == ["Example"])
+        #expect(try await store.names().isEmpty)
     }
 
     @Test("Addresses are canonicalized on the way in")
@@ -63,7 +70,7 @@ struct OPMLImportTests {
 
         let nested = try await store.feed(at: "https://feeds.example.com/2.xml")
         #expect(nested?.title == "Nested")
-        #expect(nested?.folder == "Tech/iOS")
+        #expect(nested?.domain == "feeds.example.com")
     }
 
     @Test("A feed with no title of its own is named after its host")
@@ -84,18 +91,20 @@ struct OPMLImportTests {
         #expect(try await store.count() == 3)
     }
 
-    @Test("A second import leaves the reader's own naming and filing alone")
+    @Test("A second import leaves the reader's own naming alone")
     func importingDoesNotOverwrite() async throws {
         _ = try await opml(Self.file)
         let feed = try #require(try await store.feed(at: "https://feeds.example.com/1.xml"))
 
         try await store.rename(feed.id, to: "My own name")
-        try await store.move(feed.id, toFolder: "Veille")
+        try await store.setFavourite(feed.id, true)
+        try await store.rename(domain: feed.domain, to: "My own publisher")
         _ = try await opml(Self.file)
 
         let again = try await store.feed(id: feed.id)
         #expect(again?.title == "My own name")
-        #expect(again?.folder == "Veille")
+        #expect(again?.isFavourite == true)
+        #expect(try await store.groups().first { $0.domain == feed.domain }?.name == "My own publisher")
     }
 
     @Test("One address listed twice is one subscription")

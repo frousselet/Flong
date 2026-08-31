@@ -21,18 +21,21 @@ nonisolated struct SidebarItem: Identifiable, Hashable, Sendable {
     enum Kind: Hashable {
         case digest
         case unread, today, starred, all
-        case folder(String)
+        /// Every source of one publisher, keyed by the address they share.
+        case group(String)
         case feed(UUID)
     }
 
     let kind: Kind
-    /// The name of a folder or a feed. Smart lists are named by the interface,
+    /// The name of a group or a feed. Smart lists are named by the interface,
     /// in the reader's language.
     let title: String?
     let unreadCount: Int
     /// Where a feed keeps its mark, when it is a feed and it states one.
     var iconURL: URL?
     var siteURL: URL?
+    /// Whether the reader singled this source out, when it is a source.
+    var isFavourite = false
     var children: [SidebarItem] = []
 
     var id: Kind { kind }
@@ -44,7 +47,10 @@ nonisolated struct SidebarItem: Identifiable, Hashable, Sendable {
         case .starred: .starred
         // The digest reads the stories, not a view of the stream.
         case .digest, .all: .all
-        case .folder(let path): .folder(path)
+        // A group is its sources and nothing else. It is worked out from their
+        // addresses rather than written on a row, so what it holds is asked of
+        // the entry that carries them and never of the store.
+        case .group: .feeds(children.compactMap { if case .feed(let id) = $0.kind { id } else { nil } })
         case .feed(let id): .feed(id)
         }
     }
@@ -575,7 +581,7 @@ final class AppModel {
         if last.lowercased().hasPrefix("feed:") {
             names = completions(for: String(last.dropFirst(5)), in: feedTitles)
         } else if last.lowercased().hasPrefix("tag:") {
-            names = completions(for: String(last.dropFirst(4)), in: folderPaths)
+            names = completions(for: String(last.dropFirst(4)), in: tagPaths)
         } else {
             return []
         }
@@ -601,9 +607,16 @@ final class AppModel {
         }
     }
 
-    private var folderPaths: [String] {
-        sidebar.compactMap { item in
-            if case .folder(let path) = item.kind { path } else { nil }
+    /// The tags there are to complete, which are the collections the reader
+    /// filled article by article.
+    ///
+    /// It used to be the folder paths as well, since a folder was a view over a
+    /// root tag. The folders are gone, and a source belongs to its publisher
+    /// rather than to a filing : `feed:` and `site:` are what narrow a search to
+    /// where an article came from.
+    private var tagPaths: [String] {
+        collections.compactMap { collection in
+            if case .made(let name) = collection.kind { CollectionStore.path(of: name) } else { nil }
         }
     }
 
@@ -649,13 +662,10 @@ final class AppModel {
         }
     }
 
-    /// The folders and the feeds outside them.
-    var feedItems: [SidebarItem] {
+    /// The publishers followed, each holding the sources it serves.
+    var sourceGroups: [SidebarItem] {
         sidebar.filter { item in
-            switch item.kind {
-            case .folder, .feed: true
-            default: false
-            }
+            if case .group = item.kind { true } else { false }
         }
     }
 
@@ -790,6 +800,9 @@ final class AppModel {
         await loadDigest()
         await loadLooseArticles()
         await loadCredentials()
+        // The search field completes tag names off them, so they are part of
+        // what a window holds and not only of what the collections page shows.
+        await loadCollections()
         // Another device may have changed them while this one was away.
         preferences.synchronize()
         articleBody = preferences.articleBody
@@ -1370,23 +1383,20 @@ final class AppModel {
                 SidebarItem(kind: .all, title: nil, unreadCount: 0),
             ]
 
-            let grouped = Dictionary(grouping: feeds, by: \.folder)
-            let folders = grouped.keys.compactMap { $0 }.sorted {
-                $0.localizedStandardCompare($1) == .orderedAscending
-            }
-
-            for folder in folders {
-                let children = (grouped[folder] ?? []).map { item(for: $0, counts: counts) }
+            // Every source sits under the publisher serving it, so there is no
+            // loose row and no reader wondering where one went : a feed's group
+            // is its own address, and it is right the moment the feed lands.
+            for group in SubscriptionStore.groups(of: feeds, named: try await subscriptions.names()) {
+                let children = group.feeds.map { item(for: $0, counts: counts) }
                 items.append(
                     SidebarItem(
-                        kind: .folder(folder),
-                        title: folder,
+                        kind: .group(group.domain),
+                        title: group.title,
                         unreadCount: children.reduce(0) { $0 + $1.unreadCount },
                         children: children
                     )
                 )
             }
-            items += (grouped[nil] ?? []).map { item(for: $0, counts: counts) }
 
             sidebar = items
             feedCount = feeds.count
@@ -1401,11 +1411,12 @@ final class AppModel {
             title: feed.title,
             unreadCount: counts[feed.id] ?? 0,
             iconURL: feed.iconURL,
-            siteURL: feed.siteURL ?? feed.url
+            siteURL: feed.siteURL ?? feed.url,
+            isFavourite: feed.isFavourite
         )
     }
 
-    /// The name of a feed or a folder, for a screen that only has its identity.
+    /// The name of a feed or a group, for a screen that only has its identity.
     func title(of kind: SidebarItem.Kind) -> String? {
         sidebar.flatMap { [$0] + $0.children }.first { $0.kind == kind }?.title
     }
@@ -1952,6 +1963,47 @@ final class AppModel {
             }
         } catch {
             failure = .notSaved
+        }
+    }
+
+    /// Singles a source out, or stops.
+    ///
+    /// It stars nothing. A favourite source is a judgement about the publisher,
+    /// and the articles underneath keep whatever the reader said about them,
+    /// which for almost all of them is nothing.
+    func setFavourite(_ id: UUID, _ isFavourite: Bool) async {
+        do {
+            try await subscriptions.setFavourite(id, isFavourite)
+            if let url = try await subscriptions.feed(id: id)?.url {
+                await cloud?.enqueue(recordNames: [SyncRecords.name(forFeed: url)])
+            }
+            await loadSidebar()
+            await loadCollections()
+        } catch {
+            failure = .notSaved
+            Log.store.error("The source could not be marked : \(error, privacy: .public)")
+        }
+    }
+
+    /// Calls a publisher something else, or calls it by its address again.
+    ///
+    /// Nothing moves : the group is the address its sources share, and this
+    /// writes only the name over it. Clearing the name is what puts the address
+    /// back, which is why an empty one is not refused.
+    func renameGroup(_ domain: String, to name: String?) async {
+        do {
+            let kept = try await subscriptions.rename(domain: domain, to: name)
+            let record = SyncRecords.name(forSourceNamedDomain: domain)
+
+            if kept == nil {
+                await cloud?.enqueue(deletions: [record])
+            } else {
+                await cloud?.enqueue(recordNames: [record])
+            }
+            await loadSidebar()
+        } catch {
+            failure = .notSaved
+            Log.store.error("The publisher could not be renamed : \(error, privacy: .public)")
         }
     }
 
