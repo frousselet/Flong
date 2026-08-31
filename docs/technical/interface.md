@@ -157,6 +157,24 @@ A region rather than a value : what is wanted is the news that something moved, 
 
 The mechanics were bad too. SwiftUI holds the refresh control out until the work the gesture started returns, and the control's space was not always reclaimed when it retracted : the page stayed pushed down by exactly its height, with the large title still open, until anything at all touched the screen and forced a layout. Four attempts at the cause missed, and none of them could be reproduced on a simulator, where a synthesised drag never engages the control at all. Removing the gesture removes the fault with it, which is a poor way to fix a bug and a fine way to remove a feature that was not wanted.
 
+## What the page says it is doing
+
+**A line at the head of the front page, while something is actually happening.** The page said nothing about any of it. A pass that fetched three hundred feeds, wrote sixty headlines and exchanged with iCloud was, to the reader, a page that changed under them for no stated reason, or worse, one that had not changed yet and gave no sign that it was about to. The only place that said anything was a footer buried in the sources list, which answers the question only for a reader who thought to go and ask it.
+
+It names the phase rather than reporting a percentage of nothing in particular : fetching the feeds, grouping what arrived, writing the headlines, filing the subjects, indexing what was kept, synchronizing with iCloud, exchanging with the other devices, tidying up. Four of those are resumable jobs that already work out how much is left after every batch and threw the number away, so those four carry a real count and the bar fills ; the rest run the bar indeterminate, which is honest.
+
+**It is not a control and takes no gesture.** There is no pull on any page, and a strip at the top of a scroll view is exactly the shape of one, so it answers to nothing at all.
+
+**It is in the pinned header, with the pills, not in the safe area.** For the reason recorded twice already in this file : a bar in the safe area lays itself out under the large title and draws itself somewhere else entirely. Being pinned, it stays where the reader can see it while they scroll, which is what "at the top of the page" has to mean on a page that scrolls. It is inside the editorial column like everything else, so it is held to the measure on a wide Mac window. It carries the page's own ground, since the stories pass behind a pinned header and the pills get away with it only because each one carries its own glass.
+
+**Two floors keep it from flickering.** It appears only after a quarter of a second, because a catch-up that finds nothing due returns in a few milliseconds and a line that appeared and left inside one frame is a flicker rather than information ; and once it has appeared it stays at least seven tenths of a second, because a line that left before it could be read is the same fault the other way. Both live in the model, so the view stays a pure function of what is happening and no other screen has to reinvent them. The words are read when the line appears rather than when it was asked for, so a burst that passes through three phases inside that quarter second shows the one it has reached.
+
+**The bar never runs backwards.** A resumable job works its total out afresh after every batch, as what it has done plus what is left, so articles arriving mid-pass raise it. Taken at face value the bar retreats, which reads as the application undoing itself.
+
+Under Reduce Motion the indeterminate bar is a still tinted rule rather than one that runs for ever, the same way `LiveDot` stops its pulse. The count is dropped before the words are at the largest type sizes, since what is happening matters more than how far along it is. VoiceOver reads the phase as the label and the count as the value, and the element updates frequently so it is not announced batch by batch.
+
+**The sources list keeps what a reader has to act on.** A full iCloud, a refusal, the offer to finish an import now : none of those belongs in a strip that disappears. Both places read the same phase, so they cannot come to describe one pass differently.
+
 **Asking is still possible, and now takes a deliberate act.** `Actualiser` sits in the reader's own menu, beside the other things they ask for, and keeps its `⌘R` on a Mac. It fetches every feed and groups what arrived ; the model's work carries on behind it, since those are resumable jobs and each headline appears as it is written.
 
 ## Pictures, and the marks beside them

@@ -277,6 +277,116 @@ final class AppModel {
     private(set) var isRefreshing = false
     private(set) var feedCount = 0
 
+    // MARK: - What the machinery is doing
+
+    /// The one phase the front page says out loud, or nothing at all.
+    private(set) var work: WorkPhase?
+
+    /// What the page shows, which folds in the work iCloud does on its own.
+    ///
+    /// `CKSyncEngine` decides for itself when to send and when to fetch, so an
+    /// exchange nothing here asked for still moves ``syncStatus`` and is still
+    /// worth saying : a reader watching their page change wants to know it is
+    /// their iPad talking and not a publisher.
+    var currentWork: WorkPhase? {
+        if let work { return work }
+        if case .working = syncStatus { return .synchronizing }
+        return nil
+    }
+
+    /// Nothing shorter than this is seen at all.
+    ///
+    /// A catch-up that finds nothing due returns in a few milliseconds, and a
+    /// line that appeared and left inside one frame is a flicker rather than
+    /// information.
+    static let workAppearsAfter = Duration.milliseconds(250)
+
+    /// Anything that is seen at all is seen for at least this long.
+    ///
+    /// The same fault the other way : a line that appeared for good reason and
+    /// left before it could be read told the reader nothing and made the page
+    /// twitch.
+    static let workStaysFor = Duration.milliseconds(700)
+
+    private var workShownAt: ContinuousClock.Instant?
+    private var pendingWork: WorkPhase?
+    private var showingWork: Task<Void, Never>?
+    private var clearingWork: Task<Void, Never>?
+
+    /// Says what is happening, or that nothing is.
+    ///
+    /// Both floors live here rather than in the view, so the view stays a pure
+    /// function of ``work`` and no screen has to reinvent them.
+    func show(_ phase: WorkPhase?) {
+        guard let phase else {
+            showingWork?.cancel()
+            showingWork = nil
+            pendingWork = nil
+            guard work != nil, let shownAt = workShownAt else {
+                work = nil
+                return
+            }
+
+            let left = AppModel.workStaysFor - shownAt.duration(to: .now)
+            guard left > .zero else {
+                work = nil
+                workShownAt = nil
+                return
+            }
+
+            clearingWork?.cancel()
+            clearingWork = Task { [weak self] in
+                try? await Task.sleep(for: left)
+                guard !Task.isCancelled else { return }
+                self?.work = nil
+                self?.workShownAt = nil
+            }
+            return
+        }
+
+        clearingWork?.cancel()
+        clearingWork = nil
+
+        // Already up : a change of phase is a change of words, not a new wait.
+        guard work == nil else {
+            work = phase
+            return
+        }
+
+        // The words are read when the line appears rather than when it was
+        // asked for, so a burst that passes through three phases inside the
+        // quarter second shows the one it has reached.
+        pendingWork = phase
+        guard showingWork == nil else { return }
+
+        showingWork = Task { [weak self] in
+            try? await Task.sleep(for: AppModel.workAppearsAfter)
+            guard !Task.isCancelled, let self, let pending = pendingWork else { return }
+            workShownAt = .now
+            work = pending
+            pendingWork = nil
+            showingWork = nil
+        }
+    }
+
+    /// Moves the count of the phase already showing, and says nothing when
+    /// something else has taken the line.
+    private func advance(_ phase: WorkPhase, done: Int, total: Int) {
+        guard let current = work ?? pendingWork else {
+            show(phase.advanced(done: done, total: total))
+            return
+        }
+        guard current.isSameKind(as: phase) else { return }
+        show(current.advanced(done: done, total: total))
+    }
+
+    /// A progress callback for the jobs, which are all `nonisolated`.
+    private func progress(of phase: WorkPhase) -> @Sendable (Int, Int) -> Void {
+        { [weak self] done, total in
+            Task { @MainActor [weak self] in self?.advance(phase, done: done, total: total) }
+        }
+    }
+
     /// What synchronization is doing, in terms the sidebar can show.
     private(set) var syncStatus = SyncStatus.idle(lastSynchronized: nil)
 
@@ -513,6 +623,8 @@ final class AppModel {
         watching?.cancel()
         ticking?.cancel()
         enriching?.cancel()
+        showingWork?.cancel()
+        clearingWork?.cancel()
     }
 
     /// How often an open window asks the publishers.
@@ -607,6 +719,7 @@ final class AppModel {
     /// model per story, and a page that waited for it would be a page that
     /// arrives a second late to say what it already knew.
     func rebuildDigest() async {
+        show(.grouping)
         await digestService.buildStories()
         await loadDigest()
         await loadLooseArticles()
@@ -786,16 +899,20 @@ final class AppModel {
         isWorking = true
         defer { isWorking = false }
 
-        await JobRunner(FirstFetchJob(database)).run(until: deadline)
+        show(.fetching(done: 0, total: 0))
+        await JobRunner(FirstFetchJob(database))
+            .run(until: deadline, onProgress: progress(of: .fetching(done: 0, total: 0)))
 
         let vectorize = VectorizeJob(database) { [weak self] items in
             // A vector computed here spares every other device the same work.
             await self?.enqueueVectors(for: items)
         }
-        await JobRunner(vectorize).run(until: deadline)
+        show(.indexing(done: 0, total: 0))
+        await JobRunner(vectorize).run(until: deadline, onProgress: progress(of: .indexing(done: 0, total: 0)))
 
         await countOutstandingWork()
         await load()
+        show(nil)
     }
 
     /// Starts the long work with the system watching over it.
@@ -863,20 +980,36 @@ final class AppModel {
         // switched Apple Intelligence on, a rate limit has certainly lifted.
         OnDeviceModel.reconsider()
 
-        let summary = await refresher.refreshAll()
+        show(.fetching(done: 0, total: 0))
+        let summary = await refresher.refreshAll(onProgress: progress(of: .fetching(done: 0, total: 0)))
         Log.fetch.notice("Full pass : \(summary.newArticles) new articles from \(summary.refreshed) feeds")
 
         await doOutstandingWork()
+
+        show(.grouping)
         // Generous, and bounded all the same. The pass has minutes rather than
         // seconds, and the model's two halves share whatever it turns out to
         // have : unbounded, the headlines took the lot and the subjects were
         // never asked for.
-        await digestService.rebuild(until: Date().addingTimeInterval(BackgroundScheduler.fullPassBudget))
+        await digestService.rebuild(
+            until: Date().addingTimeInterval(BackgroundScheduler.fullPassBudget),
+            onWriting: progress(of: .writing(done: 0, total: 0)),
+            onFiling: progress(of: .filing(done: 0, total: 0)),
+            onPhase: { [weak self] phase in
+                Task { @MainActor [weak self] in self?.show(phase) }
+            }
+        )
         await announceNewStories()
+
+        show(.tidying)
         _ = try? await Retention(database).purge()
         try? await SearchIndex(database).optimize()
+
+        show(.synchronizing)
         await cloud?.enqueueReadStates()
         await cloud?.enqueueCatchUp()
+
+        show(.exchanging)
         await exchangeArchives()
 
         // The whole of what the window shows, and not only part of it. The
@@ -884,6 +1017,7 @@ final class AppModel {
         // reader opens in the morning is that one rather than last night's.
         await reloadWhatIsShown()
         await countOutstandingWork()
+        show(nil)
     }
 
     /// Starts synchronizing with the reader's own iCloud.
@@ -1382,10 +1516,12 @@ final class AppModel {
         isRefreshing = true
         defer { isRefreshing = false }
 
+        show(.fetching(done: 0, total: 0))
+        let fetching = progress(of: .fetching(done: 0, total: 0))
         let summary =
             reason.asksEveryFeed
-            ? await refresher.refreshAll(until: deadline)
-            : await refresher.refreshDue(sparingly: reason.sparingly, until: deadline)
+            ? await refresher.refreshAll(until: deadline, onProgress: fetching)
+            : await refresher.refreshDue(sparingly: reason.sparingly, until: deadline, onProgress: fetching)
 
         if summary.newArticles > 0 {
             Log.fetch.info("\(summary.newArticles) new articles from \(summary.refreshed) feeds")
@@ -1395,10 +1531,14 @@ final class AppModel {
         // waiting to be grouped may have come from iCloud, from a shared
         // archive, or from a pass that ran while the window was away, and
         // grouping is a single query when there is nothing to group.
+        show(.grouping)
         await digestService.buildStories()
         await load()
 
-        guard reason.mayRunTheModel else { return }
+        guard reason.mayRunTheModel else {
+            show(nil)
+            return
+        }
         enrich(until: deadline)
     }
 
@@ -1445,9 +1585,17 @@ final class AppModel {
 
         enriching = Task { [weak self] in
             guard let self else { return }
-            await digestService.enrich(until: deadline)
+            await digestService.enrich(
+                until: deadline,
+                onWriting: progress(of: .writing(done: 0, total: 0)),
+                onFiling: progress(of: .filing(done: 0, total: 0)),
+                onPhase: { [weak self] phase in
+                    Task { @MainActor [weak self] in self?.show(phase) }
+                }
+            )
             await loadDigest()
             await announceNewStories()
+            show(nil)
             enriching = nil
         }
     }
