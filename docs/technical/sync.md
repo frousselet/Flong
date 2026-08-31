@@ -96,6 +96,16 @@ A build for a real device is what proves any of this. The simulator does not che
 
 Without the push the application still synchronizes : the engine sends what is pending and fetches what is waiting whenever it runs, which is at every launch, on returning to the foreground, and on a pull. What is lost is promptness, not correctness.
 
+## Starting again from nothing
+
+There is one command that repairs rather than exchanges, under `#if DEBUG` and nowhere else. It used to queue every local record and send them, which is only half of a repair : the engine still held its change tokens, so it asked the server what had changed since them and was told, correctly, that nothing had. A device whose copy had drifted learned nothing from the one command meant to fix exactly that.
+
+It forgets three things first, and all three are needed. The engine's serialized state, which holds the change tokens, so a new engine fetches the zone from the beginning. What the server said about each record, so nothing is skipped for carrying a tag that looks current. And the ledger of which shared archives have been read, so the days the other devices wrote are taken in again rather than skipped as seen.
+
+Then it runs the whole of the ordinary pass : every feed asked again, the stories built again, the headlines and the subjects written again, the index and the purge, and iCloud once more at the end with everything that has just arrived. Each step names itself at the head of the front page, since a repair a reader cannot watch is a repair they cannot tell from a hang.
+
+It spends the record budget of section 7 in one exchange. That is the point of it, and the reason it does not ship.
+
 ## The schema, and the day it stops being automatic
 
 The development environment invents the schema as it goes : the first save of a record type creates it, and the first save carrying a new field adds it. Nothing has to be declared, which is why none of this has needed a thought so far.

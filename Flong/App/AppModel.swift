@@ -77,10 +77,11 @@ nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
 
 /// What set a catch-up going.
 ///
-/// The five triggers differ in three ways and in no others : whether every
-/// feed is asked or only the ones politeness says are due, whether the data
-/// plan may be spent, and whether the model may be run. Naming them here keeps
-/// those three answers in one place instead of at five call sites that drift.
+/// The triggers differ in four ways and in no others : whether every feed is
+/// asked or only the ones politeness says are due, whether the data plan may be
+/// spent, whether the model may be run, and whether the page is replaced before
+/// the catch-up returns. Naming them here keeps those four answers in one place
+/// instead of at six call sites that drift.
 nonisolated enum CatchUp: Hashable, Sendable {
     /// The window opened.
     case launch
@@ -92,17 +93,30 @@ nonisolated enum CatchUp: Hashable, Sendable {
     case background
     /// The reader asked, in so many words.
     case reader
+    /// The reader pulled the front page down.
+    case pull
 
     /// Whether every feed is asked, or only those that are due.
     ///
-    /// Only when the reader asked. Everything else goes through the politeness
-    /// of section 8, which is what keeps a reader's devices from becoming a
-    /// burden on three hundred publishers.
-    var asksEveryFeed: Bool { self == .reader }
+    /// Only when the reader asked, by the command or by the gesture. Everything
+    /// automatic goes through the politeness of section 8, which is what keeps
+    /// a reader's devices from becoming a burden on three hundred publishers.
+    var asksEveryFeed: Bool { self == .reader || self == .pull }
 
     /// Whether nobody is waiting, and the reader's data plan is therefore not
     /// to be spent.
     var sparingly: Bool { self == .background }
+
+    /// Whether the page is replaced before the catch-up returns.
+    ///
+    /// **Not under a pull.** SwiftUI holds the refresh control out until the
+    /// gesture's work returns, so replacing the page's content as the last
+    /// thing before returning has the scroll view begin its retraction against
+    /// content it has never laid out. The window follows the store, and the
+    /// watcher deliberately waits for a refresh to be over before it reads
+    /// back, so the page arrives a moment later with the control out of the
+    /// way.
+    var readsBackAtOnce: Bool { self != .pull }
 
     /// Whether this is a moment to run the on-device model.
     ///
@@ -276,6 +290,36 @@ final class AppModel {
 
     private(set) var isRefreshing = false
     private(set) var feedCount = 0
+
+    /// Runs one piece of work that asks the publishers, and only ever one.
+    ///
+    /// **One gate over every path that fetches.** There were three ways in and
+    /// two of them shared a flag : a clock tick took ``isRefreshing``, the full
+    /// pass took nothing at all, and the long jobs took a flag of their own. So
+    /// the nightly pass and the five-minute clock could ask three hundred
+    /// publishers the same question at the same second, each unaware of the
+    /// other, and the reader's own command could land in the middle of both.
+    /// The scheduler already refuses to start two of its own passes at once ;
+    /// this is the same rule where the two halves actually meet, which is here.
+    ///
+    /// The gate is taken by the outermost entry point only. What runs inside a
+    /// pass, the first fetch and the vectors and the model's own work, is that
+    /// pass's business and asks nobody.
+    ///
+    /// Being observable, it is also what greys the reader's own `Refresh` while
+    /// anything is running, so the command cannot start a second one either.
+    @discardableResult
+    private func exclusively(_ name: StaticString, _ work: () async -> Void) async -> Bool {
+        guard !isRefreshing else {
+            Log.fetch.info("\(name, privacy: .public) stood aside for a refresh already running")
+            return false
+        }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        await work()
+        return true
+    }
 
     // MARK: - What the machinery is doing
 
@@ -927,7 +971,7 @@ final class AppModel {
         )
         guard !accepted else { return }
 
-        await doOutstandingWork()
+        await exclusively("Finishing the setup") { await self.doOutstandingWork() }
     }
 
     private func enqueueVectors(for entries: [Entry]) async {
@@ -979,7 +1023,12 @@ final class AppModel {
         // the assets may have finished downloading, the reader may have
         // switched Apple Intelligence on, a rate limit has certainly lifted.
         OnDeviceModel.reconsider()
+        await exclusively("The full pass") { await self.fullPass() }
+    }
 
+    /// Every feed, then everything that is derived from what they brought, then
+    /// iCloud. Named step by step, since this is the pass a reader watches.
+    private func fullPass() async {
         show(.fetching(done: 0, total: 0))
         let summary = await refresher.refreshAll(onProgress: progress(of: .fetching(done: 0, total: 0)))
         Log.fetch.notice("Full pass : \(summary.newArticles) new articles from \(summary.refreshed) feeds")
@@ -1042,20 +1091,52 @@ final class AppModel {
     /// demand while something is being built, not for a reader who thinks
     /// their iPad is behind.
     ///
-    /// It queues every record this device holds rather than what changed, which
-    /// is the repair path and is expensive : a few thousand records against a
-    /// budget of three thousand. That is the point of it and the reason it does
-    /// not ship.
+    /// It starts from nothing rather than from where the last exchange left
+    /// off, which is the repair path and is expensive : a few thousand records
+    /// against a budget of three thousand. That is the point of it and the
+    /// reason it does not ship.
+    ///
+    /// **Everything, and in both directions.** Queueing every local record only
+    /// ever sent : the engine still held its change tokens, so it asked the
+    /// server what had changed since them and was told, correctly, that nothing
+    /// had. A device whose copy had drifted learned nothing from that, which is
+    /// the one thing this command exists to fix. The tokens, the tags the server
+    /// gave each record, and the ledger of archives already read are all
+    /// forgotten first, so the whole of the zone comes back down as well as up.
+    /// **Everything, and every step of it said out loud.** It was the sending
+    /// half alone, so the one thing a reader watching it wanted to see, the
+    /// whole of the work happening again, was the one thing it did not do : two
+    /// phases went by, `Synchronizing with iCloud` and then nothing.
     func forceSynchronization() async {
         guard let cloud else { return }
 
+        await exclusively("A forced synchronization") { await self.resynchronizing(cloud) }
+    }
+
+    private func resynchronizing(_ cloud: CloudSync) async {
+        // The model is asked again too : a repair that left it silenced by
+        // three failures from an hour ago would rebuild the page and leave it
+        // with no headlines and no subjects, which is most of what a reader
+        // asking for a repair is looking at.
+        OnDeviceModel.reconsider()
+
+        show(.synchronizing)
+        await cloud.resetFromScratch()
         await cloud.enqueueEverything()
         await cloud.enqueueReadStates()
         await cloud.enqueueCatchUp()
         await cloud.synchronize()
-        await exchangeArchives()
-        await load()
-        await loadDigest()
+
+        // Opened again from nothing, since the ledger of what has been read has
+        // just been thrown away.
+        archive = nil
+
+        // And then the whole of the ordinary pass, which is what makes this a
+        // repair rather than an exchange : every feed asked again, the stories
+        // built again, the headlines and the subjects written again, the index
+        // and the purge, and iCloud once more at the end with everything that
+        // has just arrived.
+        await fullPass()
     }
 
     /// Sends and fetches now, and folds in whatever arrived.
@@ -1512,10 +1593,10 @@ final class AppModel {
     /// that ran while the window was away, and the reader is looking at the page
     /// now.
     func catchUp(_ reason: CatchUp, until deadline: Date? = nil) async {
-        guard !isRefreshing else { return }
-        isRefreshing = true
-        defer { isRefreshing = false }
+        await exclusively("A catch-up") { await self.catchingUp(reason, until: deadline) }
+    }
 
+    private func catchingUp(_ reason: CatchUp, until deadline: Date?) async {
         show(.fetching(done: 0, total: 0))
         let fetching = progress(of: .fetching(done: 0, total: 0))
         let summary =
@@ -1533,13 +1614,29 @@ final class AppModel {
         // grouping is a single query when there is nothing to group.
         show(.grouping)
         await digestService.buildStories()
-        await load()
+        if reason.readsBackAtOnce { await load() }
 
         guard reason.mayRunTheModel else {
             show(nil)
             return
         }
         enrich(until: deadline)
+    }
+
+    /// What a pull on the front page asks for.
+    ///
+    /// Every feed, because they asked, and the grouping with it : what a reader
+    /// means by pulling a page down is `show me what there is now`, and a page
+    /// that fetched without grouping would answer with a longer tail and the
+    /// same stories.
+    ///
+    /// It ends when the fetching and the grouping end, which is what the
+    /// gesture holds its control out for. The model's work carries on behind
+    /// it : a headline written and a subject filed for every story that has
+    /// just arrived is one call to the model apiece and seconds each, and a
+    /// gesture that waited for those would be a spinner held out for minutes.
+    func pullToRefresh() async {
+        await catchUp(.pull)
     }
 
     /// Refreshes every feed, which is what the reader's own command means.

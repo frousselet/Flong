@@ -16,6 +16,8 @@ It did not refresh at all until it was asked to. It enriched, purged, indexed an
 
 The moment of the last pass is written to disk rather than held in a static. Held in a static it was forgotten at every relaunch, which on iOS is minutes, so the hundred-minute floor guarded nothing across exactly the launches it exists to guard across.
 
+**One refresh at a time, whichever of the six triggers asked for it.** There were three ways in and two of them shared a flag : a clock tick took one, the full pass took nothing at all, and the long jobs took a flag of their own. So the nightly pass and the five-minute clock could ask three hundred publishers the same question at the same second, each unaware of the other, and the reader's own command could land in the middle of both. The scheduler already refuses to start two of its own passes at once ; the same rule now sits where the two halves actually meet, in the model, taken by the outermost entry point only. What runs inside a pass, the first fetch and the vectors and the model's own work, is that pass's business and asks nobody. Being observable, the same gate greys `Actualiser` while anything is running.
+
 **A pass that ran out of time is a success.** Every job here is resumable by construction, so a partial pass is the ordinary outcome and not a failure. Reporting one as a failure, which a cancelled task did on every budgeted run, teaches the scheduler to grant time less often. The watchdog races the work rather than outliving it : it was a detached sleep that held the job for its whole budget even when the work had returned in a second.
 
 ## What Photos does, and what of it is taken

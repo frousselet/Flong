@@ -120,6 +120,17 @@ nonisolated struct SyncPayload: Sendable {
         try await everything().map(\.recordID.recordName)
     }
 
+    /// Forgets which shared archives this device has already read.
+    ///
+    /// The ledger is what makes an exchange cheap to run often : a file whose
+    /// modification date has not moved since it was last read is skipped. A
+    /// resynchronization from nothing has to take them all in again, or the one
+    /// thing the archives carry, the days the other devices wrote, is the one
+    /// thing the repair leaves untouched.
+    func forgetEveryArchiveRead() async throws {
+        try await database.writer.write { db in try db.execute(sql: "DELETE FROM archive_ingest") }
+    }
+
     /// Folds a record the server already had into what is here.
     ///
     /// Only read states can genuinely conflict, two devices adding to the same

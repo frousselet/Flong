@@ -108,6 +108,39 @@ actor CloudSync {
         }
     }
 
+    /// Forgets everything this device remembers about past exchanges, and
+    /// starts again as though it had never spoken.
+    ///
+    /// **Three things are forgotten, and all three are needed.** Queueing every
+    /// local record, which is what ``enqueueEverything()`` does, only sends :
+    /// the engine still holds a change token, so it asks the server for what
+    /// changed since that token and is told, correctly, that nothing did. A
+    /// device whose copy has drifted learns nothing from that.
+    ///
+    /// - The engine's serialized state, which holds the change tokens. Without
+    ///   it a new engine fetches the zone from the beginning.
+    /// - What the server said about each record, so nothing is skipped for
+    ///   having a tag that looks current.
+    /// - The ledger of which shared archives have been read, so the days other
+    ///   devices wrote are taken in again rather than skipped as seen.
+    ///
+    /// Expensive by construction and a development command for that reason :
+    /// it spends the whole record budget of section 7 in one exchange.
+    func resetFromScratch() async {
+        engine = nil
+
+        do {
+            try await state.setEngineState(nil)
+            try await state.forgetEveryRecord()
+            try await payload.forgetEveryArchiveRead()
+        } catch {
+            Log.sync.error("Nothing could be forgotten : \(error.localizedDescription, privacy: .public)")
+        }
+
+        Log.sync.notice("Synchronization was reset, and starts again from nothing")
+        await start()
+    }
+
     /// Queues everything this device holds, for a first exchange or a repair.
     func enqueueEverything() async {
         guard let engine else { return }

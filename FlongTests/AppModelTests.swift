@@ -355,6 +355,113 @@ struct WorkPhaseTests {
     }
 }
 
+/// One refresh at a time, whichever of the six triggers asked for it.
+@Suite("Two refreshes never run at once", .serialized)
+@MainActor
+struct ExclusiveRefreshTests {
+    private let database: AppDatabase
+    private let subscriptions: SubscriptionStore
+    private let model: AppModel
+    private let server = StubServer(host: "exclusive.example.com")
+
+    init() throws {
+        database = try AppDatabase.inMemory()
+        subscriptions = SubscriptionStore(database)
+        model = AppModel(
+            database: database,
+            fetcher: FeedFetcher(
+                session: server.makeSession(),
+                throttle: HostThrottle(interval: 0, burst: 100),
+                userAgent: "Flong/test"
+            )
+        )
+    }
+
+    @Test("A second catch-up while one is running is refused, not queued")
+    func concurrentCatchUps() async throws {
+        try await subscriptions.subscribe(
+            to: Subscription(url: server.url.appending(path: "f.xml"), title: "F")
+        )
+
+        let body = try Fixtures.data("Feeds/rss2.xml")
+        server.install { _ in StubResponse(statusCode: 200, body: body) }
+        defer { server.reset() }
+
+        // The nightly pass and the five-minute clock could ask three hundred
+        // publishers the same question at the same second, each unaware of the
+        // other. What a publisher sees is what this is about.
+        async let first: Void = model.catchUp(.reader)
+        async let second: Void = model.catchUp(.clock)
+        _ = await (first, second)
+
+        #expect(server.requests.count == 1)
+        // And the gate is given back, so the next one is not refused for ever.
+        #expect(!model.isRefreshing)
+    }
+
+    @Test("The reader's command stands aside for a pass already running")
+    func commandStandsAside() async throws {
+        try await subscriptions.subscribe(
+            to: Subscription(url: server.url.appending(path: "g.xml"), title: "G")
+        )
+        server.install { _ in StubResponse(statusCode: 304) }
+        defer { server.reset() }
+
+        async let pass: Void = model.backgroundProcessing()
+        async let asked: Void = model.refreshAll()
+        _ = await (pass, asked)
+
+        #expect(server.requests.count == 1)
+        #expect(!model.isRefreshing)
+    }
+}
+
+/// What each trigger asks for, which is the whole of what tells them apart.
+@Suite("What sets a catch-up going")
+struct CatchUpTests {
+    @Test("Only the reader asks for every feed")
+    func everyFeed() {
+        // Everything automatic goes through the politeness of section 8, which
+        // is what keeps a reader's devices from becoming a burden on three
+        // hundred publishers.
+        #expect(CatchUp.reader.asksEveryFeed)
+        #expect(CatchUp.pull.asksEveryFeed)
+        #expect(!CatchUp.launch.asksEveryFeed)
+        #expect(!CatchUp.foreground.asksEveryFeed)
+        #expect(!CatchUp.clock.asksEveryFeed)
+        #expect(!CatchUp.background.asksEveryFeed)
+    }
+
+    @Test("Only a background pass spares the reader's data plan")
+    func sparingly() {
+        #expect(CatchUp.background.sparingly)
+        #expect(!CatchUp.pull.sparingly)
+        #expect(!CatchUp.clock.sparingly)
+    }
+
+    @Test("The model is not run in the twenty-five seconds of a background refresh")
+    func model() {
+        // The system rate-limits a backgrounded application's sessions hard,
+        // and a handful of refusals there used to silence the model for the
+        // whole of the process that followed.
+        #expect(!CatchUp.background.mayRunTheModel)
+        #expect(CatchUp.pull.mayRunTheModel)
+        #expect(CatchUp.launch.mayRunTheModel)
+    }
+
+    @Test("A pull does not replace the page under its own control")
+    func readsBack() {
+        // SwiftUI holds the refresh control out until the gesture's work
+        // returns, so replacing the content as the last thing before returning
+        // has the scroll view begin its retraction against content it has never
+        // laid out. The watcher reads back once the control is out of the way.
+        #expect(!CatchUp.pull.readsBackAtOnce)
+        #expect(CatchUp.reader.readsBackAtOnce)
+        #expect(CatchUp.clock.readsBackAtOnce)
+        #expect(CatchUp.background.readsBackAtOnce)
+    }
+}
+
 /// The two floors that keep the line from flickering.
 @Suite("When the activity line appears, and when it goes", .serialized)
 @MainActor
