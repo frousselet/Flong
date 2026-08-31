@@ -354,11 +354,11 @@ nonisolated struct DigestService: Sendable {
         let end = deadline ?? Date().addingTimeInterval(Self.enrichmentTurn)
 
         while !Task.isCancelled, Date() < end {
-            onPhase(.writing(done: 0, total: 0))
+            onPhase(.writing)
             let slice = min(Date().addingTimeInterval(Self.enrichmentSlice), end)
             let written = await brief(until: slice, onProgress: onWriting)
 
-            onPhase(.filing(done: 0, total: 0))
+            onPhase(.filing)
             let next = min(Date().addingTimeInterval(Self.enrichmentSlice), end)
             let filed = await nameTopics(until: next, now: now, onProgress: onFiling)
 

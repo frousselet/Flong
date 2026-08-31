@@ -1,6 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "" : {},
     "%@, read" : {
       "localizations" : {
         "fr" : {
@@ -257,16 +258,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "%lld of %lld" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%lld sur %lld"
           }
         }
       }

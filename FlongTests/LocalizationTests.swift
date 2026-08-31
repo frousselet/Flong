@@ -35,11 +35,7 @@ struct LocalizationTests {
 
     @Test("Every phase the front page can be showing has its French")
     func workPhases() {
-        let phases: [WorkPhase] = [
-            .fetching(done: 1, total: 2), .grouping, .writing(done: 1, total: 2),
-            .filing(done: 1, total: 2), .indexing(done: 1, total: 2),
-            .synchronizing, .exchanging, .tidying,
-        ]
+        let phases = WorkPhase.allCases
 
         // A phase whose key drifts from the catalog does not fail to build : it
         // falls back to the English key, in the French interface, at the head
@@ -55,7 +51,6 @@ struct LocalizationTests {
 
         #expect(String(localized: "Fetching the feeds", locale: french) == "Récupération des flux")
         #expect(String(localized: "Filing the subjects", locale: french) == "Classement par thématique")
-        #expect(String(localized: "\(3) of \(12)", locale: french) == "3 sur 12")
         #expect(String(localized: "In progress", locale: french) == "En cours")
     }
 

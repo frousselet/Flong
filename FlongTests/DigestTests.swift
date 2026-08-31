@@ -694,13 +694,12 @@ struct DigestTests {
         // happen, and both have to say so. They said nothing at all until the
         // turns were named : the page went from grouping straight to tidying.
         let seen = phases.value
-        #expect(seen.contains { if case .writing = $0 { true } else { false } })
-        #expect(seen.contains { if case .filing = $0 { true } else { false } })
+        #expect(seen.contains(.writing))
+        #expect(seen.contains(.filing))
 
         // And in that order, a written headline being a better thing to file
         // than the title of whichever article was nearest the middle.
-        let first = try #require(seen.first)
-        #expect(first.isSameKind(as: .writing(done: 0, total: 0)))
+        #expect(seen.first == .writing)
     }
 
     @Test("Throwing away what the model wrote puts every story back in both queues")

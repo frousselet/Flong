@@ -40,12 +40,13 @@ struct DigestScreen: View {
                 } header: {
                     VStack(alignment: .leading, spacing: 0) {
                         topics
-                        if let phase = model.currentWork {
-                            ActivityLine(phase: phase)
-                                .transition(.move(edge: .top).combined(with: .opacity))
-                        }
+                        // A place of its own, kept whether anything is
+                        // happening or not : a row that appears and disappears
+                        // moves the whole page under the reader's thumb twice
+                        // per pass, which is worse than the quiet band it
+                        // leaves behind.
+                        ActivityLine(work: model.currentWork)
                     }
-                    .animation(.snappy(duration: 0.28), value: model.currentWork)
                 }
             }
             .editorialColumn()
@@ -677,77 +678,97 @@ private struct PillShape: ViewModifier {
 /// **The page said nothing about any of it.** A pass that fetched three hundred
 /// feeds, wrote sixty headlines and exchanged with iCloud was, to the reader,
 /// a page that changed under them for no stated reason, or worse, a page that
-/// had not changed yet and gave no sign that it was about to. The only place
-/// that said anything was a footer buried in the sources list.
+/// had not changed yet and gave no sign that it was about to.
 ///
-/// **It is not a control, and there is nothing here to pull.** The pull belongs
-/// to the scroll view and is a deliberate reach ; a strip that reported progress
-/// and also answered to a finger would be two gestures in the same place, and
-/// the reader could not tell which one they had. So it takes no gesture at all :
-/// it says what is being brought in, how far along it is, and then it goes.
+/// **One bar for the whole pass, and the words above it change.** Every stage
+/// used to carry its own count, so a single pass ran a bar from nothing to full
+/// five times over. A reader doing one thing and waiting for one answer does
+/// not read that as progress ; they read it as an application that keeps
+/// starting over. ``WorkPlan`` weighs the stages against each other so the bar
+/// crosses the lot once.
+///
+/// **It keeps its place whether or not there is anything to say.** A row that
+/// appears and disappears moves the whole page under the reader's thumb twice
+/// per pass. The band stays and its contents fade, which costs one line of
+/// quiet under the pills and takes the jolt out of every refresh.
 ///
 /// It lives inside the pinned header rather than in the safe area, for the same
 /// reason the pills do : a bar in the safe area lays itself out under the large
-/// title and draws itself somewhere else entirely. Being pinned, it stays where
-/// the reader can see it while they scroll, which is what `at the top of the
-/// page` has to mean on a page that scrolls.
+/// title and draws itself somewhere else entirely.
 private struct ActivityLine: View {
-    let phase: WorkPhase
+    let work: WorkPlan?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The height the band keeps for itself, which follows the type size since
+    /// what sits in it is one line of type over a rule.
+    ///
+    /// Held to what the content actually needs. The rubric under it carries
+    /// `Editorial.rhythm` of its own, so a band with padding to spare leaves a
+    /// hand's width of nothing between the dateline and the first story.
+    @ScaledMetric(relativeTo: .caption) private var reserved: CGFloat = 42
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            // The count is dropped before the words are : what is happening
-            // matters more than how far along it is, and at the largest type
-            // sizes there is room for one of the two.
-            ViewThatFits(in: .horizontal) {
-                line(withCount: true)
-                line(withCount: false)
+        ZStack(alignment: .bottomLeading) {
+            // The reserved place. It draws nothing and it never moves.
+            Color.clear
+
+            if let work {
+                content(work)
+                    // Glass of its own, like the pills above it, rather than a
+                    // slab of the page's own ground running the full width. The
+                    // header is pinned and the stories pass behind it, so
+                    // something has to come between the two ; a band of opaque
+                    // paper reads as a shelf bolted to the page, and this is a
+                    // control floating over it, which is the layer the material
+                    // is for.
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .glassEffect(.regular, in: .capsule)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .leading)))
             }
-            bar
         }
-        .padding(.top, 4)
-        .padding(.bottom, Editorial.tightRhythm)
-        // The page's own ground under it. The header is pinned, so the stories
-        // pass behind whatever is in it, and the pills get away with it only
-        // because each one carries its own glass.
-        .background(.background)
+        .frame(height: reserved, alignment: .bottom)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(.snappy(duration: 0.28), value: work)
         // Nothing here answers to a finger : the pull underneath it is the
         // gesture, and two in one place is one the reader cannot aim.
         .allowsHitTesting(false)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(phase.title))
+        .accessibilityLabel(work.map { Text($0.phase.title) } ?? Text(""))
         .accessibilityValue(value)
+        .accessibilityHidden(work == nil)
         // So VoiceOver does not read every batch out as it lands.
         .accessibilityAddTraits(.updatesFrequently)
     }
 
-    private func line(withCount: Bool) -> some View {
-        HStack(spacing: 8) {
-            Text(phase.title)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 6)
-            if withCount, let count = phase.count {
-                Text("\(count.done) of \(count.total)")
-                    .monospacedDigit()
-                    .lineLimit(1)
-            }
+    private func content(_ work: WorkPlan) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // **The words and the rule, and no figures.** A count beside them
+            // is a second measure of the same thing, disagreeing with the first
+            // : the rule is the whole pass and a figure can only ever be the
+            // step, so `9 of 112` sat under a bar four fifths of the way along
+            // and the reader had to work out which of the two to believe. The
+            // bar says how far ; the words say what.
+            Text(work.phase.title)
+                .lineLimit(1)
+                .font(Editorial.metadata)
+                .foregroundStyle(.secondary)
+            bar(work)
         }
-        .font(Editorial.metadata)
-        .foregroundStyle(.secondary)
+        // The capsule runs the measure of the column, like the row of pills
+        // above it, so the rule inside it has something to fill.
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// A rule that fills, which is the page's own idiom : the stories are
-    /// separated by rules, and this is one of them saying how far along it is
-    /// by how much of it is inked.
+    /// separated by rules, and this is one of them saying how far along the
+    /// pass is by how much of it is inked.
     @ViewBuilder
-    private var bar: some View {
-        if let count = phase.count {
-            ProgressView(value: Double(count.done), total: Double(max(count.total, 1)))
+    private func bar(_ work: WorkPlan) -> some View {
+        if let fraction = work.fraction {
+            ProgressView(value: fraction)
                 .progressViewStyle(.linear)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: count.done)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: fraction)
         } else if reduceMotion {
             // A bar that runs for ever is motion for its own sake, and the line
             // above has already said what is happening.
@@ -758,7 +779,8 @@ private struct ActivityLine: View {
     }
 
     private var value: Text {
-        guard let count = phase.count else { return Text("In progress") }
-        return Text("\(count.done) of \(count.total)")
+        guard let work else { return Text("") }
+        guard let fraction = work.fraction else { return Text("In progress") }
+        return Text(fraction.formatted(.percent.precision(.fractionLength(0))))
     }
 }

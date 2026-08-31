@@ -145,6 +145,13 @@ nonisolated struct FeedRefresh: Sendable {
         guard !feeds.isEmpty else { return RefreshSummary() }
         let total = feeds.count
 
+        // Said before anything is asked for, so whatever is measuring the pass
+        // has a denominator from the start rather than guessing one. Nothing
+        // else knows how many feeds are due : that is worked out here, and a
+        // caller that tried to count them again would be doing the same work
+        // twice and getting a different answer.
+        onProgress(0, total)
+
         return await withTaskGroup(of: RefreshResult.self) { group in
             var iterator = feeds.makeIterator()
             var running = 0

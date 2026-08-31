@@ -266,6 +266,23 @@ nonisolated struct DigestStore: Sendable {
         return digest
     }
 
+    /// How many stories the page is looking at.
+    ///
+    /// What the model's own work is measured against before there is anything
+    /// better to measure it with. The stories waiting for a headline cannot be
+    /// counted until the feeds have been fetched and what they brought has been
+    /// grouped, and taking that count at the start of a pass answers nought :
+    /// the stage is then worth nothing, and the bar reaches the end of its rail
+    /// while the pass is a third done. The stories already on the page are the
+    /// right order of magnitude for the ones that are about to be.
+    func storyCount(now: Date = Date()) async throws -> Int {
+        let since = now.addingTimeInterval(-Self.window)
+
+        return try await database.writer.read { db in
+            try Story.filter(Story.Columns.lastAt >= since).fetchCount(db)
+        }
+    }
+
     /// A story that has just been opened, as a notification needs it.
     nonisolated struct Opened: Hashable, Sendable, Identifiable {
         let id: UUID
