@@ -98,7 +98,7 @@ struct CollectionsScreen: View {
                 }
             }
             ToolbarItem(placement: .primaryAction) {
-                ReaderMenu(model: model, open: menu)
+                ReaderButton(model: model)
             }
         }
         .overlay {

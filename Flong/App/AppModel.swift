@@ -1792,7 +1792,7 @@ final class AppModel {
         await catchUp(.pull)
     }
 
-    /// Refreshes every feed, which is what the reader's own command means.
+    /// Refreshes every feed, which is what an import ends with.
     ///
     /// **A refresh, and not the spring clean it had become.** It used to purge,
     /// compact, enqueue read states, enqueue a catch-up and exchange the

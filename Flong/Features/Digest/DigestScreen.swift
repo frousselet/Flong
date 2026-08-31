@@ -92,8 +92,9 @@ struct DigestScreen: View {
         // model's work carries on behind it, and the page is read back once the
         // control has retracted rather than under it.
         //
-        // A Mac has no pull and keeps `⌘R` in the reader's own menu, which is
-        // where the command lives on every platform.
+        // A Mac has no pull and no command either, since the command came out
+        // of the reader's menu : it keeps up through the clock, the full pass
+        // at rest, and the watcher that follows the store.
         //
         // **It is `PullToRefresh` and not `refreshable`.** SwiftUI's modifier
         // draws a control for a `List` ; on a scroll view it is accepted and
@@ -121,7 +122,7 @@ struct DigestScreen: View {
                 NotificationsButton(model: model)
             }
             ToolbarItem(placement: .primaryAction) {
-                ReaderMenu(model: model, open: open)
+                ReaderButton(model: model)
             }
         }
         // **The page is put back where the pull started.**
@@ -142,8 +143,8 @@ struct DigestScreen: View {
         // A beat first, so it is not fighting the control on the way out.
         //
         // **And the page is read back here, which is the other half of it.**
-        // `Actualiser` reads it back as the last thing it does, and the pull
-        // could not : SwiftUI holds the refresh control out until the gesture's
+        // A catch-up the reader asked for reads the page back as the last thing
+        // it does, and the pull could not : SwiftUI holds the refresh control out until the gesture's
         // work returns, so replacing the content just before returning has the
         // scroll view begin its retraction against content it has never laid
         // out. So the pull left it to the watcher that follows the store, which
