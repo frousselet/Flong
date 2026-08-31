@@ -177,6 +177,14 @@ It is the same host the front page counts as a room, computed by the same functi
 
 **A favourite source is a mark and nothing else.** It stars no article, moves no row to the top, and changes nothing the front page ranks : the reader was asked and said so. What it does is wear a small star where its name is read, and fill the square beside the starred articles on the collections page. A star on a source and a star on an article would be one gesture meaning two things, which is the mistake the article's own bar already refuses ; the words say which is which in both places, and `Sources favorites` is never `Favoris`.
 
+## The lead, and reading a page with the thing that ranks it
+
+The front page runs its first story large, and the rest smaller. Which one is the lead was worked out by a computed property that each row called as it was built.
+
+**A `LazyVStack` builds a row when it gets round to it**, which is not the pass that laid the page out and is not a pass that records what the page depends on. So a row compared a story from the array it had been handed against a lead worked out from whatever the store held at that later moment. After a refresh the two disagreed : every row answered `false`, the page ran with no lead at all, and nothing ever put it back, since nothing had recorded that the row depended on the lead in the first place.
+
+**The page and its lead are read once, together**, into values the row closures capture. The story is from this array and the lead is from the same read of the same page, so the two cannot come apart however long the layout takes to ask for a row. It is the general rule behind the particular fault : anything a lazily built row is compared against has to come from the same read as the row itself.
+
 ## The page keeps itself up to date
 
 **The window follows the store.** Every list used to be loaded by an explicit call after an action the window itself had taken, which works perfectly for what the window does and not at all for what it does not : a background refresh, a change arriving from another device through `CKSyncEngine`, an archive read in, a job finishing. All of those wrote to the store and nothing told the reader, so a window left open showed this morning's page until it was pulled down, or left and come back to.
@@ -276,7 +284,9 @@ An alignment guide was tried first, holding the whole text block to the left and
 
 **A short sheet from the bottom, and no longer a page.** One switch does not want a navigation stack, a title bar and a way back : the reader came to answer a question about being interrupted, and the page they were reading is still behind the panel while they answer it. It goes with a flick, or with the button a Mac needs, since a Mac sheet cannot be flicked away and one way out on both platforms is one thing to learn rather than two.
 
-Its height is fixed rather than half the screen : a sheet at `.medium` for one switch is a great deal of nothing under it. The one thing that makes it taller is a refusal, which adds a line saying why nothing there can be turned on and the way to the system settings.
+**It floats, and the system draws that.** A sheet here is already inset from the edges of the screen and rounded on all four corners. What squared it off was what was put inside it : a `List` paints its own background edge to edge, over the rounded corners and down past the safe area, so the panel read as the page having been cut off rather than as something laid over it. A panel of one's own drawn inside the sheet is no better, being a second surface inside the one the system already drew. Nothing in it paints a background of its own now, and the shape the system draws is the shape that shows.
+
+Its height is fixed rather than half the screen : a sheet at `.medium` for one switch is a great deal of nothing under it. It is the height of the sheet and not of the panel, the system insetting the one inside the other. The one thing that makes it taller is a refusal, which adds a line saying why nothing there can be turned on and the way to the system settings.
 
 **It says nothing it does not have to.** It carried a heading, `Ce que Flong vous signale`, over a single switch : a heading over one thing names the list it is heading, and a list of one does not need naming. Under the switch was a paragraph explaining what a story is, to a reader who reaches this panel from a page made of them. What is left is the switch and its own name, which is what they came to set.
 
