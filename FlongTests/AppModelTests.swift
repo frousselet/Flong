@@ -304,54 +304,97 @@ struct AppModelTests {
     }
 }
 
-/// What the front page says the machinery is doing.
+/// One bar for a whole pass, rather than one bar per stage.
 ///
-/// The page said nothing about any of it : a pass that fetched three hundred
-/// feeds, wrote sixty headlines and exchanged with iCloud was, to the reader, a
-/// page that changed under them for no stated reason.
+/// Every stage used to carry its own count, so a single pass ran a bar from
+/// nothing to full five times over. A reader doing one thing and waiting for one
+/// answer does not read that as progress ; they read it as an application that
+/// keeps starting over.
 @Suite("What the page says is happening")
-struct WorkPhaseTests {
-    @Test("A count is shown only once there is one to show")
-    func counts() {
-        // Nought of nought is a job that has not said yet, not a job with
-        // nothing to do : the bar runs rather than showing itself full.
-        #expect(WorkPhase.fetching(done: 0, total: 0).count == nil)
-        #expect(WorkPhase.grouping.count == nil)
-        #expect(WorkPhase.synchronizing.count == nil)
+struct WorkPlanTests {
+    private let pass: [WorkPhase] = [.fetching, .grouping, .writing, .filing]
 
-        let count = WorkPhase.fetching(done: 3, total: 12).count
-        #expect(count?.done == 3)
-        #expect(count?.total == 12)
+    @Test("A stage cannot own the whole bar, however much it is said to cost")
+    func noStageOwnsEverything() {
+        // A pass whose stories have not been grouped yet : nothing is waiting
+        // for a headline, so weighted purely by cost the model's two stages are
+        // worth nothing and the fetching owns the rail. Finishing it then left
+        // the bar full with two stages still to run, which is what put a stage
+        // reading nine of a hundred and twelve under a bar with nowhere to go.
+        var plan = WorkPlan(pass, costing: [.fetching: 61, .writing: 0, .filing: 0])
+        plan.advance(done: 61, total: 61)
+
+        #expect((plan.fraction ?? 1) < 0.75)
     }
 
-    @Test("The bar never runs backwards")
-    func monotonic() {
-        // A resumable job works its total out afresh after every batch, as what
-        // it has done plus what is left, so articles arriving mid-pass raise
-        // it. Taken at face value the bar retreats, which reads as the
-        // application undoing itself.
-        let phase = WorkPhase.filing(done: 8, total: 20).advanced(done: 9, total: 12)
+    @Test("A stage cannot be worth nothing either")
+    func noStageOwnsNothing() {
+        var plan = WorkPlan(pass, costing: [.fetching: 61, .writing: 0, .filing: 0])
+        plan.begin(.filing)
+        let atTheLastStage = plan.fraction ?? 1
 
-        #expect(phase.count?.total == 20)
-        #expect(phase.count?.done == 9)
+        plan.advance(done: 1, total: 2)
+        // It has a share of its own to move through, so the bar still says
+        // something while it runs.
+        #expect((plan.fraction ?? 0) > atTheLastStage)
     }
 
-    @Test("A count past its total is held to it")
-    func clamped() {
-        #expect(WorkPhase.writing(done: 30, total: 12).count?.done == 12)
+    @Test("The bar never runs backwards, whatever the arithmetic discovers")
+    func neverRetreats() {
+        var plan = WorkPlan(pass, costing: [.fetching: 61, .writing: 4, .filing: 4])
+        plan.begin(.writing)
+        plan.advance(done: 4, total: 4)
+        let full = plan.fraction
+
+        // A hundred more stories arrive mid-pass, so the stage is a fraction of
+        // the way through what it thought it had finished. A bar that showed
+        // that would read as the application undoing itself.
+        plan.advance(done: 4, total: 112)
+        #expect(plan.fraction == full)
     }
 
-    @Test("A phase that carries no count ignores one")
-    func countlessPhases() {
-        #expect(WorkPhase.grouping.advanced(done: 4, total: 9) == .grouping)
-        #expect(WorkPhase.tidying.advanced(done: 4, total: 9) == .tidying)
+    @Test("A pass only reaches the end at the end")
+    func fullOnlyAtTheEnd() {
+        var plan = WorkPlan(pass, costing: [.fetching: 61, .writing: 20, .filing: 20])
+
+        for stage in pass.dropLast() {
+            plan.begin(stage)
+            plan.advance(done: 1, total: 1)
+            #expect((plan.fraction ?? 1) < 1)
+        }
+
+        plan.begin(.filing)
+        plan.advance(done: 20, total: 20)
+        #expect(plan.fraction == 1)
     }
 
-    @Test("A batch moving on is told from a different phase taking the line")
-    func kinds() {
-        #expect(WorkPhase.fetching(done: 1, total: 2).isSameKind(as: .fetching(done: 9, total: 9)))
-        #expect(!WorkPhase.fetching(done: 1, total: 2).isSameKind(as: .filing(done: 1, total: 2)))
-        #expect(WorkPhase.tidying.isSameKind(as: .tidying))
+    @Test("A heavier stage takes more of the bar than a lighter one")
+    func weightedByWhatItCosts() {
+        var heavy = WorkPlan([.fetching, .writing], costing: [.fetching: 300, .writing: 1])
+        heavy.begin(.writing)
+
+        var light = WorkPlan([.fetching, .writing], costing: [.fetching: 1, .writing: 300])
+        light.begin(.writing)
+
+        // Both have finished the fetching. The one that fetched three hundred
+        // feeds has done more of its pass than the one that fetched one.
+        #expect((heavy.fraction ?? 0) > (light.fraction ?? 0))
+    }
+
+    @Test("A pass with nothing countable in it runs rather than measuring itself")
+    func nothingToMeasure() {
+        // What an exchange the engine started on its own looks like : one stage,
+        // and no queue anybody can count.
+        #expect(WorkPlan([.synchronizing]).fraction == nil)
+        #expect(WorkPlan([.fetching]).fraction != nil)
+    }
+
+    @Test("A stage the pass does not hold is not one it can move to")
+    func onlyItsOwnStages() {
+        var plan = WorkPlan([.fetching, .grouping])
+        plan.begin(.exchanging)
+
+        #expect(plan.phase == .fetching)
     }
 }
 
@@ -463,6 +506,7 @@ struct CatchUpTests {
 }
 
 /// The two floors that keep the line from flickering.
+/// The two floors that keep the line from flickering.
 @Suite("When the activity line appears, and when it goes", .serialized)
 @MainActor
 struct ActivityTimingTests {
@@ -474,8 +518,8 @@ struct ActivityTimingTests {
 
     @Test("Work that is over before it could be read is never shown at all")
     func tooShortToShow() async throws {
-        model.show(.fetching(done: 0, total: 0))
-        model.show(nil)
+        await model.beginWork([.fetching])
+        model.endWork()
 
         // A catch-up that finds nothing due returns in a few milliseconds, and
         // a line that appeared and left inside one frame is a flicker rather
@@ -486,28 +530,42 @@ struct ActivityTimingTests {
 
     @Test("Work that lasts is shown, and shown long enough to read")
     func longEnoughToRead() async throws {
-        model.show(.grouping)
+        await model.beginWork([.grouping])
         // Not yet : nothing shorter than the first floor is seen at all.
         #expect(model.work == nil)
 
         try await Task.sleep(for: AppModel.workAppearsAfter * 3)
-        #expect(model.work == .grouping)
+        #expect(model.work?.phase == .grouping)
 
         // The same fault the other way : a line that appeared for good reason
         // and left before it could be read told the reader nothing.
-        model.show(nil)
-        #expect(model.work == .grouping)
+        model.endWork()
+        #expect(model.work?.phase == .grouping)
 
         try await Task.sleep(for: AppModel.workStaysFor * 2)
         #expect(model.work == nil)
     }
 
-    @Test("The words are the phase the work has reached, not the one it started")
+    @Test("The words are the stage the pass has reached, not the one it started")
     func showsThePhaseReached() async throws {
-        model.show(.fetching(done: 0, total: 0))
-        model.show(.grouping)
+        await model.beginWork([.fetching, .grouping])
+        model.moveWork(to: .grouping)
 
         try await Task.sleep(for: AppModel.workAppearsAfter * 3)
-        #expect(model.work == .grouping)
+        #expect(model.work?.phase == .grouping)
+    }
+
+    @Test("A pass already declared is not restarted by the steps inside it")
+    func innerStepsDoNotRestart() async throws {
+        await model.beginWork([.fetching, .grouping, .writing])
+        model.moveWork(to: .writing)
+
+        // What `doOutstandingWork` does inside a full pass. It declares a pass
+        // of its own when it is the whole of the work, and must not throw away
+        // the bigger one it is a part of.
+        await model.beginWork([.fetching, .indexing])
+
+        try await Task.sleep(for: AppModel.workAppearsAfter * 3)
+        #expect(model.work?.phase == .writing)
     }
 }

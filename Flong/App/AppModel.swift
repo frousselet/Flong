@@ -323,8 +323,11 @@ final class AppModel {
 
     // MARK: - What the machinery is doing
 
-    /// The one phase the front page says out loud, or nothing at all.
-    private(set) var work: WorkPhase?
+    /// The pass as the page shows it, held back and held on by the two floors.
+    private(set) var work: WorkPlan?
+
+    /// The pass as it actually stands, whether or not it is on screen yet.
+    private var plan: WorkPlan?
 
     /// What the page shows, which folds in the work iCloud does on its own.
     ///
@@ -332,9 +335,9 @@ final class AppModel {
     /// exchange nothing here asked for still moves ``syncStatus`` and is still
     /// worth saying : a reader watching their page change wants to know it is
     /// their iPad talking and not a publisher.
-    var currentWork: WorkPhase? {
+    var currentWork: WorkPlan? {
         if let work { return work }
-        if case .working = syncStatus { return .synchronizing }
+        if case .working = syncStatus { return WorkPlan([.synchronizing]) }
         return nil
     }
 
@@ -353,75 +356,128 @@ final class AppModel {
     static let workStaysFor = Duration.milliseconds(700)
 
     private var workShownAt: ContinuousClock.Instant?
-    private var pendingWork: WorkPhase?
     private var showingWork: Task<Void, Never>?
     private var clearingWork: Task<Void, Never>?
 
-    /// Says what is happening, or that nothing is.
+    /// Begins a pass, having asked the store what it is likely to be made of.
     ///
-    /// Both floors live here rather than in the view, so the view stays a pure
-    /// function of ``work`` and no screen has to reinvent them.
-    func show(_ phase: WorkPhase?) {
-        guard let phase else {
-            showingWork?.cancel()
-            showingWork = nil
-            pendingWork = nil
-            guard work != nil, let shownAt = workShownAt else {
-                work = nil
-                return
-            }
+    /// **The whole pass, declared before it starts.** Every stage used to bring
+    /// its own bar, so one pass ran from nothing to full five times over, and a
+    /// reader doing one thing and waiting for one answer watched an application
+    /// that kept starting over. One bar crosses the lot now, and the words
+    /// above it change.
+    ///
+    /// The counts are three cheap questions the store already answers. They are
+    /// asked before the feeds are fetched, so what arrives during the pass is
+    /// not in them ; each stage corrects its own share as it learns better, and
+    /// the bar is held to the furthest it has been.
+    func beginWork(_ stages: [WorkPhase]) async {
+        // A pass already under way has already declared what it is made of, and
+        // the inner steps of one are not passes of their own : the repair
+        // declares the whole of itself and the ordinary pass inside it adds
+        // nothing.
+        guard plan == nil else { return }
 
-            let left = AppModel.workStaysFor - shownAt.duration(to: .now)
-            guard left > .zero else {
-                work = nil
-                workShownAt = nil
-                return
-            }
+        // Nothing is guessed for the feeds : `FeedRefresh` says how many it is
+        // about to ask for before it asks for any of them, which lands well
+        // inside the quarter second before the line appears at all.
+        let onThePage = (try? await DigestStore(database).storyCount()) ?? 0
+        show(WorkPlan(stages, costing: await costsOfTheModelsWork(stages, floor: onThePage)))
+    }
 
-            clearingWork?.cancel()
-            clearingWork = Task { [weak self] in
-                try? await Task.sleep(for: left)
-                guard !Task.isCancelled else { return }
-                self?.work = nil
-                self?.workShownAt = nil
-            }
+    /// What the model's own work is likely to cost, asked of the store, which
+    /// already answers all of it.
+    ///
+    /// - Parameter floor: what to fall back on where a queue answers nought.
+    ///   Before a pass has fetched anything, nothing is waiting for a headline
+    ///   and both of the model's stages are worth nothing : the fetching then
+    ///   owns the whole bar, and finishing it leaves the rule full with two
+    ///   stages still to go. The stories already on the page are the right
+    ///   order of magnitude for the ones about to be, and once grouping is over
+    ///   the real counts replace them.
+    private func costsOfTheModelsWork(_ stages: [WorkPhase], floor: Int = 0) async -> [WorkPhase: Int] {
+        var costs: [WorkPhase: Int] = [:]
+        if stages.contains(.writing) {
+            costs[.writing] = max((try? await BriefStoriesJob(database).remaining()) ?? 0, floor)
+        }
+        if stages.contains(.filing) {
+            costs[.filing] = max((try? await FileStoriesJob(database).remaining()) ?? 0, floor)
+        }
+        if stages.contains(.indexing) {
+            costs[.indexing] = (try? await VectorStore(database).outstandingCount()) ?? 0
+        }
+        return costs
+    }
+
+    /// Moves the pass to a stage, which changes the words and not the bar.
+    func moveWork(to phase: WorkPhase) {
+        guard plan != nil else { return }
+        plan?.begin(phase)
+        mirror()
+    }
+
+    /// Says the pass is over, once it has been on screen long enough to read.
+    func endWork() {
+        plan = nil
+        showingWork?.cancel()
+        showingWork = nil
+
+        guard work != nil, let shownAt = workShownAt else {
+            work = nil
+            return
+        }
+
+        let left = AppModel.workStaysFor - shownAt.duration(to: .now)
+        guard left > .zero else {
+            work = nil
+            workShownAt = nil
             return
         }
 
         clearingWork?.cancel()
-        clearingWork = nil
+        clearingWork = Task { [weak self] in
+            try? await Task.sleep(for: left)
+            guard !Task.isCancelled else { return }
+            self?.work = nil
+            self?.workShownAt = nil
+        }
+    }
 
-        // Already up : a change of phase is a change of words, not a new wait.
+    /// Puts a pass up, after the floor that stops it flickering.
+    private func show(_ plan: WorkPlan) {
+        clearingWork?.cancel()
+        clearingWork = nil
+        self.plan = plan
+
         guard work == nil else {
-            work = phase
+            work = plan
             return
         }
-
-        // The words are read when the line appears rather than when it was
-        // asked for, so a burst that passes through three phases inside the
-        // quarter second shows the one it has reached.
-        pendingWork = phase
         guard showingWork == nil else { return }
 
+        // The plan is read when the line appears rather than when it was asked
+        // for, so a burst that passes through three stages inside the quarter
+        // second shows the one it has reached.
         showingWork = Task { [weak self] in
             try? await Task.sleep(for: AppModel.workAppearsAfter)
-            guard !Task.isCancelled, let self, let pending = pendingWork else { return }
+            guard !Task.isCancelled, let self, let plan = self.plan else { return }
             workShownAt = .now
-            work = pending
-            pendingWork = nil
+            work = plan
             showingWork = nil
         }
     }
 
-    /// Moves the count of the phase already showing, and says nothing when
-    /// something else has taken the line.
+    private func mirror() {
+        guard work != nil else { return }
+        work = plan
+    }
+
+    /// Moves the stage running along, and says nothing when the pass has moved
+    /// on without it.
     private func advance(_ phase: WorkPhase, done: Int, total: Int) {
-        guard let current = work ?? pendingWork else {
-            show(phase.advanced(done: done, total: total))
-            return
-        }
-        guard current.isSameKind(as: phase) else { return }
-        show(current.advanced(done: done, total: total))
+        guard plan?.phase == phase else { return }
+        plan?.advance(done: done, total: total)
+        mirror()
     }
 
     /// A progress callback for the jobs, which are all `nonisolated`.
@@ -763,7 +819,7 @@ final class AppModel {
     /// model per story, and a page that waited for it would be a page that
     /// arrives a second late to say what it already knew.
     func rebuildDigest() async {
-        show(.grouping)
+        moveWork(to: .grouping)
         await digestService.buildStories()
         await loadDigest()
         await loadLooseArticles()
@@ -943,16 +999,17 @@ final class AppModel {
         isWorking = true
         defer { isWorking = false }
 
-        show(.fetching(done: 0, total: 0))
+        await beginWork([.fetching, .indexing])
+        moveWork(to: .fetching)
         await JobRunner(FirstFetchJob(database))
-            .run(until: deadline, onProgress: progress(of: .fetching(done: 0, total: 0)))
+            .run(until: deadline, onProgress: progress(of: .fetching))
 
         let vectorize = VectorizeJob(database) { [weak self] items in
             // A vector computed here spares every other device the same work.
             await self?.enqueueVectors(for: items)
         }
-        show(.indexing(done: 0, total: 0))
-        await JobRunner(vectorize).run(until: deadline, onProgress: progress(of: .indexing(done: 0, total: 0)))
+        moveWork(to: .indexing)
+        await JobRunner(vectorize).run(until: deadline, onProgress: progress(of: .indexing))
 
         await countOutstandingWork()
         await load()
@@ -971,7 +1028,7 @@ final class AppModel {
         guard !accepted else { return }
 
         await exclusively("Finishing the setup") { await self.doOutstandingWork() }
-        show(nil)
+        endWork()
     }
 
     private func enqueueVectors(for entries: [Entry]) async {
@@ -1029,36 +1086,41 @@ final class AppModel {
     /// Every feed, then everything that is derived from what they brought, then
     /// iCloud. Named step by step, since this is the pass a reader watches.
     private func fullPass() async {
-        show(.fetching(done: 0, total: 0))
-        let summary = await refresher.refreshAll(onProgress: progress(of: .fetching(done: 0, total: 0)))
+        await beginWork([
+            .fetching, .indexing, .grouping, .writing, .filing, .tidying, .synchronizing, .exchanging,
+        ])
+        moveWork(to: .fetching)
+        let summary = await refresher.refreshAll(onProgress: progress(of: .fetching))
         Log.fetch.notice("Full pass : \(summary.newArticles) new articles from \(summary.refreshed) feeds")
 
         await doOutstandingWork()
 
-        show(.grouping)
+        moveWork(to: .grouping)
+        await digestService.buildStories()
+
         // Generous, and bounded all the same. The pass has minutes rather than
         // seconds, and the model's two halves share whatever it turns out to
         // have : unbounded, the headlines took the lot and the subjects were
         // never asked for.
-        await digestService.rebuild(
+        await digestService.enrich(
             until: Date().addingTimeInterval(BackgroundScheduler.fullPassBudget),
-            onWriting: progress(of: .writing(done: 0, total: 0)),
-            onFiling: progress(of: .filing(done: 0, total: 0)),
+            onWriting: progress(of: .writing),
+            onFiling: progress(of: .filing),
             onPhase: { [weak self] phase in
-                Task { @MainActor [weak self] in self?.show(phase) }
+                Task { @MainActor [weak self] in self?.moveWork(to: phase) }
             }
         )
         await announceNewStories()
 
-        show(.tidying)
+        moveWork(to: .tidying)
         _ = try? await Retention(database).purge()
         try? await SearchIndex(database).optimize()
 
-        show(.synchronizing)
+        moveWork(to: .synchronizing)
         await cloud?.enqueueReadStates()
         await cloud?.enqueueCatchUp()
 
-        show(.exchanging)
+        moveWork(to: .exchanging)
         await exchangeArchives()
 
         // The whole of what the window shows, and not only part of it. The
@@ -1066,7 +1128,7 @@ final class AppModel {
         // reader opens in the morning is that one rather than last night's.
         await reloadWhatIsShown()
         await countOutstandingWork()
-        show(nil)
+        endWork()
     }
 
     /// Starts synchronizing with the reader's own iCloud.
@@ -1120,7 +1182,10 @@ final class AppModel {
         // asking for a repair is looking at.
         OnDeviceModel.reconsider()
 
-        show(.synchronizing)
+        await beginWork([
+            .synchronizing, .fetching, .indexing, .grouping, .writing, .filing, .tidying, .exchanging,
+        ])
+        moveWork(to: .synchronizing)
         await cloud.resetFromScratch()
         await cloud.enqueueEverything()
         await cloud.enqueueReadStates()
@@ -1609,8 +1674,9 @@ final class AppModel {
     }
 
     private func catchingUp(_ reason: CatchUp, until deadline: Date?) async {
-        show(.fetching(done: 0, total: 0))
-        let fetching = progress(of: .fetching(done: 0, total: 0))
+        await beginWork([.fetching, .grouping, .writing, .filing])
+        moveWork(to: .fetching)
+        let fetching = progress(of: .fetching)
         let summary =
             reason.asksEveryFeed
             ? await refresher.refreshAll(until: deadline, onProgress: fetching)
@@ -1624,12 +1690,12 @@ final class AppModel {
         // waiting to be grouped may have come from iCloud, from a shared
         // archive, or from a pass that ran while the window was away, and
         // grouping is a single query when there is nothing to group.
-        show(.grouping)
+        moveWork(to: .grouping)
         await digestService.buildStories()
         if reason.readsBackAtOnce { await load() }
 
         guard reason.mayRunTheModel else {
-            show(nil)
+            endWork()
             return
         }
         enrich(until: deadline)
@@ -1696,15 +1762,15 @@ final class AppModel {
             guard let self else { return }
             await digestService.enrich(
                 until: deadline,
-                onWriting: progress(of: .writing(done: 0, total: 0)),
-                onFiling: progress(of: .filing(done: 0, total: 0)),
+                onWriting: progress(of: .writing),
+                onFiling: progress(of: .filing),
                 onPhase: { [weak self] phase in
-                    Task { @MainActor [weak self] in self?.show(phase) }
+                    Task { @MainActor [weak self] in self?.moveWork(to: phase) }
                 }
             )
             await loadDigest()
             await announceNewStories()
-            show(nil)
+            endWork()
             enriching = nil
         }
     }
