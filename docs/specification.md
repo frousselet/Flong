@@ -612,6 +612,14 @@ The initial import runs in a resumable task with system progress.
 - No logging of article content or of a secret URL, including on a crash.
 - A privacy policy and an App Store privacy nutrition label consistent with the above : no collection.
 
+### Deleting everything
+
+There is no account to close, so there is a command that deletes everything instead. It sits at the foot of the reader's panel in a card of red glass rather than in the grouped form the settings sit in, it names what it will delete before it does it, and it reaches all six places that hold something : the database, the keychain, the key-value store, the Spotlight index, the record zone and the archive in iCloud Drive. Fewer than all six is a pause rather than a reset, since the last three would fill the first three back up at the next exchange.
+
+It is not the purge of section 13, which frees space and spares everything marked. This deletes what that one exists to protect.
+
+**It cannot reach another device.** One that still holds the subscriptions finds the zone gone, takes that as `zoneNotFound`, recreates it and sends its copy back, which is the correct repair path for a zone lost for any other reason and is the price of having no server. The alert says so in a sentence before the reader confirms. `docs/technical/erasure.md` records the order and why it is that order.
+
 ---
 
 ## 21. Performance and budgets

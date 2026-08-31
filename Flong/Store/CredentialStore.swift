@@ -21,6 +21,8 @@ nonisolated protocol CredentialStoring: Sendable {
     func credential(for id: UUID) throws -> FeedCredential?
     func setCredential(_ credential: FeedCredential?, for id: UUID) throws
     func identifiers() throws -> Set<UUID>
+    /// Deletes every secret this application put in there, for a reset.
+    func removeEverything() throws
 }
 
 /// Why the keychain would not answer.
@@ -135,6 +137,24 @@ nonisolated struct KeychainCredentials: CredentialStoring {
         }
     }
 
+    /// Deletes every credential Flong holds, whichever feed it belonged to.
+    ///
+    /// By service rather than feed by feed, so a secret whose subscription is
+    /// already gone goes with the rest : a reset that left an orphan behind
+    /// would leave the one thing section 20 is most careful about.
+    func removeEverything() throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw CredentialError.keychain(status)
+        }
+    }
+
     private func baseQuery(for id: UUID) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
@@ -164,5 +184,9 @@ nonisolated final class MemoryCredentials: CredentialStoring, @unchecked Sendabl
 
     func identifiers() throws -> Set<UUID> {
         lock.withLock { Set(credentials.keys) }
+    }
+
+    func removeEverything() throws {
+        lock.withLock { credentials.removeAll() }
     }
 }

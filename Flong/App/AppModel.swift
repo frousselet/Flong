@@ -69,6 +69,7 @@ nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
     case unreachableFeed
     case noFeedFound
     case notSignedIn
+    case notDeleted
 
     var id: Self { self }
 
@@ -81,6 +82,7 @@ nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
         case .unreachableFeed: "This address could not be reached."
         case .noFeedFound: "No feed was found at this address."
         case .notSignedIn: "This site left no session. Sign in on its page, then say so."
+        case .notDeleted: "Not everything could be deleted. Try again in a moment."
         }
     }
 }
@@ -1334,6 +1336,143 @@ final class AppModel {
         } catch {
             Log.store.error("The purge failed : \(error, privacy: .public)")
         }
+    }
+
+    // MARK: - Starting over
+
+    /// Deletes everything Flong holds, on this device and in the reader's iCloud.
+    ///
+    /// **The whole of it, or the reset would undo itself.** Six places hold
+    /// something : the database, the keychain, the key-value store, Spotlight,
+    /// the record zone and the archive in iCloud Drive. Leaving any of the last
+    /// three would have the first three fill back up at the next exchange,
+    /// which is not a reset but a pause.
+    ///
+    /// The order is what makes it safe. Nothing that writes may be running when
+    /// the tables go, so the enrichment is stopped and the window stops
+    /// following the store ; iCloud is told first, while the tokens that
+    /// address the zone are still in the database that is about to be erased ;
+    /// and the reader's own choices go last, since the window reads its name
+    /// and its face back from them.
+    ///
+    /// **What it cannot promise.** Another device that still holds the
+    /// subscriptions will find the zone gone, recreate it and put its own copy
+    /// back, exactly as it would after any loss. There is no server to tell it
+    /// otherwise, which is the design and not an oversight, and the panel says
+    /// so before the reader confirms.
+    func deleteEverything() async {
+        let ran = await exclusively("Deleting everything", waiting: true) {
+            await self.deletingEverything()
+        }
+        if !ran { failure = .notDeleted }
+    }
+
+    private func deletingEverything() async {
+        // Nothing may be writing while the tables go. The enrichment is the one
+        // long task that runs without the gate, and the window's own watcher
+        // would only watch its tables be dropped.
+        enriching?.cancel()
+        await enriching?.value
+        search?.cancel()
+        watching?.cancel()
+        await watching?.value
+        watching = nil
+
+        // iCloud first, while what addresses it is still here.
+        await cloud?.eraseEverything()
+        await eraseArchives()
+
+        var failed = false
+        do {
+            try await database.eraseEverything()
+        } catch {
+            failed = true
+            Log.store.error("The store could not be erased : \(error, privacy: .public)")
+        }
+
+        do {
+            try credentials.removeEverything()
+            try sessions.removeEverything()
+        } catch {
+            failed = true
+            Log.store.error("The keychain could not be emptied : \(error, privacy: .public)")
+        }
+
+        // The store it is written from is empty now, so this deletes the lot
+        // and tells Spotlight that nothing is what it should be holding.
+        do {
+            try await spotlight.rebuild()
+        } catch {
+            Log.index.error("Spotlight could not be emptied : \(error, privacy: .public)")
+        }
+
+        await announcer.withdrawEverything()
+        ImageStore.shared.forgetEverything()
+
+        // The reader's own choices, last and in this order : each of these
+        // writes what it is set to back to the store, so they are emptied
+        // before the keys are removed rather than after.
+        firstName = ""
+        lastName = ""
+        setPicture(nil)
+        articleBody = .feed
+        wantsNewStoryNotices = false
+        preferences.forgetEverything()
+
+        forgetWhatIsShown()
+
+        await load()
+        await loadSubscribedSites()
+
+        // And the window goes back to work : an application that had to be
+        // relaunched after a reset would be saying the reset broke it.
+        keepUp()
+        await cloud?.start()
+
+        if failed {
+            failure = .notDeleted
+        } else {
+            Log.store.notice("Everything was deleted, on this device and in iCloud")
+        }
+    }
+
+    /// Deletes the shared archive from iCloud Drive.
+    ///
+    /// Opened first where it never was : a reader who has not synchronized on
+    /// this device since launching it still has days of the stream sitting in
+    /// their iCloud from another one.
+    private func eraseArchives() async {
+        await openArchive()
+        guard let archive else { return }
+
+        do {
+            try await Task.detached(priority: .utility) { try archive.erase() }.value
+        } catch {
+            Log.sync.error("The shared archive could not be deleted : \(error, privacy: .public)")
+        }
+
+        // Opened again when it is next needed, under the name this device is
+        // about to give itself.
+        self.archive = nil
+    }
+
+    /// Puts the window back where a first launch finds it.
+    ///
+    /// What is read from the store is reloaded rather than cleared, since the
+    /// store is empty and reading it back is what proves it. What is not, the
+    /// selection, the query and the article being read, has nothing to be read
+    /// from and is put down here.
+    private func forgetWhatIsShown() {
+        selection = .all
+        selectedArticle = nil
+        article = nil
+        openStory = nil
+        storyArticles = [:]
+        collectionArticles = []
+        digestTopic = .frontPage
+        searchText = ""
+        report = nil
+        failure = nil
     }
 
     /// Writes the marked articles to Spotlight when the two have drifted apart.

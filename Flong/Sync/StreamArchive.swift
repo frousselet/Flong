@@ -176,6 +176,43 @@ nonisolated struct StreamArchive: Sendable {
         return added
     }
 
+    // MARK: - Starting over
+
+    /// Deletes the whole archive from iCloud, every device's folder included.
+    ///
+    /// **All of it, and not only this device's own.** Everywhere else the rule
+    /// is that a device writes inside its own folder and never touches
+    /// anybody's else, which is what makes this a log with no conflicts to
+    /// resolve. This is the one operation that is not a write : a reader
+    /// asking for everything to go means the whole of what Flong put in their
+    /// iCloud Drive, and leaving three other folders standing would be
+    /// answering a different question.
+    ///
+    /// Another device that still holds the stream will write its own days out
+    /// again, which is the same thing the record zone does and is said plainly
+    /// in the interface.
+    ///
+    /// Coordinated, unlike the writes : the files may be being read or written
+    /// by another process on this device at the moment they go.
+    func erase() throws {
+        guard let root, FileManager.default.fileExists(atPath: root.path()) else { return }
+
+        var failure: (any Error)?
+        var coordinationError: NSError?
+        NSFileCoordinator().coordinate(writingItemAt: root, options: .forDeleting, error: &coordinationError) { url in
+            do {
+                try FileManager.default.removeItem(at: url)
+            } catch {
+                failure = error
+            }
+        }
+
+        if let coordinationError { throw coordinationError }
+        if let failure { throw failure }
+
+        Log.sync.notice("The shared archive was deleted from iCloud")
+    }
+
     // MARK: - The ledger
 
     private func isWorthReading(_ name: String, modified: Date) async throws -> Bool {

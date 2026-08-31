@@ -37,6 +37,8 @@ protocol Announcing {
     func status() async -> UNAuthorizationStatus
     func authorize() async -> Bool
     func post(_ announcement: Announcement) async
+    /// Takes back everything already said, for a reset.
+    func withdrawEverything() async
 }
 
 struct Notifier: Announcing {
@@ -83,6 +85,16 @@ struct Notifier: Announcing {
         }
     }
 
+    /// Takes back every notice this device has posted.
+    ///
+    /// A notice names a story, and after a reset there is no story to open :
+    /// left in the notification centre it is a headline that leads nowhere.
+    func withdrawEverything() async {
+        let centre = UNUserNotificationCenter.current()
+        centre.removeAllDeliveredNotifications()
+        centre.removeAllPendingNotificationRequests()
+    }
+
     /// Takes the reader to where the system keeps its own answer.
     static func openSystemSettings() {
         #if os(iOS)
@@ -122,6 +134,8 @@ final class MemoryAnnouncer: Announcing {
     }
 
     func post(_ announcement: Announcement) async { posted.append(announcement) }
+
+    func withdrawEverything() async { posted.removeAll() }
 }
 
 /// Holds what a tapped notification asked for, until there is a window to show

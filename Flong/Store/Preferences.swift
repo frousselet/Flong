@@ -51,6 +51,11 @@ nonisolated final class Preferences: @unchecked Sendable {
         static let device = "device.identifier"
         static let newStoryNotices = "notify.new-stories"
         static let storiesAnnouncedAt = "notify.stories-announced-at"
+
+        /// Every key, for the one operation that has to name all of them.
+        static let all = [
+            articleBody, firstName, lastName, picture, device, newStoryNotices, storiesAnnouncedAt,
+        ]
     }
 
     /// The largest picture that may be kept.
@@ -169,6 +174,26 @@ nonisolated final class Preferences: @unchecked Sendable {
         let made = UUID().uuidString
         local.set(made, forKey: Key.device)
         return made
+    }
+
+    // MARK: - Starting over
+
+    /// Forgets every choice the reader ever made, here and in their iCloud.
+    ///
+    /// Every key this type owns, and only those : the store belongs to the
+    /// whole system and a reset of Flong is not a reason to touch what anybody
+    /// else put in it.
+    ///
+    /// **The device identifier goes too.** It is an identifier, and a reset
+    /// that left one behind would not be one. The archive folder it named is
+    /// deleted in the same pass, so nothing is orphaned by the new name this
+    /// device will give itself.
+    func forgetEverything() {
+        for key in Key.all {
+            local.removeObject(forKey: key)
+            cloud?.removeObject(forKey: key)
+        }
+        cloud?.synchronize()
     }
 
     // MARK: - Both stores

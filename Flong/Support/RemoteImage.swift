@@ -180,6 +180,19 @@ nonisolated final class ImageStore: Sendable {
         }
     }
 
+    /// Forgets every picture ever fetched, decoded or on disk.
+    ///
+    /// The pictures are the publishers' and only their addresses were ever
+    /// stored, but the bytes themselves sit in a cache of nearly two hundred
+    /// megabytes on this device, and a reader who asked for everything to go
+    /// meant those too.
+    func forgetEverything() {
+        memory.removeAllObjects()
+        tints.removeAllObjects()
+        refused.removeAllObjects()
+        session.configuration.urlCache?.removeAllCachedResponses()
+    }
+
     /// Where a mark stops and a photograph starts, in pixels.
     static let markPixels = 128
 

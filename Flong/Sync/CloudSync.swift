@@ -141,6 +141,49 @@ actor CloudSync {
         await start()
     }
 
+    /// Deletes the reader's zone from their iCloud, and forgets it ever existed.
+    ///
+    /// **The copy in iCloud goes with the local one, or the reset undoes
+    /// itself.** Deleting the database alone would leave the engine's next
+    /// fetch pulling the whole of the zone straight back down, and a reader who
+    /// asked for everything to go would watch it all return. So the zone is
+    /// deleted first, while the tokens that address it are still here, and what
+    /// this device remembers about past exchanges is dropped afterwards.
+    ///
+    /// **What another device holds is not this device's to delete.** One that
+    /// still has the reader's subscriptions will find the zone gone, take that
+    /// as `zoneNotFound`, recreate it and put its own copy back : that is the
+    /// existing repair path of ``handle(_:)`` and it is correct. The interface
+    /// says so plainly rather than promising a reach this design does not have.
+    ///
+    /// Nothing to delete is not a failure : a reader with no iCloud account has
+    /// no engine, and everything here is a no-op for them.
+    func eraseEverything() async {
+        guard let engine else { return }
+
+        // Anything already queued would recreate what is about to be deleted,
+        // since a save carries its zone with it.
+        engine.state.remove(pendingRecordZoneChanges: engine.state.pendingRecordZoneChanges)
+        engine.state.remove(pendingDatabaseChanges: engine.state.pendingDatabaseChanges)
+        engine.state.add(pendingDatabaseChanges: [.deleteZone(zoneID)])
+
+        do {
+            try await engine.sendChanges()
+            Log.sync.notice("The zone was deleted from the reader's iCloud")
+        } catch {
+            Log.sync.error("The zone could not be deleted : \(error.localizedDescription, privacy: .public)")
+        }
+
+        // Whatever the server said, this device is starting again from nothing.
+        // The tables these live in are erased a moment later ; forgetting them
+        // here is what stops the engine writing its state back into the fresh
+        // schema on the way out.
+        self.engine = nil
+        try? await state.setEngineState(nil)
+        try? await state.forgetEveryRecord()
+        status = .idle(lastSynchronized: nil)
+    }
+
     /// Queues everything this device holds, for a first exchange or a repair.
     func enqueueEverything() async {
         guard let engine else { return }

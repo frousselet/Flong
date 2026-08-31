@@ -11,6 +11,7 @@
 
 import Foundation
 import GRDB
+import OSLog
 
 /// The local SQLite database, opened and migrated.
 ///
@@ -42,6 +43,29 @@ nonisolated final class AppDatabase: Sendable {
     /// A database living in memory, for tests and previews.
     static func inMemory() throws -> AppDatabase {
         try AppDatabase(DatabaseQueue(configuration: configuration()))
+    }
+
+    /// Throws the whole of it away, and builds the schema again from nothing.
+    ///
+    /// **The file is emptied rather than deleted.** Every store, every job and
+    /// the change observation hold this same writer, and a new file would mean
+    /// a new writer none of them has : emptying it leaves every one of them
+    /// pointing at a database that is simply empty, which is what starting over
+    /// means here.
+    ///
+    /// The schema comes straight back, so nothing that runs afterwards has to
+    /// know whether a reset happened. What is gone is the content : the
+    /// articles, the subscriptions, what the reader kept, and the change tokens
+    /// and record tags that told this device what iCloud already knew.
+    ///
+    /// `@concurrent` because both halves block : the erasure takes the writer's
+    /// barrier and the migrator runs twenty-odd migrations, and the caller is
+    /// the window.
+    @concurrent
+    func eraseEverything() async throws {
+        try await writer.erase()
+        try Self.migrator.migrate(writer)
+        Log.store.notice("The store was erased, and its schema built again")
     }
 
     private static func defaultFolder() throws -> URL {
