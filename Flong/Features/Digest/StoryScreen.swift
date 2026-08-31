@@ -62,8 +62,11 @@ struct StoryScreen: View {
 
     private func header(_ story: DigestStory) -> some View {
         VStack(alignment: .leading, spacing: 12) {
+            // The same picture the row carried, and the same credit in the
+            // corner of it : a name the front page shows and the page it opens
+            // onto drops would be a courtesy that lasts as long as a glance.
             if story.imageURL != nil {
-                RemoteImage(url: story.imageURL, corner: 10)
+                RemoteImage(url: story.imageURL, credit: story.imageCredit, corner: 10)
                     .padding(.bottom, 2)
             }
 

@@ -521,7 +521,7 @@ The mark of a publisher stands once, at the head of its group, and the rows unde
 
 A source can be made a **favourite**, which is the reader saying this publisher is one of theirs. It is not the star an article wears : it stars nothing, it reorders nothing, and it changes nothing the front page ranks. It marks the row, and it fills a square on the collections page beside the starred articles, where the two are plainly different things.
 
-The digest, a story and an article are set as a page rather than as a control panel : one column held to a readable measure, serif headlines, hairline rules, no cards and no boxes. Liquid Glass appears only in the navigation layer, which is the system's own bar, and never in the content. `docs/technical/interface.md` records the design and what was rejected.
+The digest, a story and an article are set as a page rather than as a control panel : one column held to a readable measure, serif headlines, hairline rules, no cards and no boxes. Liquid Glass belongs to the navigation layer, which is the system's own bar. The application draws it of its own in two places and both are that same rule : the subject pills, which are controls floating over the page, and the credit in the corner of a picture, which has to stay legible over an image nobody chose. `docs/technical/interface.md` records the design and what was rejected.
 
 ### The wire
 
@@ -533,7 +533,7 @@ Adjustable density, a one- to three-line excerpt, an optional thumbnail, the pub
 
 **The publisher and not the feed.** A row says `Le Monde`, whichever of its desks the article arrived through, and wears the one mark that paper drew. A reader following three desks of one paper was meeting three names down one page and having to work out that they were one paper ; which desk it was is a detail of how the paper publishes, and it stays in the sources list where a subscription is managed.
 
-The picture an article carries is taken from the feed, or failing that from the first picture in the body, and only its address is stored : the file stays the publisher's and is asked for when a screen shows it. `docs/technical/ingestion.md` records the order, `docs/technical/interface.md` how the page uses it.
+The picture an article carries is taken from the feed, or failing that from the first picture in the body, and only its address is stored : the file stays the publisher's and is asked for when a screen shows it. **Every picture the digest shows is credited** to the publisher whose article it arrived with : their name, in the corner of the picture, on a pill of glass, and never a byline, since what reaches a feed is where a picture came from and never who made it. An article row carries none and needs none, its own headline already naming the publisher. `docs/technical/ingestion.md` records the order, `docs/technical/interface.md` how the page uses it.
 
 ### Article
 

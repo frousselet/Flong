@@ -1663,6 +1663,17 @@
         }
       }
     },
+    "Picture via %@" : {
+      "comment" : "Credit under a picture : the publisher whose article it came with",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Image via %@"
+          }
+        }
+      }
+    },
     "Politics" : {
       "localizations" : {
         "fr" : {

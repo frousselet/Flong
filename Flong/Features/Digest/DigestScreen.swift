@@ -414,6 +414,12 @@ struct DigestScreen: View {
 /// The lead runs its picture across the column, above a larger headline. The
 /// others keep theirs to a square at the side, where it says which story this is
 /// without competing with the story above it.
+///
+/// **Every picture is credited.** A story is several rooms and its picture is
+/// one room's, so the marks beside the headline do not say whose it is. The
+/// name sits in the corner of the picture, on a pill of glass, at both sizes :
+/// a credit shown on the lead and withheld from the rest would be a courtesy
+/// paid to whichever publisher happened to be first that morning.
 struct StoryRow: View {
     let story: DigestStory
     var isLead = false
@@ -446,7 +452,7 @@ struct StoryRow: View {
     private var lead: some View {
         VStack(alignment: .leading, spacing: 10) {
             if story.imageURL != nil {
-                RemoteImage(url: story.imageURL, corner: 10)
+                RemoteImage(url: story.imageURL, credit: story.imageCredit, corner: 10)
                     .padding(.bottom, 2)
             }
             VStack(alignment: .leading, spacing: 7) {
@@ -474,7 +480,7 @@ struct StoryRow: View {
                 whatHappened
 
                 if story.imageURL != nil {
-                    RemoteImage(url: story.imageURL, width: Self.thumbnailWidth)
+                    RemoteImage(url: story.imageURL, credit: story.imageCredit, width: Self.thumbnailWidth)
                 }
             }
         }
