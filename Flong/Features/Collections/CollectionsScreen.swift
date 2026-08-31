@@ -64,7 +64,7 @@ struct CollectionsScreen: View {
         .navigationTitle(Text("Collections"))
         .toolbar {
             ToolbarItem(placement: .sectionLeading) {
-                SourcesButton(open: menu)
+                SourcesButton(model: model, open: menu)
             }
             ToolbarItem(placement: .sectionLeading) {
                 TopicsButton(model: model)

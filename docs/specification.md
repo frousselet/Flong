@@ -397,7 +397,7 @@ Nothing new was needed in the store for any of it. A built-in one is a column ; 
 
 Everything Flong may interrupt the reader for is a switch in one panel, and every switch starts off.
 
-**A panel from the bottom, beside the sources.** It was a line in the reader's menu leading to a screen of its own, which is two presses and a way back for one switch : a reader who turns a notice on is not going anywhere, they are answering a question and returning to what they were reading. The bell stands next to the sources in the leading corner of every section a reader reads in, and opens a short sheet over the page. The panel says nothing it does not have to : a heading over a single switch named the list it was heading, and a paragraph under it explained what a story is to somebody who has been reading a page of them.
+**A panel from the bottom, beside the sources.** The sources and the subjects are panels too, opened from the same corner and built the same way : untitled, closed by a flick, and with the button a Mac needs since a Mac sheet cannot be flicked. This one was a line in the reader's menu leading to a screen of its own, which is two presses and a way back for one switch : a reader who turns a notice on is not going anywhere, they are answering a question and returning to what they were reading. The bell stands next to the sources in the leading corner of every section a reader reads in, and opens a short sheet over the page. The panel says nothing it does not have to : a heading over a single switch named the list it was heading, and a paragraph under it explained what a story is to somebody who has been reading a page of them.
 
 **Local, and only local.** There is no server, so there is nobody to send a notification : each device writes what it shows, about something it worked out for itself. Two devices may say the same thing at different moments, or one of them not at all, and that is correct rather than a drift to reconcile. The silent push of section 7 is `CKSyncEngine` telling this device that another one changed something, and nothing that arrives that way is ever shown.
 
@@ -511,7 +511,7 @@ The model names and summarizes ; without one, a story takes the title and standf
 
 On macOS those same sections become a sidebar, drawn by the system for an adaptable tab view, since a Mac window keeps its sections at the side.
 
-Views the sidebar was also to list, today, starred, tags, saved queries and individual feeds, are reached from the sources section rather than from a permanent column.
+Views the sidebar was also to list, today, starred, tags, saved queries and individual feeds, are reached from the sources panel rather than from a permanent column.
 
 ### The sources
 

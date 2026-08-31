@@ -108,7 +108,7 @@ struct DigestScreen: View {
         // same way round in every section.
         .toolbar {
             ToolbarItem(placement: .sectionLeading) {
-                SourcesButton(open: open)
+                SourcesButton(model: model, open: open)
             }
             ToolbarItem(placement: .sectionLeading) {
                 TopicsButton(model: model)

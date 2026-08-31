@@ -143,16 +143,27 @@ struct ReaderMark: View {
 /// one on its own, or to see what the machinery is doing, which is often
 /// enough to be worth a corner of its own.
 ///
+/// It opens a panel like the two beside it. A reader who picks a source is
+/// going somewhere, so the panel goes and the page they asked for arrives
+/// behind it : a screen that stayed on the stack behind every feed they opened
+/// would be a way back nobody asked for.
+///
 /// The three sections a reader reads in carry it. Search does not : its bar
 /// belongs to the field, and a reader who is searching is not organizing.
 struct SourcesButton: View {
+    let model: AppModel
     let open: (Route) -> Void
+
+    @State private var isOpen = false
 
     var body: some View {
         Button {
-            open(.sources)
+            isOpen = true
         } label: {
             Label("Sources", systemImage: "square.stack")
+        }
+        .sheet(isPresented: $isOpen) {
+            SourcesPanel(model: model) { kind in open(.view(kind)) }
         }
     }
 }

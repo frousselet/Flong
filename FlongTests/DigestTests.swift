@@ -867,8 +867,10 @@ struct DigestTests {
         #expect(cycling.stories == 0)
         #expect(cycling.score == 1)
 
-        // What was spoken about comes first.
-        #expect(known.first?.name == "Logiciel")
+        // The alphabet, and in the reader's own : `Éducation` files under E
+        // rather than after Z, and a subject nudged up does not move out from
+        // under the finger that nudged it.
+        #expect(known.map(\.name) == ["Cyclisme", "Éducation", "Logiciel"])
     }
 
     @Test("Everything said can be taken back at once")

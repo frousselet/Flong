@@ -34,10 +34,12 @@ import UserNotifications
 /// something laid over it. Nothing here paints a background of its own, so the
 /// shape the system draws is the shape that shows.
 ///
-/// **It says nothing it does not have to.** A heading over a single switch
-/// named the list it was heading, and a paragraph under it explained what a
-/// story is to somebody who has been reading a page of them. What is left is
-/// the switch and its own name, which is what the reader came to set.
+/// **It says nothing it does not have to.** It carried a heading, then a title
+/// of its own, over a single switch that names itself : a panel opened from a
+/// bell, holding one line reading `Nouveaux fils`, has been read before it has
+/// been titled. Under the switch was a paragraph explaining what a story is, to
+/// somebody who reaches this from a page made of them. What is left is the
+/// switch.
 struct NotificationsPanel: View {
     let model: AppModel
 
@@ -57,7 +59,7 @@ struct NotificationsPanel: View {
     /// It is the height of the sheet and not of the panel : the system insets
     /// the one inside the other, so the panel stands a little taller than the
     /// number here.
-    private var height: CGFloat { isRefused ? 240 : 120 }
+    private var height: CGFloat { isRefused ? 215 : 96 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -84,28 +86,23 @@ struct NotificationsPanel: View {
         .padding(.top, 20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .presentationDetents([.height(height)])
+        .presentationDragIndicator(.visible)
         .task { await model.refreshNotificationStatus() }
     }
 
-    /// What the panel is, and the way out of it.
+    /// The way out, on the platform that needs one.
     ///
-    /// The way out is a button rather than only a flick : a Mac sheet cannot be
-    /// flicked away, and the same button on both platforms is one thing to
-    /// learn instead of two.
+    /// A row with nothing but that : the panel is titled by the button that
+    /// opened it and by the one line inside it, and the indicator above says
+    /// how it goes away.
+    @ViewBuilder
     private var head: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("Notifications")
-                .font(Editorial.headline(.title3))
-
-            Spacer(minLength: 12)
-
-            Button {
-                dismiss()
-            } label: {
-                Text("Done").font(.subheadline.weight(.medium))
+        #if os(macOS)
+            HStack {
+                Spacer(minLength: 0)
+                PanelDismiss()
             }
-            .buttonStyle(.borderless)
-        }
+        #endif
     }
 
     /// What a refusal leaves the reader able to do, which is go and undo it.

@@ -31,6 +31,10 @@ import SwiftUI
 /// reader's own are a list to scroll, and a list to scroll wants the height a
 /// reader chooses.
 ///
+/// **No title over it.** The panel is named by the button that opened it, and
+/// the bands inside say what they hold : a title would be the third thing on
+/// screen saying `Thématiques`.
+///
 /// **Nothing in it paints a background.** A sheet is already inset from the
 /// edges of the screen and rounded on all four corners ; a `List` paints its
 /// own background edge to edge, over the rounded corners and down past the safe
@@ -45,22 +49,13 @@ struct TopicsPanel: View {
     @State private var isAdding = false
     @State private var name = ""
 
-    /// How tall the panel stands before the reader asks for more.
-    ///
-    /// A height of its own rather than `.medium`, which is measured off the
-    /// bottom of the screen and takes the panel's lower corners with it : the
-    /// notices beside it float on all four, and a second panel that did not
-    /// would be two ideas of what a panel is. Tall enough to be worth
-    /// scrolling, and it pulls up to the whole screen for a reader going
-    /// through fifty sections.
-    private static let height: CGFloat = 520
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             head
             subjects
         }
-        .presentationDetents([.height(Self.height), .large])
+        .presentationDetents([.height(Panel.tall), .large])
+        .presentationDragIndicator(.visible)
         .alert("Add a subject", isPresented: $isAdding) {
             TextField("Subject", text: $name)
             Button("Add") { Task { await model.addTopic(name) } }
@@ -71,18 +66,15 @@ struct TopicsPanel: View {
         .task { await model.loadKnownTopics() }
     }
 
-    /// What the panel is, what can be added to it, and the way out of it.
+    /// What can be added to the list, and the way out on the platform that
+    /// needs one.
     ///
-    /// Its own row rather than a navigation bar : a bar brings a background
-    /// with it, and a background is the one thing a floating panel cannot have
-    /// inside it. The way out is a button as well as a flick, since a Mac sheet
-    /// cannot be flicked away.
+    /// No title over it. The panel is named by the button that opened it, and
+    /// the bands inside it say what they hold ; a title would be the third
+    /// thing on screen saying `Thématiques`.
     private var head: some View {
         HStack(spacing: 14) {
-            Text("Subjects")
-                .font(Editorial.headline(.title3))
-
-            Spacer(minLength: 8)
+            Spacer(minLength: 0)
 
             Button {
                 name = ""
@@ -93,16 +85,11 @@ struct TopicsPanel: View {
                     .font(.body.weight(.medium))
             }
 
-            Button {
-                dismiss()
-            } label: {
-                Text("Done").font(.subheadline.weight(.medium))
-            }
+            PanelDismiss()
         }
         .buttonStyle(.borderless)
         .padding(.horizontal, 20)
-        .padding(.top, 20)
-        .padding(.bottom, 6)
+        .padding(.top, 18)
     }
 
     private var subjects: some View {

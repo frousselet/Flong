@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import UniformTypeIdentifiers
 
 /// One `outline` element, with the children nested under it.
 ///
@@ -45,6 +46,15 @@ nonisolated struct OPMLFeed: Hashable, Sendable {
     var address: String
     var title: String
     var siteAddress: String?
+}
+
+nonisolated extension OPMLDocument {
+    /// What a file picker lets the reader choose.
+    ///
+    /// `.xml` as well as the extension : plenty of exports are named `.xml`,
+    /// and a picker that refused those would refuse a file Flong reads
+    /// perfectly well.
+    static var types: [UTType] { [UTType(filenameExtension: "opml"), .xml].compactMap { $0 } }
 }
 
 /// The contents of an OPML file.

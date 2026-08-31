@@ -138,7 +138,7 @@ struct ArticleFeedScreen: View {
         .toolbar {
             if let menu {
                 ToolbarItem(placement: .sectionLeading) {
-                    SourcesButton(open: menu)
+                    SourcesButton(model: model, open: menu)
                 }
                 ToolbarItem(placement: .sectionLeading) {
                     TopicsButton(model: model)

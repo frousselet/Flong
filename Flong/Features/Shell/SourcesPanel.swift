@@ -1,5 +1,5 @@
 //
-//  SourcesScreen.swift
+//  SourcesPanel.swift
 //  Flong
 //
 //  Created by François Rousselet on 29/08/2026.
@@ -40,18 +40,23 @@ import SwiftUI
 /// reorder the list and does not change what the front page ranks. What it does
 /// is fill a square on the collections page, beside the starred articles, where
 /// the two are plainly different things.
-struct SourcesScreen: View {
+struct SourcesPanel: View {
     let model: AppModel
-    @Binding var isAddingFeed: Bool
-    @Binding var isChoosingFile: Bool
+    /// Where a row leads, once the panel is out of the way.
     let open: (SidebarItem.Kind) -> Void
+
+    @Environment(\.dismiss) private var dismiss
 
     /// The publisher whose name is being written, and what is being written.
     @State private var renaming: String?
     @State private var renamed = ""
+    @State private var isAddingFeed = false
+    @State private var isChoosingFile = false
 
     var body: some View {
-        Group {
+        VStack(alignment: .leading, spacing: 0) {
+            head
+
             List {
                 Section {
                     ForEach(model.smartLists.filter { $0.kind != .digest }) { item in
@@ -73,43 +78,7 @@ struct SourcesScreen: View {
 
                 status
             }
-            .alert(
-                Text("Rename"),
-                isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } }),
-                presenting: renaming
-            ) { domain in
-                TextField("Name", text: $renamed)
-                Button("Cancel", role: .cancel) {}
-                Button("Rename") {
-                    let name = renamed
-                    Task { await model.renameGroup(domain, to: name) }
-                }
-            } message: { domain in
-                // Verbatim : an address is the same address in every language.
-                Text(
-                    "The sources stay where they are. Leave it empty to call it \(domain) again.",
-                    comment: "The address of a publisher, such as lemonde.fr"
-                )
-            }
-            .navigationTitle(Text("Sources"))
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button {
-                            isAddingFeed = true
-                        } label: {
-                            Label("Add a feed", systemImage: "plus")
-                        }
-                        Button {
-                            isChoosingFile = true
-                        } label: {
-                            Label("Import an OPML file", systemImage: "square.and.arrow.down")
-                        }
-                    } label: {
-                        Label("Add a feed", systemImage: "plus")
-                    }
-                }
-            }
+            .scrollContentBackground(.hidden)
             .overlay {
                 if model.isEmpty {
                     ContentUnavailableView {
@@ -123,6 +92,81 @@ struct SourcesScreen: View {
                 }
             }
         }
+        .presentationDetents([.height(Panel.tall), .large])
+        .presentationDragIndicator(.visible)
+        .alert(
+            Text("Rename"),
+            isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } }),
+            presenting: renaming
+        ) { domain in
+            TextField("Name", text: $renamed)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") {
+                let name = renamed
+                Task { await model.renameGroup(domain, to: name) }
+            }
+        } message: { domain in
+            // Verbatim : an address is the same address in every language.
+            Text(
+                "The sources stay where they are. Leave it empty to call it \(domain) again.",
+                comment: "The address of a publisher, such as lemonde.fr"
+            )
+        }
+        // The two ways in, presented over the panel rather than behind it. They
+        // belong to what the reader is doing here, and a panel that had to be
+        // dismissed before either could open would be asking them to put the
+        // list away in order to add to it.
+        .sheet(isPresented: $isAddingFeed) {
+            AddFeedView(
+                add: { address in await model.addFeed(at: address) },
+                addPrivate: { address in await model.addPrivateFeed(at: address) }
+            )
+        }
+        .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: OPMLDocument.types) { result in
+            guard case .success(let url) = result else { return }
+            Task { await model.importOPML(from: url) }
+        }
+    }
+
+    /// The two ways to add a source, and the way out on the platform that needs
+    /// one.
+    ///
+    /// No title over it. The panel is named by the button that opened it, and
+    /// what is in it is a list of sources ; a title would be a third thing on
+    /// screen saying `Sources`.
+    private var head: some View {
+        HStack(spacing: 14) {
+            Spacer(minLength: 0)
+
+            Menu {
+                Button {
+                    isAddingFeed = true
+                } label: {
+                    Label("Add a feed", systemImage: "plus")
+                }
+                Button {
+                    isChoosingFile = true
+                } label: {
+                    Label("Import an OPML file", systemImage: "square.and.arrow.down")
+                }
+            } label: {
+                Label("Add a feed", systemImage: "plus")
+                    .labelStyle(.iconOnly)
+                    .font(.body.weight(.medium))
+            }
+
+            PanelDismiss()
+        }
+        .buttonStyle(.borderless)
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+    }
+
+    /// Where a row leads : the panel goes first, and the page it asked for
+    /// arrives behind it.
+    private func go(to kind: SidebarItem.Kind) {
+        dismiss()
+        open(kind)
     }
 
     /// What synchronization is doing, and what is left of a long job.
@@ -231,7 +275,7 @@ struct SourcesScreen: View {
                 Label("Rename", systemImage: "pencil")
             }
             Button {
-                open(group.kind)
+                go(to: group.kind)
             } label: {
                 Label("All articles", systemImage: "tray.full")
             }
@@ -287,7 +331,7 @@ struct SourcesScreen: View {
     @ViewBuilder
     private func row(_ item: SidebarItem) -> some View {
         Button {
-            open(item.kind)
+            go(to: item.kind)
         } label: {
             // A source wears no mark of its own. The mark is the publisher's
             // and stands once, at the head of the group ; a row here is a desk
