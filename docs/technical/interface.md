@@ -256,6 +256,10 @@ Under Reduce Motion the indeterminate bar is a still tinted rule rather than one
 
 **Asking without the gesture is still possible.** `Actualiser` sits in the reader's own menu, beside the other things they ask for, keeps its `⌘R`, and is the only way on a Mac. It does what the pull does : every feed, and the grouping with it.
 
+**The gesture is UIKit's control, not `refreshable`.** SwiftUI draws a pull-to-refresh for a `List` ; on a `ScrollView` the modifier is accepted and unreliable, and on this one, a lazy stack with a pinned header, a scroll position binding and an edge effect, no control was drawn at all. A reader pulling a page that does not flinch, while the same work runs perfectly from the menu, is one of the two paths never being called. `PullToRefresh` sits in the content, walks up to the scroll view it is inside, and hands it a `UIRefreshControl` : the control every application that needs this on a scroll view ends up reaching for.
+
+It taps under the finger when it takes. The control emits nothing of its own, the system's own lists add theirs and SwiftUI's modifier added one, so a page that borrows the control borrows that too : a gesture that answers with a picture and nothing felt is a gesture the reader is not sure they made.
+
 **And the two end the same way.** The command reads the page back as the last thing it does ; the pull could not, since SwiftUI holds its control out until the gesture's work returns and replacing the content there has the scroll view retract against content it has never laid out. So the pull left the read-back to the watcher that follows the store, which reads back only when a change reaches it : a gesture that asked for the page and got it only if something happened to be written is not the command in the menu by another name. The page asks for the read-back itself now, a beat after the control has gone, which is the same read-back with the layout out of its way.
 
 ## Pictures, and the marks beside them
