@@ -2,6 +2,25 @@
 
 Refreshing one feed is where the four modules meet : the fetcher brings bytes, the parser turns them into articles, the sanitizer decides what of an article may be kept, and the store recognizes what it has already seen. All of it lands in one transaction, so a feed is either updated whole or not at all.
 
+## When an article happened
+
+**The date shown is the publisher's own**, and the page sorts by it : `COALESCE(published_at, received_at)`, so the moment the article reached this device is the fallback and nothing more.
+
+**Some feeds date nothing, and that has to be visible.** `Le Parisien` states a build date for its channel and none for any of its items ; in one store of fifteen hundred articles a hundred and thirty had no date at all, and every one of them wore the moment it was pulled as though it were the moment it was written. There is no better answer available, but there is a more honest way to show it : an article nobody dated says `Reçu il y a deux heures` rather than `il y a deux heures`, so the reader can tell what is known from what is inferred.
+
+**Two spellings were losing dates silently.** A date that will not parse leaves the article with none, which sorts it on the day it arrived, and nothing said so.
+
+- `senat.fr` writes `Fri,28 Aug 2026 01:03:20 GMT`, with no space after the weekday's comma where RFC 822 puts one. A space is inserted before anything tries to read it.
+- `cert.europa.eu` writes `CEST`. The RFC names a handful of North American abbreviations and a POSIX locale knows those ; European publishers write their own, and a French reader's feeds are full of them. `CET`, `CEST`, `WET`, `WEST`, `EET`, `EEST`, `BST`, `MSK` and `JST` are mapped to their offsets, each of which carries its own summer time so there is nothing to work out from the date.
+
+`IST` is deliberately absent : it is Indian, Irish and Israeli standard time at three different offsets. A date that does not parse costs one article its ordering ; a date parsed wrongly costs the reader their trust in the page.
+
+**An update is shown where the publisher states one, and it changes nothing about where the article sits.** The stream is ordered by the publication date, newest first, and the chart above it counts the same date : an update is information about an article, not a new position for it. So a row leads with the publication and says `modifié` after it, never instead of it. A list ordered by one date and labelled with another is a list that looks wrongly sorted, and the reader is right.
+
+The update's own time is dropped before the fact of it is, since a row has one line and knowing a piece was revised matters more than knowing to the minute when. The article's own page has room for both and shows both.
+
+Only when the update is more than a minute later than the publication : a publisher who stamps both at the same second has published, not updated, and a row saying `modifié` about every article says nothing.
+
 ## Recognizing an article
 
 An article is matched on its identity, the GUID or the link and date of `docs/technical/feed-formats.md`, within its feed. That is what makes a refresh idempotent : the same feed served twice adds nothing the second time.

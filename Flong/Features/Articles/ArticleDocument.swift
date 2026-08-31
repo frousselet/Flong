@@ -60,6 +60,13 @@ nonisolated enum ArticleDocument {
         if let date = article.publishedAt {
             parts.append(date.formatted(date: .long, time: .shortened))
         }
+        // Said in full here, beside the publication rather than instead of it :
+        // the page has room for both, and a reader who has opened the article
+        // is the one who wants to know exactly what changed when. The list has
+        // room for one and shows whichever is the later.
+        if let updated = article.updatedAt {
+            parts.append(String(localized: "updated \(updated.formatted(date: .long, time: .shortened))"))
+        }
         return parts.joined(separator: " · ")
     }
 

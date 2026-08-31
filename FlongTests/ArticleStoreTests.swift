@@ -28,6 +28,76 @@ struct ArticleStoreTests {
         articles = ArticleStore(database)
     }
 
+    /// An article as a feed that dates nothing leaves it, or one a publisher
+    /// went back to.
+    @discardableResult
+    private func addEntry(
+        _ title: String,
+        feed: Feed,
+        published: Date?,
+        updated: Date? = nil,
+        received: Date
+    ) async throws -> UUID {
+        var entry = Entry(
+            feedID: feed.id,
+            guid: "urn:example:\(title)",
+            title: title,
+            publishedAt: published,
+            updatedAt: updated,
+            receivedAt: received
+        )
+        entry.hasMedia = false
+        try await database.writer.write { db in try entry.insert(db) }
+        return entry.id
+    }
+
+    // MARK: - What is known about when
+
+    @Test("An article nobody dated says the moment it arrived, and says which it is")
+    func undatedArticlesSayTheyArrived() async throws {
+        let feed = try await subscriptions.subscribe(
+            to: Subscription(address: "https://a.example.com/f.xml", title: "A")
+        ).feed
+
+        // What `Le Parisien` serves : a build date for the channel and none for
+        // any of its items. A hundred of its articles have only the moment they
+        // were pulled to sort by, which is the honest answer and must not be
+        // shown as though the publisher had said it.
+        try await addEntry("Sans date", feed: feed, published: nil, received: now)
+        try await addEntry("Datée", feed: feed, published: now.addingTimeInterval(-60), received: now)
+
+        let summaries = try await articles.summaries(.all)
+        let undated = try #require(summaries.first { $0.title == "Sans date" })
+        let dated = try #require(summaries.first { $0.title == "Datée" })
+
+        #expect(!undated.isDated)
+        #expect(undated.date == now)
+        #expect(dated.isDated)
+    }
+
+    @Test("A publisher who went back to an article says when, and one who did not says nothing")
+    func updatesWorthSaying() async throws {
+        let feed = try await subscriptions.subscribe(
+            to: Subscription(address: "https://b.example.com/f.xml", title: "B")
+        ).feed
+
+        let published = now.addingTimeInterval(-3600)
+        try await addEntry("Reprise", feed: feed, published: published, updated: now, received: now)
+        // Stamped within seconds of publishing, which is publishing and not
+        // updating : a row saying `modifié` about every article says nothing.
+        try await addEntry(
+            "Intacte",
+            feed: feed,
+            published: published,
+            updated: published.addingTimeInterval(2),
+            received: now
+        )
+
+        let summaries = try await articles.summaries(.all)
+        #expect(summaries.first { $0.title == "Reprise" }?.updatedAt == now)
+        #expect(summaries.first { $0.title == "Intacte" }?.updatedAt == nil)
+    }
+
     @discardableResult
     private func add(
         _ title: String,

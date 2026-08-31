@@ -133,3 +133,74 @@ struct Sparkline: View {
         .accessibilityHidden(true)
     }
 }
+
+/// When an article happened, said as precisely as what is known allows.
+///
+/// **Three different things wear the same shape, and saying so is the point.**
+///
+/// - **Published.** What a feed states. It is what the page sorts by, so it is
+///   what the row leads with : a list ordered by one date and labelled with
+///   another is a list that looks wrongly sorted, and the reader is right.
+/// - **Received.** Some feeds date nothing at all : `Le Parisien` states a
+///   build date for the channel and none for any of its items, so a hundred of
+///   its articles have only the moment they were pulled to sort by. That is the
+///   honest answer and there is no other, but it must not be shown as though
+///   the publisher had said it. A row reading `il y a deux heures` about an
+///   article nobody dated is telling the reader something nobody knows.
+/// - **Updated.** A publisher who went back to the piece after publishing it.
+///   It is said after the publication and never instead of it : **it changes
+///   nothing about where the article sits**, and a row that led with it would
+///   say so falsely. Only where the publisher states one and it is more than a
+///   minute later, since stamping both at the same second is publishing rather
+///   than updating.
+///
+/// The update's own time is dropped before the fact of it is, since a row has
+/// one line and knowing that a piece was revised matters more than knowing to
+/// the minute when. The article's own page has room for both.
+struct ArticleMoment: View {
+    let article: ArticleSummary
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            line(sayingWhen: true)
+            line(sayingWhen: false)
+        }
+        .lineLimit(1)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken)
+    }
+
+    private func line(sayingWhen: Bool) -> some View {
+        HStack(spacing: 4) {
+            published
+
+            if let updated = article.updatedAt {
+                Text(verbatim: "·")
+                if sayingWhen {
+                    Text("updated \(updated, format: .relative(presentation: .numeric))")
+                } else {
+                    Text("updated")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var published: some View {
+        if article.isDated {
+            Text(article.date, format: .relative(presentation: .numeric))
+        } else {
+            Text("Received \(article.date, format: .relative(presentation: .numeric))")
+        }
+    }
+
+    private var spoken: Text {
+        let when =
+            article.isDated
+            ? Text("Published \(article.date, format: .relative(presentation: .named))")
+            : Text("Received \(article.date, format: .relative(presentation: .named))")
+
+        guard let updated = article.updatedAt else { return when }
+        return when + Text(verbatim: ". ") + Text("updated \(updated, format: .relative(presentation: .named))")
+    }
+}

@@ -54,6 +54,20 @@ struct LocalizationTests {
         #expect(String(localized: "In progress", locale: french) == "En cours")
     }
 
+    @Test("What is known about an article's moment reaches its French")
+    func articleMoments() {
+        let moment = Date(timeIntervalSince1970: 1_787_646_600)
+        let relative = moment.formatted(.relative(presentation: .numeric))
+
+        // Three different things wear the same shape, and the word is what
+        // tells them apart : a publisher's own date, a publisher's own change
+        // to it, and the moment an undated article reached this device.
+        #expect(String(localized: "Received \(relative)", locale: french).hasPrefix("Reçu"))
+        #expect(String(localized: "Published \(relative)", locale: french).hasPrefix("Publié"))
+        #expect(String(localized: "updated \(relative)", locale: french).hasPrefix("modifié"))
+        #expect(String(localized: "updated", locale: french) == "modifié")
+    }
+
     @Test("The import summary agrees with French plural rules")
     func plurals() {
         // French treats zero and one alike, which is the whole reason these are
