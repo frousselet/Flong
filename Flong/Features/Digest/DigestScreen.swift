@@ -28,6 +28,14 @@ struct DigestScreen: View {
     /// Carries a pill's glass from one state to the next.
     @Namespace private var pills
 
+    /// Where the page is, so it can be put back after a pull.
+    @State private var position = ScrollPosition()
+    /// How far down the page is, for deciding whether putting it back is a
+    /// kindness or an interruption.
+    @State private var offset: CGFloat = 0
+    /// Whether the gesture's work is still running.
+    @State private var isPulling = false
+
     var body: some View {
         ScrollView {
             // A pinned section header rather than a bar in the safe area : the
@@ -40,11 +48,8 @@ struct DigestScreen: View {
                 } header: {
                     VStack(alignment: .leading, spacing: 0) {
                         topics
-                        // A place of its own, kept whether anything is
-                        // happening or not : a row that appears and disappears
-                        // moves the whole page under the reader's thumb twice
-                        // per pass, which is worse than the quiet band it
-                        // leaves behind.
+                        // It grows into its height and shrinks out of it again,
+                        // rather than keeping a place it does not need.
                         ActivityLine(work: model.currentWork)
                     }
                 }
@@ -52,6 +57,12 @@ struct DigestScreen: View {
             .editorialColumn()
             .padding(.horizontal, 22)
             .padding(.bottom, 90)
+        }
+        .scrollPosition($position)
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top
+        } action: { _, y in
+            offset = y
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         // The date is the title of the page, where a newspaper puts it. Not the
@@ -86,7 +97,40 @@ struct DigestScreen: View {
         //
         // A Mac has no pull and keeps `⌘R` in the reader's own menu, which is
         // where the command lives on every platform.
-        .refreshable { await model.pullToRefresh() }
+        .refreshable {
+            isPulling = true
+            await model.pullToRefresh()
+            isPulling = false
+        }
+        // **The page is put back where the pull started.**
+        //
+        // SwiftUI holds the refresh control out until the gesture's work
+        // returns, and the space it held is not always given back : the page
+        // stays pushed down by exactly its height, with the large title still
+        // open, until anything at all touches the screen and forces a layout.
+        // That fault is why the gesture was taken out of the application once
+        // already, and four attempts at its cause missed. None of them could be
+        // reproduced on a simulator either, where a synthesised drag never
+        // engages the control at all.
+        //
+        // So this does not try to diagnose it. It asks for the one outcome the
+        // reader wants, which is the page back at its top, and asking moves the
+        // scroll view whether or not it had reclaimed the inset on its own.
+        //
+        // A beat first, so it is not fighting the control on the way out.
+        //
+        // And only when the reader is still near the top. A pull starts there,
+        // but a refresh takes seconds and they may have scrolled off to read
+        // something ; hauling them back would be the application taking the
+        // page away from them.
+        .onChange(of: isPulling) { _, pulling in
+            guard !pulling, offset < Self.stillAtTheTop else { return }
+
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(150))
+                withAnimation(.easeOut(duration: 0.2)) { position.scrollTo(edge: .top) }
+            }
+        }
         // Not while something is being brought in. `Nothing has come in yet`
         // over a page that is at that moment fetching sixty feeds is untrue,
         // and it is untrue at the one moment the reader is most likely to be
@@ -205,6 +249,13 @@ struct DigestScreen: View {
             }
         }
     }
+
+    /// How far down the page still counts as being at the top of it.
+    ///
+    /// About a story's worth. Inside that the reader has not gone anywhere and
+    /// is looking at a page pushed out of place ; past it they have left the
+    /// head of the page deliberately.
+    private static let stillAtTheTop: CGFloat = 240
 
     /// Today, spelled the way the reader's language spells it.
     ///
