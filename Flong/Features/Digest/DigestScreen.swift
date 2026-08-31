@@ -763,7 +763,7 @@ private struct ActivityLine: View {
     private var height: CGFloat { work == nil ? 0 : open }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        ZStack(alignment: .top) {
             if let work {
                 content(work)
                     // Glass of its own, like the pills above it, rather than a
@@ -776,6 +776,8 @@ private struct ActivityLine: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 7)
                     .glassEffect(.regular, in: .capsule)
+                    // Fading as it goes, which is what lets the band be
+                    // measured without being clipped : see below.
                     .transition(.opacity)
             }
         }
@@ -788,8 +790,16 @@ private struct ActivityLine: View {
         // a page jumping. The height is what is animated rather than the row's
         // presence, since a pinned header measuring a child that has just been
         // inserted lands on the answer a frame late and that frame is the jolt.
-        .frame(height: height, alignment: .bottom)
-        .clipped()
+        //
+        // **And it is not clipped to that height.** Glass casts a soft shadow,
+        // and a rectangular clip cuts it off where it is still dark : what the
+        // reader saw was a grey oblong with hard edges sitting behind a
+        // capsule with round ones. Unclipped, the capsule spills a little
+        // during the third of a second it is growing or shrinking, which is
+        // covered by the fade happening over exactly the same third of a
+        // second, and it spills downwards into the rubric's own top rhythm
+        // rather than upwards into the subjects.
+        .frame(height: height, alignment: .top)
         .animation(reduceMotion ? nil : .snappy(duration: 0.32), value: height)
         .animation(.snappy(duration: 0.28), value: work?.phase)
         // Nothing here answers to a finger : the pull underneath it is the
