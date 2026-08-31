@@ -75,6 +75,45 @@ nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
     }
 }
 
+/// What set a catch-up going.
+///
+/// The five triggers differ in three ways and in no others : whether every
+/// feed is asked or only the ones politeness says are due, whether the data
+/// plan may be spent, and whether the model may be run. Naming them here keeps
+/// those three answers in one place instead of at five call sites that drift.
+nonisolated enum CatchUp: Hashable, Sendable {
+    /// The window opened.
+    case launch
+    /// The reader came back to it.
+    case foreground
+    /// The clock, while a window sits open.
+    case clock
+    /// The few seconds the system gave in the background.
+    case background
+    /// The reader asked, in so many words.
+    case reader
+
+    /// Whether every feed is asked, or only those that are due.
+    ///
+    /// Only when the reader asked. Everything else goes through the politeness
+    /// of section 8, which is what keeps a reader's devices from becoming a
+    /// burden on three hundred publishers.
+    var asksEveryFeed: Bool { self == .reader }
+
+    /// Whether nobody is waiting, and the reader's data plan is therefore not
+    /// to be spent.
+    var sparingly: Bool { self == .background }
+
+    /// Whether this is a moment to run the on-device model.
+    ///
+    /// **Not in the twenty-five seconds of a background refresh.** The system
+    /// rate-limits a backgrounded application's sessions hard, and a handful of
+    /// refusals there used to silence the model for the whole of the process
+    /// that followed. The model's work belongs to the full pass, at rest and on
+    /// the mains, and to a window somebody is looking at.
+    var mayRunTheModel: Bool { self != .background }
+}
+
 /// What the window shows, and what the reader can do to it.
 ///
 /// One object for one window : the three levels of section 16 of the
@@ -428,13 +467,43 @@ final class AppModel {
 
                 await self?.reloadWhatIsShown()
             }
+
+            // The stream ended, which means the observation could not be
+            // started at all. Letting go of the task is what allows another
+            // call to try again : the guard above reads `watching`, so leaving
+            // a finished task in it left the window deaf for the rest of the
+            // process with nothing but a log line to show for it. Coming back
+            // to the foreground calls this again.
+            await self?.stopWatching()
         }
 
+        startTheClock(.launch)
+    }
+
+    private func stopWatching() {
+        guard watching != nil else { return }
+        watching = nil
+        Log.store.notice("The window stopped following the store, and will try again")
+    }
+
+    /// The clock that asks the publishers while a window sits open.
+    ///
+    /// **It acts first and sleeps after.** It slept first, so a window that had
+    /// just come back to the front waited a whole interval before anything was
+    /// asked ; and a tick that fell while the window was away was spent on
+    /// nothing and cost another whole interval after that.
+    ///
+    /// Restarted rather than left running when the reader comes back, so
+    /// returning to the application is itself a tick and the next one is
+    /// counted from then.
+    func startTheClock(_ reason: CatchUp = .foreground) {
+        ticking?.cancel()
         ticking = Task { [weak self] in
+            var reason = reason
             while !Task.isCancelled {
+                if let self, isReading { await catchUp(reason) }
+                reason = .clock
                 try? await Task.sleep(for: .seconds(AppModel.foregroundInterval))
-                guard let self, isReading else { continue }
-                _ = await refresher.refreshDue()
             }
         }
     }
@@ -450,10 +519,15 @@ final class AppModel {
     ///
     /// A window open all day asked nobody anything : the only foreground
     /// refresh was returning to the front, and a Mac window that never leaves
-    /// the front never returns to it. Ten minutes is well inside the politeness
-    /// of section 8, which decides per feed what may actually be asked : most
-    /// ticks find nothing due and cost one query.
-    static let foregroundInterval: TimeInterval = 10 * 60
+    /// the front never returns to it.
+    ///
+    /// **Five minutes, and it costs the publishers nothing.** What a publisher
+    /// sees is decided per feed by ``RefreshSchedule/isDue(_:now:stagger:)``,
+    /// whose floor is fifteen minutes ; a tick is a question put to the store,
+    /// and most ticks find nothing due and send no request at all. What
+    /// halving the tick buys is the wait between a feed becoming due and being
+    /// asked, which is the only part of the delay the application controls.
+    static let foregroundInterval: TimeInterval = 5 * 60
 
     /// Reads back what the window is showing, after something changed it.
     ///
@@ -472,6 +546,12 @@ final class AppModel {
     func load() async {
         await loadSidebar()
         await loadArticles()
+        // The front page is part of what the window shows, and this is the
+        // read-back every path that writes ends with. Leaving it out is how a
+        // pass could fetch, group and announce a page of new stories and leave
+        // the reader looking at yesterday's.
+        await loadDigest()
+        await loadLooseArticles()
         await loadCredentials()
         // Another device may have changed them while this one was away.
         preferences.synchronize()
@@ -531,13 +611,10 @@ final class AppModel {
         await loadDigest()
         await loadLooseArticles()
 
-        // The briefs first, then the subjects : the model sorts the page it
-        // is shown, and a written headline says what a story is about far
-        // better than the title of whichever article was nearest its middle.
-        await digestService.brief()
-        await digestService.nameTopics()
-        await loadDigest()
-        await announceNewStories()
+        // The headlines and the subjects, turn about and under a bound. They
+        // ran one after the other and unbounded, which is how a page could
+        // arrive fully written and filed under nothing at all.
+        enrich()
     }
 
     // MARK: - Telling the reader
@@ -746,11 +823,22 @@ final class AppModel {
     /// the reader's data plan. The feeds come back in the order of how overdue
     /// each is against its own rhythm, so the budget goes to what is most
     /// likely to have something and nothing is left permanently at the back.
+    ///
+    /// **It groups what it fetched.** It used to fetch and stop there, so a
+    /// phone in a pocket collected articles all day and the front page gained
+    /// nothing from any of it until the next full pass or the next cold launch.
+    /// Grouping is plain SQL and costs a fraction of what the fetching just
+    /// cost.
+    ///
+    /// The read states go out first. They are a few bytes, the other devices
+    /// are waiting for them, and a pass whose budget runs out during the
+    /// fetching must not be a pass that swallowed them.
     func backgroundRefresh() async {
         let deadline = Date().addingTimeInterval(BackgroundScheduler.refreshBudget)
-        _ = await refresher.refreshDue(sparingly: true)
-        await JobRunner(FirstFetchJob(database)).run(until: deadline)
         await cloud?.enqueueReadStates()
+
+        await catchUp(.background, until: deadline)
+        await JobRunner(FirstFetchJob(database)).run(until: deadline)
     }
 
     /// The whole of the work, at rest and on the mains.
@@ -774,7 +862,11 @@ final class AppModel {
         Log.fetch.notice("Full pass : \(summary.newArticles) new articles from \(summary.refreshed) feeds")
 
         await doOutstandingWork()
-        await digestService.rebuild()
+        // Generous, and bounded all the same. The pass has minutes rather than
+        // seconds, and the model's two halves share whatever it turns out to
+        // have : unbounded, the headlines took the lot and the subjects were
+        // never asked for.
+        await digestService.rebuild(until: Date().addingTimeInterval(BackgroundScheduler.fullPassBudget))
         await announceNewStories()
         _ = try? await Retention(database).purge()
         try? await SearchIndex(database).optimize()
@@ -782,7 +874,11 @@ final class AppModel {
         await cloud?.enqueueCatchUp()
         await exchangeArchives()
 
-        await load()
+        // The whole of what the window shows, and not only part of it. The
+        // pass ends by reading back the page it has just built, so the page a
+        // reader opens in the morning is that one rather than last night's.
+        await reloadWhatIsShown()
+        await countOutstandingWork()
     }
 
     /// Starts synchronizing with the reader's own iCloud.
@@ -1252,76 +1348,103 @@ final class AppModel {
 
     // MARK: - Refreshing
 
-    /// Refreshes every feed, which is what a pull means.
+    /// Asks the publishers, groups what arrived, and shows it.
+    ///
+    /// **One entry point, and every automatic trigger goes through it.**
+    /// Fetching and showing used to be wired to different things. The clock,
+    /// the background refresh and the return to the foreground all fetched ;
+    /// only a cold launch, the menu command and the nightly pass ever grouped
+    /// what had arrived into stories. So a window left open all day watched its
+    /// sidebar counts move and `The rest` grow while the front page itself sat
+    /// unchanged, and a reader whose reader plainly worked had to ask it by
+    /// hand for the one thing they opened it for.
+    ///
+    /// The three steps are deliberately of different weights :
+    ///
+    /// - **fetching** is bounded by the network and by section 8, which decides
+    ///   per feed what may be asked at all ;
+    /// - **grouping** is plain SQL over what has just arrived, cheap next to the
+    ///   fetching, so it happens on every pass that brought anything ;
+    /// - **the model's own work** is the expensive half, so it runs behind this
+    ///   rather than inside it, under a deadline, and only where it is welcome.
+    ///
+    /// The page is read back whether or not this pass found anything : something
+    /// may have arrived from another device, from an archive, or from a pass
+    /// that ran while the window was away, and the reader is looking at the page
+    /// now.
+    func catchUp(_ reason: CatchUp, until deadline: Date? = nil) async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        let summary =
+            reason.asksEveryFeed
+            ? await refresher.refreshAll(until: deadline)
+            : await refresher.refreshDue(sparingly: reason.sparingly, until: deadline)
+
+        if summary.newArticles > 0 {
+            Log.fetch.info("\(summary.newArticles) new articles from \(summary.refreshed) feeds")
+        }
+
+        // Always, and not only when this pass brought something itself. What is
+        // waiting to be grouped may have come from iCloud, from a shared
+        // archive, or from a pass that ran while the window was away, and
+        // grouping is a single query when there is nothing to group.
+        await digestService.buildStories()
+        await load()
+
+        guard reason.mayRunTheModel else { return }
+        enrich(until: deadline)
+    }
+
+    /// Refreshes every feed, which is what the reader's own command means.
     ///
     /// **A refresh, and not the spring clean it had become.** It used to purge,
     /// compact, enqueue read states, enqueue a catch-up and exchange the
     /// archives as well : the whole of the nightly pass, in the foreground, on
-    /// a gesture a reader makes reflexively and willingly repeats. All of that
-    /// belongs to ``backgroundProcessing()``, which runs at rest on the mains
-    /// and still does every bit of it.
+    /// a command a reader willingly repeats. All of that belongs to
+    /// ``backgroundProcessing()``, which runs at rest on the mains and still
+    /// does every bit of it.
     ///
-    /// What is left is what the reader asked for : every feed, and the page
-    /// rebuilt from what arrived. Every feed and not only those that are due,
-    /// because they asked ; the token bucket per host is what keeps that polite
-    /// to the publishers.
+    /// Every feed and not only those that are due, because they asked ; the
+    /// token bucket per host is what keeps that polite to the publishers.
     ///
-    /// **It ends when the fetching ends.** SwiftUI holds the refresh control out
-    /// until this returns, so whatever this waits for is how long the page sits
-    /// pushed down by the spinner's height with the large title still open.
-    ///
-    /// It used to wait for `rebuild`, which runs the model over the whole
-    /// backlog with no deadline : a headline written and a subject filed for
-    /// every story that has just arrived, one call to the model apiece, seconds
-    /// each. On a device with Apple Intelligence and a page of new stories that
-    /// is minutes of gesture. It looked like a scroll view stuck in the wrong
-    /// place and it was a refresh that had not finished.
-    ///
-    /// So the gesture is the fetching and the grouping, which is what a reader
-    /// means by a refresh and is bounded by the network's own timeouts. The
-    /// model's work carries on behind it : those are resumable jobs, the window
-    /// follows the store, and each headline appears as it is written.
-    ///
-    /// It writes and reads nothing back for the same reason. Replacing the
-    /// page's content as the last thing before returning would have the scroll
-    /// view begin its retraction against content it has never laid out.
+    /// **It ends when the fetching and the grouping end.** It used to wait for
+    /// `rebuild`, which runs the model over the whole backlog with no deadline :
+    /// a headline written and a subject filed for every story that has just
+    /// arrived, one call to the model apiece, seconds each. On a device with
+    /// Apple Intelligence and a page of new stories that is minutes of waiting
+    /// for a command that had, as far as the reader could tell, already done
+    /// its work. The model's work carries on behind it : those are resumable
+    /// jobs, the window follows the store, and each headline appears as it is
+    /// written.
     func refreshAll() async {
-        guard !isRefreshing else { return }
-        isRefreshing = true
-        defer { isRefreshing = false }
-
-        _ = await refresher.refreshAll()
-        await digestService.buildStories()
-
-        enrich()
+        await catchUp(.reader)
     }
 
     /// Writes the headlines and files the subjects, behind whatever asked.
     ///
-    /// One at a time : a second pull while the first is still being written
+    /// One at a time : a second command while the first is still being written
     /// would have two runs of the model competing for it, and the jobs pick up
     /// where they were left anyway.
-    private func enrich() {
+    ///
+    /// **The two halves share the time rather than the first taking all of
+    /// it.** Writing a headline and filing a subject are one model call each,
+    /// and the briefs ran first with no deadline at all : a night that brought
+    /// sixty stories spent a hundred and eighty calls on headlines before the
+    /// first subject was ever asked for, and the reader woke to a page of
+    /// written headlines under no subjects at all. Half the time each, and the
+    /// subjects get their half whatever the headlines did with theirs.
+    private func enrich(until deadline: Date? = nil) {
         guard enriching?.isCancelled ?? true else { return }
 
         enriching = Task { [weak self] in
             guard let self else { return }
-            await digestService.brief()
-            await digestService.nameTopics()
+            await digestService.enrich(until: deadline)
+            await loadDigest()
             await announceNewStories()
             enriching = nil
         }
-    }
-
-    /// Refreshes the feeds that are due, on returning to the foreground.
-    func refreshDue() async {
-        guard !isRefreshing else { return }
-        isRefreshing = true
-        defer { isRefreshing = false }
-
-        let summary = await refresher.refreshDue()
-        guard summary.attempted > 0 else { return }
-        await load()
     }
 
     // MARK: - Subscribing

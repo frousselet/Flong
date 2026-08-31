@@ -86,6 +86,39 @@ struct BackgroundPassTests {
         // time would refuse the next one for having been punctual.
         #expect(BackgroundScheduler.fullPassFloor < BackgroundScheduler.fullPassInterval)
     }
+
+    @Test("The next pass is counted from the last one, not from whenever it was asked")
+    func countedFromTheLast() async {
+        let now = Date()
+        _ = await BackgroundScheduler.runFullPass {}
+
+        // Asked for a second later, and a second later again : the answer is
+        // the same moment both times. It used to be six hours from whenever it
+        // was asked, and it was asked at every launch and on every return to
+        // the foreground, so on a phone anyone actually uses the pass was
+        // pushed out of reach and only ever ran after a night untouched.
+        let next = BackgroundScheduler.nextFullPass(now: now, jitter: 0)
+        #expect(abs(next.timeIntervalSince(now) - BackgroundScheduler.fullPassInterval) < 5)
+    }
+
+    @Test("A device that has not had a pass for a day asks for one now")
+    func overdueAsksNow() {
+        BackgroundScheduler.forgetTheLastFullPass()
+
+        let now = Date()
+        #expect(BackgroundScheduler.nextFullPass(now: now, jitter: 0) == now)
+    }
+
+    @Test("The moment of the last pass outlives the process that ran it")
+    func remembered() async {
+        let now = Date()
+        _ = await BackgroundScheduler.runFullPass {}
+
+        // Held in a static for the life of the process, it was forgotten at
+        // every relaunch, which on iOS is minutes : the floor guarded nothing
+        // across exactly the launches it exists to guard across.
+        #expect(BackgroundScheduler.lastFullPass().timeIntervalSince(now) > -5)
+    }
 }
 
 /// The order a budget is spent in, and what a background pass will not spend.

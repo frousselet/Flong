@@ -157,21 +157,31 @@ struct AppShell: View {
                 process: { @MainActor in await model.backgroundProcessing() }
             )
             BackgroundScheduler.schedule()
+            // Asked for once per launch, and otherwise only by its own handler.
+            // Asking for it again on every foreground return pushed it six
+            // hours further out each time, so on a phone anyone actually uses
+            // it never ran.
+            BackgroundScheduler.scheduleFullPass()
 
             // A window that opens in the background has no phase change to
             // learn from, and `onChange` only fires on a change.
             model.isReading = scenePhase == .active
 
-            // Follows the store and the clock from here on, so a change from
-            // anywhere reaches the window without the reader pulling anything.
-            model.keepUp()
-
+            // Before the page is read : the subjects a story is filed under are
+            // chosen from this vocabulary, and a filing pass that ran before it
+            // existed had nothing to choose from and stamped the story as asked
+            // all the same.
             await model.seedStandardTopics()
             await model.load()
-            await model.rebuildDigest()
+
+            // Follows the store and the clock from here on, so a change from
+            // anywhere reaches the window without the reader asking for
+            // anything. The clock's first turn is the launch refresh, so
+            // nothing is asked for twice.
+            model.keepUp()
+
             await model.startSync()
             await model.synchronizeSpotlight()
-            await model.refreshDue()
         }
         .onChange(of: scenePhase) { _, phase in
             // What the reader is looking at decides whether Flong may
@@ -181,11 +191,19 @@ struct AppShell: View {
             guard phase == .active else {
                 // Asked for on the way out, which is when iOS wants it : a task
                 // is submitted for an application that has stopped, and the
-                // request is replaced rather than duplicated.
+                // request is replaced rather than duplicated. The refresh only :
+                // the full pass keeps its own clock.
                 BackgroundScheduler.schedule()
                 return
             }
-            Task { await model.refreshDue() }
+            // Asked again in case the observation could not be started : it is
+            // a no-op while the window is already following the store.
+            model.keepUp()
+            // Restarted rather than left running, so coming back is itself a
+            // tick and the next one is counted from now. It reads the page back
+            // whatever the publishers say, which is what repairs a window that
+            // was away while a background pass rewrote the store under it.
+            model.startTheClock(.foreground)
         }
         .alert(
             Text("Import finished"),

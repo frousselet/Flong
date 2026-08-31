@@ -4,11 +4,19 @@ Two things in Flong take longer than a moment : fetching a thousand feeds nobody
 
 ## Two passes, and what tells them apart
 
-**The half-hourly refresh** asks only the feeds that are due, within the politeness of `docs/technical/fetching.md`. It is what a phone in a pocket gets, and it is deliberately small : twenty-five seconds, a token bucket per host, and no promise that anything finishes.
+**The opportunistic refresh** asks only the feeds that are due, within the politeness of `docs/technical/fetching.md`. It is what a phone in a pocket gets, and it is deliberately small : twenty-five seconds, a token bucket per host, and no promise that anything finishes. It asks for a floor of fifteen minutes, the same floor a feed is held to anyway, so it refuses none of the opportunities the system offers ; how many it actually gets is the system's decision and not this one's.
 
-**The full pass** runs when the device is at rest on the mains. Every feed a reader follows, then the enrichment, the purge, the index, and the exchange with iCloud, in that order so that everything downstream works on what has just arrived rather than on what was there this morning.
+**It groups what it fetched.** It used to fetch and stop there, so a phone in a pocket collected articles all day and the front page gained nothing from any of it until the next full pass or the next cold launch. Grouping is plain SQL over what has just arrived and costs a fraction of the fetching that preceded it. What it does not do is run the model : a backgrounded application's sessions are rate-limited hard, and a handful of refusals there used to silence the model for the whole of the process that followed. That work belongs to the full pass and to a window somebody is looking at.
+
+**The full pass** runs when the device is at rest on the mains. Every feed a reader follows, then the enrichment, the purge, the index, and the exchange with iCloud, in that order so that everything downstream works on what has just arrived rather than on what was there this morning. It ends by reading back what the window shows, the front page included, so the page a reader opens in the morning is the one the pass built and not the one it replaced.
 
 It did not refresh at all until it was asked to. It enriched, purged, indexed and exchanged what was already in the store, which is a reasonable thing to do on charge and is not what a reader means by a full refresh.
+
+**The pass keeps its own clock, on disk, and asks for itself.** Both requests used to be submitted together, from a function called at every launch and on every return from the foreground, and each of those pushed the pass six hours and up to forty-five minutes further out : on a phone anyone actually uses it was permanently starved and only ever ran after a night untouched, which is exactly what a reader reported. It is asked for once at launch and thereafter only by its own handler, and its next moment is counted from when the last pass actually ran rather than from whenever something asked. A device that has not had one for a day asks for one now.
+
+The moment of the last pass is written to disk rather than held in a static. Held in a static it was forgotten at every relaunch, which on iOS is minutes, so the hundred-minute floor guarded nothing across exactly the launches it exists to guard across.
+
+**A pass that ran out of time is a success.** Every job here is resumable by construction, so a partial pass is the ordinary outcome and not a failure. Reporting one as a failure, which a cancelled task did on every budgeted run, teaches the scheduler to grant time less often. The watchdog races the work rather than outliving it : it was a detached sleep that held the job for its whole budget even when the work had returned in a second.
 
 ## What Photos does, and what of it is taken
 
@@ -31,7 +39,7 @@ It did not refresh at all until it was asked to. It enriched, purged, indexed an
 
 **`PreventsDeviceSleep` is refused on purpose.** It is right for Photos, which has hours of analysis to get through and no other moment to do it in. A feed reader holding a Mac awake to fetch three hundred feeds is a feed reader nobody keeps, and the activity repeats : what it misses tonight it does tomorrow.
 
-**Photos splits power from network and Flong does not.** `cloudphotod` synchronizes on battery so long as there is a network, `RequiresExternalPower` false and `RequiresNetworkConnectivity` true ; `photoanalysisd` waits for the mains and asks for no network at all. That split is the better design and it is two daemons. What was asked for here is one pass that both fetches and enriches, so it takes the stricter of the two conditions : the mains and a network. The half-hourly refresh is what covers a reader on battery.
+**Photos splits power from network and Flong does not.** `cloudphotod` synchronizes on battery so long as there is a network, `RequiresExternalPower` false and `RequiresNetworkConnectivity` true ; `photoanalysisd` waits for the mains and asks for no network at all. That split is the better design and it is two daemons. What was asked for here is one pass that both fetches and enriches, so it takes the stricter of the two conditions : the mains and a network. The opportunistic refresh is what covers a reader on battery.
 
 **The network condition was wrong and is fixed.** The processing request said `requiresNetworkConnectivity = false`, from when it only vectorized what was already stored. It now fetches every feed, exchanges with iCloud and reads the shared archives, and the system was entitled to run the whole thing with no way to reach anything.
 
@@ -58,7 +66,7 @@ A feed that refuses to be fetched does not hold the queue for ever : three refus
 
 | API | What it does | What it is worth |
 | --- | ------------ | ---------------- |
-| `BGAppRefreshTask` | refreshes what is due, about thirty seconds | opportunistic, never counted on |
+| `BGAppRefreshTask` | refreshes what is due and groups it, about twenty-five seconds | opportunistic, never counted on |
 | `BGProcessingTask` | vectorizes, purges, compacts, `requiresExternalPower` | minutes of work, on charge |
 | `BGContinuedProcessingTask` | the reader starts it and watches it finish | iOS only, and refused often |
 | `NSBackgroundActivityScheduler` | both of the first two, on macOS | |

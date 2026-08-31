@@ -39,6 +39,14 @@ nonisolated enum BackgroundScheduler {
     /// About what a refresh is given, and all it should count on.
     static let refreshBudget: TimeInterval = 25
 
+    /// What the model's own work is given inside a full pass.
+    ///
+    /// The pass has minutes rather than seconds, and nothing here is urgent :
+    /// the jobs are resumable, so what one pass does not get through the next
+    /// one does. What the bound is for is that the headlines and the subjects
+    /// share the time instead of the first of them taking all of it.
+    static let fullPassBudget: TimeInterval = 5 * 60
+
     // MARK: - How often the whole of the work runs
     //
     // Read off Photos, which does the same kind of thing for the same kind of
@@ -78,8 +86,42 @@ nonisolated enum BackgroundScheduler {
     /// this reason.
     static let fullPassJitter: TimeInterval = 45 * 60
 
+    /// Where the moment of the last full pass is written down.
+    ///
+    /// **On disk, and not only in memory.** It was a static held for the life
+    /// of the process, which on iOS is minutes : every relaunch forgot that a
+    /// pass had just run, so the floor guarded nothing across the launches it
+    /// exists to guard across, and the next request could not be asked for at
+    /// the right moment because nothing knew when the right moment was.
+    private static let lastFullPassKey = "flong.last-full-pass"
+
     /// When the last full pass ran, so the floor can be kept.
     private static let lastFullPass = Mutex(Date.distantPast)
+
+    /// When the last full pass ran, as far as this device remembers.
+    static func lastFullPass(in defaults: UserDefaults = .standard) -> Date {
+        let remembered = Date(timeIntervalSince1970: defaults.double(forKey: lastFullPassKey))
+        return max(lastFullPass.withLock { $0 }, remembered)
+    }
+
+    private static func rememberTheFullPass(at date: Date, in defaults: UserDefaults = .standard) {
+        lastFullPass.withLock { $0 = date }
+        defaults.set(date.timeIntervalSince1970, forKey: lastFullPassKey)
+    }
+
+    /// The earliest a full pass may begin, counted from the last one rather
+    /// than from now.
+    ///
+    /// A device that has just run one waits the whole interval. A device that
+    /// has not run one for a day asks for one immediately : the wait is owed
+    /// to the last pass, and starting it afresh every time anything asked was
+    /// what starved the pass on a phone in daily use.
+    static func nextFullPass(
+        now: Date = Date(),
+        jitter: TimeInterval = .random(in: 0...BackgroundScheduler.fullPassJitter)
+    ) -> Date {
+        max(lastFullPass().addingTimeInterval(fullPassInterval), now).addingTimeInterval(jitter)
+    }
     /// Whether a pass is running, so two never are.
     ///
     /// Photos puts every heavy activity in one group with a concurrency limit
@@ -96,7 +138,7 @@ nonisolated enum BackgroundScheduler {
         let now = Date()
         let mayRun = isPassing.withLock { passing -> Bool in
             guard !passing else { return false }
-            guard lastFullPass.withLock({ now.timeIntervalSince($0) >= fullPassFloor }) else { return false }
+            guard now.timeIntervalSince(lastFullPass()) >= fullPassFloor else { return false }
             passing = true
             return true
         }
@@ -106,7 +148,7 @@ nonisolated enum BackgroundScheduler {
         }
 
         defer {
-            lastFullPass.withLock { $0 = Date() }
+            rememberTheFullPass(at: Date())
             isPassing.withLock { $0 = false }
         }
         await work()
@@ -114,11 +156,9 @@ nonisolated enum BackgroundScheduler {
     }
 
     /// Forgets when the last pass ran, so a test can ask for another.
-    ///
-    /// The floor is measured against a moment held for the life of the process,
-    /// which is right in an application and impossible to test around.
-    static func forgetTheLastFullPass() {
+    static func forgetTheLastFullPass(in defaults: UserDefaults = .standard) {
         lastFullPass.withLock { $0 = .distantPast }
+        defaults.removeObject(forKey: lastFullPassKey)
         isPassing.withLock { $0 = false }
     }
 
@@ -176,7 +216,7 @@ nonisolated enum BackgroundScheduler {
             }
             BGTaskScheduler.shared.register(forTaskWithIdentifier: processingIdentifier, using: nil) { task in
                 handle(task, budget: nil) { _ = await runFullPass { await process() } }
-                scheduleProcessing()
+                scheduleFullPass()
             }
             BGTaskScheduler.shared.register(forTaskWithIdentifier: continuedIdentifier, using: nil) { task in
                 handle(task, budget: nil) { await process() }
@@ -211,15 +251,32 @@ nonisolated enum BackgroundScheduler {
             }
         }
 
-        /// Asks for both kinds of time.
+        /// Asks for the opportunistic kind of time.
+        ///
+        /// **Only that kind.** It used to ask for the full pass in the same
+        /// breath, and it is called on every return from the foreground and at
+        /// every launch : each of those pushed the pass six hours and up to
+        /// forty-five minutes further out, so on a phone anyone actually uses
+        /// the pass was permanently starved and only ever ran after a night
+        /// untouched. The pass asks for itself now, from its own handler and
+        /// once at launch, against a moment written to disk.
         static func schedule() {
             let request = BGAppRefreshTaskRequest(identifier: refreshIdentifier)
-            request.earliestBeginDate = Date(timeIntervalSinceNow: 30 * 60)
+            // The floor a feed is held to anyway. Asking for more often than
+            // this would be asking for time the politeness of section 8 has
+            // nothing to spend, and asking for less often throws away an
+            // opportunity the system had already decided to offer.
+            request.earliestBeginDate = Date(timeIntervalSinceNow: RefreshSchedule.minimumInterval)
             submit(request)
-            scheduleProcessing()
         }
 
-        private static func scheduleProcessing() {
+        /// Asks for the full pass, counting from when the last one actually
+        /// ran rather than from now.
+        ///
+        /// A device that has not had a pass for a day asks for one now. Asking
+        /// for one six hours out, as it did, meant the wait started again every
+        /// time anything asked.
+        static func scheduleFullPass(now: Date = Date()) {
             let request = BGProcessingTaskRequest(identifier: processingIdentifier)
             // A device at rest on charge, which is what this asks for and what
             // the system reads it as : overnight, on the desk, plugged in. It
@@ -232,13 +289,11 @@ nonisolated enum BackgroundScheduler {
             // it only vectorized what was already here, and the system was
             // entitled to run the whole thing with no way to reach anything.
             request.requiresNetworkConnectivity = true
-            // Six hours and up to forty-five minutes more, which is what Photos
-            // asks for. The jitter is what keeps a reader's devices from waking
-            // together and asking three hundred publishers the same question at
-            // the same second.
-            request.earliestBeginDate = Date(
-                timeIntervalSinceNow: fullPassInterval + .random(in: 0...fullPassJitter)
-            )
+            // Six hours after the last pass, and up to forty-five minutes more,
+            // which is what Photos asks for. The jitter is what keeps a
+            // reader's devices from waking together and asking three hundred
+            // publishers the same question at the same second.
+            request.earliestBeginDate = Self.nextFullPass(now: now)
             submit(request)
         }
 
@@ -258,19 +313,36 @@ nonisolated enum BackgroundScheduler {
         ///
         /// A task that is never marked finished is a task the system remembers
         /// for the wrong reasons, and it hands out less time next time.
+        ///
+        /// **A pass that ran out of time is a success.** Every job here is
+        /// resumable by construction : the work left is a question the store
+        /// answers, so stopping between two batches loses nothing and the next
+        /// grant carries on. Reporting a budgeted run as a failure, which is
+        /// what `!Task.isCancelled` did on every single one of them, told the
+        /// scheduler the opposite and taught it to grant time less often. That
+        /// is the one thing a task whose budget keeps expiring least needs.
+        ///
+        /// The watchdog races the work rather than outliving it : it used to be
+        /// a detached sleep that held the job for its whole budget even when
+        /// the work had returned in a second.
         private static func handle(_ task: BGTask, budget: TimeInterval?, work: @escaping @Sendable () async -> Void) {
             let job = Task {
-                await work()
-                task.setTaskCompleted(success: !Task.isCancelled)
+                if let budget {
+                    await withTaskGroup(of: Void.self) { group in
+                        group.addTask { await work() }
+                        group.addTask { try? await Task.sleep(for: .seconds(budget)) }
+                        // Whichever comes first ends the other : the work
+                        // finishing cancels the clock, the clock running out
+                        // cancels the work.
+                        await group.next()
+                        group.cancelAll()
+                    }
+                } else {
+                    await work()
+                }
+                task.setTaskCompleted(success: true)
             }
             task.expirationHandler = { job.cancel() }
-
-            if let budget {
-                Task {
-                    try? await Task.sleep(for: .seconds(budget))
-                    job.cancel()
-                }
-            }
         }
     #else
         /// The macOS equivalent, which asks for the same two kinds of time.
@@ -280,7 +352,10 @@ nonisolated enum BackgroundScheduler {
         static func register(
             refresh: @escaping @Sendable () async -> Void, process: @escaping @Sendable () async -> Void
         ) {
-            refreshActivity = activity(identifier: refreshIdentifier, interval: 30 * 60) {
+            // The same floor a feed is held to anyway, so a Mac left with its
+            // window behind another one is asked as often as a phone is. What
+            // reaches a publisher is still decided per feed.
+            refreshActivity = activity(identifier: refreshIdentifier, interval: RefreshSchedule.minimumInterval) {
                 await runRefresh { await refresh() }
             }
             processingActivity = activity(identifier: processingIdentifier, interval: fullPassInterval) {
@@ -302,6 +377,10 @@ nonisolated enum BackgroundScheduler {
         }
 
         static func schedule() {}
+
+        /// `NSBackgroundActivityScheduler` repeats on its own, so there is
+        /// nothing to ask for a second time.
+        static func scheduleFullPass(now: Date = Date()) {}
 
         /// macOS has no equivalent, and needs none : an application that is open
         /// is an application that can simply do the work.
