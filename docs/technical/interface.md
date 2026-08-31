@@ -260,6 +260,10 @@ Under Reduce Motion the indeterminate bar is a still tinted rule rather than one
 
 It taps under the finger when it takes. The control emits nothing of its own, the system's own lists add theirs and SwiftUI's modifier added one, so a page that borrows the control borrows that too : a gesture that answers with a picture and nothing felt is a gesture the reader is not sure they made.
 
+**And the line answers on the beat.** It is held back a quarter of a second so that an automatic pass finding nothing due does not flicker a line onto a page nobody was watching. A pull or a press is watched : the finger is still on the glass, and a beat of nothing between the gesture and the line is what makes the line look like it arrived from nowhere. What the reader asked for skips the wait ; everything automatic keeps it.
+
+The capsule grows out of the top edge rather than materializing. A fade on its own put it on screen at full size in a band that was still opening, which is a thing appearing over a page that has not made room for it yet ; anchored at the top it comes up out of the edge the room is opening from, over the same third of a second and the same curve as the room itself, so the two move as one.
+
 **And the two end the same way.** The command reads the page back as the last thing it does ; the pull could not, since SwiftUI holds its control out until the gesture's work returns and replacing the content there has the scroll view retract against content it has never laid out. So the pull left the read-back to the watcher that follows the store, which reads back only when a change reaches it : a gesture that asked for the page and got it only if something happened to be written is not the command in the menu by another name. The page asks for the read-back itself now, a beat after the control has gone, which is the same read-back with the layout out of its way.
 
 ## Pictures, and the marks beside them
