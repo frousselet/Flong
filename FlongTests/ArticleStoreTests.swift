@@ -162,6 +162,29 @@ struct ArticleStoreTests {
         #expect(try await articles.summaries(.today, now: now).map(\.title) == ["today", "starred"])
     }
 
+    @Test("The picture the head is set with is taken out of the body")
+    func theHeadPictureIsNotShownTwice() {
+        let picture = URL(string: "https://example.com/photo.jpg")!
+        let body =
+            "<figure><img src=\"https://example.com/photo.jpg\" alt=\"\"><figcaption>Ici</figcaption></figure><p>Le corps.</p>"
+
+        let stripped = ArticleDocument.without(picture, in: body)
+
+        // The tag goes and nothing around it does : the caption is the
+        // publisher's and belongs to whatever is left of the figure.
+        #expect(!stripped.contains("<img"))
+        #expect(stripped.contains("<figcaption>Ici</figcaption>"))
+        #expect(stripped.contains("<p>Le corps.</p>"))
+    }
+
+    @Test("A body whose pictures are not the head's is left alone")
+    func anotherPictureIsLeftAlone() {
+        let body = "<p><img src=\"https://example.com/other.jpg\"></p>"
+
+        #expect(ArticleDocument.without(URL(string: "https://example.com/photo.jpg"), in: body) == body)
+        #expect(ArticleDocument.without(nil, in: body) == body)
+    }
+
     @Test("An article carries the publisher it came from, and not only the desk")
     func carriesItsPublisher() async throws {
         let sport = try await subscriptions.subscribe(

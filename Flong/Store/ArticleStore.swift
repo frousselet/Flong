@@ -105,6 +105,8 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
     let feedTitle: String
     /// The publisher it came from, whose name is what the page is headed with.
     let domain: String?
+    /// The picture that stands for it, which the page runs across its head.
+    let imageURL: URL?
     let author: String?
     let url: URL?
     let publishedAt: Date?
@@ -127,6 +129,7 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
         title: String,
         feedTitle: String,
         domain: String? = nil,
+        imageURL: URL? = nil,
         author: String? = nil,
         url: URL? = nil,
         publishedAt: Date? = nil,
@@ -142,6 +145,7 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
         self.title = title
         self.feedTitle = feedTitle
         self.domain = domain
+        self.imageURL = imageURL
         self.author = author
         self.url = url
         self.publishedAt = publishedAt
@@ -286,6 +290,7 @@ nonisolated struct ArticleStore: Sendable {
                 title: entry.title,
                 feedTitle: feed.title,
                 domain: feed.domain,
+                imageURL: entry.imageURL,
                 author: entry.author,
                 url: entry.url,
                 publishedAt: entry.publishedAt,

@@ -298,6 +298,14 @@ An alignment guide was tried first, holding the whole text block to the left and
 
 It carries a navigation stack of its own, for the bar the controls hang off. That stack leads nowhere : what is on it is the article.
 
+**It opens on the picture the row was carrying.** The article's own picture runs across the head of the page, above the headline, edge to edge and under the controls : the reader tapped a row with that photograph on it, and the page they land on opens on the same one. Three by two and cropped rather than fitted, which is the ratio every other picture in the application is shown at, so the first screen of an article is the same height whatever shape the publisher's file happened to be.
+
+The controls float over it. They are already on glass of the system's own, which is what keeps them legible over a photograph ; a band of paper behind them would be a shelf bolted across the picture. **The bar carries no title**, and cannot : plain type over somebody's photograph is unreadable on half the photographs there are. The publisher is named in the byline under the headline, where the page says it in its own voice.
+
+An article with no picture starts where it always did, below the bar. There is nothing to run under it.
+
+**The picture is taken out of the body.** An article's picture comes from the feed or, failing that, from the first picture in its body ; in the second case the head and the first paragraph would be the same photograph twice, one above the other. What is removed is the tag and nothing around it, so a caption stays with whatever is left of the figure it was in.
+
 **The way out is a cross, not a way back.** The reader is not returning to a screen they left. The page they came from never went anywhere, and an arrow pointing at something already behind the article would be describing a journey nobody made. A cross says what this is, which is a thing put down.
 
 `Route.article` stays a route, since an article is a place a reader can be ; it is simply not a place on a stack. One function in the window decides which of the two a route is, so no screen has to know what its own rows do.

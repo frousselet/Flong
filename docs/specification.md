@@ -543,6 +543,8 @@ Reader mode when the reader has chosen it, a switch to the feed content or the w
 
 **Presented over the window rather than pushed onto a section.** An article on a section's stack is an article under the tab bar, which is a row of places to go laid across the one thing that asks to be read with nothing else in the way. It grows out of the row that opened it and is put down with a cross : the page it came from never went anywhere, so there is nothing to go back to.
 
+**It opens on the picture the row was carrying**, run across the head above the headline, edge to edge and under the controls, cropped to the three by two every other picture is shown at. The same picture is taken out of the body where it came from there, so the page does not show it twice.
+
 ### Search
 
 A single field accepting the query language, live results, and saving a query straight from the field. The switch between stream and library is gone with the library : there is one corpus, and `is:starred`, `is:collected` and `is:annotated` narrow it to what the reader marked.

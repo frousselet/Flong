@@ -34,7 +34,8 @@ nonisolated enum ArticleDocument {
     ///   The feed's own title stands in only where the publisher is unknown.
     static func html(for article: Article, publisher: String? = nil, showing body: Body = .page) -> String {
         let byline = byline(of: article, publisher: publisher)
-        let markup = (body == .page ? article.extractedHTML : nil) ?? article.bodyHTML ?? ""
+        let chosen = (body == .page ? article.extractedHTML : nil) ?? article.bodyHTML ?? ""
+        let markup = without(article.imageURL, in: chosen)
 
         return """
             <!doctype html>
@@ -45,14 +46,58 @@ nonisolated enum ArticleDocument {
             <style>\(stylesheet)</style>
             </head>
             <body>
+            \(lead(of: article))
+            <div class="column">
             <header>
             <h1>\(HTMLEntities.escape(article.title))</h1>
             <p class="byline">\(HTMLEntities.escape(byline))</p>
             </header>
             <article>\(markup)</article>
+            </div>
             </body>
             </html>
             """
+    }
+
+    /// The picture the article is headed with, running the whole width.
+    ///
+    /// **Above the headline and under the controls.** It is the same picture
+    /// the row the reader tapped was carrying, so the page opens on what they
+    /// were looking at when they decided to open it. The controls float over
+    /// it, which is what the width is for : a picture inset inside the column
+    /// with a bar of its own above it would be a photograph with a shelf on it.
+    ///
+    /// Three by two, cropped rather than fitted. It is the ratio every other
+    /// picture in the application is shown at, and a head that took whatever
+    /// shape the publisher's file happened to be would be a page whose first
+    /// screen is a different height every time.
+    private static func lead(of article: Article) -> String {
+        guard let address = article.imageURL, HTTPURL.isFetchable(address) else { return "" }
+        let source = HTMLEntities.escape(address.absoluteString)
+        return "<figure class=\"lead\"><img src=\"\(source)\" alt=\"\"></figure>"
+    }
+
+    /// The body without the picture the page is already headed with.
+    ///
+    /// An article's picture is taken from the feed or, failing that, from the
+    /// first picture in its body : in the second case the head and the first
+    /// paragraph would be the same photograph twice, one above the other. What
+    /// is removed is the tag and nothing around it ; an empty `figure` left
+    /// behind is drawn as nothing, which the stylesheet sees to.
+    static func without(_ picture: URL?, in markup: String) -> String {
+        guard let address = picture?.absoluteString, !address.isEmpty else { return markup }
+        guard let found = markup.range(of: address) else { return markup }
+
+        // Back to the `<` that opens the tag holding it, and on to the `>` that
+        // closes it. Anything else between them is that tag's own business.
+        let before = markup.startIndex..<found.lowerBound
+        let after = found.upperBound..<markup.endIndex
+
+        guard let opening = markup.range(of: "<img", options: [.backwards, .caseInsensitive], range: before),
+            let closing = markup.range(of: ">", range: after)
+        else { return markup }
+
+        return markup.replacingCharacters(in: opening.lowerBound..<closing.upperBound, with: "")
     }
 
     private static func byline(of article: Article, publisher: String?) -> String {
@@ -86,13 +131,20 @@ nonisolated enum ArticleDocument {
           :root { --text: #f2f2f7; --muted: #9c9ca1; --rule: #3a3a3c; --link: #6fb2ff; }
         }
         body {
-          margin: 0 auto; padding: 16px; max-width: 42em;
+          margin: 0; padding: 0;
           /* The shorthand carries Dynamic Type ; the family after it carries the
              voice. Serif for what was written, as everywhere else. */
           font: -apple-system-body; font-family: ui-serif, "New York", Georgia, serif;
           line-height: 1.55; color: var(--text);
           -webkit-text-size-adjust: 100%; overflow-wrap: break-word;
         }
+        /* The measure lives here rather than on the body, so that the picture
+           at the head can run the whole width while the words do not. */
+        .column { margin: 0 auto; padding: 16px; max-width: 42em; }
+        /* Cropped to the ratio every other picture is shown at, and drawn edge
+           to edge under the controls. */
+        .lead { margin: 0; }
+        .lead img { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; }
         h1 { font-size: 1.6em; line-height: 1.25; margin: 0 0 8px; }
         h2, h3, h4 { line-height: 1.3; margin: 1.4em 0 0.4em; }
         /* What the application says about the article, rather than the article. */
@@ -101,6 +153,8 @@ nonisolated enum ArticleDocument {
         a { color: var(--link); }
         img, video, audio, iframe { max-width: 100%; height: auto; }
         figure { margin: 1em 0; }
+        /* What is left where the head's own picture was taken out of the body. */
+        figure:empty, p:empty { display: none; margin: 0; }
         figcaption { font-family: var(--voice); color: var(--muted); font-size: 0.85em; }
         blockquote {
           margin: 1em 0; padding: 0 0 0 1em;

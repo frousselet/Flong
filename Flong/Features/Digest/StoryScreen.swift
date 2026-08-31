@@ -215,14 +215,22 @@ struct ArticleScreen: View {
                     ArticleWebView(
                         html: ArticleDocument.html(for: article, publisher: publisher(of: article), showing: showing)
                     )
-                    .ignoresSafeArea(edges: .bottom)
+                    // **The picture at the head runs under the controls**, so
+                    // the page starts at the top of the screen rather than
+                    // below the bar. An article with none has nothing to run
+                    // under it and its words start where they always did.
+                    .ignoresSafeArea(edges: article.imageURL != nil ? [.top, .bottom] : .bottom)
                     .toolbar { toolbar(for: article) }
-                    // The publisher, not the desk : a reader who opened a piece
-                    // from `Le Monde - Sport` is reading Le Monde, and the page
-                    // that says so agrees with every row that led them here.
-                    .navigationTitle(Text(verbatim: publisher(of: article)))
+                    // **No bar behind them, and no title in it.** The controls
+                    // are already on glass of the system's own, which is what
+                    // keeps them legible over a photograph ; a band of paper
+                    // behind them would be a shelf bolted across the picture.
+                    // A title cannot be : plain type over somebody's photograph
+                    // is unreadable on half the photographs there are, and the
+                    // publisher is named in the byline under the headline
+                    // anyway, where the page says it in its own voice.
                     #if os(iOS)
-                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbarBackground(.hidden, for: .navigationBar)
                     #endif
                     .overlay(alignment: .bottom) {
                         if model.isFetchingFullText {
