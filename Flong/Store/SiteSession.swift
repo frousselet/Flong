@@ -146,6 +146,8 @@ nonisolated protocol SessionStoring: Sendable {
     func session(for host: String) throws -> SiteSession?
     func setSession(_ session: SiteSession?, for host: String) throws
     func hosts() throws -> [String]
+    /// Signs out of every site at once, for a reset.
+    func removeEverything() throws
 }
 
 /// The keychain, keyed by host.
@@ -225,6 +227,20 @@ nonisolated struct KeychainSessions: SessionStoring {
         }
     }
 
+    /// Signs out of every site, including any whose feeds are already gone.
+    func removeEverything() throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
+        ]
+
+        let status = SecItemDelete(query as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw CredentialError.keychain(status)
+        }
+    }
+
     private func baseQuery(for host: String) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
@@ -252,5 +268,9 @@ nonisolated final class MemorySessions: SessionStoring, @unchecked Sendable {
 
     func hosts() throws -> [String] {
         lock.withLock { sessions.keys.sorted() }
+    }
+
+    func removeEverything() throws {
+        lock.withLock { sessions.removeAll() }
     }
 }

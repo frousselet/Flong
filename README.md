@@ -89,6 +89,8 @@ Everything else comes from the system frameworks.
 
 No data leaves the device, apart from the private CloudKit database, the requests to the feeds themselves, and the pictures those feeds point at, which are asked for from the publisher when a screen shows one. No telemetry, no tracker, no third-party service active by default. Feed credentials and secret feed URLs live in the keychain only, and never appear in the database, in an export, or in a log.
 
+There is no account to close, so the reader's panel holds a danger zone that deletes everything instead : the database, the keychain, the preferences, the Spotlight index, the CloudKit record zone and the archive in iCloud Drive. Another device that still holds the subscriptions will put its own copy back, which the confirmation says before the reader confirms.
+
 ## Other services
 
 Flong is not a client for any service. FreshRSS, Miniflux, Feedbin and Feedly are supported as one-shot import sources only : subscriptions, labels, stars and read states are retrieved once, after which Flong runs on its own. Their folders are read for the subscriptions inside them and not kept, since Flong groups sources by the publisher serving them.
@@ -115,6 +117,7 @@ The interface is authored in English and translated to French. All strings live 
 | [`docs/technical/search.md`](docs/technical/search.md) | The index, the query language, and why nothing typed into it is ever run |
 | [`docs/technical/marks.md`](docs/technical/marks.md) | What a mark is, why the library went, and what Spotlight is told |
 | [`docs/technical/sync.md`](docs/technical/sync.md) | What travels between devices, what never does, and why the record budget shapes it |
+| [`docs/technical/erasure.md`](docs/technical/erasure.md) | What deleting everything reaches, in which order, and what it cannot promise |
 | [`docs/technical/notifications.md`](docs/technical/notifications.md) | What Flong may interrupt you for, and the rules it interrupts you under |
 | [`docs/technical/background.md`](docs/technical/background.md) | How long work survives being interrupted, and how the marked articles are searched by meaning |
 | [`docs/technical/digest.md`](docs/technical/digest.md) | How articles become stories, and why not with the vectors |

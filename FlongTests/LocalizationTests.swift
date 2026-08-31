@@ -44,6 +44,28 @@ struct LocalizationTests {
         #expect(String(localized: "Favourite source", locale: french) == "Source favorite")
     }
 
+    @Test("The one command that cannot be undone says so in French")
+    func dangerZone() {
+        #expect(String(localized: "Danger zone", locale: french) == "Zone de danger")
+        #expect(String(localized: "Delete everything", locale: french) == "Tout supprimer")
+        #expect(String(localized: "Delete everything?", locale: french) == "Tout supprimer ?")
+
+        // The sentence a reader reads before they confirm. A key that drifted
+        // would leave the English one standing in the French alert, which is
+        // the worst place in the application to be reading a language you may
+        // not have.
+        let warning = String(
+            localized: """
+                Your subscriptions, every article, everything you kept and every site you are signed in to, \
+                on this device and in your iCloud. This cannot be undone. Another device that still has them \
+                will put its own copy back.
+                """,
+            locale: french
+        )
+        #expect(warning.hasPrefix("Vos abonnements"))
+        #expect(warning.contains("irréversible"))
+    }
+
     @Test("Naming a publisher says which one it is putting back")
     func namingAPublisher() {
         let french = String(

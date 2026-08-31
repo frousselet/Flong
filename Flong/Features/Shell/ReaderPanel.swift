@@ -39,16 +39,25 @@ import SwiftUI
 /// about any feed, and, where a build allows it, the command that makes the
 /// exchange with iCloud happen on demand.
 ///
+/// And, at the foot of it, the one command that takes something away for good.
+/// A reader has no account to close, so deleting everything is what stands in
+/// for closing one, and it belongs under their own face for the same reason the
+/// name and the picture do.
+///
 /// Everything in it is optional and nothing is asked for twice. A reader who
 /// never opens it gets a generic face and an application that works exactly as
 /// well.
 struct ReaderPanel: View {
     @Bindable var model: AppModel
 
+    @Environment(\.dismiss) private var dismiss
+
     @State private var isNotAnImage = false
     @State private var isAddingSite = false
     @State private var host = ""
     @State private var signingInTo: SigningIn?
+    @State private var isAskingToDeleteEverything = false
+    @State private var isDeletingEverything = false
 
     #if os(iOS)
         @State private var chosen: PhotosPickerItem?
@@ -68,6 +77,8 @@ struct ReaderPanel: View {
                 #if DEBUG
                     development
                 #endif
+
+                dangerZone
             }
             .scrollContentBackground(.hidden)
             #if os(macOS)
@@ -92,6 +103,21 @@ struct ReaderPanel: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("The address of a site you subscribe to, such as lemonde.fr.")
+        }
+        .alert("Delete everything?", isPresented: $isAskingToDeleteEverything) {
+            Button("Delete everything", role: .destructive) {
+                Task {
+                    isDeletingEverything = true
+                    await model.deleteEverything()
+                    isDeletingEverything = false
+                    dismiss()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "Your subscriptions, every article, everything you kept and every site you are signed in to, on this device and in your iCloud. This cannot be undone. Another device that still has them will put its own copy back."
+            )
         }
         .sheet(item: $signingInTo) { signing in
             SiteLoginView(host: signing.host) { cookies in
@@ -269,6 +295,81 @@ struct ReaderPanel: View {
             } label: {
                 Label("Sign out", systemImage: "trash")
             }
+        }
+    }
+
+    // MARK: - Starting over
+
+    /// The one command here that takes something away for good.
+    ///
+    /// **It is in this panel because it is about the reader.** Everything else
+    /// under this face is what they chose ; this is them taking all of it back,
+    /// which is the same conversation and belongs in the same place. It stands
+    /// at the bottom, so nothing above it can be pressed by mistake for it.
+    ///
+    /// **A card of its own rather than another row in the form.** Every other
+    /// section here is a setting, and a setting is a thing a reader changes
+    /// their mind about freely ; this one is not, and a row that looks like its
+    /// neighbours is a row that is pressed like its neighbours. So it leaves the
+    /// grouped background entirely and stands on red glass, which is the one
+    /// place in the application the material is used to say danger rather than
+    /// to float over a page. `docs/technical/interface.md` records why the
+    /// exception is allowed here and nowhere else.
+    ///
+    /// **It says what it will do before it does it, and it is honest about what
+    /// it cannot do.** There is no server and no account : deleting the zone
+    /// and the archive empties the reader's iCloud, and a second device that
+    /// still holds the subscriptions will recreate the zone and put its copy
+    /// back. Promising otherwise would be promising a reach Flong does not
+    /// have.
+    private var dangerZone: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    // The mark is the red thing in the heading and the words are
+                    // not : a title in red on a red wash is a title read with
+                    // effort, and this is the one heading in the application
+                    // that has to be read.
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                    Text("Danger zone")
+                }
+                .font(.headline)
+
+                Text(
+                    "Deletes every subscription, every article and everything you kept, here and in your iCloud. Flong starts again as it was on its first day."
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+                Button(role: .destructive) {
+                    isAskingToDeleteEverything = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("Delete everything")
+                        if isDeletingEverything {
+                            ProgressView().controlSize(.small).tint(.white)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+                .controlSize(.large)
+                .disabled(isDeletingEverything)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // A wash and not a coat. Tinted at full strength the glass stops
+            // being glass : it is a flat red block, nothing of the page shows
+            // through it, and the solid red of the button it holds disappears
+            // into it. A third of the colour leaves the material doing its own
+            // work and leaves the one control in the card the strongest red on
+            // screen, which is the right way round.
+            .glassEffect(.regular.tint(.red.opacity(0.3)), in: .rect(cornerRadius: 26))
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets())
         }
     }
 
