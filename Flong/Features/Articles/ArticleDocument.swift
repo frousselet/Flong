@@ -32,8 +32,15 @@ nonisolated enum ArticleDocument {
     /// - Parameter publisher: who published it, as the application names them
     ///   everywhere else : the group rather than the feed it arrived through.
     ///   The feed's own title stands in only where the publisher is unknown.
-    static func html(for article: Article, publisher: String? = nil, showing body: Body = .page) -> String {
-        let byline = byline(of: article, publisher: publisher)
+    /// - Parameter mark: the publisher's own mark, to set in the pill in front
+    ///   of their name. One address and no second try : see ``SourceIcon/mark(for:)``.
+    static func html(
+        for article: Article,
+        publisher: String? = nil,
+        mark: URL? = nil,
+        showing body: Body = .page
+    ) -> String {
+        let byline = byline(of: article, publisher: publisher, mark: mark)
         let chosen = (body == .page ? article.extractedHTML : nil) ?? article.bodyHTML ?? ""
         let markup = without(article.imageURL, in: chosen)
 
@@ -44,13 +51,14 @@ nonisolated enum ArticleDocument {
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
             <style>\(stylesheet)</style>
+            <style>\(Self.mark(at: mark))</style>
             </head>
             <body>
             \(lead(of: article))
             <div class="column">
             <header>
             <h1>\(HTMLEntities.escape(article.title))</h1>
-            <p class="byline">\(HTMLEntities.escape(byline))</p>
+            <p class="byline">\(byline)</p>
             </header>
             <article>\(markup)</article>
             </div>
@@ -105,9 +113,24 @@ nonisolated enum ArticleDocument {
         return markup.replacingCharacters(in: opening.lowerBound..<closing.upperBound, with: "")
     }
 
-    private static func byline(of article: Article, publisher: String?) -> String {
+    /// Who published it, on a pill, and what else is known about the article
+    /// beside it.
+    ///
+    /// **The publisher is set apart from the rest of the line.** Everything
+    /// here is the application talking about the article rather than the
+    /// article talking, and one of the four is not like the other three : the
+    /// author, the date and the revision describe this piece, and the publisher
+    /// is the one fact that is the same for every piece they have ever run. It
+    /// is also the only one that is looked up rather than read off the article,
+    /// so a reader who renames a publisher renames it here too, and the mark
+    /// they know it by can stand in front of the name, which is what a mark is
+    /// for : it is recognized before the name is read.
+    ///
+    /// The pill is the same one the pictures wear their credit on, so a reader
+    /// meets one shape for *this came from them* rather than one per screen.
+    private static func byline(of article: Article, publisher: String?, mark: URL?) -> String {
         let source = publisher ?? article.domain ?? article.feedTitle
-        var parts = source.isEmpty ? [] : [source]
+        var parts: [String] = []
         if let author = article.author, !author.isEmpty {
             parts.append(String(localized: "By \(author)"))
         }
@@ -121,7 +144,46 @@ nonisolated enum ArticleDocument {
         if let updated = article.updatedAt {
             parts.append(String(localized: "updated \(updated.formatted(date: .long, time: .shortened))"))
         }
-        return parts.joined(separator: " · ")
+        let rest = parts.joined(separator: " · ")
+
+        // Nothing at all rather than an empty pill : an article whose feed has
+        // gone and which never carried a domain has nobody to name.
+        guard !source.isEmpty else { return HTMLEntities.escape(rest) }
+
+        // The mark's own box is dropped when there is no mark to put in it,
+        // since scripting is off and nothing in the page can notice a picture
+        // that failed : a box kept for one that never arrives is a hole in
+        // front of the name for the whole life of the page.
+        let stamp = mark == nil ? "" : "<span class=\"mark\"></span>"
+        let pill = "<span class=\"source\">\(stamp)\(HTMLEntities.escape(source))</span>"
+
+        return rest.isEmpty ? pill : "\(pill)<span>\(HTMLEntities.escape(rest))</span>"
+    }
+
+    /// The rule that puts the publisher's mark in the pill, or none.
+    ///
+    /// Set here rather than on the element : it is one mark per document, and
+    /// an address written into a `style` attribute is escaped twice, once for
+    /// the attribute and once for the value inside it, which is two chances to
+    /// get it wrong for no gain.
+    ///
+    /// **It is an address from a feed, so it is checked before it is written.**
+    /// ``SourceIcon/mark(for:)`` has already refused anything that is not an
+    /// http address and raised it to TLS ; what is left is to make sure the
+    /// text of it cannot close the `url()` it sits in and start a rule of its
+    /// own. Percent encoding means neither character should survive that far,
+    /// and neither is written out on the strength of should.
+    private static func mark(at address: URL?) -> String {
+        guard let address else { return "" }
+
+        let quoted =
+            address.absoluteString
+            .replacingOccurrences(of: "\\", with: "%5C")
+            .replacingOccurrences(of: "\"", with: "%22")
+            .replacingOccurrences(of: "\n", with: "")
+            .replacingOccurrences(of: "\r", with: "")
+
+        return ".source .mark { background-image: url(\"\(quoted)\"); }"
     }
 
     /// Deliberately small : an article is text, and the reader's own settings
@@ -131,9 +193,13 @@ nonisolated enum ArticleDocument {
           color-scheme: light dark;
           --text: #1c1c1e; --muted: #6c6c70; --rule: #d8d8dc; --link: #0b6bcb;
           --voice: -apple-system, system-ui, sans-serif;
+          --glass: rgba(120, 120, 128, 0.12);
         }
         @media (prefers-color-scheme: dark) {
-          :root { --text: #f2f2f7; --muted: #9c9ca1; --rule: #3a3a3c; --link: #6fb2ff; }
+          :root {
+            --text: #f2f2f7; --muted: #9c9ca1; --rule: #3a3a3c; --link: #6fb2ff;
+            --glass: rgba(120, 120, 128, 0.24);
+          }
         }
         body {
           margin: 0; padding: 0;
@@ -153,7 +219,28 @@ nonisolated enum ArticleDocument {
         h1 { font-size: 1.6em; line-height: 1.25; margin: 0 0 8px; }
         h2, h3, h4 { line-height: 1.3; margin: 1.4em 0 0.4em; }
         /* What the application says about the article, rather than the article. */
-        .byline { font-family: var(--voice); color: var(--muted); font-size: 0.9em; margin: 0 0 16px; }
+        .byline {
+          font-family: var(--voice); color: var(--muted); font-size: 0.9em; margin: 0 0 16px;
+          display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+        }
+        /* Who published it, on the pill the picture credits already use. It
+           takes the colour of what is under it, which on this page is paper
+           and over a picture is the picture. */
+        .source {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 3px 10px; border-radius: 999px;
+          color: var(--text); background: var(--glass);
+          -webkit-backdrop-filter: blur(20px) saturate(180%);
+          backdrop-filter: blur(20px) saturate(180%);
+          box-shadow: inset 0 0 0 0.5px var(--rule);
+        }
+        /* Round and ringed, as the marks are everywhere else, and tucked into
+           the padding so the pill sits no taller for having one. */
+        .source .mark {
+          width: 17px; height: 17px; margin: -1px 0 -1px -5px;
+          border-radius: 50%; background: center / cover no-repeat;
+          box-shadow: inset 0 0 0 0.5px var(--rule);
+        }
         header { border-bottom: 1px solid var(--rule); padding-bottom: 12px; margin-bottom: 16px; }
         a { color: var(--link); }
         img, video, audio, iframe { max-width: 100%; height: auto; }

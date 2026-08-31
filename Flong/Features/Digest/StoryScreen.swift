@@ -201,8 +201,10 @@ struct ArticleScreen: View {
         model.article?.id == articleID && model.article?.imageURL != nil
     }
 
-    private func publisher(of article: Article) -> String {
-        model.publisher(of: article.domain)?.name ?? article.domain ?? article.feedTitle
+    /// The group the article came from, which is what names it and what wears
+    /// the mark. Nil where the reader is not subscribed to it any more.
+    private func publisher(of article: Article) -> SourceIdentity? {
+        model.publisher(of: article.domain)
     }
 
     var body: some View {
@@ -221,7 +223,12 @@ struct ArticleScreen: View {
             Group {
                 if let article = model.article, article.id == articleID {
                     ArticleWebView(
-                        html: ArticleDocument.html(for: article, publisher: publisher(of: article), showing: showing),
+                        html: ArticleDocument.html(
+                            for: article,
+                            publisher: publisher(of: article)?.name ?? article.domain ?? article.feedTitle,
+                            mark: SourceIcon.mark(for: publisher(of: article)),
+                            showing: showing
+                        ),
                         runsUnderTheBar: hasHeadPicture
                     )
                     .toolbar { toolbar(for: article) }
@@ -373,28 +380,6 @@ struct ArticleScreen: View {
                 )
             }
         }
-
-        // **Who published it, on glass, between the two.** The bar carried the
-        // name as plain type and could not keep it : the page runs a
-        // photograph under the controls, and type laid on somebody's
-        // photograph is unreadable on half the photographs there are. A pill
-        // takes what is under it and stays legible over any of them.
-        //
-        // Its mark in front of the name, as everywhere else : a mark is
-        // recognized before a name is read, and this is the one place in the
-        // application where the publisher is named at the top of what they
-        // wrote rather than beside it.
-        ToolbarItem(placement: .principal) {
-            SourceStamp(domain: article.domain, side: 16)
-                .font(.subheadline)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .glassEffect(.regular, in: .capsule)
-        }
-        // The bar gives its items glass of its own. This one brings its own
-        // capsule, and two panes of glass stacked on one another read as a
-        // smudge rather than as either of them.
-        .sharedBackgroundVisibility(.hidden)
 
         ToolbarItem {
             filing

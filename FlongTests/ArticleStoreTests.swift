@@ -185,6 +185,55 @@ struct ArticleStoreTests {
         #expect(ArticleDocument.without(nil, in: body) == body)
     }
 
+    @Test("The publisher is set apart on a pill, with their mark in front of the name")
+    func thePublisherWearsAPill() async throws {
+        let feed = try await subscriptions.subscribe(
+            to: Subscription(
+                address: "https://www.lemonde.fr/rss/une.xml",
+                title: "Le Monde",
+                siteURL: URL(string: "https://www.lemonde.fr")
+            )
+        ).feed
+        try await add("Un match", feed: feed, published: now)
+        let summary = try #require(try await articles.summaries(.all, now: now).first)
+        let article = try #require(await articles.article(id: summary.id))
+
+        let page = ArticleDocument.html(
+            for: article,
+            publisher: "Le Monde",
+            mark: URL(string: "https://www.lemonde.fr/favicon.ico")
+        )
+        #expect(page.contains("<span class=\"source\"><span class=\"mark\"></span>Le Monde</span>"))
+        #expect(page.contains(".source .mark { background-image: url(\"https://www.lemonde.fr/favicon.ico\"); }"))
+
+        // No box is kept for a mark there is none of : scripting is off, so
+        // nothing in the page could notice one that never arrives and take its
+        // place back.
+        let bare = ArticleDocument.html(for: article, publisher: "Le Monde")
+        #expect(bare.contains("<span class=\"source\">Le Monde</span>"))
+        #expect(!bare.contains("class=\"mark\""))
+    }
+
+    @Test("An address cannot close the rule it is written into")
+    func aMarkCannotEscapeItsRule() async throws {
+        let feed = try await subscriptions.subscribe(
+            to: Subscription(address: "https://feeds.example.com/rss.xml", title: "Example")
+        ).feed
+        try await add("Un titre", feed: feed, published: now)
+        let summary = try #require(try await articles.summaries(.all, now: now).first)
+        let article = try #require(await articles.article(id: summary.id))
+
+        // Percent encoding means the quote should never reach this far. It is
+        // not written out on the strength of should.
+        let page = ArticleDocument.html(
+            for: article,
+            publisher: "Example",
+            mark: URL(string: "https://example.com/a%22.ico")
+        )
+        #expect(page.contains("url(\"https://example.com/a%22.ico\")"))
+        #expect(!page.contains("a\".ico"))
+    }
+
     @Test("An article carries the publisher it came from, and not only the desk")
     func carriesItsPublisher() async throws {
         let sport = try await subscriptions.subscribe(

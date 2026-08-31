@@ -68,6 +68,29 @@ nonisolated enum SourceIcon {
         var seen = Set<URL>()
         return addresses.filter { seen.insert($0).inserted }
     }
+
+    /// The one address to try where only one may be tried.
+    ///
+    /// A view asks for the three in turn and stops at the first that answers.
+    /// A page cannot : the article is rendered with scripting off, so nothing
+    /// in it can notice that a picture failed and reach for the next, and a
+    /// stylesheet that names three addresses paints all three on top of one
+    /// another rather than falling through them.
+    ///
+    /// So the order changes when there is only one go at it. What a feed states
+    /// is still first, since the publisher chose it and it is the one address
+    /// that is known to exist. Failing that it is `favicon.ico` rather than
+    /// `apple-touch-icon.png` : the touch icon is the better picture and the
+    /// more often absent, and the better picture is worth a try only where a
+    /// miss costs another request rather than an empty space.
+    static func mark(for identity: SourceIdentity?) -> URL? {
+        guard let identity else { return nil }
+
+        let addresses = candidates(for: identity)
+        let chosen = identity.iconURL == nil ? addresses.last : addresses.first
+        guard let chosen, HTTPURL.isFetchable(chosen) else { return nil }
+        return HTTPURL.secured(chosen)
+    }
 }
 
 nonisolated extension EnvironmentValues {

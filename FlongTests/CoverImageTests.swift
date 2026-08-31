@@ -178,6 +178,47 @@ struct CoverImageTests {
         #expect(SourceIcon.candidates(stated: nil, site: nil).isEmpty)
     }
 
+    @Test("Where there is one go at the mark, the order changes")
+    func theOneMarkWorthTrying() throws {
+        // What the publisher stated is still first : they chose it, and it is
+        // the one address known to exist.
+        let stated = SourceIdentity(
+            domain: "example.com",
+            name: "Example",
+            iconURL: URL(string: "logo.png"),
+            siteURL: URL(string: "https://www.example.com/blog/")
+        )
+        #expect(SourceIcon.mark(for: stated)?.absoluteString == "https://www.example.com/blog/logo.png")
+
+        // Failing that it is the oldest well-known path rather than the best
+        // picture : a page with scripting off cannot notice a miss and reach
+        // for the next, so the address most widely served wins.
+        let silent = SourceIdentity(
+            domain: "example.com",
+            name: "Example",
+            iconURL: nil,
+            siteURL: URL(string: "https://www.example.com")
+        )
+        #expect(SourceIcon.mark(for: silent)?.absoluteString == "https://www.example.com/favicon.ico")
+
+        // Raised to TLS, since App Transport Security refuses a plain one
+        // outright and a mark that cannot be fetched is worse than none.
+        let plain = SourceIdentity(
+            domain: "example.com",
+            name: "Example",
+            iconURL: nil,
+            siteURL: URL(string: "http://www.example.com")
+        )
+        #expect(SourceIcon.mark(for: plain)?.absoluteString == "https://www.example.com/favicon.ico")
+
+        #expect(SourceIcon.mark(for: nil) == nil)
+        #expect(
+            SourceIcon.mark(
+                for: SourceIdentity(domain: "example.com", name: "Example", iconURL: nil, siteURL: nil)
+            ) == nil
+        )
+    }
+
     @Test("A publisher is asked for its mark once, however many feeds it serves")
     func iconIsOnePerPublisher() throws {
         let une = try Feed(
