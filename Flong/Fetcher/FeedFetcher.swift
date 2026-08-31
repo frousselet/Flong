@@ -55,6 +55,15 @@ nonisolated struct FetchedDocument: Sendable {
 nonisolated enum FetchFailure: Error, Hashable, Sendable {
     /// The request never reached a server, or the connection broke.
     case unreachable
+    /// The system would not send the request at all : there was no network, or
+    /// the only one there was is one the reader pays for and nobody was
+    /// waiting for this.
+    ///
+    /// **Not the publisher's doing, so not counted against them.** A refusal
+    /// here says something about the device and nothing about the feed, and
+    /// counting it as a failure had a reader who spent two days tethered come
+    /// back to a shelf of quarantined feeds.
+    case notAttempted
     /// The feed needs credentials, or refuses these. Section 9 quarantines it.
     case unauthorized(status: Int)
     /// The feed is not there any more.
@@ -147,11 +156,35 @@ actor FeedFetcher {
             return .failed(error)
         } catch let error as URLError where error.code == .cancelled {
             return .failed(.cancelled)
+        } catch let error as URLError where Self.wasNeverSent(error) {
+            // Nothing reached a server, so there is nothing to hold against
+            // the feed. It is asked again on the next pass, over the network
+            // the reader will be on by then.
+            return .failed(.notAttempted)
         } catch {
             // The address of a private feed is a secret : the reason a request
             // failed is logged, never what was asked for.
             Log.fetch.error("A feed could not be fetched : \(error.localizedDescription, privacy: .public)")
             return .failed(.unreachable)
+        }
+    }
+
+    /// Whether the system refused to send the request rather than a server
+    /// refusing to answer it.
+    ///
+    /// `allowsExpensiveNetworkAccess` is what a background pass sets to false,
+    /// and `URLSession` answers a request it may not send with
+    /// `networkUnavailableReason` rather than falling back. No network at all
+    /// and cellular data switched off are the same kind of answer : the feed
+    /// was never asked.
+    nonisolated static func wasNeverSent(_ error: URLError) -> Bool {
+        guard error.networkUnavailableReason == nil else { return true }
+
+        switch error.code {
+        case .notConnectedToInternet, .dataNotAllowed, .internationalRoamingOff:
+            return true
+        default:
+            return false
         }
     }
 

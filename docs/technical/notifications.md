@@ -24,7 +24,9 @@ A story is several articles, from several newsrooms, about one thing : the unit 
 
 **A cluster of one is not a story**, so this is not a notice per article. Two articles have to be close enough in vocabulary to be about the same thing before anything is opened at all.
 
-**What counts as new** is a story row opened since this device last said anything. The identifier answers it : every technical key is a UUIDv7 and carries the moment it was made, so the question is a range on the primary key rather than a scan. Nothing else records it, `first_at` being the date of the story's earliest article, which may be days older than the story.
+**What counts as new** is a story row opened since this device last said anything, **and that the front page will actually show**. The identifier answers the first half : every technical key is a UUIDv7 and carries the moment it was made, so the question is a range on the primary key rather than a scan. Nothing else records it, `first_at` being the date of the story's earliest article, which may be days older than the story.
+
+The second half was missing, and the two questions came apart. The page holds a story to the three-day window and to having more than one article left inside it ; the announcement asked the key and nothing else. A pass that grouped a quiet feed's week-old backlog into stories announced every one of them and put none of them on the page, so the reader was told about news they then could not find : a notification about a page that had, as far as they could see, not changed at all. The announcement asks the same three questions the page asks.
 
 Everything that was already open when the reader turned the notices on is not new : the watermark is stamped at that moment rather than at the beginning of time.
 
@@ -40,7 +42,7 @@ Announced after the model has written the headlines rather than before, so what 
 
 ## Where it happens
 
-The digest is rebuilt in three places : when a window opens, when the reader pulls, and in the background processing task. Only the last is a moment the reader is not looking, and it is the one this exists for.
+The digest is rebuilt wherever articles arrive : at launch, on the clock, on returning to the foreground, on the reader's own command, in the opportunistic background refresh and in the full pass. Only the background ones are moments the reader is not looking, and they are what this exists for.
 
 **Both background tasks were dead when this was written.** They were registered while the application launched, as they have to be, against a box that nothing ever filled ; on iOS no request was ever submitted either, so the system had nothing to schedule. Both are fixed here, since a notice that can only fire while the reader is watching is a notice that never fires.
 

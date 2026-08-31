@@ -405,4 +405,83 @@ struct FeedRefreshTests {
         #expect(summary.unchanged == 1)
         #expect(summary.newArticles == 2)
     }
+
+    // MARK: - What is not the publisher's fault
+
+    @Test("A request the system would not send is not held against the feed")
+    func neverSent() async throws {
+        let feed = try await subscribe()
+        // What a background pass gets when the only network is one the reader
+        // pays for by the megabyte, and what any pass gets with no network at
+        // all.
+        server.install { _ in StubResponse.failing(.dataNotAllowed) }
+        defer { server.reset() }
+
+        let result = await refresh.refresh(feed, sparingly: true)
+
+        #expect(result == .skipped)
+
+        // Nothing reached a server, so the feed's health says nothing about
+        // it. Counting these was how a reader who spent two days tethered came
+        // back to a shelf of quarantined feeds.
+        let stored = try await self.feed(feed.id)
+        #expect(stored.failureCount == 0)
+        #expect(stored.lastFailureReason == nil)
+        #expect(stored.quarantinedAt == nil)
+        #expect(stored.lastFetchAt == nil)
+    }
+
+    @Test("Six passes over a network that will not carry them quarantine nothing")
+    func neverSentNeverQuarantines() async throws {
+        let feed = try await subscribe()
+        server.install { _ in StubResponse.failing(.notConnectedToInternet) }
+        defer { server.reset() }
+
+        for _ in 0..<(FeedRefresh.quarantineAfterFailure + 1) {
+            _ = await refresh.refresh(feed)
+        }
+
+        #expect(try await self.feed(feed.id).quarantinedAt == nil)
+    }
+
+    @Test("A pass that runs out of time says what it never got to")
+    func deadline() async throws {
+        var feeds: [Feed] = []
+        for index in 0..<(FeedRefresh.concurrency + 4) {
+            let url = server.url.appending(path: "f\(index).xml")
+            feeds.append(try await subscriptions.subscribe(to: Subscription(url: url, title: "F\(index)")).feed)
+        }
+
+        server.install { _ in StubResponse(statusCode: 304) }
+        defer { server.reset() }
+
+        // A deadline already past : the first handful are already in flight and
+        // are seen through, and nothing else is handed out.
+        let summary = await refresh.refresh(feeds, until: Date().addingTimeInterval(-1))
+
+        #expect(summary.attempted == FeedRefresh.concurrency)
+        #expect(summary.skipped == 4)
+        // What was in flight was finished rather than cut off, so every feed
+        // the pass did reach is fully written down.
+        #expect(summary.unchanged == FeedRefresh.concurrency)
+    }
+}
+
+@Suite("What a fetch counts as never having been sent")
+struct NeverSentTests {
+    @Test("A network the reader pays for, or no network at all")
+    func refusals() {
+        #expect(FeedFetcher.wasNeverSent(URLError(.dataNotAllowed)))
+        #expect(FeedFetcher.wasNeverSent(URLError(.notConnectedToInternet)))
+        #expect(FeedFetcher.wasNeverSent(URLError(.internationalRoamingOff)))
+    }
+
+    @Test("A server that answered badly is not one that was never asked")
+    func actualFailures() {
+        // These reached somebody, so they say something about the feed and
+        // count towards its health.
+        #expect(!FeedFetcher.wasNeverSent(URLError(.timedOut)))
+        #expect(!FeedFetcher.wasNeverSent(URLError(.cannotFindHost)))
+        #expect(!FeedFetcher.wasNeverSent(URLError(.badServerResponse)))
+    }
 }

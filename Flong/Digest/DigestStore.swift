@@ -237,14 +237,25 @@ nonisolated struct DigestStore: Sendable {
         // late.
         digest.live = built.filter(\.isLive).sorted { $0.lastAt > $1.lastAt }
 
-        // The rest is ordered by what the reader asked for, then by weight.
+        // The rest is ordered by what the reader asked for, then by when, then
+        // by weight.
+        //
         // The score comes first rather than being mixed into the weight : a
         // reader who says more of this expects more of this, not a story two
         // articles heavier than the one they asked for.
+        //
+        // **Then when, and not how heavy.** Weight came second, and a reader
+        // who has said nothing about anything, which is every reader on their
+        // first days, had a page ordered by article count alone. A story that
+        // ran all week outweighs anything that opened overnight and outweighs
+        // it more every day, so the top of the page was the same top of the
+        // page every morning however much had arrived : a front page that says
+        // nothing has happened is a front page nobody believes. A newspaper
+        // orders the day's news by the day.
         digest.stories = built.filter { !$0.isLive }
             .sorted {
-                let left = ($0.score(scores), $0.articleCount, $0.lastAt)
-                let right = ($1.score(scores), $1.articleCount, $1.lastAt)
+                let left = ($0.score(scores), $0.lastAt, $0.articleCount)
+                let right = ($1.score(scores), $1.lastAt, $1.articleCount)
                 return left > right
             }
 
@@ -275,11 +286,25 @@ nonisolated struct DigestStore: Sendable {
     /// is a range on the key, not a scan with a timestamp unpacked per row.
     /// Nothing else records when a story was opened, `first_at` being the date
     /// of its earliest article, which may be days older than the story.
-    func opened(since moment: Date, limit: Int = 20) async throws -> [Opened] {
-        try await database.writer.read { db in
+    func opened(since moment: Date, limit: Int = 20, now: Date = Date()) async throws -> [Opened] {
+        let since = now.addingTimeInterval(-Self.window)
+
+        return try await database.writer.read { db in
             let stories =
                 try Story
                 .filter(Column("id") > UUID.v7Floor(at: moment))
+                // Only what the reader will actually find on the page.
+                //
+                // **The two used to ask different questions.** This asked the
+                // primary key and nothing else, while ``digest(_:now:limit:)``
+                // also holds a story to the window and to having more than one
+                // article left inside it. A pass that grouped a quiet feed's
+                // backlog into stories dated last week announced every one of
+                // them and put none of them on the page, and the reader was
+                // told about news they then could not find : a notification
+                // about a page that had, as far as they could see, not changed
+                // at all.
+                .filter(Story.Columns.lastAt >= since)
                 .order(Column("id"))
                 .limit(limit)
                 .fetchAll(db)
@@ -296,23 +321,32 @@ nonisolated struct DigestStore: Sendable {
                     JOIN entry e ON e.id = m.entry_id
                     JOIN feed f ON f.id = e.feed_id
                     WHERE m.story_id IN (\(databaseQuestionMarks(count: ids.count)))
+                      AND e.duplicate_of IS NULL
+                      AND COALESCE(e.published_at, e.received_at) >= ?
                     ORDER BY date
                     """,
-                arguments: StatementArguments(ids)
+                arguments: StatementArguments(ids) + [since]
             )
 
             var rooms: [UUID: [String]] = [:]
+            var counts: [UUID: Int] = [:]
             for row in members {
                 let site = (row["site_url"] as String?).flatMap(URL.init(string:))
                 let room = FeedURL.room(of: site) ?? (row["feed_title"] as String)
                 let id = row["story_id"] as UUID
+                counts[id, default: 0] += 1
                 guard !(rooms[id] ?? []).contains(room) else { continue }
                 rooms[id, default: []].append(room)
             }
 
-            return stories.map {
-                Opened(id: $0.id, title: $0.title, summary: $0.summary, rooms: rooms[$0.id] ?? [])
-            }
+            // The page shows nothing a single article stands behind, so
+            // neither does a notification about the page.
+            return
+                stories
+                .filter { (counts[$0.id] ?? 0) > 1 }
+                .map {
+                    Opened(id: $0.id, title: $0.title, summary: $0.summary, rooms: rooms[$0.id] ?? [])
+                }
         }
     }
 

@@ -28,6 +28,9 @@ nonisolated struct RefreshSummary: Hashable, Sendable {
     var unchanged = 0
     var failed = 0
     var newArticles = 0
+    /// Feeds the pass never got to, or never got to ask : the budget ran out,
+    /// or the system would not send the request.
+    var skipped = 0
 
     var attempted: Int { refreshed + unchanged + failed }
 }
@@ -86,7 +89,11 @@ nonisolated struct FeedRefresh: Sendable {
     /// Sorted by how overdue each one is against its own rhythm, the budget
     /// goes to what is most likely to have something, and a feed that misses
     /// one pass is nearer the front of the next.
-    func refreshDue(now: Date = Date(), sparingly: Bool = false) async -> RefreshSummary {
+    func refreshDue(
+        now: Date = Date(),
+        sparingly: Bool = false,
+        until deadline: Date? = nil
+    ) async -> RefreshSummary {
         let device = DeviceStagger.deviceIdentifier()
         let feeds = (try? await allFeeds()) ?? []
 
@@ -101,16 +108,35 @@ nonisolated struct FeedRefresh: Sendable {
             .sorted { $0.1 > $1.1 }
             .map(\.0)
 
-        return await refresh(due, sparingly: sparingly)
+        return await refresh(due, sparingly: sparingly, until: deadline)
     }
 
-    /// Refreshes every feed, due or not, which is what a pull to refresh means.
-    func refreshAll() async -> RefreshSummary {
+    /// Refreshes every feed, due or not, which is what asking for a refresh
+    /// means.
+    func refreshAll(until deadline: Date? = nil) async -> RefreshSummary {
         let feeds = (try? await allFeeds()) ?? []
-        return await refresh(feeds.filter { $0.quarantinedAt == nil })
+        return await refresh(feeds.filter { $0.quarantinedAt == nil }, until: deadline)
     }
 
-    func refresh(_ feeds: [Feed], sparingly: Bool = false) async -> RefreshSummary {
+    /// Refreshes a list of feeds, in the order given, for as long as it is
+    /// given.
+    ///
+    /// **The deadline is honoured between feeds, not inside one.** A pass that
+    /// runs out of time stops handing out work and lets what is in flight
+    /// finish, so nothing is cancelled mid-write and every feed the pass did
+    /// reach is fully recorded. What is left is simply the most overdue thing
+    /// at the head of the next pass, which is what makes the whole of this
+    /// resumable without a checkpoint.
+    ///
+    /// It used to have no deadline at all, so a background refresh spent its
+    /// entire twenty-five seconds here and was then cancelled by the system
+    /// mid-flight, which cancelled the writes too and reported the whole task
+    /// as failed.
+    func refresh(
+        _ feeds: [Feed],
+        sparingly: Bool = false,
+        until deadline: Date? = nil
+    ) async -> RefreshSummary {
         guard !feeds.isEmpty else { return RefreshSummary() }
 
         return await withTaskGroup(of: RefreshResult.self) { group in
@@ -125,10 +151,15 @@ nonisolated struct FeedRefresh: Sendable {
             var summary = RefreshSummary()
             for await result in group {
                 summary.add(result)
+
+                guard !Task.isCancelled, deadline.map({ Date() < $0 }) ?? true else { continue }
                 if let feed = iterator.next() {
                     group.addTask { await refresh(feed, sparingly: sparingly) }
                 }
             }
+
+            // Whatever the iterator still holds was never asked for.
+            while iterator.next() != nil { summary.skipped += 1 }
             return summary
         }
     }
@@ -158,6 +189,13 @@ nonisolated struct FeedRefresh: Sendable {
         case .notModified:
             try? await recordSuccess(feed, notModified: true)
             return .notModified
+
+        case .failed(.notAttempted), .failed(.cancelled):
+            // Nothing was asked, so there is nothing to write down. Recording
+            // these was how a reader who spent two days on a tethered
+            // connection, or a background pass the system cut short, came back
+            // to feeds quarantined for a fault that was never theirs.
+            return .skipped
 
         case .failed(let failure):
             try? await recordFailure(feed, failure: failure)
@@ -417,6 +455,7 @@ nonisolated struct FeedRefresh: Sendable {
     private static func reason(for failure: FetchFailure) -> String {
         switch failure {
         case .unreachable: "unreachable"
+        case .notAttempted: "not attempted"
         case .unauthorized(let status): "rejected (\(status))"
         case .gone(let status): "gone (\(status))"
         case .rateLimited: "rate limited"
@@ -438,7 +477,7 @@ nonisolated extension RefreshSummary {
         case .failed:
             failed += 1
         case .skipped:
-            break
+            skipped += 1
         }
     }
 }

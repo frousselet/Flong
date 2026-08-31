@@ -293,15 +293,53 @@ nonisolated struct DigestService: Sendable {
 
     /// Names and summarizes. Slow, and what the screen does not wait for : a
     /// story with no headline of its own still has its article's.
-    func brief(until deadline: Date? = nil) async {
-        await JobRunner(BriefStoriesJob(database)).run(until: deadline)
+    @discardableResult
+    func brief(until deadline: Date? = nil) async -> Int {
+        await JobRunner(BriefStoriesJob(database)).run(until: deadline).done
+    }
+
+    /// How long one turn of the model's work is given when nobody named a
+    /// limit.
+    ///
+    /// The jobs are resumable and the window follows the store, so a turn that
+    /// runs out carries on at the next one. What a bound buys is that both
+    /// halves get a turn at all.
+    static let enrichmentTurn: TimeInterval = 120
+
+    /// How long either half gets before the other has a go.
+    static let enrichmentSlice: TimeInterval = 15
+
+    /// Writes the headlines and files the subjects, turn about.
+    ///
+    /// **Turn about, and not one after the other.** A written headline says
+    /// what a story is about better than the title of whichever article was
+    /// nearest its middle, so the briefs still go first ; but they went first
+    /// over the whole backlog, with no deadline, and a night that brought sixty
+    /// stories spent every call the model would take on headlines and left the
+    /// page with no subjects at all. That is the page the reader reported : the
+    /// stories were written and none of them was filed under anything.
+    ///
+    /// A slice each, in turn, until there is nothing left to do or no time left
+    /// to do it in. Neither half can starve the other, and both stop cleanly on
+    /// a batch that changed nothing.
+    func enrich(until deadline: Date? = nil, now: Date = Date()) async {
+        let end = deadline ?? Date().addingTimeInterval(Self.enrichmentTurn)
+
+        while !Task.isCancelled, Date() < end {
+            let slice = min(Date().addingTimeInterval(Self.enrichmentSlice), end)
+            let written = await brief(until: slice)
+
+            let next = min(Date().addingTimeInterval(Self.enrichmentSlice), end)
+            let filed = await nameTopics(until: next, now: now)
+
+            guard written > 0 || filed > 0 else { break }
+        }
     }
 
     @discardableResult
     func rebuild(until deadline: Date? = nil, now: Date = Date()) async -> StoryBuilder.Summary {
         let summary = await buildStories(now: now)
-        await brief(until: deadline)
-        await nameTopics(until: deadline, now: now)
+        await enrich(until: deadline, now: now)
         return summary
     }
 
@@ -311,8 +349,9 @@ nonisolated struct DigestService: Sendable {
     /// a run left a reader with a backlog of them permanently unfiled, since a
     /// page brings in more than twelve between two openings. It runs until the
     /// backlog is empty, the time runs out, or the model gives up.
-    func nameTopics(until deadline: Date? = nil, now: Date = Date()) async {
-        await JobRunner(FileStoriesJob(database, locale: locale, now: now)).run(until: deadline)
+    @discardableResult
+    func nameTopics(until deadline: Date? = nil, now: Date = Date()) async -> Int {
+        await JobRunner(FileStoriesJob(database, locale: locale, now: now)).run(until: deadline).done
     }
 
     func digest(_ topic: DigestTopic = .frontPage, now: Date = Date()) async throws -> Digest {

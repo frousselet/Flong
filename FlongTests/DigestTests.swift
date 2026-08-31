@@ -438,6 +438,76 @@ struct DigestTests {
         #expect(rest.allSatisfy { $0.briefLocale == nil })
     }
 
+    // MARK: - The order of the page
+
+    /// A story of several articles, each from its own room, ending some hours
+    /// ago.
+    ///
+    /// Written straight into the store rather than grouped out of the corpus :
+    /// what this pins is the order the page is read in, and the corpus has no
+    /// heavy old story to set against a light new one.
+    private func story(_ title: String, articles count: Int, endingHoursAgo hours: Double) async throws {
+        let last = now.addingTimeInterval(-hours * 3600)
+        let story = Story(id: .v7(at: last), title: title, firstAt: last, lastAt: last, updatedAt: last)
+
+        try await database.writer.write { db in
+            try story.insert(db)
+
+            for index in 0..<count {
+                let host = "order-\(abs(title.hashValue))-\(index).example.com"
+                var feed = Feed(url: URL(string: "https://\(host)/f.xml")!, title: host)
+                feed.siteURL = URL(string: "https://\(host)")
+                try feed.insert(db)
+
+                // Spread backwards, so nothing is recent enough to be live.
+                let date = last.addingTimeInterval(-Double(index) * 3600)
+                var entry = Entry(
+                    feedID: feed.id,
+                    guid: "urn:\(host):\(index)",
+                    title: title,
+                    publishedAt: date,
+                    receivedAt: date
+                )
+                entry.hasMedia = false
+                try entry.insert(db)
+                try StoryMember(storyID: story.id, entryID: entry.id, similarity: 1).insert(db)
+            }
+        }
+    }
+
+    @Test("The page leads with what happened last, not with what has most articles")
+    func recencyBeforeWeight() async throws {
+        // A story that has run all week keeps gathering articles and outweighs
+        // anything that opened this morning, and outweighs it more every day.
+        // Ordered by weight, the top of the page was the same top of the page
+        // every morning however much had arrived overnight, which is a front
+        // page saying nothing has happened.
+        try await story("Le long feuilleton", articles: 6, endingHoursAgo: 40)
+        try await story("Ce matin", articles: 2, endingHoursAgo: 2)
+
+        let page = try await service.digest(now: now)
+
+        #expect(page.stories.map(\.title) == ["Ce matin", "Le long feuilleton"])
+    }
+
+    @Test("What the reader asked for still comes before when it happened")
+    func preferenceBeforeRecency() async throws {
+        try await story("Le long feuilleton", articles: 6, endingHoursAgo: 40)
+        try await story("Ce matin", articles: 2, endingHoursAgo: 2)
+
+        try await database.writer.write { db in
+            let story = try Story.filter(Column("title") == "Le long feuilleton").fetchOne(db)
+            try StoryTopic(storyID: try #require(story).id, name: "Éducation").insert(db)
+        }
+        try await TopicPreferences(database).adjust("Éducation", by: 1)
+
+        let page = try await service.digest(now: now)
+
+        // A reader who says more of this expects more of this, whenever it
+        // happened : the score is still the first thing asked.
+        #expect(page.stories.map(\.title) == ["Le long feuilleton", "Ce matin"])
+    }
+
     // MARK: - What the reader wants more or less of
 
     @Test("A subject the reader asked more of comes first, whatever its weight")

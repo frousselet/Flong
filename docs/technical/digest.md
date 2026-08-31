@@ -155,6 +155,8 @@ A long press on a subject moves it up or down, by one, between three and minus t
 
 **The score comes before the weight, not mixed into it.** A reader who says more of this expects more of this, not a story two articles heavier than the one they asked for. What is happening now is ordered by when and by nothing else : asking for less of a subject is not asking to hear about it late.
 
+**Then when, and only then how heavy.** Weight came second, and a reader who has said nothing about anything, which is every reader for their first days, had a page ordered by article count alone. A story that has run all week keeps gathering articles and outweighs anything that opened this morning, and outweighs it more every day : the top of the page was the same top of the page every morning however much had arrived overnight, which is a front page saying nothing has happened. A newspaper orders the day's news by the day.
+
 **A story is under several subjects**, and takes the strongest thing said about any of them : asking for more of anything wins, and it is only when nothing about it was asked for that asking for less applies. An advisory about a stolen database is under both computer security and cybercrime, and a reader who asked for more of either meant this one.
 
 The key is the name of the subject, because a subject has nothing else to be known by : it is written afresh by the model on each rebuild, and the reader pressed on a word rather than on a row of a table. A model that renames `Cybercriminalité` to `Cybersécurité` loses the preference attached to it, which is the price of a name being the only handle there is.
@@ -177,6 +179,10 @@ Articles that grouped with nothing are still there, under the tail, as the ordin
 
 ## Where it runs
 
-Grouping is cheap and incremental, so it runs when the window opens and after every refresh. Naming is a call to a model per story, so it runs in batches of three, as a resumable job like the others in `docs/technical/background.md`.
+Grouping is cheap and incremental, so it runs after every refresh, which now means every one : the clock, the return to the foreground, the background refresh and the full pass all go through the one entry point that fetches, groups and reads the page back. It said this before and only three of those honoured it, which is why a window left open gained articles and no stories.
+
+Naming is a call to a model per story, so it runs in batches of three, as a resumable job like the others in `docs/technical/background.md`.
+
+**The headlines and the subjects take turns, and both are bounded.** They ran one after the other with no deadline at all, so a night that brought sixty stories spent every call the model would take on headlines and the subjects were never asked for : the reader woke to a page fully written and filed under nothing. Each gets a slice, in turn, until there is nothing left to do or no time left to do it in. The briefs still go first within a turn, a written headline being a better thing to file than the title of whichever article was nearest the middle of the group.
 
 Stories are derived data and are never synchronized. Another device holds the same articles and works out the same stories ; sending them would spend records to say what the other end already knows.

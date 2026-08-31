@@ -16,6 +16,17 @@ nonisolated struct StubResponse: Sendable {
     var statusCode = 200
     var headers: [String: String] = [:]
     var body = Data()
+    /// The connection failing rather than answering.
+    ///
+    /// Some of what a fetch has to tell apart never reaches a status code : a
+    /// request the system refuses to send at all, over a network the reader
+    /// pays for or with no network there, arrives as a `URLError` and nothing
+    /// else.
+    var error: URLError.Code?
+
+    static func failing(_ code: URLError.Code) -> StubResponse {
+        StubResponse(error: code)
+    }
 
     static func text(_ body: String, status: Int = 200) -> StubResponse {
         StubResponse(statusCode: status, headers: ["Content-Type": "text/plain"], body: Data(body.utf8))
@@ -168,6 +179,11 @@ nonisolated final class StubURLProtocol: URLProtocol {
         let recorded = RecordedRequest(request)
         StubRegistry.shared.record(recorded)
         let stub = StubRegistry.shared.respond(to: recorded)
+
+        if let code = stub.error {
+            client?.urlProtocol(self, didFailWithError: URLError(code))
+            return
+        }
 
         let response = HTTPURLResponse(
             url: recorded.url,

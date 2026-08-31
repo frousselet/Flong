@@ -39,13 +39,17 @@ They are sorted by how overdue each one is **against its own rhythm**. A daily f
 
 ## What a background pass will not spend
 
-**Nothing runs in Low Power Mode.** The reader has told the system to stop doing things they did not ask for, and a feed reader waking the radio every half hour is exactly such a thing. What they did ask for still works : opening Flong refreshes, and pulling the list down refreshes.
+**Nothing runs in Low Power Mode.** The reader has told the system to stop doing things they did not ask for, and a feed reader waking the radio on its own is exactly such a thing. What they did ask for still works : opening Flong refreshes, and `Actualiser` in the reader's own menu refreshes.
 
 **A background refresh does not go over an expensive network.** `allowsExpensiveNetworkAccess` is false for a pass nobody is waiting for, so a reader on cellular data or tethering from their phone is not spending it on feeds they have not asked to see. `URLSession` refuses such a request rather than falling back, which is the right answer : the feed is asked again on the next pass, over the Wi-Fi they will be on by then.
 
-A refresh the reader asked for is a different matter, and is allowed whatever network there is. They pulled the list down and they are looking at it, and second-guessing them about their own data plan would be the application deciding something that is theirs to decide.
+A refresh the reader asked for is a different matter, and is allowed whatever network there is. They asked and they are looking at it, and second-guessing them about their own data plan would be the application deciding something that is theirs to decide.
 
-**Asking more often would not help.** `BGAppRefreshTask` is granted on the system's own budget, worked out from how often the reader opens the application ; a request for fifteen minutes rather than thirty does not buy more runs, only more refused requests. The levers that do anything are which feeds the granted time is spent on and what it is not spent on, which is what this page describes.
+**A request the system would not send is not a failure.** `URLSession` answers a request it may not carry with `networkUnavailableReason` rather than falling back, and no network at all answers the same way. That says something about the device and nothing about the feed, so it is not written down : the fetch counts as skipped, the feed's health is untouched, and it is asked again on the next pass. Counted as failures, as they were, six background passes on a tethered connection quarantined every feed a reader had, for a fault that was never the publisher's and that the reader could not see.
+
+**Asking more often does not buy more grants, but it does stop refusing them.** `BGAppRefreshTask` is granted on the system's own budget, worked out from how often the reader opens the application, and a shorter floor does not raise that budget. What a floor does do is discard any opportunity offered inside it, in a window the system had already decided to give. So it matches the fifteen minutes a feed is held to anyway, and the system's budget is left as the only limiter.
+
+**A pass that ran out of time reports success.** Everything a background pass does is resumable by construction : the work left is a question the store answers, so stopping between two batches loses nothing. Reporting a budgeted run as a failure, which is what a cancelled task did on every single one of them, tells the scheduler the opposite and teaches it to grant time less often, which is the one thing a task whose budget keeps expiring least needs. The deadline is threaded into the fetching itself instead, so a pass ends between two feeds with a partial summary rather than being cut off mid-write.
 
 ## When a feed is asked again
 
@@ -67,7 +71,7 @@ A quarantined feed is not asked for at all until the reader does something about
 
 ## Not here yet
 
-The network settings of section 8, Wi-Fi only, suspension in Low Power Mode and the monthly cellular cap, arrive with the settings screen. Background refresh arrives with M4 ; until then, refreshing happens on returning to the foreground and on a pull, which section 25 names as the primary mechanism anyway.
+The network settings of section 8 arrive with the settings screen : Wi-Fi only, the monthly cellular cap, and Low Power Mode as a preference rather than the hard rule it is today. The interval correction for sources that publish on business hours, and the quarantine notice offering to fix or delete a feed, are not written yet either.
 
 ## Pictures
 

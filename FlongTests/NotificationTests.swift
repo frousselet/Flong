@@ -123,9 +123,31 @@ struct OpenedStoryTests {
         digest = DigestStore(database)
     }
 
+    /// A story as the page would have one : two rooms, inside the window.
+    ///
+    /// One article is not a story and the front page does not show one, so
+    /// neither does a notification about the front page.
+    /// - Parameters:
+    ///   - moment: when its articles were published, which is what the page
+    ///     holds a story to.
+    ///   - opened: when the story itself was made, which the identifier carries
+    ///     and which the announcement asks about. They differ whenever a pass
+    ///     groups a backlog : the story is minutes old and its articles are
+    ///     days old.
     @discardableResult
-    private func story(_ title: String, at moment: Date, rooms: [String] = ["a.example.com"]) async throws -> UUID {
-        let story = Story(id: .v7(at: moment), title: title, firstAt: moment, lastAt: moment, updatedAt: moment)
+    private func story(
+        _ title: String,
+        at moment: Date,
+        opened: Date? = nil,
+        rooms: [String] = ["a.example.com", "b.example.com"]
+    ) async throws -> UUID {
+        let story = Story(
+            id: .v7(at: opened ?? moment),
+            title: title,
+            firstAt: moment,
+            lastAt: moment,
+            updatedAt: moment
+        )
         try await database.writer.write { db in
             try story.insert(db)
 
@@ -156,7 +178,7 @@ struct OpenedStoryTests {
 
         // The identifier carries the moment the story was opened. `first_at`
         // is the date of its earliest article and may be days older.
-        #expect(try await digest.opened(since: now).map(\.title) == ["Nouveau"])
+        #expect(try await digest.opened(since: now, now: now).map(\.title) == ["Nouveau"])
     }
 
     @Test("They arrive in the order they opened")
@@ -165,14 +187,40 @@ struct OpenedStoryTests {
             try await story(title, at: now.addingTimeInterval(Double(index + 1) * 60))
         }
 
-        #expect(try await digest.opened(since: now).map(\.title) == ["Premier", "Deuxième", "Troisième"])
+        #expect(try await digest.opened(since: now, now: now).map(\.title) == ["Premier", "Deuxième", "Troisième"])
+    }
+
+    @Test("A story the front page will not show is not announced either")
+    func onlyWhatThePageShows() async throws {
+        // A quiet feed's backlog, fetched by a full pass and grouped into a
+        // story dated last week. The story is new, and the page looks back
+        // three days, so the reader would be told about news they then could
+        // not find anywhere : a notification about a page that had, as far as
+        // they could see, not changed at all.
+        try await story(
+            "Vieilles nouvelles",
+            at: now.addingTimeInterval(-8 * 24 * 3600),
+            opened: now.addingTimeInterval(30)
+        )
+        try await story("Ce matin", at: now.addingTimeInterval(60))
+
+        #expect(try await digest.opened(since: now, now: now).map(\.title) == ["Ce matin"])
+    }
+
+    @Test("A single article is not a story, and is not announced")
+    func oneArticleIsNotAStory() async throws {
+        try await story("Seul", at: now.addingTimeInterval(60), rooms: ["a.example.com"])
+
+        // The page shows nothing a single article stands behind, so neither
+        // does a notification about the page.
+        #expect(try await digest.opened(since: now, now: now).isEmpty)
     }
 
     @Test("A story says which newsrooms are covering it, once each")
     func rooms() async throws {
         try await story("Une réforme", at: now.addingTimeInterval(60), rooms: ["lemonde.fr", "liberation.fr"])
 
-        let opened = try #require(await digest.opened(since: now).first)
+        let opened = try #require(await digest.opened(since: now, now: now).first)
         // A set, not a list : the rooms come back in the order they picked the
         // story up, and this fixture gives both articles the same moment, so
         // asserting an order would be asserting whatever the database happened
@@ -242,7 +290,17 @@ struct AnnouncingTests {
     private let preferences: Preferences
     private let announcer = MemoryAnnouncer()
     private let model: AppModel
-    private let now = Date(timeIntervalSince1970: 1_787_646_600)
+    /// Two minutes ago, and not a fixed date in the past.
+    ///
+    /// What is announced is what the front page is showing, and the page looks
+    /// back three days : a fixture dated last week describes a story the reader
+    /// could not find if they went looking for it.
+    ///
+    /// Two minutes rather than none, because the stories are dated a minute
+    /// after this and the watermark the announcement leaves behind is the
+    /// moment it ran : a story dated in the future would sit above every
+    /// watermark and be announced again on every pass.
+    private let now = Date().addingTimeInterval(-120)
 
     init() throws {
         database = try AppDatabase.inMemory()
@@ -253,19 +311,22 @@ struct AnnouncingTests {
         model = AppModel(database: database, preferences: preferences, announcer: announcer)
     }
 
+    /// Two rooms, which is the smallest thing the front page calls a story.
     private func story(_ title: String, at moment: Date) async throws {
         let story = Story(id: .v7(at: moment), title: title, firstAt: moment, lastAt: moment, updatedAt: moment)
         try await database.writer.write { db in
             try story.insert(db)
 
-            var feed = Feed(url: URL(string: "https://a.example.com/\(title).xml")!, title: "A")
-            feed.siteURL = URL(string: "https://a.example.com")
-            try feed.insert(db)
+            for room in ["a.example.com", "b.example.com"] {
+                var feed = Feed(url: URL(string: "https://\(room)/\(title).xml")!, title: room)
+                feed.siteURL = URL(string: "https://\(room)")
+                try feed.insert(db)
 
-            var entry = Entry(feedID: feed.id, guid: "urn:\(title)", title: title, publishedAt: moment)
-            entry.hasMedia = false
-            try entry.insert(db)
-            try StoryMember(storyID: story.id, entryID: entry.id, similarity: 1).insert(db)
+                var entry = Entry(feedID: feed.id, guid: "urn:\(title):\(room)", title: title, publishedAt: moment)
+                entry.hasMedia = false
+                try entry.insert(db)
+                try StoryMember(storyID: story.id, entryID: entry.id, similarity: 1).insert(db)
+            }
         }
     }
 
