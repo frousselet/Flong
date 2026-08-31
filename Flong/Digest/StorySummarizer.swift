@@ -56,7 +56,7 @@ nonisolated struct GeneratedBrief {
     @Guide(description: "The headline : what happened, in at most ten words, every one of them carrying information")
     var title: String
 
-    @Guide(description: "The standfirst : one or two sentences saying what the headline could not, never repeating it")
+    @Guide(description: "The standfirst : the angle, in one or two sentences, answering what the headline left out")
     var summary: String
 }
 
@@ -125,10 +125,26 @@ nonisolated struct StorySummarizer: Sendable {
     /// credit of a publication over time, and the same is true of a reader's
     /// own front page : a page that oversells is a page they stop believing.
     ///
-    /// **The headline and the line under it share the work.** The standfirst
-    /// states the angle and answers what the headline had no room for, which is
-    /// most of the who, what, where and why. It is not the headline again in
-    /// other words ; ``repeats(_:in:)`` is what checks.
+    /// **The headline and the line under it share the work.** They are one
+    /// piece of furniture. The headline says what happened ; the standfirst
+    /// states the angle, which is what this story is about of everything it
+    /// could have been about, and answers what the headline had no room for :
+    /// who, what, where and why. It is not the headline again in other words ;
+    /// ``repeats(_:in:)`` is what checks.
+    ///
+    /// **Of the five, *when* is deliberately missing.** A chapeau normally
+    /// answers it, and here it must not : the model is shown no dates at all,
+    /// only headlines and standfirsts, so it has nothing to date anything by
+    /// and fills the gap rather than leaving it. The page already says when a
+    /// story arrived, to the minute, so nothing is lost. ``inventedYear(title:summary:from:)``
+    /// is what catches it when the instruction does not hold.
+    ///
+    /// **One or two sentences.** Past that it is the article, and the article
+    /// is one tap away. What is enforced is a ceiling in words rather than a
+    /// count of sentences : a sentence tokenizer splits `M. Dupont` in two, and
+    /// a standfirst rejected for naming somebody is a worse outcome than one
+    /// that ran to three sentences. The ceiling is a backstop against a model
+    /// writing a paragraph, not an attempt to enforce the ideal length.
     ///
     /// The picture cannot be taken into account, and that settles a question
     /// rather than leaving one open. A desk can let a headline lean on an
@@ -147,7 +163,10 @@ nonisolated struct StorySummarizer: Sendable {
         Never a pun, never a play on words, never a tease, never a question.
         Never promise more than the articles say, and never exaggerate.
 
-        The standfirst is one or two sentences. It answers what the headline had no room for.
+        The standfirst is one or two sentences and no more.
+        It states the angle : what this story is about, of everything it could have been about.
+        It answers what the headline left out : who, what, where, and why.
+        Prefer a fact, a figure or a named actor to a general statement.
         Never write the headline again in other words.
 
         Be factual and plain. Never add an opinion, a judgement or a call to action.
@@ -251,6 +270,19 @@ nonisolated struct StorySummarizer: Sendable {
                 )
             }
 
+            // A standfirst that runs to a paragraph is the article, and the
+            // article is one tap away.
+            guard Self.isBrief(summary) else {
+                return await retry(
+                    in: session,
+                    saying: """
+                        That standfirst is too long. Write it again in one or two sentences, \
+                        keeping the angle and what the headline left out.
+                        """,
+                    fallback: fallback
+                )
+            }
+
             // Only when the reader's language is what was asked for. A model
             // that does not write it is asked for the articles' language
             // instead, deliberately, and demanding the reader's language of an
@@ -326,10 +358,12 @@ nonisolated struct StorySummarizer: Sendable {
                 return fallback.asked(in: locale)
             }
 
-            // A standfirst that is still the headline is dropped rather than
-            // retried again : the article's own is at least a different
-            // sentence, and a third call is a second and a half nobody has.
-            let kept = Self.repeats(title, in: summary) ? (fallback.summary ?? "") : summary
+            // A standfirst that is still the headline, or still a paragraph, is
+            // dropped rather than asked for again : the article's own is at
+            // least a real one, and a third call is a second and a half nobody
+            // has and comes out of the same budget as the subjects.
+            let usable = !Self.repeats(title, in: summary) && Self.isBrief(summary)
+            let kept = usable ? summary : (fallback.summary ?? "")
 
             return StoryBrief(
                 title: title,
@@ -351,6 +385,20 @@ nonisolated struct StorySummarizer: Sendable {
     /// being one over the ideal ; past twelve it has stopped being a headline
     /// and become a sentence.
     static let maximumTitleWords = 12
+
+    /// How many words a standfirst may run to.
+    ///
+    /// A chapeau of one or two sentences runs to about twenty-five or forty
+    /// words. Forty-five is generous on purpose : what it is for is the model
+    /// that writes a paragraph, and rejecting a good standfirst of forty-two
+    /// words costs the reader a real line for nothing, since what replaces it
+    /// is the article's own.
+    static let maximumSummaryWords = 45
+
+    /// Whether a standfirst has stayed a standfirst.
+    static func isBrief(_ summary: String) -> Bool {
+        summary.split(whereSeparator: \.isWhitespace).count <= maximumSummaryWords
+    }
 
     /// Whether a headline is short enough to be one.
     ///
