@@ -18,9 +18,11 @@ import SwiftUI
 struct CollectionScreen: View {
     let model: AppModel
     let kind: ArticleCollection.Kind
+    /// The window's own : see ``ArticleFeedScreen`` for why it cannot be one
+    /// of this screen's making.
+    let zoom: Namespace.ID
     let open: (UUID) -> Void
 
-    @Namespace private var zoom
     @State private var isRenaming = false
     @State private var renamed = ""
     @Environment(\.dismiss) private var dismiss

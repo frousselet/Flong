@@ -20,6 +20,15 @@ nonisolated enum Route: Hashable {
     case collection(ArticleCollection.Kind)
 }
 
+/// The article being read, when one is.
+///
+/// A type of its own so the presentation can be keyed on it. `UUID` would do as
+/// well and would be a conformance added to somebody else's type, which every
+/// other file in the target would then inherit without asking for it.
+nonisolated struct Reading: Identifiable, Hashable {
+    let id: UUID
+}
+
 /// Which part of the application the reader is in.
 ///
 /// Named `AppSection` rather than `Section`, which is a view SwiftUI already
@@ -47,6 +56,13 @@ struct AppShell: View {
     @State private var streamPath: [Route] = []
     @State private var collectionsPath: [Route] = []
     @State private var searchPath: [Route] = []
+    /// The article being read, when one is.
+    ///
+    /// It used to be a route on whichever section's stack the reader was in,
+    /// which drew an article under the tab bar. One thing is read at a time and
+    /// it is read over everything, so it is presented rather than pushed, and
+    /// it belongs to the window rather than to a section.
+    @State private var reading: Reading?
     @State private var isAddingFeed = false
     @State private var isChoosingFile = false
     @Namespace private var zoom
@@ -61,12 +77,15 @@ struct AppShell: View {
         TabView(selection: $section) {
             Tab("Digest", systemImage: "sparkles.rectangle.stack", value: AppSection.digest) {
                 stack($digestPath) {
+                    let open: (Route) -> Void = opening($digestPath)
+
                     DigestScreen(
                         model: model,
                         zoom: zoom,
                         isAddingFeed: $isAddingFeed,
-                        isChoosingFile: $isChoosingFile
-                    ) { digestPath.append($0) }
+                        isChoosingFile: $isChoosingFile,
+                        open: open
+                    )
                 }
             }
 
@@ -91,16 +110,17 @@ struct AppShell: View {
                     ArticleFeedScreen(
                         model: model,
                         kind: .all,
+                        zoom: zoom,
                         named: "Stream",
                         showsArrivals: true,
-                        menu: { streamPath.append($0) }
-                    ) { streamPath.append(.article($0)) }
+                        menu: opening($streamPath)
+                    ) { reading = Reading(id: $0) }
                 }
             }
 
             Tab("Collections", systemImage: "folder", value: AppSection.collections) {
                 stack($collectionsPath) {
-                    CollectionsScreen(model: model, menu: { collectionsPath.append($0) }) {
+                    CollectionsScreen(model: model, menu: opening($collectionsPath)) {
                         collectionsPath.append(.collection($0))
                     }
                 }
@@ -108,8 +128,8 @@ struct AppShell: View {
 
             Tab(value: AppSection.search, role: .search) {
                 stack($searchPath) {
-                    SearchScreen(model: model, zoom: zoom, menu: { searchPath.append($0) }) {
-                        searchPath.append(.article($0))
+                    SearchScreen(model: model, zoom: zoom, menu: opening($searchPath)) {
+                        reading = Reading(id: $0)
                     }
                 }
             }
@@ -127,6 +147,13 @@ struct AppShell: View {
         // is one answer per publisher rather than one per feed. Injected once,
         // here, so no screen has to carry it down to the row that draws it.
         .environment(\.publishers, model.publishers)
+        // **The one thing that is read is read over everything.** Presented
+        // from the window rather than pushed onto a section, so the tab bar is
+        // behind it rather than drawn across it, and the page the reader came
+        // from is still there when they put the article down.
+        .sheet(item: $reading) { article in
+            zoomed(ArticleScreen(model: model, articleID: article.id), from: article.id)
+        }
         .sheet(isPresented: $isAddingFeed) {
             AddFeedView(
                 add: { address in await model.addFeed(at: address) },
@@ -230,6 +257,24 @@ struct AppShell: View {
 
     /// One stack per section, so going back means going back where the reader
     /// was rather than to the beginning of everything.
+    /// Where a route goes : an article is presented, everything else is pushed.
+    ///
+    /// **One rule, in one place.** An article is a place the reader can be, so
+    /// it stays a route ; it is simply not a place on a stack. Reading is one
+    /// thing at a time and over everything, and a section's stack is where the
+    /// reader was before they opened it and where they will be when they put it
+    /// down. Every closure that hands a route out goes through here, so no
+    /// screen has to know which of the two its rows do.
+    private func opening(_ path: Binding<[Route]>) -> (Route) -> Void {
+        { route in
+            if case .article(let id) = route {
+                reading = Reading(id: id)
+            } else {
+                path.wrappedValue.append(route)
+            }
+        }
+    }
+
     private func stack(_ path: Binding<[Route]>, @ViewBuilder root: () -> some View) -> some View {
         NavigationStack(path: path) {
             root()
@@ -249,19 +294,23 @@ struct AppShell: View {
             // none, a window being its own explanation.
             zoomed(
                 StoryScreen(model: model, storyID: id, zoom: zoom) {
-                    path.wrappedValue.append(.article($0))
+                    reading = Reading(id: $0)
                 },
                 from: id
             )
 
-        case .article(let id):
-            zoomed(ArticleScreen(model: model, articleID: id), from: id)
+        // Never reached : `opening(_:)` presents an article rather than
+        // putting it on a stack, so nothing appends this one. It stays a route
+        // because it is a place the reader can be, and the switch has to say
+        // so somewhere.
+        case .article:
+            EmptyView()
 
         case .view(let kind):
-            ArticleFeedScreen(model: model, kind: kind) { path.wrappedValue.append(.article($0)) }
+            ArticleFeedScreen(model: model, kind: kind, zoom: zoom) { reading = Reading(id: $0) }
 
         case .collection(let kind):
-            CollectionScreen(model: model, kind: kind) { path.wrappedValue.append(.article($0)) }
+            CollectionScreen(model: model, kind: kind, zoom: zoom) { reading = Reading(id: $0) }
 
         }
     }

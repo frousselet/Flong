@@ -91,7 +91,9 @@ It is shown at both sizes and on the story page, since a credit paid on the lead
 
 Motion is either information or decoration, and decoration on a screen read every morning becomes noise by the second week. Three movements survive :
 
-- **A story page grows out of the row that opened it**, through `navigationTransition(.zoom(sourceID:in:))` and `matchedTransitionSource`. The motion says where the page came from, which is the one thing a push animation cannot. iOS and iPadOS only : macOS has no such transition and needs none.
+- **A story page, and an article, grow out of the row that opened them**, through `navigationTransition(.zoom(sourceID:in:))` and `matchedTransitionSource`. The motion says where the page came from, which is the one thing a push animation cannot. iOS and iPadOS only : macOS has no such transition and needs none.
+
+  The article is presented rather than pushed, so the row it grows out of and the view it grows into are in two different trees, and the namespace has to be the window's. A screen that made one of its own matched nothing across that boundary and the article arrived from nowhere : the two lists that had a private one now take the window's, and it is passed in rather than declared, so there is one namespace in the application and no way to make a second by accident.
 - **The rule under the period slides** from `Day` to `Week` rather than blinking on, through `matchedGeometryEffect`. It is the same object moving, so it moves.
 - **The live dot breathes**, and stops breathing under Reduce Motion, where it becomes a plain dot that still reads as red.
 
@@ -289,6 +291,16 @@ An alignment guide was tried first, holding the whole text block to the left and
 **The pictures are decoded off the main thread, and were not.** The target builds with `SWIFT_APPROACHABLE_CONCURRENCY`, under which a `nonisolated async` function runs on its caller's actor rather than on the pool. Every caller of the image store is a view, so every caller is the main actor, so the ImageIO decode was happening on the main thread : one picture at a time, a few milliseconds each, for every row a reader scrolls past. A list that stops moving while it fills is the shape of that, and it is what the reader reported as the interface freezing.
 
 `@concurrent` on the fetch is what takes it back to the pool. It never showed on a simulator, where a Mac decodes a photograph faster than a frame lasts ; it shows on a phone. The lesson is worth keeping rather than the fix : under approachable concurrency, `nonisolated` no longer means off the main actor, and anything expensive a view awaits has to say so.
+
+## The article, over everything
+
+**It was pushed and is presented.** An article went onto the stack of whichever section the reader was in, which drew it under the tab bar : a row of places to go, laid across the one thing in the application that asks to be read with nothing else in the way. It is presented from the window now, so the bar is behind it, and the page the reader came from is still there when they put it down.
+
+It carries a navigation stack of its own, for the bar the controls hang off. That stack leads nowhere : what is on it is the article.
+
+**The way out is a cross, not a way back.** The reader is not returning to a screen they left. The page they came from never went anywhere, and an arrow pointing at something already behind the article would be describing a journey nobody made. A cross says what this is, which is a thing put down.
+
+`Route.article` stays a route, since an article is a place a reader can be ; it is simply not a place on a stack. One function in the window decides which of the two a route is, so no screen has to know what its own rows do.
 
 ## The panels, in the leading corner
 

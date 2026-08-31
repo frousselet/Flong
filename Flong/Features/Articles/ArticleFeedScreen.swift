@@ -18,6 +18,15 @@ import SwiftUI
 struct ArticleFeedScreen: View {
     let model: AppModel
     let kind: SidebarItem.Kind
+    /// The window's own, and not one of this screen's making.
+    ///
+    /// An article is presented from the window rather than pushed onto this
+    /// screen's stack, so the row it grows out of and the view it grows into
+    /// are in two different trees. A namespace private to either of them
+    /// matches nothing across that boundary, and the article arrives from
+    /// nowhere instead of from the row the reader touched.
+    let zoom: Namespace.ID
+
     /// What the screen is called, when the section it sits in calls it
     /// something other than the view it shows.
     var named: LocalizedStringResource?
@@ -31,8 +40,6 @@ struct ArticleFeedScreen: View {
     /// same in all four.
     var menu: ((Route) -> Void)?
     let open: (UUID) -> Void
-
-    @Namespace private var zoom
 
     /// The day the reader has scrolled to, which is what the chart is about.
     @State private var day: Date?

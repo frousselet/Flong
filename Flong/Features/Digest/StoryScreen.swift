@@ -171,6 +171,8 @@ struct ArticleScreen: View {
     let model: AppModel
     let articleID: UUID
 
+    @Environment(\.dismiss) private var dismiss
+
     @State private var isNamingCollection = false
     @State private var collectionName = ""
 
@@ -196,36 +198,49 @@ struct ArticleScreen: View {
     }
 
     var body: some View {
-        Group {
-            if let article = model.article, article.id == articleID {
-                ArticleWebView(
-                    html: ArticleDocument.html(for: article, publisher: publisher(of: article), showing: showing)
-                )
-                .ignoresSafeArea(edges: .bottom)
-                .toolbar { toolbar(for: article) }
-                // The publisher, not the desk : a reader who opened a piece
-                // from `Le Monde - Sport` is reading Le Monde, and the page
-                // that says so agrees with every row that led them here.
-                .navigationTitle(Text(verbatim: publisher(of: article)))
-                #if os(iOS)
-                    .navigationBarTitleDisplayMode(.inline)
-                #endif
-                .overlay(alignment: .bottom) {
-                    if model.isFetchingFullText {
-                        fetching
-                    }
-                }
-                .sheet(isPresented: $signingIn) {
-                    if let host = article.url.flatMap(FeedURL.room(of:)) {
-                        SiteLoginView(host: host) { cookies in
-                            await model.saveSession(for: host, cookies: cookies)
-                            // Signed in : ask the page again, as them.
-                            await showFullArticle()
+        // **A view of its own, over the page it was opened from.** It was
+        // pushed onto the stack of whichever section the reader was in, which
+        // put an article under the tab bar : a row of places to go, drawn over
+        // the one thing in the application that asks to be read without
+        // anything else in the way. It is presented now, so the bar is behind
+        // it and the page it came from is still there underneath.
+        //
+        // A navigation stack of its own inside it, for the bar the controls
+        // hang off. It leads nowhere : what is on the stack is the article, and
+        // the way out is the cross rather than a way back to a screen the
+        // reader is already looking at behind this one.
+        NavigationStack {
+            Group {
+                if let article = model.article, article.id == articleID {
+                    ArticleWebView(
+                        html: ArticleDocument.html(for: article, publisher: publisher(of: article), showing: showing)
+                    )
+                    .ignoresSafeArea(edges: .bottom)
+                    .toolbar { toolbar(for: article) }
+                    // The publisher, not the desk : a reader who opened a piece
+                    // from `Le Monde - Sport` is reading Le Monde, and the page
+                    // that says so agrees with every row that led them here.
+                    .navigationTitle(Text(verbatim: publisher(of: article)))
+                    #if os(iOS)
+                        .navigationBarTitleDisplayMode(.inline)
+                    #endif
+                    .overlay(alignment: .bottom) {
+                        if model.isFetchingFullText {
+                            fetching
                         }
                     }
+                    .sheet(isPresented: $signingIn) {
+                        if let host = article.url.flatMap(FeedURL.room(of:)) {
+                            SiteLoginView(host: host) { cookies in
+                                await model.saveSession(for: host, cookies: cookies)
+                                // Signed in : ask the page again, as them.
+                                await showFullArticle()
+                            }
+                        }
+                    }
+                } else {
+                    ProgressView()
                 }
-            } else {
-                ProgressView()
             }
         }
         .task {
@@ -307,6 +322,19 @@ struct ArticleScreen: View {
     /// went in.
     @ToolbarContentBuilder
     private func toolbar(for article: Article) -> some ToolbarContent {
+        // **A cross and not a way back.** The reader is not returning to a
+        // screen they left : the page they came from never went anywhere, and
+        // an arrow pointing at something already behind the article would be
+        // describing a journey nobody made. A cross says what this is, which is
+        // a thing put down.
+        ToolbarItem(placement: .cancellationAction) {
+            Button {
+                dismiss()
+            } label: {
+                Label("Close", systemImage: "xmark")
+            }
+        }
+
         ToolbarItem {
             Button {
                 Task { await model.toggleStarredCurrent() }

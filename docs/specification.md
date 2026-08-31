@@ -541,6 +541,8 @@ The picture an article carries is taken from the feed, or failing that from the 
 
 Reader mode when the reader has chosen it, a switch to the feed content or the web view, the choice remembered and carried between devices by the iCloud key-value store rather than by a CloudKit record, keyboard navigation on Mac and iPad, a constant action bar : read, star, tag, share, open in the browser.
 
+**Presented over the window rather than pushed onto a section.** An article on a section's stack is an article under the tab bar, which is a row of places to go laid across the one thing that asks to be read with nothing else in the way. It grows out of the row that opened it and is put down with a cross : the page it came from never went anywhere, so there is nothing to go back to.
+
 ### Search
 
 A single field accepting the query language, live results, and saving a query straight from the field. The switch between stream and library is gone with the library : there is one corpus, and `is:starred`, `is:collected` and `is:annotated` narrow it to what the reader marked.

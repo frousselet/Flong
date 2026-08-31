@@ -1,7 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "" : {},
+    "" : {
+
+    },
     "%@, read" : {
       "localizations" : {
         "fr" : {
@@ -710,6 +712,17 @@
         }
       }
     },
+    "Close" : {
+      "comment" : "Puts the article down and goes back to the page behind it",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer"
+          }
+        }
+      }
+    },
     "Collections" : {
       "comment" : "The section holding what the reader chose to keep. Not `Library` : that is the specification's word for the half of the store that is never purged, and a shelf of books is not what this is.",
       "localizations" : {
@@ -1112,6 +1125,7 @@
       }
     },
     "Force a synchronization" : {
+      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
