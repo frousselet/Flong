@@ -53,10 +53,10 @@ nonisolated struct StoryBrief: Hashable, Sendable {
 /// it returns two fields.
 @Generable
 nonisolated struct GeneratedBrief {
-    @Guide(description: "A short neutral headline for the group, at most eight words")
+    @Guide(description: "The headline : what happened, in at most ten words, every one of them carrying information")
     var title: String
 
-    @Guide(description: "One sentence saying what happened, at most thirty words")
+    @Guide(description: "The standfirst : one or two sentences saying what the headline could not, never repeating it")
     var summary: String
 }
 
@@ -94,10 +94,62 @@ nonisolated struct StorySummarizer: Sendable {
         self.locale = locale
     }
 
+    /// What a headline is for, put to a model that has never worked on a desk.
+    ///
+    /// A headline does two things at once : it says in a few words what the
+    /// piece contains, and it makes somebody want to read it. The second is
+    /// worthless without the first, which is why almost every line here is
+    /// about the first.
+    ///
+    /// **Every word carries information.** The headline holds the most
+    /// important words of the story and no others. `Le numérique en question`
+    /// says nothing : a fact, a figure, a named actor or a verb of action says
+    /// something. Jargon is out.
+    ///
+    /// **Short.** Up to about ten words sits comfortably in a reader's
+    /// immediate memory ; past twelve it is a sentence. ``isShort(_:)`` is what
+    /// holds it there, since a small model asked for ten words gives fifteen
+    /// about as often as not.
+    ///
+    /// **Clear before clever.** A plain headline barely trying to tempt anybody
+    /// beats a pun nobody can parse. Wordplay is a legitimate craft and it
+    /// needs a readership and an editorial line to land ; a model writing for
+    /// one reader it has never met has neither.
+    ///
+    /// **Read out of context.** This is a list, and a headline in it arrives
+    /// with no page around it and is often cut short, so the words a reader
+    /// would look for go at the front.
+    ///
+    /// **And never more than the articles say.** The gap between what a
+    /// headline promises and what the piece delivers is what destroys the
+    /// credit of a publication over time, and the same is true of a reader's
+    /// own front page : a page that oversells is a page they stop believing.
+    ///
+    /// **The headline and the line under it share the work.** The standfirst
+    /// states the angle and answers what the headline had no room for, which is
+    /// most of the who, what, where and why. It is not the headline again in
+    /// other words ; ``repeats(_:in:)`` is what checks.
+    ///
+    /// The picture cannot be taken into account, and that settles a question
+    /// rather than leaving one open. A desk can let a headline lean on an
+    /// explicit photograph and be more tempting for it ; here the row's picture
+    /// is whatever the publisher happened to attach, so the headline has to
+    /// carry the information every time.
     private var instructions: String {
         """
-        You name and summarize groups of news articles about the same event.
+        You write the headline and the standfirst for a group of news articles about one event.
         \(OnDeviceModel.languageInstruction(for: locale))
+
+        The headline says what happened, in the fewest words that are still precise.
+        Every word must carry information. No jargon, no abstractions.
+        Name who did what. Prefer a fact, a figure or a verb of action to a general idea.
+        Put the words a reader would look for first : it is read in a list and often cut short.
+        Never a pun, never a play on words, never a tease, never a question.
+        Never promise more than the articles say, and never exaggerate.
+
+        The standfirst is one or two sentences. It answers what the headline had no room for.
+        Never write the headline again in other words.
+
         Be factual and plain. Never add an opinion, a judgement or a call to action.
         Never write a date, a year or a day of the week. Say what happened, not when.
         Never mention that you are a model or that you were asked anything.
@@ -172,6 +224,33 @@ nonisolated struct StorySummarizer: Sendable {
                 )
             }
 
+            // A headline of twenty words is a sentence, and the instruction
+            // alone does not hold a small model to ten.
+            guard Self.isShort(title) else {
+                return await retry(
+                    in: session,
+                    saying: """
+                        That headline is too long. Write it again in at most \(Self.maximumTitleWords) words, \
+                        keeping only the words that carry information.
+                        """,
+                    fallback: fallback
+                )
+            }
+
+            // The headline and the line under it are one piece of furniture and
+            // divide the work between them. A standfirst that says the headline
+            // again has spent the only line the story gets saying nothing.
+            guard !Self.repeats(title, in: summary) else {
+                return await retry(
+                    in: session,
+                    saying: """
+                        That standfirst repeats the headline. Write it again saying what the headline \
+                        left out : who, what, where, why.
+                        """,
+                    fallback: fallback
+                )
+            }
+
             // Only when the reader's language is what was asked for. A model
             // that does not write it is asked for the articles' language
             // instead, deliberately, and demanding the reader's language of an
@@ -240,16 +319,21 @@ nonisolated struct StorySummarizer: Sendable {
             let title = response.content.title.trimmingCharacters(in: .whitespacesAndNewlines)
             let summary = response.content.summary.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            guard !title.isEmpty,
+            guard !title.isEmpty, Self.isShort(title),
                 !OnDeviceModel.writes(locale) || Self.isWritten(in: locale, title: title, summary: summary)
             else {
                 Log.enrich.notice("A brief came back wrong twice and was left to its article")
                 return fallback.asked(in: locale)
             }
 
+            // A standfirst that is still the headline is dropped rather than
+            // retried again : the article's own is at least a different
+            // sentence, and a third call is a second and a half nobody has.
+            let kept = Self.repeats(title, in: summary) ? (fallback.summary ?? "") : summary
+
             return StoryBrief(
                 title: title,
-                summary: summary.isEmpty ? fallback.summary : summary,
+                summary: kept.isEmpty ? fallback.summary : kept,
                 isGenerated: true,
                 askedIn: locale
             )
@@ -257,6 +341,57 @@ nonisolated struct StorySummarizer: Sendable {
             OnDeviceModel.refused(error)
             return fallback.asked(in: locale)
         }
+    }
+
+    /// How many words a headline may run to.
+    ///
+    /// Up to about ten sits comfortably in a reader's immediate memory, which
+    /// is the length a desk aims for. Twelve is where the line is drawn rather
+    /// than ten, so a good headline of eleven words is not thrown away for
+    /// being one over the ideal ; past twelve it has stopped being a headline
+    /// and become a sentence.
+    static let maximumTitleWords = 12
+
+    /// Whether a headline is short enough to be one.
+    ///
+    /// Asked for ten words a small model gives fifteen about as often as not,
+    /// and the instruction alone does not hold it. Counted on whitespace, so an
+    /// elision is the one word it is : `l'étude` is not two.
+    static func isShort(_ title: String) -> Bool {
+        title.split(whereSeparator: \.isWhitespace).count <= maximumTitleWords
+    }
+
+    /// Whether the line under a headline is the headline again.
+    ///
+    /// The two are one piece of furniture and they divide the work between
+    /// them : the headline says what happened, the standfirst says what the
+    /// headline had no room for. A standfirst that restates it has spent the
+    /// only line the story gets saying nothing new.
+    ///
+    /// Deliberately narrow. It catches the shape that actually comes back, the
+    /// headline repeated with a clause bolted on, and leaves alone a standfirst
+    /// that happens to name the same subject while going on to say something :
+    /// `La réforme du calendrier scolaire` will and should appear in a line
+    /// about the reform of the school calendar, and rejecting that would reject
+    /// most of what the model writes correctly.
+    static func repeats(_ title: String, in summary: String) -> Bool {
+        let title = fold(title)
+        let summary = fold(summary)
+        guard !title.isEmpty, summary.contains(title) else { return false }
+
+        let added = summary.split(separator: " ").count - title.split(separator: " ").count
+        return added < wordsThatWouldBeWorthIt
+    }
+
+    /// How much a standfirst has to add before it has earned its line.
+    private static let wordsThatWouldBeWorthIt = 5
+
+    /// Case and accents away, so a repeat is caught however it was spelled.
+    private static func fold(_ text: String) -> String {
+        text.folding(options: [.diacriticInsensitive, .caseInsensitive, .widthInsensitive], locale: nil)
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 
     /// A four-digit year the articles never mention.
