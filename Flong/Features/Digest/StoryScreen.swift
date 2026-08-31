@@ -193,6 +193,14 @@ struct ArticleScreen: View {
     /// `Le Monde - Sport`. The address stands in while the subscriptions are
     /// being read, and the feed's own title only for an article whose feed has
     /// gone from under it.
+    /// Whether the article this is about has a picture to run across its head.
+    ///
+    /// Read from the model rather than from the article in hand, so the answer
+    /// exists before the article does and the bar is laid out once.
+    private var hasHeadPicture: Bool {
+        model.article?.id == articleID && model.article?.imageURL != nil
+    }
+
     private func publisher(of article: Article) -> String {
         model.publisher(of: article.domain)?.name ?? article.domain ?? article.feedTitle
     }
@@ -215,23 +223,7 @@ struct ArticleScreen: View {
                     ArticleWebView(
                         html: ArticleDocument.html(for: article, publisher: publisher(of: article), showing: showing)
                     )
-                    // **The picture at the head runs under the controls**, so
-                    // the page starts at the top of the screen rather than
-                    // below the bar. An article with none has nothing to run
-                    // under it and its words start where they always did.
-                    .ignoresSafeArea(edges: article.imageURL != nil ? [.top, .bottom] : .bottom)
                     .toolbar { toolbar(for: article) }
-                    // **No bar behind them, and no title in it.** The controls
-                    // are already on glass of the system's own, which is what
-                    // keeps them legible over a photograph ; a band of paper
-                    // behind them would be a shelf bolted across the picture.
-                    // A title cannot be : plain type over somebody's photograph
-                    // is unreadable on half the photographs there are, and the
-                    // publisher is named in the byline under the headline
-                    // anyway, where the page says it in its own voice.
-                    #if os(iOS)
-                        .toolbarBackground(.hidden, for: .navigationBar)
-                    #endif
                     .overlay(alignment: .bottom) {
                         if model.isFetchingFullText {
                             fetching
@@ -250,6 +242,30 @@ struct ArticleScreen: View {
                     ProgressView()
                 }
             }
+            // **The bar is settled before the article arrives, not after.**
+            // These were inside the branch that draws the article, which is
+            // the branch that appears once it has been read out of the store :
+            // a navigation bar told what to look like after it has already
+            // laid itself out keeps the look it had, which is a band of paper
+            // across the top and the page beginning underneath it. Out here
+            // they are what the bar is from the first frame.
+            //
+            // **The picture at the head runs under the controls**, so the page
+            // starts at the top of the screen. An article with none has
+            // nothing to run under it and its words start where they always
+            // did, below the bar.
+            .ignoresSafeArea(edges: hasHeadPicture ? [.top, .bottom] : .bottom)
+            // **No bar behind them, and no title in it.** The controls are
+            // already on glass of the system's own, which is what keeps them
+            // legible over a photograph ; a band of paper behind them would be
+            // a shelf bolted across the picture. A title cannot be there :
+            // plain type over somebody's photograph is unreadable on half the
+            // photographs there are, and the publisher is named in the byline
+            // under the headline anyway, where the page says it in its own
+            // voice.
+            #if os(iOS)
+                .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+            #endif
         }
         .task {
             pageGaveNothing = false
