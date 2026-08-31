@@ -17,7 +17,6 @@ nonisolated enum Route: Hashable {
     case story(UUID)
     case article(UUID)
     case view(SidebarItem.Kind)
-    case sources
     case collection(ArticleCollection.Kind)
     case profile
     case subscribedSites
@@ -136,7 +135,7 @@ struct AppShell: View {
                 addPrivate: { address in await model.addPrivateFeed(at: address) }
             )
         }
-        .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: Self.opmlTypes) { result in
+        .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: OPMLDocument.types) { result in
             guard case .success(let url) = result else { return }
             Task { await model.importOPML(from: url) }
         }
@@ -263,11 +262,6 @@ struct AppShell: View {
         case .view(let kind):
             ArticleFeedScreen(model: model, kind: kind) { path.wrappedValue.append(.article($0)) }
 
-        case .sources:
-            SourcesScreen(model: model, isAddingFeed: $isAddingFeed, isChoosingFile: $isChoosingFile) {
-                path.wrappedValue.append(.view($0))
-            }
-
         case .collection(let kind):
             CollectionScreen(model: model, kind: kind) { path.wrappedValue.append(.article($0)) }
 
@@ -286,10 +280,6 @@ struct AppShell: View {
         #else
             content.navigationTransition(.zoom(sourceID: id, in: zoom))
         #endif
-    }
-
-    private static var opmlTypes: [UTType] {
-        [UTType(filenameExtension: "opml"), .xml].compactMap { $0 }
     }
 
     private static func summary(of report: OPMLImportReport) -> String {

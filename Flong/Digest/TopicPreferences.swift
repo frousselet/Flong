@@ -121,13 +121,17 @@ nonisolated struct TopicPreferences: Sendable {
                 )
             }
 
-            // What the reader spoke about first, then what covers the most,
-            // then the alphabet. The names are compared the other way round
-            // so that the whole comparison stays a single descending one
-            // while the names read forwards.
-            return rows.sorted {
-                (abs($0.score), $0.stories, $1.name) > (abs($1.score), $1.stories, $0.name)
-            }
+            // **The alphabet, and nothing else.** It led with what the reader
+            // had spoken about and then with what covered the most of the page,
+            // which is an order that reads well on a front page and badly in a
+            // list somebody is editing : a subject nudged up moved out from
+            // under their finger, and a reader looking for `Météo` among fifty
+            // sections had to know how much of the page it covers to guess
+            // where it is.
+            //
+            // The reader's own locale rather than byte order, so `Écologie`
+            // files under E rather than after Z.
+            return rows.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         }
     }
 

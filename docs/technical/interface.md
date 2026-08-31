@@ -284,11 +284,17 @@ An alignment guide was tried first, holding the whole text block to the left and
 
 ## The panels, in the leading corner
 
-**Short sheets from the bottom, and no longer pages.** The notices and the subjects were lines in the reader's menu leading to screens of their own, which is two presses and a way back for what a reader does in a moment. Neither is going anywhere : one answers a question about being interrupted, the other nudges a subject and watches the page take it, and in both the page they were reading is still behind the panel while they do it. A panel goes with a flick, or with the button a Mac needs, since a Mac sheet cannot be flicked away and one way out on both platforms is one thing to learn rather than two.
+**Short sheets from the bottom, and no longer pages.** The sources, the subjects and the notices were a screen apiece, two of them behind a line in the reader's menu, which is two presses and a way back for what a reader does in a moment. None of them is a place to be : one answers a question about being interrupted, one nudges a subject and watches the page take it, one picks a feed and reads it. In all three the page they were reading is still behind the panel, and a panel goes with a flick.
 
-Three buttons stand in the leading corner now, in the order a reader meets what they hold : the sources they follow, the subjects the page is sorted into, the notices they may be interrupted by. The subject wears `circle.grid.2x2` wherever it appears, which is a grid of sections rather than the stack of cards it used to be.
+Three buttons stand in the leading corner, in the order a reader meets what they hold : the sources they follow, the subjects the page is sorted into, the notices they may be interrupted by. The subject wears `circle.grid.2x2` wherever it appears, which is a grid of sections rather than the stack of cards it used to be.
 
-**The subjects panel stands taller and scrolls.** One switch has a height of its own ; fifty sections and however many the reader wrote are a list, and a list wants the height a reader chooses. It opens at a height of its own rather than at `.medium`, which is measured off the bottom of the screen and takes the panel's lower corners with it, and it pulls up to the whole screen.
+**None of them is titled.** A panel is named by the button that opened it, and by what is in it : a sheet holding one switch reading `Nouveaux fils`, or a list of publishers, or fifty sections under their own headings, has been read before it has been titled. A title would be the third thing on screen saying the same word.
+
+**The way out is a flick, and the indicator says so.** There is no `Terminé` : a button that repeats what the gesture already offers is a control spent on nothing, and the indicator at the head of every panel is the thing that says a panel is a panel. A Mac keeps the button, and only a Mac, since a Mac sheet cannot be flicked and would strand the reader with no way out at all.
+
+**The sources and the subjects stand taller and scroll.** One switch has a height of its own ; a list of publishers, or fifty sections and however many the reader wrote, wants the height a reader chooses. Both open at a height of their own rather than at `.medium`, which is measured off the bottom of the screen and takes the panel's lower corners with it, and both pull up to the whole screen.
+
+**Picking a source closes the panel.** It is the one of the three that leads somewhere : the panel goes and the page it asked for arrives behind it, rather than staying on the stack as a way back nobody asked for.
 
 **A panel is not a page, and is not pulled.** `refreshable` puts its action in the environment, and a sheet inherits the environment of whatever presented it : declared under the front page's toolbar, the pull reached the panels the buttons up there open, and a list of subjects offered to fetch three hundred feeds. It is applied to the page it belongs to and above the toolbar, which is where its scope should have ended all along.
 
@@ -304,9 +310,9 @@ One button in the same corner of every section, holding what the reader has deci
 
 It is still not an account. There is no account and nothing to sign in to, and the face on the button is the reader's own picture rather than a sign that they are signed in to something. It is called `Réglages` in French.
 
-It holds the sites the reader is signed in to and `Actualiser`, which asks for a refresh from anywhere in the application and is the only way to ask on a Mac.
+It holds the reader's own profile, the sites they are signed in to, and `Actualiser`, which asks for a refresh from anywhere in the application and is the only way to ask on a Mac.
 
-**The notices and the subjects came out of it.** Not because they are opened often, which they are not, but because of the shape of what a reader does in them : they say one thing about the page they are looking at and go back to reading it. Two presses to reach a whole screen with a way back on it is the wrong shape for that, however rarely it is done. Both stand beside the sources in the leading corner now and open panels over the page.
+**The notices and the subjects came out of it.** Not because they are opened often, which they are not, but because of the shape of what a reader does in them : they say one thing about the page they are looking at and go back to reading it. Two presses to reach a whole screen with a way back on it is the wrong shape for that, however rarely it is done. Both stand beside the sources in the leading corner now, and all three open panels over the page.
 
 It also holds `Forcer la synchronisation`, under `#if DEBUG` and nowhere else. The engine decides when to send and when to fetch and is right far more often than a button would be ; what that command is for is watching an exchange happen on demand while something is being built. It queues every record this device holds, which is the repair path and costs a few thousand records against a budget of three thousand, and that is why it does not ship.
 
