@@ -106,7 +106,8 @@ struct ArticleStoreTests {
         isRead: Bool = false,
         isStarred: Bool = false,
         isHidden: Bool = false,
-        body: String? = nil
+        body: String? = nil,
+        author: String? = nil
     ) async throws -> UUID {
         var entry = Entry(
             feedID: feed.id,
@@ -121,6 +122,7 @@ struct ArticleStoreTests {
             isHidden: isHidden
         )
         entry.hasMedia = false
+        entry.author = author
 
         try await database.writer.write { db in
             try entry.insert(db)
@@ -194,7 +196,7 @@ struct ArticleStoreTests {
                 siteURL: URL(string: "https://www.lemonde.fr")
             )
         ).feed
-        try await add("Un match", feed: feed, published: now)
+        try await add("Un match", feed: feed, published: now, author: "Claire Ancelin")
         let summary = try #require(try await articles.summaries(.all, now: now).first)
         let article = try #require(await articles.article(id: summary.id))
 
@@ -203,15 +205,69 @@ struct ArticleStoreTests {
             publisher: "Le Monde",
             mark: URL(string: "https://www.lemonde.fr/favicon.ico")
         )
-        #expect(page.contains("<span class=\"source\"><span class=\"mark\"></span>Le Monde</span>"))
-        #expect(page.contains(".source .mark { background-image: url(\"https://www.lemonde.fr/favicon.ico\"); }"))
+        #expect(page.contains("<span class=\"pill\"><span class=\"mark m0\"></span>Le Monde</span>"))
+        #expect(page.contains(".pill .m0 { background-image: url(\"https://www.lemonde.fr/favicon.ico\"); }"))
+
+        // Where it came from and when on the first line, who wrote it on the
+        // second : a person was in a run of punctuation between two timestamps,
+        // which gave a name the weight of a date. The name alone, since a pill
+        // under the paper that ran it is already a byline.
+        #expect(page.contains("<span>\(now.formatted(date: .long, time: .shortened))</span></div>"))
+        #expect(page.contains("<div class=\"line\"><span class=\"pill\">Claire Ancelin</span></div>"))
 
         // No box is kept for a mark there is none of : scripting is off, so
         // nothing in the page could notice one that never arrives and take its
         // place back.
         let bare = ArticleDocument.html(for: article, publisher: "Le Monde")
-        #expect(bare.contains("<span class=\"source\">Le Monde</span>"))
+        #expect(bare.contains("<span class=\"pill\">Le Monde</span>"))
         #expect(!bare.contains("class=\"mark\""))
+    }
+
+    @Test("Two people are two pills, and one written backwards is still one person")
+    func aBylineIsUnpicked() {
+        #expect(ArticleDocument.people(in: "Claire Ancelin") == ["Claire Ancelin"])
+
+        // The separators publishers actually use, in one field none of them
+        // was designed for.
+        #expect(ArticleDocument.people(in: "Claire Ancelin, Paul Rey") == ["Claire Ancelin", "Paul Rey"])
+        #expect(ArticleDocument.people(in: "Claire Ancelin & Paul Rey") == ["Claire Ancelin", "Paul Rey"])
+        #expect(ArticleDocument.people(in: "Claire Ancelin and Paul Rey") == ["Claire Ancelin", "Paul Rey"])
+        #expect(ArticleDocument.people(in: "Claire Ancelin et Paul Rey") == ["Claire Ancelin", "Paul Rey"])
+        #expect(
+            ArticleDocument.people(in: "Claire Ancelin, Paul Rey et Yann Sobral")
+                == ["Claire Ancelin", "Paul Rey", "Yann Sobral"]
+        )
+
+        // One person written backwards, which splitting would tear in half.
+        #expect(ArticleDocument.people(in: "Dupont, Jean") == ["Dupont, Jean"])
+
+        #expect(ArticleDocument.people(in: "").isEmpty)
+        #expect(ArticleDocument.people(in: " , ").isEmpty)
+    }
+
+    @Test("Each person's pill has a place for a picture, and none is kept empty")
+    func aPillIsReadyForAFace() async throws {
+        let feed = try await feed("https://feeds.example.com/rss.xml", title: "Example")
+        try await add("Un titre", feed: feed, published: now, author: "Claire Ancelin, Paul Rey")
+        let summary = try #require(try await articles.summaries(.all, now: now).first)
+        let article = try #require(await articles.article(id: summary.id))
+
+        // Nothing gives a journalist a face yet. What would is this, and the
+        // page is built to take it.
+        let page = ArticleDocument.html(
+            for: article,
+            publisher: "Example",
+            mark: URL(string: "https://example.com/favicon.ico"),
+            portraits: ["Paul Rey": URL(string: "https://example.com/paul.jpg")!]
+        )
+
+        // Numbered as they are met : the publisher, then whoever has a picture.
+        #expect(page.contains("<span class=\"mark m0\"></span>Example"))
+        #expect(page.contains("<span class=\"pill\">Claire Ancelin</span>"))
+        #expect(page.contains("<span class=\"mark m1\"></span>Paul Rey"))
+        #expect(page.contains(".pill .m0 { background-image: url(\"https://example.com/favicon.ico\"); }"))
+        #expect(page.contains(".pill .m1 { background-image: url(\"https://example.com/paul.jpg\"); }"))
+        #expect(!page.contains("m2"))
     }
 
     @Test("An address cannot close the rule it is written into")
@@ -230,7 +286,7 @@ struct ArticleStoreTests {
             publisher: "Example",
             mark: URL(string: "https://example.com/a%22.ico")
         )
-        #expect(page.contains("url(\"https://example.com/a%22.ico\")"))
+        #expect(page.contains(".pill .m0 { background-image: url(\"https://example.com/a%22.ico\"); }"))
         #expect(!page.contains("a\".ico"))
     }
 

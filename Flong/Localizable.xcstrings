@@ -1,9 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "" : {
-
-    },
+    "" : {},
     "%@, read" : {
       "localizations" : {
         "fr" : {
@@ -636,16 +634,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Entreprises"
-          }
-        }
-      }
-    },
-    "By %@" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Par %@"
           }
         }
       }

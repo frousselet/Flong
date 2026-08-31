@@ -34,13 +34,24 @@ nonisolated enum ArticleDocument {
     ///   The feed's own title stands in only where the publisher is unknown.
     /// - Parameter mark: the publisher's own mark, to set in the pill in front
     ///   of their name. One address and no second try : see ``SourceIcon/mark(for:)``.
+    /// - Parameter portraits: a picture for a person who is credited, by the
+    ///   name they are credited under.
+    ///
+    ///   **Nothing fills this yet, and the pills are built to be filled.** A
+    ///   publisher draws a logo and every feed says where it is ; a journalist
+    ///   has a face and no feed format has a field for it, so a picture would
+    ///   have to come from somewhere else : an `h-card` on the article's own
+    ///   page, a Micropub author, or the reader's own choosing. Whichever of
+    ///   those arrives, what it has to hand over is this, and the page already
+    ///   knows what to do with it.
     static func html(
         for article: Article,
         publisher: String? = nil,
         mark: URL? = nil,
+        portraits: [String: URL] = [:],
         showing body: Body = .page
     ) -> String {
-        let byline = byline(of: article, publisher: publisher, mark: mark)
+        let credits = byline(of: article, publisher: publisher, mark: mark, portraits: portraits)
         let chosen = (body == .page ? article.extractedHTML : nil) ?? article.bodyHTML ?? ""
         let markup = without(article.imageURL, in: chosen)
 
@@ -51,14 +62,14 @@ nonisolated enum ArticleDocument {
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
             <style>\(stylesheet)</style>
-            <style>\(Self.mark(at: mark))</style>
+            <style>\(credits.rules)</style>
             </head>
             <body>
             \(lead(of: article))
             <div class="column">
             <header>
             <h1>\(HTMLEntities.escape(article.title))</h1>
-            <p class="byline">\(byline)</p>
+            <div class="byline">\(credits.rows)</div>
             </header>
             <article>\(markup)</article>
             </div>
@@ -113,77 +124,140 @@ nonisolated enum ArticleDocument {
         return markup.replacingCharacters(in: opening.lowerBound..<closing.upperBound, with: "")
     }
 
-    /// Who published it, on a pill, and what else is known about the article
-    /// beside it.
+    /// Where it came from and when, then who wrote it : two lines, each name
+    /// on a pill of its own.
     ///
-    /// **The publisher is set apart from the rest of the line.** Everything
-    /// here is the application talking about the article rather than the
-    /// article talking, and one of the four is not like the other three : the
-    /// author, the date and the revision describe this piece, and the publisher
-    /// is the one fact that is the same for every piece they have ever run. It
-    /// is also the only one that is looked up rather than read off the article,
-    /// so a reader who renames a publisher renames it here too, and the mark
-    /// they know it by can stand in front of the name, which is what a mark is
-    /// for : it is recognized before the name is read.
+    /// **A person is not a date.** The author used to sit in a run of
+    /// punctuation with the publication and the revision, which put a name
+    /// between two timestamps and gave it the weight of one. The first line is
+    /// the piece as a whole : who ran it and when. The second is who wrote it,
+    /// and it is the only thing on it.
     ///
-    /// The pill is the same one the pictures wear their credit on, so a reader
-    /// meets one shape for *this came from them* rather than one per screen.
-    private static func byline(of article: Article, publisher: String?, mark: URL?) -> String {
-        let source = publisher ?? article.domain ?? article.feedTitle
-        var parts: [String] = []
-        if let author = article.author, !author.isEmpty {
-            parts.append(String(localized: "By \(author)"))
+    /// **One pill per person, never one pill per credit line.** Feeds write
+    /// three names into one field and leave the reader to unpick them. Two
+    /// people are two people : they are separated here so that each is a thing
+    /// on the page rather than a substring, which is what a face in front of a
+    /// name will need when there is one to put there.
+    ///
+    /// Returns the rows, and the rules that put each picture in its pill.
+    private static func byline(
+        of article: Article,
+        publisher: String?,
+        mark: URL?,
+        portraits: [String: URL]
+    ) -> (rows: String, rules: String) {
+        // Numbered as they are met, since each picture needs a selector of its
+        // own and the address itself stays in the stylesheet rather than going
+        // into an attribute, where it would be escaped twice for one gain of
+        // nothing.
+        var pictures: [URL] = []
+
+        func pill(_ name: String, wearing picture: URL?) -> String {
+            var stamp = ""
+            // The mark's own box is dropped when there is no picture to put in
+            // it, since scripting is off and nothing in the page can notice one
+            // that failed : a box kept for a picture that never arrives is a
+            // hole in front of the name for the whole life of the page.
+            if let picture {
+                pictures.append(picture)
+                stamp = "<span class=\"mark m\(pictures.count - 1)\"></span>"
+            }
+            return "<span class=\"pill\">\(stamp)\(HTMLEntities.escape(name))</span>"
         }
+
+        var lines: [String] = []
+
+        // The first line is where it came from and when they ran it. Both are
+        // facts about the piece as a whole, and the date is the shortest thing
+        // a reader checks, so it sits where the eye already is.
+        var first: [String] = []
+
+        let source = publisher ?? article.domain ?? article.feedTitle
+        if !source.isEmpty { first.append(pill(source, wearing: mark)) }
+
+        var when: [String] = []
         if let date = article.publishedAt {
-            parts.append(date.formatted(date: .long, time: .shortened))
+            when.append(date.formatted(date: .long, time: .shortened))
         }
         // Said in full here, beside the publication rather than instead of it :
         // the page has room for both, and a reader who has opened the article
         // is the one who wants to know exactly what changed when. The list has
         // room for one and shows whichever is the later.
         if let updated = article.updatedAt {
-            parts.append(String(localized: "updated \(updated.formatted(date: .long, time: .shortened))"))
+            when.append(String(localized: "updated \(updated.formatted(date: .long, time: .shortened))"))
         }
-        let rest = parts.joined(separator: " · ")
+        if !when.isEmpty {
+            first.append("<span>\(HTMLEntities.escape(when.joined(separator: " · ")))</span>")
+        }
 
-        // Nothing at all rather than an empty pill : an article whose feed has
-        // gone and which never carried a domain has nobody to name.
-        guard !source.isEmpty else { return HTMLEntities.escape(rest) }
+        if !first.isEmpty { lines.append("<div class=\"line\">\(first.joined())</div>") }
 
-        // The mark's own box is dropped when there is no mark to put in it,
-        // since scripting is off and nothing in the page can notice a picture
-        // that failed : a box kept for one that never arrives is a hole in
-        // front of the name for the whole life of the page.
-        let stamp = mark == nil ? "" : "<span class=\"mark\"></span>"
-        let pill = "<span class=\"source\">\(stamp)\(HTMLEntities.escape(source))</span>"
+        // The second line is who wrote it. The names alone : a pill under the
+        // paper that ran it, holding a person's name, is a byline, and a word
+        // in front of it would be the page explaining a shape that explains
+        // itself.
+        let people = self.people(in: article.author ?? "")
+        if !people.isEmpty {
+            let pills = people.map { pill($0, wearing: portraits[$0]) }.joined()
+            lines.append("<div class=\"line\">\(pills)</div>")
+        }
 
-        return rest.isEmpty ? pill : "\(pill)<span>\(HTMLEntities.escape(rest))</span>"
+        let rules = pictures.enumerated()
+            .map { ".pill .m\($0.offset) { background-image: url(\"\(address($0.element))\"); }" }
+            .joined(separator: "\n")
+
+        return (lines.joined(), rules)
     }
 
-    /// The rule that puts the publisher's mark in the pill, or none.
+    /// The people named in one credit line, one by one.
     ///
-    /// Set here rather than on the element : it is one mark per document, and
-    /// an address written into a `style` attribute is escaped twice, once for
-    /// the attribute and once for the value inside it, which is two chances to
-    /// get it wrong for no gain.
+    /// A feed has one field for this and publishers put whole newsrooms in it,
+    /// separated by whichever punctuation the template happened to use. The
+    /// separators here are the ones that actually turn up : a comma, a
+    /// semicolon, an ampersand, and the word for *and* in the two languages
+    /// this application speaks.
     ///
-    /// **It is an address from a feed, so it is checked before it is written.**
+    /// **Two bare words divided by a comma are left alone.** `Dupont, Jean` is
+    /// one person written backwards, and splitting it produces two pills naming
+    /// halves of somebody. It is a guess, and it is the guess that fails
+    /// quietly : a pair of one-word stage names kept together reads as an
+    /// oddity, where a surname and a forename torn apart reads as a bug.
+    static func people(in line: String) -> [String] {
+        let flattened =
+            line
+            .replacingOccurrences(of: ";", with: ",")
+            .replacingOccurrences(of: " & ", with: ",")
+            .replacingOccurrences(of: " and ", with: ",", options: .caseInsensitive)
+            .replacingOccurrences(of: " et ", with: ",", options: .caseInsensitive)
+
+        let parts =
+            flattened
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        if parts.count == 2, parts.allSatisfy({ !$0.contains(" ") }) {
+            let whole = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            return whole.isEmpty ? [] : [whole]
+        }
+
+        return parts
+    }
+
+    /// An address, safe to write into the `url()` of a rule.
+    ///
+    /// **It comes from a feed, so it is checked before it is written.**
     /// ``SourceIcon/mark(for:)`` has already refused anything that is not an
     /// http address and raised it to TLS ; what is left is to make sure the
     /// text of it cannot close the `url()` it sits in and start a rule of its
     /// own. Percent encoding means neither character should survive that far,
     /// and neither is written out on the strength of should.
-    private static func mark(at address: URL?) -> String {
-        guard let address else { return "" }
-
-        let quoted =
-            address.absoluteString
+    private static func address(_ picture: URL) -> String {
+        picture.absoluteString
             .replacingOccurrences(of: "\\", with: "%5C")
             .replacingOccurrences(of: "\"", with: "%22")
             .replacingOccurrences(of: "\n", with: "")
             .replacingOccurrences(of: "\r", with: "")
-
-        return ".source .mark { background-image: url(\"\(quoted)\"); }"
     }
 
     /// Deliberately small : an article is text, and the reader's own settings
@@ -219,14 +293,17 @@ nonisolated enum ArticleDocument {
         h1 { font-size: 1.6em; line-height: 1.25; margin: 0 0 8px; }
         h2, h3, h4 { line-height: 1.3; margin: 1.4em 0 0.4em; }
         /* What the application says about the article, rather than the article. */
+        /* Two lines : where it came from and when, then who wrote it. */
         .byline {
           font-family: var(--voice); color: var(--muted); font-size: 0.9em; margin: 0 0 16px;
-          display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+          display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
         }
-        /* Who published it, on the pill the picture credits already use. It
-           takes the colour of what is under it, which on this page is paper
-           and over a picture is the picture. */
-        .source {
+        .byline:empty { display: none; margin: 0; }
+        .byline .line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+        /* The pill the picture credits already use. It takes the colour of what
+           is under it, which on this page is paper and over a picture is the
+           picture. */
+        .pill {
           display: inline-flex; align-items: center; gap: 6px;
           padding: 3px 10px; border-radius: 999px;
           color: var(--text); background: var(--glass);
@@ -236,7 +313,7 @@ nonisolated enum ArticleDocument {
         }
         /* Round and ringed, as the marks are everywhere else, and tucked into
            the padding so the pill sits no taller for having one. */
-        .source .mark {
+        .pill .mark {
           width: 17px; height: 17px; margin: -1px 0 -1px -5px;
           border-radius: 50%; background: center / cover no-repeat;
           box-shadow: inset 0 0 0 0.5px var(--rule);
