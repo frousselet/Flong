@@ -111,10 +111,31 @@ nonisolated struct TopicNamer: Sendable {
     /// Inventing is the second pass and is deliberately separate.
     func file(_ headline: String, summary: String?, into vocabulary: [String]) async -> Filing {
         guard OnDeviceModel.isAvailable else { return .unusable }
-        guard !vocabulary.isEmpty else { return .chosen([]) }
+
+        // **An empty vocabulary is not an answer about this story.** It used to
+        // give back `.chosen([])`, which reads as the model having considered
+        // the story and placed it under nothing : the caller stamped it as
+        // asked and never came back to it. Nothing had been asked at all. A
+        // migration that left every existing subject marked as the model's own
+        // emptied this list for one run, and a whole page of stories was
+        // stamped as answered by a question nobody ever put.
+        guard !vocabulary.isEmpty else {
+            Log.enrich.notice("There is no subject to file a story under yet")
+            return .unusable
+        }
+
+        // Built before the session, and its failure is neither the model's nor
+        // this story's : a schema that will not build is a mistake here. It
+        // used to be thrown inside the same `do`, where anything that is not a
+        // `GenerationError` counts as the model being unusable, so three
+        // stories in a row silenced the model for the rest of the run, briefs
+        // included.
+        guard let schema = try? Self.schema(for: vocabulary) else {
+            Log.enrich.error("The filing schema could not be built from \(vocabulary.count) subjects")
+            return .unusable
+        }
 
         do {
-            let schema = try Self.schema(for: vocabulary)
             // The general model, and not `contentTagging`, which looks like the
             // obvious choice and was measured to be worse. See
             // ``OnDeviceModel/model(for:)``.

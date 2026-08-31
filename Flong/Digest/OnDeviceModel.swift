@@ -28,7 +28,25 @@ nonisolated enum OnDeviceModel {
     /// fourth time costs a quarter of a second to learn what the third already
     /// said, and the digest is perfectly good without it.
     static let refusalsBeforeGivingUp = 3
-    private static let refusals = Mutex(0)
+
+    /// How long the model is left alone once it has been given up on.
+    ///
+    /// **A pause, and not the one-way latch it was.** Nothing cleared the count
+    /// except a success, and no success is possible while every caller asks
+    /// ``isAvailable`` first : three failures and the model was off for the
+    /// whole life of the process, which on a Mac is days. The reasons it fails
+    /// are mostly temporary, and every one of them is a reason to try again
+    /// later : assets still downloading, a reader switching Apple Intelligence
+    /// on, a rate limit lifting.
+    static let refusalPause: TimeInterval = 10 * 60
+
+    /// The failures in a row, and when they added up to giving up.
+    private nonisolated struct Refusals: Sendable {
+        var count = 0
+        var gaveUpAt: Date?
+    }
+
+    private static let refusals = Mutex(Refusals())
 
     // MARK: - The model, as a news reader needs it
 
@@ -86,8 +104,24 @@ nonisolated enum OnDeviceModel {
     // MARK: - Whether to ask at all
 
     static var isAvailable: Bool {
-        guard refusals.withLock({ $0 }) < refusalsBeforeGivingUp else { return false }
+        guard !hasGivenUp(now: Date()) else { return false }
         return SystemLanguageModel.default.availability == .available
+    }
+
+    /// Whether the model is still being left alone after a run of failures.
+    ///
+    /// The pause expiring forgets the failures outright rather than allowing
+    /// one more call : what follows is a fresh run of three, so a model that is
+    /// genuinely broken is asked three times every ten minutes and no more.
+    static func hasGivenUp(now: Date) -> Bool {
+        refusals.withLock { refusals in
+            guard let gaveUpAt = refusals.gaveUpAt else { return false }
+            guard now.timeIntervalSince(gaveUpAt) < refusalPause else {
+                refusals = Refusals()
+                return false
+            }
+            return true
+        }
     }
 
     /// Whether the model writes the language the reader reads in.
@@ -136,27 +170,51 @@ nonisolated enum OnDeviceModel {
     }
 
     static func succeeded() {
-        refusals.withLock { $0 = 0 }
+        refusals.withLock { $0 = Refusals() }
     }
 
     /// Records a failure, and says so once rather than once per story.
     ///
     /// A model that will not write about one story is not a model that has
     /// stopped working, and only the second is worth giving up on.
-    static func refused(_ error: Error) {
+    ///
+    /// **Nor is a model that is merely busy.** A rate limit and a clash of
+    /// concurrent requests are the system saying to come back, which is the
+    /// opposite of a reason to stop coming back. They still stop this
+    /// particular call, so nothing is stamped as answered, and they no longer
+    /// count towards giving up : a background pass is rate-limited hard, and
+    /// three of those used to silence the model for the rest of the process,
+    /// which is how a night of writing headlines ended with no subjects filed.
+    static func refused(_ error: Error, now: Date = Date()) {
         guard isTheModelItself(error) else {
             Log.enrich.notice("The model would not write about one story : \(Self.kind(of: error), privacy: .public)")
             return
         }
+        guard !isBusy(error) else {
+            Log.enrich.info("The model is busy : \(Self.kind(of: error), privacy: .public)")
+            return
+        }
 
-        let count = refusals.withLock { count -> Int in
-            count += 1
-            return count
+        let count = refusals.withLock { refusals -> Int in
+            refusals.count += 1
+            if refusals.count == refusalsBeforeGivingUp { refusals.gaveUpAt = now }
+            return refusals.count
         }
         guard count == refusalsBeforeGivingUp else { return }
         Log.enrich.notice(
-            "The model failed \(count) times and will not be asked again this run : \(Self.kind(of: error), privacy: .public)"
+            "The model failed \(count) times and is left alone for a while : \(Self.kind(of: error), privacy: .public)"
         )
+    }
+
+    /// Whether the answer is the system asking for a moment rather than saying
+    /// it cannot help.
+    static func isBusy(_ error: Error) -> Bool {
+        guard let error = error as? LanguageModelSession.GenerationError else { return false }
+
+        switch error {
+        case .rateLimited, .concurrentRequests: return true
+        default: return false
+        }
     }
 
     /// Whether an error is the model being unusable, rather than the model
@@ -202,8 +260,13 @@ nonisolated enum OnDeviceModel {
     }
 
     /// Forgets the refusals, for the next launch or a deliberate retry.
+    ///
+    /// Called when the reader comes back to the application and at the head of
+    /// the full pass. Both are moments when what made the model fail an hour
+    /// ago may well have changed, and neither costs anything if it has not :
+    /// the count simply builds again.
     static func reconsider() {
-        refusals.withLock { $0 = 0 }
+        refusals.withLock { $0 = Refusals() }
     }
 
     // MARK: - The language of the answer
