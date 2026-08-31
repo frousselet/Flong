@@ -192,6 +192,8 @@ struct CollectionsScreen: View {
 struct CollectionSquare: View {
     let collection: ArticleCollection
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             cover
@@ -201,7 +203,7 @@ struct CollectionSquare: View {
                     .font(.system(.subheadline, weight: .medium))
                     .lineLimit(1)
                 Text("\(collection.count) articles")
-                    .font(Editorial.metadata)
+                    .font(theme.metadata)
                     .foregroundStyle(.secondary)
             }
         }

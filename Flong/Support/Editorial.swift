@@ -14,8 +14,15 @@ import SwiftUI
 /// The few decisions that make the interface look like one thing.
 ///
 /// Everything here is a token rather than a value typed at a call site : one
-/// place to change a measure, a rhythm or a face, which is how a design stays
+/// place to change a measure or a rhythm, which is how a design stays
 /// consistent while it is still being argued about.
+///
+/// **The faces moved to ``Theme``.** They were three tokens here and they were
+/// the right three ; what changed is that there is more than one answer to each
+/// of them. A headline is serif, or sans, or monospace, depending on which
+/// theme the reader chose, and a static property has nowhere to read that from.
+/// The measures stayed : a column is 680 points wide in every theme, since the
+/// eye loses a long line whatever face it is set in.
 nonisolated enum Editorial {
     /// The width a column of text may reach.
     ///
@@ -38,22 +45,6 @@ nonisolated enum Editorial {
 
     static let rhythm: CGFloat = 28
     static let tightRhythm: CGFloat = 10
-
-    /// Headlines are serif, everything else is not.
-    ///
-    /// It is the cheapest way to say that this is a place where things are read
-    /// rather than a place where things are managed, and it separates what an
-    /// article says from what the application says about it.
-    static func headline(_ style: Font.TextStyle) -> Font {
-        .system(style, design: .serif, weight: .semibold)
-    }
-
-    /// The line under a headline : what happened, in one sentence.
-    static var standfirst: Font { .system(.subheadline, design: .serif) }
-
-    /// Everything the application says about an article rather than in it :
-    /// rooms, counts, times.
-    static var metadata: Font { .system(.caption, design: .default) }
 }
 
 nonisolated extension View {
@@ -70,13 +61,6 @@ nonisolated extension View {
 /// and one that is moving has a moving dot. It stops entirely when the reader
 /// has asked for less motion.
 struct LiveDot: View {
-    /// The colour of the dot, and of anything that names it.
-    ///
-    /// Named rather than written twice : a heading beside the dot has to be the
-    /// dot's own colour, and two literals that happen to agree today are two
-    /// literals that stop agreeing the first time one of them is changed.
-    static let tint = Color.red
-
     /// How faint the dot goes at the bottom of its pulse.
     ///
     /// A heading beside it takes this rather than the full colour : the dot is
@@ -86,14 +70,21 @@ struct LiveDot: View {
     static let faded = 0.55
 
     /// The colour a heading beside the dot is set in.
-    static var quietTint: Color { tint.opacity(faded) }
+    ///
+    /// Asked for rather than written twice : a heading beside the dot has to be
+    /// the dot's own colour, and two literals that happen to agree today are
+    /// two literals that stop agreeing the first time one of them is changed.
+    static func quietTint(_ theme: Theme) -> Color {
+        theme.live.opacity(faded)
+    }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.theme) private var theme
     @State private var isPulsing = false
 
     var body: some View {
         Circle()
-            .fill(Self.tint)
+            .fill(theme.live)
             .frame(width: 7, height: 7)
             .scaleEffect(isPulsing ? 1.35 : 1)
             .opacity(isPulsing ? Self.faded : 1)

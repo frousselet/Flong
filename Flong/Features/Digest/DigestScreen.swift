@@ -25,6 +25,8 @@ struct DigestScreen: View {
     @Binding var isChoosingFile: Bool
     let open: (Route) -> Void
 
+    @Environment(\.theme) private var theme
+
     /// Carries a pill's glass from one state to the next.
     @Namespace private var pills
 
@@ -213,7 +215,7 @@ struct DigestScreen: View {
                     // The dot's own colour at the quiet end of its pulse : the
                     // dot is the loud thing and the word is what it means, so
                     // the pair reads as one mark rather than as two red things.
-                    Text("Live stories").foregroundStyle(LiveDot.quietTint)
+                    Text("Live stories").foregroundStyle(LiveDot.quietTint(theme))
                 }
             }
             ForEach(live) { story in
@@ -481,6 +483,8 @@ struct StoryRow: View {
     let zoom: Namespace.ID
     let open: () -> Void
 
+    @Environment(\.theme) private var theme
+
     /// The width of the picture beside a story that is not the lead. Its
     /// height follows from the one ratio every picture is shown in.
     private static let thumbnailWidth: CGFloat = 96
@@ -559,7 +563,7 @@ struct StoryRow: View {
             }
 
             Text(verbatim: story.title)
-                .font(Editorial.headline(headline))
+                .font(theme.headline(headline))
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
@@ -585,7 +589,7 @@ struct StoryRow: View {
         VStack(alignment: .leading, spacing: 7) {
             if let summary = story.summary, !summary.isEmpty {
                 Text(verbatim: summary)
-                    .font(Editorial.standfirst)
+                    .font(theme.standfirst())
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.leading)
                     .lineLimit(3)
@@ -637,7 +641,7 @@ struct StoryRow: View {
             factsLine(sparkline: false)
             factsLine(sparkline: false, articles: false)
         }
-        .font(Editorial.metadata)
+        .font(theme.metadata)
         .foregroundStyle(.tertiary)
     }
 
@@ -675,6 +679,8 @@ struct ArticleRow: View {
     let zoom: Namespace.ID
     let open: () -> Void
 
+    @Environment(\.theme) private var theme
+
     /// The width of the picture beside an article.
     private static let thumbnailWidth: CGFloat = 78
 
@@ -699,7 +705,7 @@ struct ArticleRow: View {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
                     headline
-                        .font(Editorial.headline(.body))
+                        .font(theme.headline(.body))
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
@@ -726,7 +732,7 @@ struct ArticleRow: View {
                                 .accessibilityLabel(Text("Holds media"))
                         }
                     }
-                    .font(Editorial.metadata)
+                    .font(theme.metadata)
                     .foregroundStyle(.tertiary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -798,6 +804,7 @@ private struct ActivityLine: View {
     let work: WorkPlan?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.theme) private var theme
 
     /// How tall the band is while there is something in it.
     ///
@@ -884,7 +891,7 @@ private struct ActivityLine: View {
             // bar says how far ; the words say what.
             Text(work.phase.title)
                 .lineLimit(1)
-                .font(Editorial.metadata)
+                .font(theme.metadata)
                 .foregroundStyle(.secondary)
             bar(work)
         }

@@ -22,6 +22,7 @@ struct StoryScreen: View {
     let zoom: Namespace.ID
     let open: (UUID) -> Void
 
+    @Environment(\.theme) private var theme
     @State private var isExplaining = false
 
     private var story: DigestStory? {
@@ -79,12 +80,14 @@ struct StoryScreen: View {
             }
 
             Text(verbatim: story.title)
-                .font(Editorial.headline(.largeTitle))
+                .font(theme.headline(.largeTitle))
                 .fixedSize(horizontal: false, vertical: true)
 
             if let summary = story.summary, !summary.isEmpty {
                 Text(verbatim: summary)
-                    .font(.system(.body, design: .serif))
+                    // The standfirst at the size a whole page gives it, rather
+                    // than at the size a row on the front page can spare.
+                    .font(theme.standfirst(.body))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -111,7 +114,7 @@ struct StoryScreen: View {
             isExplaining = true
         } label: {
             Label("Written by the model", systemImage: "sparkles")
-                .font(Editorial.metadata)
+                .font(theme.metadata)
                 .foregroundStyle(.secondary)
         }
         .buttonStyle(.plain)
@@ -161,7 +164,7 @@ struct StoryScreen: View {
             Spacer(minLength: 4)
             Text(story.lastAt, format: .relative(presentation: .numeric))
         }
-        .font(Editorial.metadata)
+        .font(theme.metadata)
         .foregroundStyle(.tertiary)
     }
 }
@@ -172,6 +175,7 @@ struct ArticleScreen: View {
     let articleID: UUID
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
 
     @State private var isNamingCollection = false
     @State private var collectionName = ""
@@ -248,7 +252,8 @@ struct ArticleScreen: View {
                             for: article,
                             publisher: publisher(of: article)?.name ?? article.domain ?? article.feedTitle,
                             mark: mark(of: publisher(of: article)),
-                            showing: showing
+                            showing: showing,
+                            theme: theme
                         ),
                         runsUnderTheBar: hasHeadPicture
                     )
@@ -351,7 +356,7 @@ struct ArticleScreen: View {
             ProgressView().controlSize(.small)
             Text("Fetching the full article")
         }
-        .font(Editorial.metadata)
+        .font(theme.metadata)
         .foregroundStyle(.secondary)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

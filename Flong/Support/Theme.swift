@@ -1,0 +1,406 @@
+//
+//  Theme.swift
+//  Flong
+//
+//  Created by François Rousselet on 31/08/2026.
+//
+//  This Source Code Form is subject to the terms of the Mozilla Public
+//  License, v. 2.0. If a copy of the MPL was not distributed with this
+//  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+
+import SwiftUI
+
+/// One colour, written once and read in the two places a colour is needed.
+///
+/// A palette is argued about in hexadecimal and used in a view and in a
+/// stylesheet, which want different things : SwiftUI wants a `Color` and a
+/// rendered article wants text. Writing each colour twice is writing each
+/// colour twice, and the two spellings stop agreeing the first time one of them
+/// is changed.
+nonisolated struct Ink: Hashable, Sendable {
+    let red: Double
+    let green: Double
+    let blue: Double
+    let alpha: Double
+
+    /// - Parameter hex: the colour as it is argued about, `0xRRGGBB`.
+    /// - Parameter alpha: how much of the page shows through. A hairline is the
+    ///   only thing here that wants any : a rule stated as an opaque colour is
+    ///   a rule that only looks right on the one paper it was picked against.
+    init(_ hex: UInt32, alpha: Double = 1) {
+        self.red = Double((hex >> 16) & 0xFF) / 255
+        self.green = Double((hex >> 8) & 0xFF) / 255
+        self.blue = Double(hex & 0xFF) / 255
+        self.alpha = alpha
+    }
+
+    var color: Color {
+        Color(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
+    }
+
+    /// The colour as a stylesheet takes it.
+    ///
+    /// Channels rather than the hexadecimal it was written as : a colour that
+    /// lets the paper through has an alpha, hexadecimal has nowhere to put one,
+    /// and a palette that spelled its opaque colours one way and its hairlines
+    /// another would be a palette read twice.
+    var css: String {
+        func byte(_ value: Double) -> Int { Int((value * 255).rounded()) }
+        let channels = "\(byte(red)), \(byte(green)), \(byte(blue))"
+        return alpha < 1 ? "rgba(\(channels), \(alpha))" : "rgb(\(channels))"
+    }
+}
+
+/// What a theme is made of, in one appearance.
+///
+/// Six colours and no more. Every theme answers all six for light and for dark,
+/// which is what stops a palette from being half a palette : a theme that
+/// stated only its paper would be a theme that looked right in one appearance
+/// and was never tried in the other.
+nonisolated struct Palette: Hashable, Sendable {
+    /// What the page is printed on.
+    let paper: Ink
+    /// What it is printed in.
+    let ink: Ink
+    /// What the application says about the page, rather than what the page says.
+    let muted: Ink
+    /// The hairline between one thing and the next.
+    let rule: Ink
+    /// The one colour that is neither paper nor ink : a link, a control, a
+    /// thing that can be pressed.
+    let accent: Ink
+    /// The edge a pill wears, which is a rule that lets the paper through.
+    let edge: Ink
+    /// A row of a list, which stands very slightly off the paper behind it.
+    let surface: Ink
+}
+
+/// How the whole application is set : the faces, and the colours.
+///
+/// **Three, and three is the number.** A list of themes is a list of opinions
+/// about what a page is, and past three they stop being opinions and become
+/// permutations of a typeface menu. Each of these says something the other two
+/// do not, and each says it in the two halves a theme has : what it is set in,
+/// and what it is printed on.
+///
+/// - ``standard`` is the system's own : its colours, its contrast, its
+///   accent, set throughout in the face the system uses for everything else.
+/// - ``paper`` is the one that looks like something that was printed. Serif
+///   headlines on warm paper, and every colour in it pulled back from the
+///   contrast a screen defaults to.
+/// - ``solarized`` is Ethan Schoonover's palette, which was worked out for
+///   reading text for hours and is the reason anybody has heard of it, with
+///   headlines set in the monospace face that palette grew up in.
+///
+/// **The face is the loud half.** A reader can name the colours of a theme
+/// after a while ; they can tell the face apart in the first second, and it is
+/// what says whether this is a place where things are read or a place where
+/// things are managed. So each theme states its own answer for headlines, for
+/// the line under one, and for what the application says about an article, and
+/// no screen sets a face of its own.
+nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
+    case standard
+    case paper
+    case solarized
+
+    var id: String { rawValue }
+
+    /// What the reader picks it by.
+    var name: LocalizedStringResource {
+        switch self {
+        case .standard: "Default"
+        case .paper: "Paper"
+        case .solarized: "Solarized"
+        }
+    }
+
+    /// The one line under the name, which says what changes.
+    ///
+    /// A theme is chosen from a list of three words, and three words are not
+    /// enough to tell a reader what they are about to get. Each line names the
+    /// two halves in the order they will be noticed : the face, then the paper.
+    var explanation: LocalizedStringResource {
+        switch self {
+        case .standard: "Sans serif throughout, in the colours of the system."
+        case .paper: "Serif headlines on warm paper, with the contrast pulled back."
+        case .solarized: "Headlines in monospace, on the Solarized palette."
+        }
+    }
+
+    // MARK: - The faces
+
+    /// Headlines, and the one decision a reader notices first.
+    func headline(_ style: Font.TextStyle) -> Font {
+        switch self {
+        case .standard: .system(style, design: .default, weight: .semibold)
+        case .paper: .system(style, design: .serif, weight: .semibold)
+        case .solarized: .system(style, design: .monospaced, weight: .semibold)
+        }
+    }
+
+    /// The line under a headline : what happened, in one sentence.
+    ///
+    /// It takes a size because the front page and a story's own page set it at
+    /// different ones, and a token that answered only for the smaller of the
+    /// two left the larger writing a face of its own at a call site.
+    func standfirst(_ style: Font.TextStyle = .subheadline) -> Font {
+        switch self {
+        // Serif under a serif headline, and sans under the other two : the
+        // standfirst belongs to the headline above it rather than to the
+        // application, so it is set in the voice the headline is set in. Never
+        // in monospace, which is a face for a title of twelve words and not for
+        // two sentences of prose.
+        case .paper: .system(style, design: .serif)
+        case .standard, .solarized: .system(style, design: .default)
+        }
+    }
+
+    /// Everything the application says about an article rather than in it :
+    /// rooms, counts, times.
+    ///
+    /// Sans in all three, which is the point of it. The metadata is the
+    /// application's own voice, and a theme that set it in the headline's face
+    /// would have lost the one distinction the typography is there to make.
+    var metadata: Font { .system(.caption, design: .default) }
+
+    // MARK: - The colours
+
+    /// Whether this theme paints the interface itself.
+    ///
+    /// ``standard`` does not, and it is the only one that does not : it *is*
+    /// the system's appearance, and a theme that restated the system's colours
+    /// as literals would be a theme that stopped following them the first time
+    /// the system changed one, or the reader turned the contrast up, or a
+    /// platform drew its windows in something other than white. Its palette
+    /// below is stated for the rendered article alone, which is a web page and
+    /// has no system colours to inherit.
+    var paints: Bool { self != .standard }
+
+    /// The colours, in one appearance.
+    func palette(in scheme: ColorScheme) -> Palette {
+        scheme == .dark ? dark : light
+    }
+
+    /// The ground a raised thing sits on : a card, a row of a form, a well.
+    ///
+    /// The system's own where the theme does not paint, which is what the
+    /// standard theme means, and one shade off the theme's paper otherwise. A
+    /// card is the one thing a themed page cannot leave to the system : a grey
+    /// well is right under the standard theme and plainly foreign on warm paper
+    /// or on base03.
+    func surface(in scheme: ColorScheme) -> AnyShapeStyle {
+        paints ? AnyShapeStyle(palette(in: scheme).surface.color) : AnyShapeStyle(.background.secondary)
+    }
+
+    private var light: Palette {
+        switch self {
+        // The system's own, as the stylesheet has always stated them.
+        case .standard:
+            Palette(
+                paper: Ink(0xFFFFFF),
+                ink: Ink(0x1C1C1E),
+                muted: Ink(0x6C6C70),
+                rule: Ink(0xD8D8DC),
+                accent: Ink(0x0B6BCB),
+                edge: Ink(0x3C3C43, alpha: 0.15),
+                surface: Ink(0xF2F2F7)
+            )
+
+        // Warm, and quieter than a screen wants to be. The ink is not black
+        // and the paper is not white : a page of text at full contrast is a
+        // page that is looked at rather than read, which is the one thing this
+        // theme is for.
+        case .paper:
+            Palette(
+                paper: Ink(0xF5EFE4),
+                ink: Ink(0x33302B),
+                muted: Ink(0x7B7368),
+                rule: Ink(0xDED4C2),
+                accent: Ink(0x9C5B33),
+                edge: Ink(0x554A3A, alpha: 0.18),
+                surface: Ink(0xFBF7EF)
+            )
+
+        // Solarized, by its own names : base3 for the paper, base01 for the
+        // ink, base00 for what is said about the page, blue for what can be
+        // pressed. Not base00 for the ink, which is the palette's body text and
+        // sits at four and a half to one against base3 : it passes, barely, and
+        // this application has a screen where the contrast has to hold at a
+        // caption size.
+        case .solarized:
+            Palette(
+                paper: Ink(0xFDF6E3),
+                ink: Ink(0x586E75),
+                muted: Ink(0x657B83),
+                rule: Ink(0x93A1A1, alpha: 0.45),
+                accent: Ink(0x268BD2),
+                edge: Ink(0x586E75, alpha: 0.20),
+                surface: Ink(0xEEE8D5)
+            )
+        }
+    }
+
+    private var dark: Palette {
+        switch self {
+        case .standard:
+            Palette(
+                paper: Ink(0x000000),
+                ink: Ink(0xF2F2F7),
+                muted: Ink(0x9C9CA1),
+                rule: Ink(0x3A3A3C),
+                accent: Ink(0x6FB2FF),
+                edge: Ink(0x545458, alpha: 0.33),
+                surface: Ink(0x1C1C1E)
+            )
+
+        // Not black : the paper is warm at night as well, or the theme is a
+        // serif face and nothing else once the sun goes down.
+        case .paper:
+            Palette(
+                paper: Ink(0x181510),
+                ink: Ink(0xECE3D3),
+                muted: Ink(0x9A9083),
+                rule: Ink(0x3A342B),
+                accent: Ink(0xD99A6C),
+                edge: Ink(0xA09480, alpha: 0.28),
+                surface: Ink(0x221E17)
+            )
+
+        // base03 and base02 for the two grounds, base1 for the ink and base0
+        // for what is said about the page : the palette's own dark, in the
+        // order it names them.
+        case .solarized:
+            Palette(
+                paper: Ink(0x002B36),
+                ink: Ink(0x93A1A1),
+                muted: Ink(0x839496),
+                rule: Ink(0x586E75, alpha: 0.55),
+                accent: Ink(0x389CE0),
+                edge: Ink(0x93A1A1, alpha: 0.22),
+                surface: Ink(0x073642)
+            )
+        }
+    }
+
+    /// The colour of the dot that says a story is still moving.
+    ///
+    /// One colour for both appearances, where everything else in a theme has
+    /// two. It is seven points across and it is the loudest thing on the page
+    /// on purpose : a red picked for paper and a red picked for night would be
+    /// two shades of alarm nobody could tell apart at that size.
+    var live: Color {
+        switch self {
+        case .standard: .red
+        case .paper: Ink(0xB0392E).color
+        case .solarized: Ink(0xDC322F).color
+        }
+    }
+
+    // MARK: - The same decisions, for a page that is not SwiftUI
+
+    /// The face a rendered article's own text is set in.
+    ///
+    /// The stacks are written out rather than left to `font-family: system-ui`,
+    /// which resolves to one face and cannot be asked for the other two.
+    var pageBody: String {
+        switch self {
+        case .standard, .solarized: Self.sansStack
+        case .paper: Self.serifStack
+        }
+    }
+
+    /// The face a rendered article's headline is set in.
+    var pageHeadline: String {
+        switch self {
+        case .standard: Self.sansStack
+        case .paper: Self.serifStack
+        case .solarized: Self.monoStack
+        }
+    }
+
+    /// The application's own voice inside a rendered article : the byline, a
+    /// caption, the dates. Sans in all three, for the reason ``metadata`` is.
+    static let sansStack = "-apple-system, system-ui, sans-serif"
+    static let serifStack = "ui-serif, \"New York\", Georgia, serif"
+    static let monoStack = "ui-monospace, SFMono-Regular, Menlo, monospace"
+}
+
+nonisolated extension EnvironmentValues {
+    /// How the application is set, for every screen that sets anything.
+    ///
+    /// In the environment rather than read off the model by each view : a sheet
+    /// inherits it, a preview can state one, and a screen that needs a face has
+    /// no business knowing there is a model.
+    @Entry var theme: Theme = .standard
+}
+
+/// Paints a view in the reader's theme.
+///
+/// **Applied at the root of the window, and again at the root of every sheet.**
+/// A sheet inherits the environment and therefore knows which theme it is in,
+/// but it is a surface of its own : the system draws it its own colour, and a
+/// background painted on the window behind it stays on the window behind it.
+///
+/// It does nothing at all under the standard theme, which is the whole of what
+/// that theme means. See ``Theme/paints``.
+struct Themed: ViewModifier {
+    @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var scheme
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if theme.paints {
+            let palette = theme.palette(in: scheme)
+
+            content
+                // The ink, and everything the hierarchy derives from it : a
+                // view asking for `.secondary` is asking for less of whatever
+                // the ink is, so the whole application follows from this one
+                // line without a screen having heard of a palette.
+                .foregroundStyle(palette.ink.color)
+                .tint(palette.accent.color)
+                // A list draws the system's grouped background, and a themed
+                // page with a grey trough down the middle of it is a page in
+                // two themes. What the rows themselves stand on is
+                // ``SwiftUICore/View/themedRows()``, said on the list itself.
+                .scrollContentBackground(.hidden)
+                .background(palette.paper.color.ignoresSafeArea())
+        } else {
+            content
+        }
+    }
+}
+
+/// Stands the rows of a list on the theme's own ground.
+///
+/// **Said on the list and not with the rest of the painting.** A row's ground
+/// is the one thing in a form that the page around it cannot state on its
+/// behalf : it has to be declared where the rows are, or the system's white
+/// card stands unchanged on warm paper, which is the brightest thing on the
+/// screen and the only thing in the panel that is not in the theme.
+struct ThemedRows: ViewModifier {
+    @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var scheme
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if theme.paints {
+            content.listRowBackground(theme.palette(in: scheme).surface.color)
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    /// Paints this view in the theme the environment carries.
+    func themed() -> some View {
+        modifier(Themed())
+    }
+
+    /// Stands this list's rows on the theme's own ground.
+    func themedRows() -> some View {
+        modifier(ThemedRows())
+    }
+}

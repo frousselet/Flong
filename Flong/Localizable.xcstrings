@@ -507,6 +507,16 @@
         }
       }
     },
+    "Appearance" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apparence"
+          }
+        }
+      }
+    },
     "Apple Intelligence is not available on this device. Stories keep the headline of their own article." : {
       "localizations" : {
         "fr" : {
@@ -670,6 +680,16 @@
         }
       }
     },
+    "Carried to your other devices, like everything else you choose here." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suit vos autres appareils, comme tout ce que vous choisissez ici."
+          }
+        }
+      }
+    },
     "Choose a picture" : {
       "localizations" : {
         "fr" : {
@@ -788,6 +808,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Zone de danger"
+          }
+        }
+      }
+    },
+    "Default" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Défaut"
           }
         }
       }
@@ -1219,6 +1249,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En-tête %@"
+          }
+        }
+      }
+    },
+    "Headlines in monospace, on the Solarized palette." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Titres en chasse fixe, sur la palette Solarized."
           }
         }
       }
@@ -1705,6 +1745,16 @@
         }
       }
     },
+    "Paper" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Papier"
+          }
+        }
+      }
+    },
     "Picture via %@" : {
       "comment" : "Credit under a picture : the publisher whose article it came with",
       "localizations" : {
@@ -1816,6 +1866,16 @@
         }
       }
     },
+    "Sans serif throughout, in the colours of the system." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout en linéale, dans les couleurs du système."
+          }
+        }
+      }
+    },
     "Science" : {
       "localizations" : {
         "fr" : {
@@ -1882,6 +1942,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vu plus souvent"
+          }
+        }
+      }
+    },
+    "Serif headlines on warm paper, with the contrast pulled back." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Titres à empattements sur papier chaud, contraste adouci."
           }
         }
       }
@@ -2042,6 +2112,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Logiciel"
+          }
+        }
+      }
+    },
+    "Solarized" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solarized"
           }
         }
       }
@@ -2367,6 +2447,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le modèle du système lit la page et la trie en thématiques. En demander plus ou moins déplace la thématique, et tout ce qu'elle couvre, vers le haut ou le bas de la une."
+          }
+        }
+      }
+    },
+    "Theme" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thème"
           }
         }
       }

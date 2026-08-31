@@ -23,6 +23,15 @@ import Testing
 struct LocalizationTests {
     private let french = Locale(identifier: "fr_FR")
 
+    /// A resource in French, which is asked for by stating the locale on the
+    /// resource rather than beside it : `String(localized:)` takes one or the
+    /// other and not both.
+    private func inFrench(_ resource: LocalizedStringResource) -> String {
+        var asked = resource
+        asked.locale = french
+        return String(localized: asked)
+    }
+
     @Test("Plain strings reach their French translation")
     func plainStrings() {
         #expect(String(localized: "Unread", locale: french) == "Non lus")
@@ -110,6 +119,26 @@ struct LocalizationTests {
         #expect(String(localized: "Published \(relative)", locale: french).hasPrefix("Publié"))
         #expect(String(localized: "updated \(relative)", locale: french).hasPrefix("modifié"))
         #expect(String(localized: "updated", locale: french) == "modifié")
+    }
+
+    @Test("Every theme is named and explained in French")
+    func themes() {
+        // A theme is chosen from three words, so the three words have to be the
+        // right ones : `Défaut` and `Papier` are translated, and `Solarized` is
+        // a name and stays as its author wrote it.
+        #expect(inFrench(Theme.standard.name) == "Défaut")
+        #expect(inFrench(Theme.paper.name) == "Papier")
+        #expect(inFrench(Theme.solarized.name) == "Solarized")
+
+        #expect(String(localized: "Appearance", locale: french) == "Apparence")
+        #expect(String(localized: "Theme", locale: french) == "Thème")
+
+        // The line under each name, which is what says what the colours do. A
+        // key that drifted would leave the English standing under a French
+        // name, which is the one place a reader is comparing three lines.
+        #expect(inFrench(Theme.standard.explanation).hasPrefix("Tout en linéale"))
+        #expect(inFrench(Theme.paper.explanation).hasPrefix("Titres à empattements"))
+        #expect(inFrench(Theme.solarized.explanation).hasPrefix("Titres en chasse fixe"))
     }
 
     @Test("The import summary agrees with French plural rules")

@@ -45,6 +45,7 @@ nonisolated final class Preferences: @unchecked Sendable {
 
     private enum Key {
         static let articleBody = "article.body"
+        static let theme = "interface.theme"
         static let firstName = "reader.first-name"
         static let lastName = "reader.last-name"
         static let picture = "reader.picture"
@@ -54,7 +55,7 @@ nonisolated final class Preferences: @unchecked Sendable {
 
         /// Every key, for the one operation that has to name all of them.
         static let all = [
-            articleBody, firstName, lastName, picture, device, newStoryNotices, storiesAnnouncedAt,
+            articleBody, theme, firstName, lastName, picture, device, newStoryNotices, storiesAnnouncedAt,
         ]
     }
 
@@ -85,6 +86,24 @@ nonisolated final class Preferences: @unchecked Sendable {
     var articleBody: ArticleBody {
         get { value(for: Key.articleBody).flatMap(ArticleBody.init(rawValue:)) ?? .feed }
         set { set(newValue.rawValue, for: Key.articleBody) }
+    }
+
+    /// How the whole application is set : the faces and the colours.
+    ///
+    /// Carried between the devices, for the same reason the body an article
+    /// opens on is : it is a decision the reader made about themselves and not
+    /// about a device, and a reader who set their iPad to read on paper did not
+    /// mean only on the iPad. The system's own appearance until they say
+    /// otherwise, which is the one answer that cannot be wrong on a device they
+    /// have never opened this panel on.
+    ///
+    /// A value nobody recognizes falls back to the standard theme rather than
+    /// to nothing : it is what a newer version writing a fourth theme would
+    /// leave behind on an older one, and an application that refused to draw
+    /// itself over a preference would be worse than one drawn plainly.
+    var theme: Theme {
+        get { value(for: Key.theme).flatMap(Theme.init(rawValue:)) ?? .standard }
+        set { set(newValue.rawValue, for: Key.theme) }
     }
 
     // MARK: - Who is reading

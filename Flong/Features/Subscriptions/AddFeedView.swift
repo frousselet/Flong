@@ -62,6 +62,7 @@ struct AddFeedView: View {
                 }
             }
             .formStyle(.grouped)
+            .themedRows()
             .navigationTitle(Text("Add a feed"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
