@@ -43,6 +43,16 @@ struct DigestScreen: View {
 
     var body: some View {
         ScrollView {
+            // The gesture, from UIKit. It draws nothing and takes no room here ;
+            // it is in the content only so that it can find the scroll view it
+            // is inside and hand it a control. `PullToRefresh` sets out why
+            // SwiftUI's own modifier is not what does this.
+            PullToRefresh {
+                isPulling = true
+                await model.pullToRefresh()
+                isPulling = false
+            }
+
             // A pinned section header rather than a bar in the safe area : the
             // bar lays out under a large title and draws itself somewhere else
             // entirely, and a header is where this one belongs anyway, at the
@@ -85,17 +95,11 @@ struct DigestScreen: View {
         // A Mac has no pull and keeps `⌘R` in the reader's own menu, which is
         // where the command lives on every platform.
         //
-        // **On the page and not on the toolbar.** `refreshable` puts its action
-        // in the environment, and a sheet inherits the environment of whatever
-        // presented it : declared below the toolbar, it reached the panels the
-        // buttons up there open, and a list of subjects offered to fetch three
-        // hundred feeds. Applied here it wraps the page it belongs to and
-        // nothing else.
-        .refreshable {
-            isPulling = true
-            await model.pullToRefresh()
-            isPulling = false
-        }
+        // **It is `PullToRefresh` and not `refreshable`.** SwiftUI's modifier
+        // draws a control for a `List` ; on a scroll view it is accepted and
+        // unreliable, and on this one it never drew anything at all. A reader
+        // pulling a page that does not flinch, while the same work runs
+        // perfectly from the menu, is one of the two paths never being called.
         // The date is the title of the page, where a newspaper puts it. Not the
         // name of the section : the tab bar says that already, and a page that
         // repeats its own label has spent a line saying nothing. A dateline says
