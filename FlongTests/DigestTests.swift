@@ -680,6 +680,63 @@ struct DigestTests {
         #expect(try await FileStoriesJob(database, now: now).remaining() == before)
     }
 
+    @Test("Enriching names each half as it takes its turn")
+    func enrichmentNamesItsPhases() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await database.writer.write { db in
+            try db.execute(sql: "UPDATE story SET summary = NULL, brief_locale = NULL, topics_asked_at = NULL")
+        }
+
+        let phases = Locked<[WorkPhase]>([])
+        await service.enrich(now: now) { phase in phases.append(phase) }
+
+        // The reader watching a repair wants to see the writing and the filing
+        // happen, and both have to say so. They said nothing at all until the
+        // turns were named : the page went from grouping straight to tidying.
+        let seen = phases.value
+        #expect(seen.contains { if case .writing = $0 { true } else { false } })
+        #expect(seen.contains { if case .filing = $0 { true } else { false } })
+
+        // And in that order, a written headline being a better thing to file
+        // than the title of whichever article was nearest the middle.
+        let first = try #require(seen.first)
+        #expect(first.isSameKind(as: .writing(done: 0, total: 0)))
+    }
+
+    @Test("Throwing away what the model wrote puts every story back in both queues")
+    func discardingRefillsTheQueues() async throws {
+        try await StoryBuilder(database).build(now: now)
+
+        // A page as it stands after a night's work : every story written and
+        // filed, so both jobs have nothing left to do.
+        try await database.writer.write { db in
+            try db.execute(
+                sql: """
+                    UPDATE story SET summary = 'Un résumé.', is_generated = 1, brief_locale = ?,
+                                     topics_asked_at = ?
+                    """,
+                arguments: [Locale.current.identifier, now]
+            )
+            try Topic(name: "Éducation", kind: .standard, createdAt: now).insert(db)
+            for id in try UUID.fetchAll(db, sql: "SELECT id FROM story") {
+                try StoryTopic(storyID: id, name: "Éducation").insert(db)
+            }
+        }
+
+        #expect(try await BriefStoriesJob(database).remaining() == 0)
+        #expect(try await FileStoriesJob(database, now: now).remaining() == 0)
+
+        // This is what the repair rests on. Forgetting the change tokens
+        // repairs what came from iCloud and nothing else, so a repair that did
+        // not also do this found both jobs empty, returned in milliseconds, and
+        // showed the reader none of the steps they had asked to watch.
+        await service.discardWhatTheModelWrote()
+
+        let stories = try await database.writer.read { db in try Story.fetchCount(db) }
+        #expect(try await BriefStoriesJob(database).remaining() == stories)
+        #expect(try await FileStoriesJob(database, now: now).remaining() == stories)
+    }
+
     @Test("A story the model cannot file does not block the ones behind it")
     func theQueueMoves() async throws {
         try await StoryBuilder(database).build(now: now)

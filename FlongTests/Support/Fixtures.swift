@@ -30,3 +30,31 @@ nonisolated enum Fixtures {
         String(decoding: try data(path), as: UTF8.self)
     }
 }
+
+/// A box a `@Sendable` callback may write to from wherever it is called.
+///
+/// The progress and phase callbacks are `@Sendable` and synchronous by design,
+/// so a test that wants to know what they said needs somewhere to put it that
+/// does not depend on which executor called them.
+nonisolated final class Locked<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Value
+
+    init(_ value: Value) {
+        stored = value
+    }
+
+    var value: Value {
+        lock.withLock { stored }
+    }
+
+    func write(_ change: (inout Value) -> Void) {
+        lock.withLock { change(&stored) }
+    }
+}
+
+nonisolated extension Locked {
+    func append<Element>(_ element: Element) where Value == [Element] {
+        write { $0.append(element) }
+    }
+}

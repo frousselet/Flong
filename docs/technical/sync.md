@@ -100,7 +100,9 @@ Without the push the application still synchronizes : the engine sends what is p
 
 There is one command that repairs rather than exchanges, under `#if DEBUG` and nowhere else. It used to queue every local record and send them, which is only half of a repair : the engine still held its change tokens, so it asked the server what had changed since them and was told, correctly, that nothing had. A device whose copy had drifted learned nothing from the one command meant to fix exactly that.
 
-It forgets three things first, and all three are needed. The engine's serialized state, which holds the change tokens, so a new engine fetches the zone from the beginning. What the server said about each record, so nothing is skipped for carrying a tag that looks current. And the ledger of which shared archives have been read, so the days the other devices wrote are taken in again rather than skipped as seen.
+It forgets four things first, and all four are needed. The engine's serialized state, which holds the change tokens, so a new engine fetches the zone from the beginning. What the server said about each record, so nothing is skipped for carrying a tag that looks current. And the ledger of which shared archives have been read, so the days the other devices wrote are taken in again rather than skipped as seen.
+
+And what the model wrote goes with them : forgetting the change tokens repairs what came from iCloud and nothing else, so every story still had its headline, its summary and its subjects, the two jobs that write them found nothing to do and returned in milliseconds, and the reader watching a repair saw the page go from grouping straight to tidying. A headline the reader settled themselves is left alone, subject included : that is theirs, and it is not what has gone wrong.
 
 Then it runs the whole of the ordinary pass : every feed asked again, the stories built again, the headlines and the subjects written again, the index and the purge, and iCloud once more at the end with everything that has just arrived. Each step names itself at the head of the front page, since a repair a reader cannot watch is a repair they cannot tell from a hang.
 
