@@ -1696,6 +1696,16 @@
         }
       }
     },
+    "Published on" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publié le"
+          }
+        }
+      }
+    },
     "Received %@" : {
       "localizations" : {
         "fr" : {
@@ -2457,6 +2467,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "modifié %@"
+          }
+        }
+      }
+    },
+    "Updated on" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mis à jour le"
           }
         }
       }

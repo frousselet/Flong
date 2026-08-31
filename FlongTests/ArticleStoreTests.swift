@@ -219,7 +219,15 @@ struct ArticleStoreTests {
         // second : a person was in a run of punctuation between two timestamps,
         // which gave a name the weight of a date. The name alone, since a pill
         // under the paper that ran it is already a byline.
-        #expect(page.contains("<span>\(now.formatted(date: .long, time: .shortened))</span></div>"))
+        // The word itself is whatever language the device is in, so what is
+        // checked is that there is one, under the right glyph, in front of the
+        // right date.
+        #expect(page.contains("<span class=\"pill\"><span class=\"glyph published\"></span><span class=\"said\">"))
+        #expect(page.contains(" </span>\(now.formatted(date: .long, time: .shortened))</span>"))
+        // The shape is cut once for every article there will ever be, so the
+        // page carries the rule that holds it.
+        #expect(page.contains(".glyph.published { --glyph: url(\"data:image/png;base64,"))
+        #expect(page.contains(".glyph.revised { --glyph: url(\"data:image/png;base64,"))
         #expect(page.contains("<div class=\"line\"><span class=\"pill\">Claire Ancelin</span></div>"))
 
         // No box is kept for a mark there is none of : scripting is off, so

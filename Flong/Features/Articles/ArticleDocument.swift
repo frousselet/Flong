@@ -75,6 +75,7 @@ nonisolated enum ArticleDocument {
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
             <style>\(stylesheet)</style>
+            <style>\(glyphs)</style>
             <style>\(credits.rules)</style>
             </head>
             <body>
@@ -190,19 +191,15 @@ nonisolated enum ArticleDocument {
         let source = publisher ?? article.domain ?? article.feedTitle
         if !source.isEmpty { first.append(pill(source, wearing: mark)) }
 
-        var when: [String] = []
         if let date = article.publishedAt {
-            when.append(date.formatted(date: .long, time: .shortened))
+            first.append(moment(date, kind: .published))
         }
         // Said in full here, beside the publication rather than instead of it :
         // the page has room for both, and a reader who has opened the article
         // is the one who wants to know exactly what changed when. The list has
         // room for one and shows whichever is the later.
         if let updated = article.updatedAt {
-            when.append(String(localized: "updated \(updated.formatted(date: .long, time: .shortened))"))
-        }
-        if !when.isEmpty {
-            first.append("<span>\(HTMLEntities.escape(when.joined(separator: " · ")))</span>")
+            first.append(moment(updated, kind: .revised))
         }
 
         if !first.isEmpty { lines.append("<div class=\"line\">\(first.joined())</div>") }
@@ -230,6 +227,72 @@ nonisolated enum ArticleDocument {
 
         return (lines.joined(), rules)
     }
+
+    /// Which of an article's two dates a pill is showing.
+    private enum Moment {
+        case published
+        case revised
+
+        /// The symbol that tells it from the other.
+        ///
+        /// One glyph and the same glyph turned back on itself, rather than two
+        /// unrelated pictures : the pair has to be read as *this time* and
+        /// *that time again*, and two symbols from different families are two
+        /// things to learn instead of one.
+        var symbol: String {
+            switch self {
+            case .published: "clock"
+            case .revised: "clock.arrow.circlepath"
+            }
+        }
+
+        /// What the glyph says, for a reader who is not looking at it.
+        ///
+        /// A shape cut out of a background says nothing to VoiceOver, and two
+        /// dates that read alike are two dates a reader cannot tell apart. It
+        /// is put in the pill and taken off the page, rather than written into
+        /// an `aria-label` : a label on a bare `span` is at the mercy of what
+        /// each reader makes of an element with no role, and text that is
+        /// merely not visible is text.
+        var said: String {
+            switch self {
+            case .published: String(localized: "Published on")
+            case .revised: String(localized: "Updated on")
+            }
+        }
+
+        var name: String {
+            switch self {
+            case .published: "published"
+            case .revised: "revised"
+            }
+        }
+    }
+
+    /// One of the article's dates, on a pill, under the glyph that says which.
+    private static func moment(_ date: Date, kind: Moment) -> String {
+        let said = HTMLEntities.escape(kind.said)
+        let written = HTMLEntities.escape(date.formatted(date: .long, time: .shortened))
+        return """
+            <span class="pill"><span class="glyph \(kind.name)"></span>\
+            <span class="said">\(said) </span>\(written)</span>
+            """
+    }
+
+    /// The two glyphs, cut once and written into every page.
+    ///
+    /// A rendered article is a web page and a web page has no symbols, so they
+    /// arrive as bytes. Read once : the same two shapes go into every article a
+    /// reader ever opens, and drawing them again per article would be the same
+    /// work for the same answer. A symbol the system does not know leaves its
+    /// rule out, and the pill shows the words with no glyph in front of them.
+    private static let glyphs: String = {
+        [Moment.published, .revised]
+            .compactMap { kind in
+                SymbolData.dataURI(kind.symbol).map { ".glyph.\(kind.name) { --glyph: url(\"\($0)\"); }" }
+            }
+            .joined(separator: "\n")
+    }()
 
     /// The people named in one credit line, one by one.
     ///
@@ -342,6 +405,21 @@ nonisolated enum ArticleDocument {
           -webkit-backdrop-filter: blur(20px) saturate(180%);
           backdrop-filter: blur(20px) saturate(180%);
           box-shadow: inset 0 0 0 0.5px rgb(var(--tint, 120 120 128) / 35%);
+        }
+        /* Cut out of the text colour rather than printed in one, so a glyph
+           follows the appearance, the pill's own tint and the reader's type
+           size without knowing about any of them. */
+        .pill .glyph {
+          width: 1em; height: 1em; margin-right: -1px; flex: none;
+          background: currentColor; opacity: 0.75;
+          -webkit-mask: var(--glyph) center / contain no-repeat;
+          mask: var(--glyph) center / contain no-repeat;
+        }
+        /* Said to a reader who is not looking at the glyph, and to nobody else.
+           Not `display: none`, which is not read either. */
+        .said {
+          position: absolute; width: 1px; height: 1px;
+          overflow: hidden; clip-path: inset(50%); white-space: nowrap;
         }
         /* Round and ringed, as the marks are everywhere else, and tucked into
            the padding so the pill sits no taller for having one. */
