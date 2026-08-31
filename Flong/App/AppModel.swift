@@ -403,7 +403,11 @@ final class AppModel {
     /// asked before the feeds are fetched, so what arrives during the pass is
     /// not in them ; each stage corrects its own share as it learns better, and
     /// the bar is held to the furthest it has been.
-    func beginWork(_ stages: [WorkPhase]) async {
+    /// - Parameter atOnce: whether the line is shown without the quarter second
+    ///   that keeps an automatic pass from flickering. A reader who pulled or
+    ///   pressed is watching for an answer, and a beat of nothing between the
+    ///   gesture and the line is the line arriving from nowhere.
+    func beginWork(_ stages: [WorkPhase], atOnce: Bool = false) async {
         // A pass already under way has already declared what it is made of, and
         // the inner steps of one are not passes of their own : the repair
         // declares the whole of itself and the ordinary pass inside it adds
@@ -414,7 +418,7 @@ final class AppModel {
         // about to ask for before it asks for any of them, which lands well
         // inside the quarter second before the line appears at all.
         let onThePage = (try? await DigestStore(database).storyCount()) ?? 0
-        show(WorkPlan(stages, costing: await costsOfTheModelsWork(stages, floor: onThePage)))
+        show(WorkPlan(stages, costing: await costsOfTheModelsWork(stages, floor: onThePage)), atOnce: atOnce)
     }
 
     /// What the model's own work is likely to cost, asked of the store, which
@@ -476,7 +480,7 @@ final class AppModel {
     }
 
     /// Puts a pass up, after the floor that stops it flickering.
-    private func show(_ plan: WorkPlan) {
+    private func show(_ plan: WorkPlan, atOnce: Bool = false) {
         clearingWork?.cancel()
         clearingWork = nil
         self.plan = plan
@@ -485,6 +489,20 @@ final class AppModel {
             work = plan
             return
         }
+
+        // **What the reader asked for is answered on the beat.** The quarter
+        // second below is there so a pass that finds nothing due does not
+        // flicker a line onto a page nobody was watching. A pull or a press is
+        // watched : the finger is still on the glass, and a beat of nothing
+        // between the gesture and the line is the line arriving from nowhere.
+        if atOnce {
+            showingWork?.cancel()
+            showingWork = nil
+            workShownAt = .now
+            work = plan
+            return
+        }
+
         guard showingWork == nil else { return }
 
         // The plan is read when the line appears rather than when it was asked
@@ -1731,7 +1749,7 @@ final class AppModel {
     }
 
     private func catchingUp(_ reason: CatchUp, until deadline: Date?) async {
-        await beginWork([.fetching, .grouping, .writing, .filing])
+        await beginWork([.fetching, .grouping, .writing, .filing], atOnce: reason.isAskedFor)
         moveWork(to: .fetching)
         let fetching = progress(of: .fetching)
         let summary =

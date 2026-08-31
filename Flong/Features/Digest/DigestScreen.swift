@@ -823,9 +823,17 @@ private struct ActivityLine: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 7)
                     .glassEffect(.regular, in: .capsule)
-                    // Fading as it goes, which is what lets the band be
+                    // **It grows out of the top rather than materializing.**
+                    // A fade on its own put the capsule on screen at full size
+                    // in a band that was still opening, which reads as a thing
+                    // arriving from nowhere over a page that has not made room
+                    // for it yet. Anchored at the top, the capsule comes up out
+                    // of the edge the room is opening from, which is the same
+                    // motion the band is making.
+                    //
+                    // Fading as it goes as well, which is what lets the band be
                     // measured without being clipped : see below.
-                    .transition(.opacity)
+                    .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .top)))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -848,6 +856,11 @@ private struct ActivityLine: View {
         // rather than upwards into the subjects.
         .frame(height: height, alignment: .top)
         .animation(reduceMotion ? nil : .snappy(duration: 0.32), value: height)
+        // The same curve and the same third of a second for the capsule's own
+        // coming and going, so the room and the thing in it move together : two
+        // animations of different lengths on one event is a capsule that lands
+        // before the space exists or hangs about after it has gone.
+        .animation(reduceMotion ? nil : .snappy(duration: 0.32), value: work == nil)
         .animation(.snappy(duration: 0.28), value: work?.phase)
         // Nothing here answers to a finger : the pull underneath it is the
         // gesture, and two in one place is one the reader cannot aim.
