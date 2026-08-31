@@ -357,16 +357,24 @@ nonisolated enum ArticleDocument {
           color-scheme: light dark;
           --text: #1c1c1e; --muted: #6c6c70; --rule: #d8d8dc; --link: #0b6bcb;
           --voice: -apple-system, system-ui, sans-serif;
+          /* The page's own colour, which a pill is mixed into rather than laid
+             over : a solid fill has to know what it is solid against. */
+          --paper: #ffffff;
+          /* Half of the separator, which is what the pictures on the front page
+             keep for their edge : enough to say where the edge is, never enough
+             to be the thing one looks at. */
+          --edge: rgba(60, 60, 67, 0.15);
         }
         @media (prefers-color-scheme: dark) {
           :root {
             --text: #f2f2f7; --muted: #9c9ca1; --rule: #3a3a3c; --link: #6fb2ff;
+            --paper: #000000;
+            --edge: rgba(84, 84, 88, 0.33);
           }
-          /* More of the colour on a dark page : the same wash that reads as a
-             tint over paper is all but gone over black. */
+          /* More of the colour on a dark page : the same amount that reads as a
+             tint against paper is all but gone against black. */
           .pill {
-            background: rgb(var(--tint, 120 120 128) / 30%);
-            box-shadow: inset 0 0 0 0.5px rgb(var(--tint, 120 120 128) / 45%);
+            background: color-mix(in srgb, rgb(var(--tint, 120 120 128)) 26%, var(--paper));
           }
         }
         body {
@@ -374,7 +382,7 @@ nonisolated enum ArticleDocument {
           /* The shorthand carries Dynamic Type ; the family after it carries the
              voice. Serif for what was written, as everywhere else. */
           font: -apple-system-body; font-family: ui-serif, "New York", Georgia, serif;
-          line-height: 1.55; color: var(--text);
+          line-height: 1.55; color: var(--text); background: var(--paper);
           -webkit-text-size-adjust: 100%; overflow-wrap: break-word;
         }
         /* The measure lives here rather than on the body, so that the picture
@@ -400,22 +408,26 @@ nonisolated enum ArticleDocument {
            from something else. Only where there is something above to stand off
            from. */
         .byline .line + .when { margin-top: 6px; }
-        /* The pill the picture credits already use. It takes the colour of what
-           is under it, which on this page is paper and over a picture is the
-           picture.
+        /* A solid fill and a hairline, which is what the pictures on the front
+           page wear.
 
-           And a tint of whoever it names, where their mark has been decoded
-           and averaged : the amount is decided here, once, so a generated rule
-           has only to say which colour. A neutral grey stands in for a pill
-           whose mark is not known, which is also every pill that has none. */
+           **Not glass, and it was glass.** Glass is worth its blur where there
+           is something behind it to take : over a photograph the credit takes
+           the photograph. Here there is paper behind and nothing else, so the
+           blur was work done to arrive at a flat colour, and a flat colour is
+           what this says now.
+
+           The colour is a tint of whoever it names, mixed into the paper rather
+           than laid over it, where their mark has been decoded and averaged.
+           How much is decided here, once, so a generated rule has only to say
+           which colour ; a neutral grey stands in for a pill whose mark is not
+           known, which is also every pill that has none. */
         .pill {
           display: inline-flex; align-items: center; gap: 6px;
           padding: 3px 10px; border-radius: 999px;
           color: var(--text);
-          background: rgb(var(--tint, 120 120 128) / 18%);
-          -webkit-backdrop-filter: blur(20px) saturate(180%);
-          backdrop-filter: blur(20px) saturate(180%);
-          box-shadow: inset 0 0 0 0.5px rgb(var(--tint, 120 120 128) / 35%);
+          background: color-mix(in srgb, rgb(var(--tint, 120 120 128)) 16%, var(--paper));
+          box-shadow: inset 0 0 0 0.5px var(--edge);
         }
         /* Cut out of the text colour rather than printed in one, so a glyph
            follows the appearance, the pill's own tint and the reader's type
