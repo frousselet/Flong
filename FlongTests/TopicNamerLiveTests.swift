@@ -112,13 +112,13 @@ struct TopicNamerLiveTests {
     func alwaysSomething() async throws {
         let namer = TopicNamer(locale: Locale(identifier: "fr_FR"))
 
-        // Nothing here is about macros. The list it is shown is the sections
-        // every newspaper has plus whatever the reader wrote, and a headline
-        // belonging under none of them is rare enough that an escape costs
-        // more than it saves : the model took it constantly, and a page where
-        // half the stories are filed under nothing is a page whose pills say
-        // nothing. What saves this story is the second pass, which names what
-        // it is actually about.
+        // Nothing here is about macros. The list it is shown is the whole of
+        // the vocabulary and there is no way out of it : offering an escape
+        // cost more than it saved, the model taking it constantly, and a page
+        // where half the stories are filed under nothing is a page whose pills
+        // say nothing. There is no second pass to save this story any more
+        // either, which is why the catalogue is fifty names deep : what a
+        // reader actually follows should be in it.
         guard
             case .chosen(let filed) = await namer.file(
                 "Les macros Swift, deux ans après",
@@ -132,14 +132,6 @@ struct TopicNamerLiveTests {
         print("=== always something -> \(filed)")
         #expect(!filed.isEmpty)
         #expect(filed.allSatisfy { ["Jardinage", "Cuisine"].contains($0) })
-
-        // And then it is asked for one of its own, which every story gets and
-        // not only the ones that fit nothing.
-        let proposed = try #require(await namer.newSubject(for: "Les macros Swift, deux ans après", summary: nil))
-        print("=== proposed -> \(proposed)")
-
-        // A field, not the story : `Les macros Swift` is the headline back.
-        #expect(TopicNamer.isField(proposed, of: "Les macros Swift, deux ans après"))
     }
 
     @Test("The page the window builds comes out with briefs and pills")

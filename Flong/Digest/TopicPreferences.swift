@@ -11,21 +11,22 @@
 
 import Foundation
 import GRDB
+import OSLog
 
 /// Where a subject came from.
 ///
-/// Three natures, and what tells them apart is who decided. A standard one was
-/// decided by a century of newspapers ; a reader's own by the reader ; a smart
-/// one by the model, when nothing it was shown covered a story.
+/// Two natures, and what tells them apart is who decided : a century of
+/// newspapers, or the reader. There was a third, the model's own, coined when
+/// nothing it was shown covered a story ; what came of it was a drift of near
+/// synonyms of the sections that already existed, so the model names nothing
+/// now and the catalogue was widened to fifty instead.
 ///
-/// The difference is what the reader may do to it and what the model is asked
-/// for. A standard one cannot be deleted, since it is not a thing that was
-/// made ; the reader's own are theirs to add and to remove ; a smart one is the
-/// model's and goes when its stories do.
+/// The difference is what the reader may do to it. A standard one cannot be
+/// deleted, since it is not a thing that was made ; the reader's own are theirs
+/// to add and to remove.
 nonisolated enum TopicKind: String, Hashable, Sendable, Codable, CaseIterable {
     case standard
     case own
-    case smart
 }
 
 /// One subject of the vocabulary.
@@ -116,7 +117,7 @@ nonisolated struct TopicPreferences: Sendable {
                     stories: $0["stories"] ?? 0,
                     score: $0["score"] ?? 0,
                     isOwn: $0["is_own"] ?? false,
-                    kind: TopicKind(rawValue: $0["kind"] ?? "") ?? .smart
+                    kind: TopicKind(rawValue: $0["kind"] ?? "") ?? .standard
                 )
             }
 
@@ -130,23 +131,19 @@ nonisolated struct TopicPreferences: Sendable {
         }
     }
 
-    /// The subjects the model must choose from : the sections every reader has
-    /// and the ones this reader wrote.
+    /// The subjects the model must choose from, which is the whole vocabulary.
     ///
-    /// **Not the smart ones.** Those are what the model came up with for one
-    /// story, and offering them back to it turns a page into a drift of near
-    /// synonyms : the model reaches for whatever is nearest, and what is
-    /// nearest is whatever it said last. A story is filed under something a
-    /// reader recognizes first, and given a smart subject afterwards.
+    /// It used to exclude a third kind, the ones the model had coined itself :
+    /// offering those back to it turned a page into a drift of near synonyms,
+    /// since it reached for whatever was nearest and what was nearest was
+    /// whatever it said last. It coins nothing now, so there is nothing to
+    /// exclude.
+    ///
+    /// The reader's own come first. They wrote them, so they are the ones they
+    /// will look for a story under.
     func settled() async throws -> [String] {
         try await database.writer.read { db in
-            try String.fetchAll(
-                db,
-                sql: """
-                    SELECT name FROM topic WHERE kind IN ('standard', 'own')
-                    ORDER BY kind = 'own' DESC, created_at
-                    """
-            )
+            try String.fetchAll(db, sql: "SELECT name FROM topic ORDER BY kind = 'own' DESC, created_at")
         }
     }
 
@@ -156,44 +153,29 @@ nonisolated struct TopicPreferences: Sendable {
     /// written `Écologie` themselves keeps theirs, and the standard one is not
     /// added beside it.
     ///
-    /// **A name the model coined first becomes the section, rather than
-    /// blocking it.** The fold used to skip whatever already existed, whoever
-    /// had made it. On a store where the model had already named a story
-    /// `Politique` or `Technologie` for itself, those two names stayed the
-    /// model's own : ``settled()`` shows the model only the standard sections
-    /// and the reader's own, so the model was never offered `Politique` again
-    /// and nothing could ever be filed under it. Two of the thirteen sections
-    /// were missing from the vocabulary and held nothing, for good.
-    ///
-    /// A section the reader wrote themselves stays theirs. It is theirs to
-    /// delete, which a standard one is not, and taking that away would be
-    /// taking something from them.
+    /// **A section that has been renamed takes its stories and the reader's
+    /// opinion with it.** A section is known by its name and by nothing else,
+    /// so renaming one without moving the filings and the preference leaves the
+    /// stories under a name that no longer exists and the reader's word
+    /// attached to it.
     ///
     /// - Returns: whether the vocabulary changed, which is what tells the
     ///   caller the stories filed against the old one deserve another look.
     @discardableResult
-    func seedStandards(_ names: [String] = StandardTopics.names(), at date: Date = Date()) async throws -> Bool {
+    func seedStandards(
+        _ names: [String] = StandardTopics.names(),
+        renaming renamings: [(String, String)] = StandardTopics.renamings(),
+        at date: Date = Date()
+    ) async throws -> Bool {
         try await database.writer.write { db in
             var changed = false
 
-            for name in names {
-                guard let existing = try Self.folded(name, in: db) else {
-                    try Topic(name: name, kind: .standard, createdAt: date).insert(db)
-                    changed = true
-                    continue
-                }
+            for (was, now) in renamings where try Self.rename(was, to: now, in: db) {
+                changed = true
+            }
 
-                let kind = try String.fetchOne(
-                    db,
-                    sql: "SELECT kind FROM topic WHERE name = ?",
-                    arguments: [existing]
-                )
-                guard kind == TopicKind.smart.rawValue else { continue }
-
-                try db.execute(
-                    sql: "UPDATE topic SET kind = ?, is_own = 0 WHERE name = ?",
-                    arguments: [TopicKind.standard.rawValue, existing]
-                )
+            for name in names where try Self.folded(name, in: db) == nil {
+                try Topic(name: name, kind: .standard, createdAt: date).insert(db)
                 changed = true
             }
 
@@ -201,6 +183,25 @@ nonisolated struct TopicPreferences: Sendable {
             try Self.reopenStoriesUnderNoSection(db)
             return true
         }
+    }
+
+    /// Moves a section, its filings and what the reader said about it onto a
+    /// new name.
+    ///
+    /// Nothing happens where the old name is not there, or where the new one
+    /// already is : the second would merge two sections, which is a different
+    /// decision and not one a rename may take by itself.
+    private static func rename(_ was: String, to now: String, in db: Database) throws -> Bool {
+        guard try folded(was, in: db) != nil, try folded(now, in: db) == nil else { return false }
+
+        try db.execute(sql: "UPDATE topic SET name = ? WHERE name = ?", arguments: [now, was])
+        try db.execute(sql: "UPDATE OR IGNORE story_topic SET name = ? WHERE name = ?", arguments: [now, was])
+        try db.execute(sql: "DELETE FROM story_topic WHERE name = ?", arguments: [was])
+        try db.execute(sql: "UPDATE OR IGNORE topic_preference SET name = ? WHERE name = ?", arguments: [now, was])
+        try db.execute(sql: "DELETE FROM topic_preference WHERE name = ?", arguments: [was])
+
+        Log.enrich.notice("A section was renamed, with its stories and what was said about it")
+        return true
     }
 
     /// Asks again about the stories the vocabulary has caught up with.
@@ -223,9 +224,7 @@ nonisolated struct TopicPreferences: Sendable {
                 UPDATE story SET topics_asked_at = NULL
                 WHERE topics_asked_at IS NOT NULL
                   AND id NOT IN (
-                      SELECT s.story_id FROM story_topic s
-                      JOIN topic t ON t.name = s.name
-                      WHERE t.kind IN ('standard', 'own')
+                      SELECT s.story_id FROM story_topic s JOIN topic t ON t.name = s.name
                   )
                 """
         )
@@ -239,13 +238,6 @@ nonisolated struct TopicPreferences: Sendable {
     func ownNames() async throws -> [String] {
         try await database.writer.read { db in
             try String.fetchAll(db, sql: "SELECT name FROM topic WHERE is_own = 1 ORDER BY created_at")
-        }
-    }
-
-    /// The subjects the model named itself.
-    func smartNames() async throws -> [String] {
-        try await database.writer.read { db in
-            try String.fetchAll(db, sql: "SELECT name FROM topic WHERE kind = 'smart'")
         }
     }
 
@@ -277,19 +269,6 @@ nonisolated struct TopicPreferences: Sendable {
         return try await database.writer.write { db in
             if let existing = try Self.folded(name, in: db) { return existing }
             try Topic(name: name, kind: .own, createdAt: date).insert(db)
-            return name
-        }
-    }
-
-    /// Records a subject the model came up with, when nothing it was shown fit.
-    @discardableResult
-    func record(_ name: String, at date: Date = Date()) async throws -> String? {
-        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return nil }
-
-        return try await database.writer.write { db in
-            if let existing = try Self.folded(name, in: db) { return existing }
-            try Topic(name: name, kind: .smart, createdAt: date).insert(db)
             return name
         }
     }
@@ -350,9 +329,12 @@ nonisolated struct TopicPreferences: Sendable {
 
         return try await database.writer.write { db in
             // A preference on a subject the vocabulary does not have would be
-            // a preference the reader can never find again to take back.
+            // a preference the reader can never find again to take back, since
+            // the screen that manages them reads the vocabulary and nothing
+            // else. It becomes theirs : they pressed it, so it is a name they
+            // should be able to remove, and only their own may be removed.
             let name = try Self.folded(name, in: db) ?? name
-            try Topic(name: name, kind: .smart, createdAt: date).insert(db, onConflict: .ignore)
+            try Topic(name: name, kind: .own, createdAt: date).insert(db, onConflict: .ignore)
 
             let current =
                 try Int.fetchOne(db, sql: "SELECT score FROM topic_preference WHERE name = ?", arguments: [name]) ?? 0

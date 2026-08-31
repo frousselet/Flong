@@ -38,13 +38,6 @@ nonisolated enum Filing: Sendable {
     case unusable
 }
 
-/// A subject the model proposes when nothing it was shown fits.
-@Generable
-nonisolated struct GeneratedTopic {
-    @Guide(description: "The subject, one or two words, capitalized as a title")
-    var name: String
-}
-
 /// Files stories under the subjects the reader already has.
 ///
 /// A story is one event ; a subject is the field several events belong to. The
@@ -61,9 +54,13 @@ nonisolated struct GeneratedTopic {
 /// has nothing to keep track of and cannot answer something that is not a
 /// subject.
 ///
-/// The list is the reader's vocabulary, its own past answers and the reader's
-/// own additions alike, plus one way out. Taking that way out is the only time
-/// it is asked to name anything.
+/// **The list is the whole of the vocabulary and there is no way out of it.**
+/// The model used to be allowed one subject of its own where nothing it was
+/// shown fitted, and what came of that was a drift of near synonyms : `Science`
+/// beside `Sciences`, `Sports` beside `Sport`, the English word for a section
+/// the reader already had. It names nothing now. The catalogue of sections and
+/// whatever the reader wrote is what there is, and a story is filed under one
+/// or two of those or under none.
 nonisolated struct TopicNamer: Sendable {
     /// How many subjects a story is allowed.
     ///
@@ -77,8 +74,6 @@ nonisolated struct TopicNamer: Sendable {
     /// structured answer is never cut off in the middle, which would come back
     /// as a `decodingFailure` and read as a refusal.
     static let filingTokens = 128
-    /// A field is one or two words, and the check that follows rejects more.
-    static let namingTokens = 64
 
     let locale: Locale
 
@@ -108,9 +103,11 @@ nonisolated struct TopicNamer: Sendable {
     /// page where half the stories are filed under nothing is a page whose
     /// pills say nothing.
     ///
-    /// What it does not do is invent. The schema is an enumeration of the names
-    /// it was given, so it cannot answer something that is not one of them.
-    /// Inventing is the second pass and is deliberately separate.
+    /// What it does not do is invent, and there is no longer a pass in which it
+    /// may. The schema is an enumeration of the names it was given, so it
+    /// cannot answer something that is not one of them, and nothing else writes
+    /// to the vocabulary : it is the seeded catalogue and the reader's own, and
+    /// nothing else.
     func file(_ headline: String, summary: String?, into vocabulary: [String]) async -> Filing {
         guard OnDeviceModel.isAvailable else { return .unusable }
 
@@ -157,211 +154,6 @@ nonisolated struct TopicNamer: Sendable {
             return OnDeviceModel.isTheModelItself(error) ? .unusable : .declined
         }
     }
-
-    /// A subject of the model's own for a story, beside the settled one it was
-    /// already filed under.
-    ///
-    /// **Every story gets one, not only the ones that fit nothing.** The
-    /// standard sections say what kind of news a story is ; this says what the
-    /// story is actually about, which is the finer thing a reader following a
-    /// subject is following. `Politique` and `Réforme des retraites` are both
-    /// true of one story and only the second is worth a pill of its own.
-    ///
-    /// Free text, and the only time the model is allowed to name anything. What
-    /// it answers is folded against the vocabulary before it is kept, so a
-    /// second spelling of a subject that exists is not a second subject.
-    func newSubject(for headline: String, summary: String?, besides settled: [String] = []) async -> String? {
-        guard OnDeviceModel.isAvailable else { return nil }
-
-        do {
-            let session = LanguageModelSession(
-                // Naming is writing, not tagging : the general model, which is
-                // the one that writes the reader's language.
-                model: OnDeviceModel.model(),
-                instructions: """
-                    You name the field of interest a news headline belongs to.
-                    A field is what a section of a newspaper is called : it outlives any one story.
-                    It must tell this story apart from the rest of the news.
-                    Never a word that would fit every article ever published, such as news or information.
-                    One or two words, each carrying information. Never the headline, never a name, never a date.
-                    \(OnDeviceModel.languageInstruction(for: locale))
-                    Answer with the field and nothing else.
-                    """
-            )
-            let asked = Self.naming(headline, summary: summary, besides: settled, locale: locale)
-
-            var response = try await session.respond(
-                to: asked,
-                generating: GeneratedTopic.self,
-                options: OnDeviceModel.options(maximumTokens: Self.namingTokens)
-            )
-            var name = response.content.name.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            // Measured : asked once, it answers with the headline about half
-            // the time. `Les macros Swift` is not a field ; `Logiciel` is. And
-            // asked not to do that, it reaches for `Actualité`, which is the
-            // opposite fault and needs the opposite thing said about it.
-            if let fault = Self.fault(in: name, of: headline, besides: settled, locale: locale) {
-                response = try await session.respond(
-                    to: Self.complaint(about: fault, in: locale),
-                    generating: GeneratedTopic.self,
-                    options: OnDeviceModel.options(maximumTokens: Self.namingTokens)
-                )
-                name = response.content.name.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-
-            OnDeviceModel.succeeded()
-            guard let fault = Self.fault(in: name, of: headline, besides: settled, locale: locale) else {
-                return name
-            }
-
-            // Twice is enough. The story keeps the section it was filed under,
-            // which is a real subject a reader recognizes ; a second one of the
-            // model's own is a nicety, and a bad one is worse than none.
-            Log.enrich.notice("The model would not name a subject : \(String(describing: fault), privacy: .public)")
-            return nil
-        } catch {
-            OnDeviceModel.refused(error)
-            return nil
-        }
-    }
-
-    /// Why a proposed subject is not one.
-    ///
-    /// Two faults, and they need different things said about them : a model
-    /// that answered with the headline has to be told to step back, and one
-    /// that answered with a word for news itself has to be told to step in.
-    /// Telling it the wrong one of those gets the other fault back.
-    nonisolated enum NotASubject: Sendable {
-        /// The headline again, or something too long to be a field.
-        case theStoryItself
-        /// A word that would fit every article ever published.
-        case theWholePage
-        /// A subject the reader already has, under that name or another
-        /// spelling of it.
-        case alreadyASection
-    }
-
-    /// What is wrong with a proposed subject, or nothing.
-    ///
-    /// **Short, and not lifted out of the headline.** A model asked for a field
-    /// and given one headline answers with that headline about half the time,
-    /// and a vocabulary of headlines is a vocabulary with one story in each.
-    ///
-    /// **And narrower than the page.** `Actualité` is true of every story there
-    /// is, so filing under it sorts nothing and a pill wearing it says
-    /// `everything`. It is the same rule that governs a headline, that every
-    /// word must carry information, applied to a single word where it is at its
-    /// sharpest. Whole names only : `Actualité internationale` is narrower than
-    /// the page and is left alone.
-    static func fault(
-        in name: String,
-        of headline: String,
-        besides settled: [String] = [],
-        locale: Locale = .current
-    ) -> NotASubject? {
-        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, name.count <= 30 else { return .theStoryItself }
-
-        let folded = TopicPreferences.fold(name)
-        guard (1...3).contains(folded.split(separator: " ").count) else { return .theStoryItself }
-        guard !TopicPreferences.fold(headline).contains(folded) else { return .theStoryItself }
-
-        let general = StandardTopics.generalNames(for: locale).map(TopicPreferences.fold)
-        guard !general.contains(folded) else { return .theWholePage }
-
-        // A section the reader already has, said again. The vocabulary would
-        // fold this one away rather than keep two, so what comes of asking is
-        // a story with no subject of its own : better to ask once more for a
-        // narrower one.
-        guard !settled.map(TopicPreferences.fold).contains(folded) else { return .alreadyASection }
-
-        return nil
-    }
-
-    /// Whether a proposed subject is one at all.
-    static func isField(
-        _ name: String,
-        of headline: String,
-        besides settled: [String] = [],
-        locale: Locale = .current
-    ) -> Bool {
-        fault(in: name, of: headline, besides: settled, locale: locale) == nil
-    }
-
-    /// What to tell the model about the subject it just proposed.
-    ///
-    /// Each complaint ends with the demand in the reader's own language, for
-    /// the reason the demand exists at all : a model answers in the language of
-    /// the words nearest its answer, and the words nearest a complaint are the
-    /// complaint's.
-    private static func complaint(about fault: NotASubject, in locale: Locale) -> String {
-        let said =
-            switch fault {
-            case .theStoryItself:
-                "That is the story, not the field it belongs to. Answer with the field."
-            case .theWholePage:
-                """
-                That word fits every article ever published, so it sorts nothing. \
-                Answer with the field this story belongs to and no other.
-                """
-            case .alreadyASection:
-                """
-                The reader already has that subject. Answer with a narrower one, \
-                about what this story is, not what kind of news it is.
-                """
-            }
-
-        return "\(said)\n\n\(OnDeviceModel.languageReminder(for: locale))"
-    }
-
-    /// What the model is shown when it is asked to name a field.
-    ///
-    /// **The reader's own subjects are in it, and that is the whole of the fix
-    /// for two faults at once.**
-    ///
-    /// The model was answering in English. It is told the language twice
-    /// already, in the instructions and again after the headline, and it still
-    /// answered `Science` where the reader's section is `Sciences` and `Sports`
-    /// where it is `Sport` : both of those are the English words, and the
-    /// reason is written down elsewhere in this project already. A model
-    /// answers in the language of the words nearest its answer, and the words
-    /// nearest this answer were an English headline from the English press.
-    ///
-    /// A dozen of the reader's own subjects, in the reader's own language,
-    /// standing between the headline and the answer, are what a demand about
-    /// language cannot be : an example of it. They also say what already
-    /// exists, so the model reaches past it for something finer instead of
-    /// translating a section that was already there.
-    ///
-    /// **Only the settled ones**, never the model's own. Offering it its past
-    /// answers is what turns a page into a drift of near synonyms : it reaches
-    /// for whatever is nearest, and what is nearest is whatever it said last.
-    static func naming(
-        _ headline: String,
-        summary: String?,
-        besides settled: [String],
-        locale: Locale
-    ) -> String {
-        var asked = prompt(headline, summary: summary)
-
-        if !settled.isEmpty {
-            asked += """
-
-
-                The subjects this reader already has : \(settled.prefix(vocabularyShown).joined(separator: ", ")).
-                Answer with a narrower one than any of those, in the same language as those.
-                """
-        }
-
-        return "\(asked)\n\n\(OnDeviceModel.languageReminder(for: locale))"
-    }
-
-    /// How many of the reader's subjects the model is shown while it names one.
-    ///
-    /// Enough to set the language and to say what already exists, and no more :
-    /// a long list is a long prompt, and this runs once per story.
-    static let vocabularyShown = 12
 
     /// A schema the model cannot answer outside of.
     ///

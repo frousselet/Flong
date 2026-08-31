@@ -406,7 +406,7 @@ struct DigestTests {
     func rewriting() async throws {
         try await StoryBuilder(database).build(now: now)
 
-        try await TopicPreferences(database).record("Software")
+        try await TopicPreferences(database).add("Software")
         try await database.writer.write { db in
             for (index, story) in try Story.fetchAll(db).enumerated() {
                 var story = story
@@ -548,7 +548,7 @@ struct DigestTests {
 
         // The typography story is also about software, and the reader wants
         // less of software and more of typography.
-        try await TopicPreferences(database).record("Logiciel")
+        try await TopicPreferences(database).add("Logiciel")
         try await database.writer.write { db in
             for story in try Story.fetchAll(db) where story.title.localizedCaseInsensitiveContains("grotesques") {
                 try StoryTopic(storyID: story.id, name: "Logiciel").insert(db, onConflict: .ignore)
@@ -597,17 +597,17 @@ struct DigestTests {
 
         let preferences = TopicPreferences(database)
         try await preferences.add("Cyclisme")
-        // One the model found, holding nothing today.
-        try await preferences.record("Cyclotourisme")
+        // A section of the catalogue, holding nothing today.
+        try await preferences.seedStandards(["Sport"], at: now)
 
         let page = try await service.digest(now: now)
 
         // A reader who has just written a subject and cannot see it has no way
         // of knowing it took.
         #expect(page.topics.contains("Cyclisme"))
-        // One the model found was never asked for, and is on the page only
-        // while it holds something.
-        #expect(!page.topics.contains("Cyclotourisme"))
+        // A section nobody asked for is on the page only while it holds
+        // something : fifty empty pills would say nothing at all.
+        #expect(!page.topics.contains("Sport"))
         #expect(page.topics.first == "Éducation")
     }
 
@@ -622,110 +622,6 @@ struct DigestTests {
         #expect(page.isEmpty)
         // And the way back is still on the page.
         #expect(page.topics.contains("Éducation"))
-    }
-
-    @Test("A word that fits every article is not a subject")
-    func aSubjectNarrowerThanThePage() {
-        let french = Locale(identifier: "fr_FR")
-
-        // `Actualité` is true of every story on the page, so filing under it
-        // sorts nothing and a pill wearing it says `everything`. It is the rule
-        // that governs a headline, that every word must carry information,
-        // applied to a single word.
-        #expect(TopicNamer.fault(in: "Actualité", of: "Une réforme", locale: french) == .theWholePage)
-        #expect(TopicNamer.fault(in: "Informations", of: "Une réforme", locale: french) == .theWholePage)
-        #expect(TopicNamer.fault(in: "Divers", of: "Une réforme", locale: french) == .theWholePage)
-
-        // Answered in the wrong language, it says just as little.
-        #expect(TopicNamer.fault(in: "News", of: "Une réforme", locale: french) == .theWholePage)
-    }
-
-    @Test("A subject that merely begins with such a word is narrower than the page")
-    func onlyTheWholeName() {
-        let french = Locale(identifier: "fr_FR")
-
-        // Whole names only : this one says which news, which is a field.
-        #expect(TopicNamer.fault(in: "Actualité internationale", of: "Une réforme", locale: french) == nil)
-        #expect(TopicNamer.fault(in: "Éducation", of: "Une réforme", locale: french) == nil)
-    }
-
-    @Test("The two faults are told apart, since they need opposite advice")
-    func faultsAreDistinct() {
-        let french = Locale(identifier: "fr_FR")
-
-        // A model told to step back from the headline reaches for a word that
-        // fits everything ; one told to step in reaches for the headline. Being
-        // told the wrong one gets the other fault back.
-        #expect(
-            TopicNamer.fault(in: "Les macros Swift", of: "Les macros Swift, deux ans après", locale: french)
-                == .theStoryItself
-        )
-        #expect(
-            TopicNamer.fault(in: "Actualité", of: "Les macros Swift, deux ans après", locale: french) == .theWholePage)
-    }
-
-    @Test("A section the reader already has is not a new subject")
-    func notASectionAgain() {
-        let french = Locale(identifier: "fr_FR")
-        let settled = ["Politique", "Sciences", "Sport"]
-
-        // What the model was doing : answering in English, so the reader's
-        // `Sciences` came back as `Science` and their `Sport` as `Sports`, each
-        // one a second pill for a subject they already had.
-        #expect(
-            TopicNamer.fault(in: "Sciences", of: "Une découverte", besides: settled, locale: french)
-                == .alreadyASection
-        )
-        #expect(
-            TopicNamer.fault(in: "politique", of: "Une découverte", besides: settled, locale: french)
-                == .alreadyASection
-        )
-
-        // Something narrower is what was asked for.
-        #expect(TopicNamer.fault(in: "Astronomie", of: "Une découverte", besides: settled, locale: french) == nil)
-    }
-
-    @Test("The reader's own subjects stand between the headline and the answer")
-    func namingIsAnchoredInTheirLanguage() {
-        let asked = TopicNamer.naming(
-            "US strikes Iranian launchers in strait of Hormuz",
-            summary: "US says it attacked Larak Island to prevent launch of sea mines.",
-            besides: ["Politique", "Sciences", "Sport"],
-            locale: Locale(identifier: "fr_FR")
-        )
-
-        // A model answers in the language of the words nearest its answer, and
-        // the words nearest this one were an English headline from the English
-        // press : that is how `Sciences` came back as `Science`. The reader's
-        // own subjects, in the reader's own language, are what a demand about
-        // language cannot be : an example of it.
-        #expect(asked.contains("Politique"))
-        #expect(asked.contains("Sciences"))
-
-        // And the demand is the last thing before the answer, in their language.
-        #expect(asked.hasSuffix(OnDeviceModel.languageReminder(for: Locale(identifier: "fr_FR"))))
-        #expect(asked.range(of: "Politique")!.lowerBound > asked.range(of: "Hormuz")!.lowerBound)
-    }
-
-    @Test("A reader with no subjects yet is asked without a list")
-    func namingWithoutAVocabulary() {
-        let asked = TopicNamer.naming("Une découverte", summary: nil, besides: [], locale: Locale(identifier: "fr_FR"))
-        #expect(!asked.contains("The subjects this reader already has"))
-    }
-
-    @Test("A headline dressed as a subject is not a subject")
-    func fieldsRatherThanStories() {
-        let headline = "Les macros Swift, deux ans après"
-
-        #expect(TopicNamer.isField("Logiciel", of: headline))
-        #expect(TopicNamer.isField("Développement logiciel", of: headline))
-
-        // The headline back, in whole or in part.
-        #expect(!TopicNamer.isField("Les macros Swift", of: headline))
-        #expect(!TopicNamer.isField("macros swift", of: headline))
-        // A sentence is not a field.
-        #expect(!TopicNamer.isField("Ce que les macros ont changé au code", of: headline))
-        #expect(!TopicNamer.isField("   ", of: headline))
     }
 
     @Test("The stories left to file are counted, and none of them is one already filed")
@@ -753,10 +649,10 @@ struct DigestTests {
     @Test("A story is not stamped as asked when there was nothing to ask about")
     func nothingIsStampedWithoutAVocabulary() async throws {
         try await StoryBuilder(database).build(now: now)
-        // The state migration v21 left behind : every subject marked as the
-        // model's own, so `settled()` is empty and the model is shown nothing.
+        // A store whose sections have not been seeded yet, so `settled()` is
+        // empty and the model would be shown nothing to choose from.
         try await database.writer.write { db in
-            try db.execute(sql: "UPDATE topic SET kind = ?", arguments: [TopicKind.smart.rawValue])
+            try db.execute(sql: "DELETE FROM topic")
         }
 
         let before = try await FileStoriesJob(database, now: now).remaining()
@@ -900,21 +796,6 @@ struct DigestTests {
         #expect(known.first?.stories == 0)
     }
 
-    @Test("What the model comes back with is folded into the vocabulary")
-    func modelSubjectsAreFolded() async throws {
-        let preferences = TopicPreferences(database)
-        try await preferences.add("Sécurité informatique")
-
-        // The model answering the same subject in another spelling has not
-        // found a new one.
-        #expect(try await preferences.record("sécurité informatique") == "Sécurité informatique")
-        #expect(try await preferences.record("Typographie") == "Typographie")
-
-        let known = try await preferences.known()
-        #expect(known.map(\.name).sorted() == ["Sécurité informatique", "Typographie"])
-        #expect(known.first { $0.name == "Typographie" }?.isOwn == false)
-    }
-
     @Test("The vocabulary shown to the model leads with what is used most")
     func vocabularyOrder() async throws {
         try await StoryBuilder(database).build(now: now)
@@ -942,18 +823,6 @@ struct DigestTests {
         #expect(try await preferences.scores().isEmpty)
         let filed = try await database.writer.read { db in try StoryTopic.fetchCount(db) }
         #expect(filed == 0)
-    }
-
-    @Test("A subject the model found is not the reader's to delete")
-    func removingAModelSubject() async throws {
-        let preferences = TopicPreferences(database)
-        try await preferences.record("Typographie")
-
-        try await preferences.remove("Typographie")
-
-        // It would only be found again on the next page. What a reader wants
-        // from one of those is the preference.
-        #expect(try await preferences.known().map(\.name) == ["Typographie"])
     }
 
     // MARK: - Managing the subjects
@@ -1069,7 +938,7 @@ struct DigestTests {
         // Through the vocabulary, as the naming job does : a subject is a
         // thing before it is a filing.
         for topic in Set(topics.values) {
-            try await TopicPreferences(database).record(topic)
+            try await TopicPreferences(database).add(topic)
         }
 
         try await database.writer.write { db in
@@ -1434,21 +1303,49 @@ struct TopicKindTests {
         #expect(known.first { $0.name == "Écologie" } == nil)
     }
 
-    @Test("A section the model happened to name first becomes the section")
-    func seedingPromotes() async throws {
-        // What the reader's own store looked like : the model had coined
-        // `Technologie` for a story before the sections were ever seeded, so
-        // the fold skipped it and the section stayed the model's own. It was
-        // therefore never in `settled()`, never shown to the model, and nothing
-        // could ever be filed under it.
-        try await topics.record("Technologie", at: now)
-        let changed = try await topics.seedStandards(["Politique", "Technologie"], at: now)
+    @Test("A section that has been renamed takes its stories and its preference with it")
+    func renaming() async throws {
+        let story = UUID.v7(at: now)
+        try await topics.seedStandards(["Écologie"], at: now)
+        try await topics.adjust("Écologie", by: 1)
+        try await database.writer.write { db in
+            try Story(id: story, title: "Une réforme", firstAt: now, lastAt: now, updatedAt: now).insert(db)
+            try StoryTopic(storyID: story, name: "Écologie").insert(db)
+        }
+
+        // A section is known by its name and by nothing else, so renaming one
+        // without moving the filings and the preference leaves the stories
+        // under a name that no longer exists and the reader's word attached to
+        // it.
+        let changed = try await topics.seedStandards(
+            ["Environnement"],
+            renaming: [("Écologie", "Environnement")],
+            at: now
+        )
 
         #expect(changed)
-        let known = try await topics.known()
-        #expect(known.count == 2)
-        #expect(known.first { $0.name == "Technologie" }?.kind == .standard)
-        #expect(try await topics.settled().sorted() == ["Politique", "Technologie"])
+        #expect(try await topics.known().map(\.name) == ["Environnement"])
+        #expect(try await topics.score(of: "Environnement") == 1)
+        #expect(
+            try await database.writer.read { db in
+                try String.fetchAll(db, sql: "SELECT name FROM story_topic")
+            } == ["Environnement"]
+        )
+    }
+
+    @Test("A rename that would land on a section that already exists is left alone")
+    func renamingNeverMerges() async throws {
+        try await topics.seedStandards(["Écologie", "Environnement"], at: now)
+
+        // Merging two sections is a different decision, and not one a rename
+        // may take by itself.
+        _ = try await topics.seedStandards(
+            ["Environnement"],
+            renaming: [("Écologie", "Environnement")],
+            at: now
+        )
+
+        #expect(try await topics.known().map(\.name).sorted() == ["Environnement", "Écologie"])
     }
 
     @Test("Seeding the sections asks again about the stories that were shown none")
@@ -1465,7 +1362,8 @@ struct TopicKindTests {
                     arguments: [asked, id]
                 )
             }
-            try Topic(name: "Cybersécurité", kind: .smart, createdAt: now).insert(db)
+            // Filed under a name that is in no vocabulary, which is what the
+            // model's own subjects became once it stopped naming them.
             try StoryTopic(storyID: unfiled, name: "Cybersécurité").insert(db)
         }
         // One story already under something the reader will recognize.
@@ -1488,32 +1386,31 @@ struct TopicKindTests {
         #expect(stamps[filed] ?? nil != nil)
     }
 
-    @Test("The model chooses from the settled subjects and never from its own")
+    @Test("The model chooses from the whole vocabulary, the reader's own first")
     func settled() async throws {
         try await topics.seedStandards(["Politique"], at: now)
-        try await topics.add("Typographie", at: now)
-        try await topics.record("Réforme des retraites", at: now)
+        try await topics.add("Typographie", at: now.addingTimeInterval(60))
 
-        // Offering its own answers back to it turns a page into a drift of
-        // near synonyms : it reaches for whatever it said last.
-        #expect(try await topics.settled().sorted() == ["Politique", "Typographie"])
-        #expect(try await topics.smartNames() == ["Réforme des retraites"])
+        // It used to exclude a third kind, the ones the model had coined
+        // itself : offering those back to it turned a page into a drift of near
+        // synonyms, since it reached for whatever it said last. It coins
+        // nothing now, so there is nothing to exclude. What the reader wrote
+        // comes first, being what they will look for a story under.
+        #expect(try await topics.settled() == ["Typographie", "Politique"])
     }
 
     @Test("A reader may unmake what they made, and nothing else")
     func removing() async throws {
         try await topics.seedStandards(["Politique"], at: now)
         try await topics.add("Typographie", at: now)
-        try await topics.record("Réforme des retraites", at: now)
 
-        for name in ["Politique", "Typographie", "Réforme des retraites"] {
+        for name in ["Politique", "Typographie"] {
             try await topics.remove(name)
         }
 
-        // A standard section is not a thing that was made, and one the model
-        // found would only be found again on the next page.
-        let left = try await topics.known().map(\.name).sorted()
-        #expect(left == ["Politique", "Réforme des retraites"])
+        // A standard section is not a thing that was made, so there is nothing
+        // there to unmake.
+        #expect(try await topics.known().map(\.name) == ["Politique"])
     }
 
     @Test("What a reader wrote comes before the sections, for the model to reach first")
