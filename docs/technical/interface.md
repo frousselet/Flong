@@ -182,7 +182,9 @@ It names the stage rather than reporting a percentage of nothing in particular :
 
 **It is in the pinned header, with the pills, not in the safe area.** For the reason recorded twice already in this file : a bar in the safe area lays itself out under the large title and draws itself somewhere else entirely. Being pinned, it stays where the reader can see it while they scroll, which is what "at the top of the page" has to mean on a page that scrolls. It is inside the editorial column like everything else, so it is held to the measure on a wide Mac window.
 
-**It keeps its place whether or not there is anything to say.** A row that appears and disappears moves the whole page under the reader's thumb twice per pass. The band stays and its contents fade, which costs one line of quiet under the pills and takes the jolt out of every refresh.
+**It takes the room it needs and gives it back.** A place kept for it permanently was a hand's width of nothing under the subjects on every page, for a line that is there a few seconds an hour. So the band grows into its height and shrinks out of it over a third of a second, which is a page making room rather than a page jumping. What is animated is the height rather than the row's presence : a pinned header measuring a child that has just been inserted lands on the answer a frame late, and that frame is the jolt.
+
+Content below it still moves by the height of the band when it appears, since the band is in the layout and not over it. Animated, that reads as the page opening a slot ; it is the residue of putting the line in the page rather than floating it above, which is the trade the pinned header was chosen for.
 
 **Glass of its own, like the pills above it.** It carried the page's own ground at first, since the stories pass behind a pinned header and something has to come between the two. A band of opaque paper running the measure of the column reads as a shelf bolted to the page ; a capsule is a control floating over it, which is the layer the material is for and the same argument that lets the pills have it.
 
