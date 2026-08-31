@@ -101,11 +101,11 @@ Nothing else animates.
 
 The section beside the digest shows everything, newest first, read or not. A queue is a thing to get to the end of, and a reader watching a subject is not trying to finish anything : what they want is to see what came in, and where they left off.
 
-**A read article is marked, not diminished.** It carried a blue dot when unread and a lighter headline when read, which made half the page look stale and quietly said that a story already opened was worth less. Every headline keeps one weight and one colour now, and a read one ends in a small tick : at the end of the words rather than beside them, where the reader stopped reading, costing the row no width. The section carries no count either. A number that only ever grows is a debt, and nobody owes their feeds anything ; the sources list still counts what is unread, for whoever wants to know.
+**A read article is marked, not diminished.** It carried a blue dot when unread and a lighter headline when read, which made half the page look stale and quietly said that a story already opened was worth less. Every headline keeps one weight and one colour now, and a read one ends in a small tick : at the end of the words rather than beside them, where the reader stopped reading, costing the row no width. The section carries no count either. A number that only ever grows is a debt, and nobody owes their feeds anything. The sources list counted what was unread and does not any more, for the same reason : what it says beside a publisher now is how many articles they have given the reader, which is a fact about the publisher rather than a tally of what is owed. The views above the sources carry no count at all, `Non lus` being a number the reader meets everywhere else and `Tous les articles` beside one being the size of the corpus, answering nothing anybody asked.
 
 It is broken by day, in the same kerned uppercase as the front page's sections. A long scroll with no landmarks is one a reader loses their place in, and the day is the landmark.
 
-Unread on its own is still a view, in the sources list, for whoever wants a queue.
+Unread on its own is still a view, in the sources panel, for whoever wants a queue.
 
 **It is called `Flux` in French, and the subscriptions are no longer.** `Flux` is what a French reader calls the river of everything, and it was already the heading over the list of feeds in the sources screen. Two sections cannot share a name, and the list of feeds is a list of subscriptions, which is what it is now called. In English the section is `Stream`, the specification's own word for the disposable cache of everything, which is exactly what it shows.
 

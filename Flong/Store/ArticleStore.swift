@@ -302,12 +302,28 @@ nonisolated struct ArticleStore: Sendable {
 
     /// How many unread articles each feed holds, feeds with none excluded.
     func unreadCounts() async throws -> [UUID: Int] {
-        try await database.writer.read { db in
+        try await counts(unreadOnly: true)
+    }
+
+    /// How many articles each feed holds, feeds with none excluded.
+    ///
+    /// **What the sources list counts, and it counts everything.** It said what
+    /// was unread, which is a number that only ever grows and that nobody owes
+    /// their feeds : a reader looking down the list wants to know how much a
+    /// publisher has given them, not how much of it they are behind on.
+    func counts() async throws -> [UUID: Int] {
+        try await counts(unreadOnly: false)
+    }
+
+    private func counts(unreadOnly: Bool) async throws -> [UUID: Int] {
+        let unread = unreadOnly ? "is_read = 0 AND " : ""
+
+        return try await database.writer.read { db in
             let rows = try Row.fetchAll(
                 db,
                 sql: """
                     SELECT feed_id, COUNT(*) AS count FROM entry
-                    WHERE is_read = 0 AND is_hidden = 0 AND duplicate_of IS NULL GROUP BY feed_id
+                    WHERE \(unread)is_hidden = 0 AND duplicate_of IS NULL GROUP BY feed_id
                     """
             )
             return Dictionary(uniqueKeysWithValues: rows.map { ($0["feed_id"] as UUID, $0["count"] as Int) })
