@@ -34,12 +34,10 @@ import UserNotifications
 /// something laid over it. Nothing here paints a background of its own, so the
 /// shape the system draws is the shape that shows.
 ///
-/// **It says nothing it does not have to.** It carried a heading, then a title
-/// of its own, over a single switch that names itself : a panel opened from a
-/// bell, holding one line reading `Nouveaux fils`, has been read before it has
-/// been titled. Under the switch was a paragraph explaining what a story is, to
-/// somebody who reaches this from a page made of them. What is left is the
-/// switch.
+/// **It says nothing it does not have to.** It carried a heading over a single
+/// switch, which is a heading naming the thing under it, and a paragraph
+/// explaining what a story is to somebody who reaches this from a page made of
+/// them. What is left is the switch, under the panel's own name.
 struct NotificationsPanel: View {
     let model: AppModel
 
@@ -59,7 +57,7 @@ struct NotificationsPanel: View {
     /// It is the height of the sheet and not of the panel : the system insets
     /// the one inside the other, so the panel stands a little taller than the
     /// number here.
-    private var height: CGFloat { isRefused ? 215 : 96 }
+    private var height: CGFloat { isRefused ? 250 : 132 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -90,19 +88,16 @@ struct NotificationsPanel: View {
         .task { await model.refreshNotificationStatus() }
     }
 
-    /// The way out, on the platform that needs one.
-    ///
-    /// A row with nothing but that : the panel is titled by the button that
-    /// opened it and by the one line inside it, and the indicator above says
-    /// how it goes away.
-    @ViewBuilder
+    /// What the panel is, and the way out on the platform that needs one.
     private var head: some View {
-        #if os(macOS)
-            HStack {
-                Spacer(minLength: 0)
-                PanelDismiss()
-            }
-        #endif
+        HStack(spacing: 14) {
+            Text("Notifications")
+                .font(Editorial.headline(.title3))
+
+            Spacer(minLength: 8)
+
+            PanelDismiss()
+        }
     }
 
     /// What a refusal leaves the reader able to do, which is go and undo it.

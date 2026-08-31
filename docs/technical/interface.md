@@ -296,7 +296,7 @@ An alignment guide was tried first, holding the whole text block to the left and
 
 Three buttons stand in the leading corner, in the order a reader meets what they hold : the sources they follow, the subjects the page is sorted into, the notices they may be interrupted by. The subject wears `circle.grid.2x2` wherever it appears, which is a grid of sections rather than the stack of cards it used to be.
 
-**None of them is titled.** A panel is named by the button that opened it, and by what is in it : a sheet holding one switch reading `Nouveaux fils`, or a list of publishers, or fifty sections under their own headings, has been read before it has been titled. A title would be the third thing on screen saying the same word.
+**The three in the leading corner are titled ; the reader's is not.** A title was taken off all four and put back on the three, which is the right answer for a different reason on each side. The three are places the reader went to on purpose, and a panel over a page of headlines wants a word saying which of the three arrived. The reader's opens on their own face at ninety-six points : nothing a title could say about who that is about would say it better.
 
 **The way out is a flick, and the indicator says so.** There is no `Terminé` : a button that repeats what the gesture already offers is a control spent on nothing, and the indicator at the head of every panel is the thing that says a panel is a panel. A Mac keeps the button, and only a Mac, since a Mac sheet cannot be flicked and would strand the reader with no way out at all.
 

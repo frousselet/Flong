@@ -30,8 +30,9 @@ import SwiftUI
 /// opened a list of lines leading to screens : a profile, the sites, a command.
 /// Two of those are things a reader sets and comes straight back from, and the
 /// third was a command in a list of places. It is the fourth panel now, built
-/// like the three in the other corner : untitled, closed by a flick, over the
-/// page rather than in front of it.
+/// like the three in the other corner : closed by a flick, over the page rather
+/// than in front of it. Untitled, where those three are not, for the reason the
+/// head below sets out.
 ///
 /// It holds what belongs to the person rather than to the page. The sites they
 /// pay for, since being signed in to `lemonde.fr` is a fact about them and not
@@ -102,9 +103,11 @@ struct ReaderPanel: View {
 
     /// The way out on the platform that needs one, and nothing else.
     ///
-    /// No title. The panel is named by the face that opened it, which is the
-    /// reader's own : nothing on screen says who this is about better than
-    /// their own picture at the top of it.
+    /// **No title, where the three in the other corner have one.** They are
+    /// places a reader went to on purpose and a word says which of the three
+    /// arrived over the page. This one opens on the reader's own face at
+    /// ninety-six points : nothing a title could say about who it is about
+    /// would say it better.
     @ViewBuilder
     private var head: some View {
         #if os(macOS)

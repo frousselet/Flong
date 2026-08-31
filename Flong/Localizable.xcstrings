@@ -1112,7 +1112,6 @@
       }
     },
     "Force a synchronization" : {
-      "extractionState" : "stale",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -1543,16 +1542,6 @@
         }
       }
     },
-    "No subscribed sites" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun site abonné"
-          }
-        }
-      }
-    },
     "Notes" : {
       "comment" : "The collection of articles the reader wrote something on",
       "localizations" : {
@@ -1695,16 +1684,6 @@
         }
       }
     },
-    "Profile" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profil"
-          }
-        }
-      }
-    },
     "Published %@" : {
       "localizations" : {
         "fr" : {
@@ -1721,16 +1700,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Reçu %@"
-          }
-        }
-      }
-    },
-    "Refresh" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Actualiser"
           }
         }
       }
@@ -1935,16 +1904,6 @@
         }
       }
     },
-    "Sign in to a site you pay for, and Flong will fetch its articles whole." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Connectez-vous à un site auquel vous êtes abonné, et Flong récupérera ses articles en entier."
-          }
-        }
-      }
-    },
     "Sign in to this site" : {
       "localizations" : {
         "fr" : {
@@ -1991,16 +1950,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Déconnecté par le site"
-          }
-        }
-      }
-    },
-    "Sites" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sites"
           }
         }
       }
@@ -2607,17 +2556,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vos thématiques"
-          }
-        }
-      }
-    },
-    "Your profile" : {
-      "comment" : "The menu entry that opens the profile, when no name has been given",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Votre profil"
           }
         }
       }

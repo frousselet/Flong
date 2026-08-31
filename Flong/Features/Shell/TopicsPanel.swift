@@ -30,10 +30,7 @@ import SwiftUI
 /// pulls up to the whole screen : fifty sections and however many of the
 /// reader's own are a list to scroll, and a list to scroll wants the height a
 /// reader chooses.
-///
-/// **No title over it.** The panel is named by the button that opened it, and
-/// the bands inside say what they hold : a title would be the third thing on
-/// screen saying `Thématiques`.
+
 ///
 /// **Nothing in it paints a background.** A sheet is already inset from the
 /// edges of the screen and rounded on all four corners ; a `List` paints its
@@ -66,15 +63,14 @@ struct TopicsPanel: View {
         .task { await model.loadKnownTopics() }
     }
 
-    /// What can be added to the list, and the way out on the platform that
-    /// needs one.
-    ///
-    /// No title over it. The panel is named by the button that opened it, and
-    /// the bands inside it say what they hold ; a title would be the third
-    /// thing on screen saying `Thématiques`.
+    /// What the panel is, what can be added to it, and the way out on the
+    /// platform that needs one.
     private var head: some View {
         HStack(spacing: 14) {
-            Spacer(minLength: 0)
+            Text("Subjects")
+                .font(Editorial.headline(.title3))
+
+            Spacer(minLength: 8)
 
             Button {
                 name = ""

@@ -128,15 +128,14 @@ struct SourcesPanel: View {
         }
     }
 
-    /// The two ways to add a source, and the way out on the platform that needs
-    /// one.
-    ///
-    /// No title over it. The panel is named by the button that opened it, and
-    /// what is in it is a list of sources ; a title would be a third thing on
-    /// screen saying `Sources`.
+    /// What the panel is, the two ways to add a source, and the way out on the
+    /// platform that needs one.
     private var head: some View {
         HStack(spacing: 14) {
-            Spacer(minLength: 0)
+            Text("Sources")
+                .font(Editorial.headline(.title3))
+
+            Spacer(minLength: 8)
 
             Menu {
                 Button {

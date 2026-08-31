@@ -30,7 +30,7 @@ struct LocalizationTests {
         #expect(String(localized: "Mark all as read", locale: french) == "Tout marquer comme lu")
         #expect(String(localized: "Add to favourites", locale: french) == "Mettre en favori")
         #expect(String(localized: "Choose a picture", locale: french) == "Choisir une photo")
-        #expect(String(localized: "Your profile", locale: french) == "Votre profil")
+        #expect(String(localized: "Subscribed sites", locale: french) == "Sites abonnés")
     }
 
     @Test("The two kinds of favourite are told apart in French too")
