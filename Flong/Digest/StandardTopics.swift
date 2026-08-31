@@ -51,7 +51,47 @@ nonisolated enum StandardTopics {
 
     /// The names as this reader reads them.
     static func names(for locale: Locale = .current) -> [String] {
-        all.map {
+        resolve(all, in: locale)
+    }
+
+    /// The words that name the news itself rather than a field of it.
+    ///
+    /// **`Actualité` is the failure this exists for.** It is true of every
+    /// story on the page, so filing under it sorts nothing and a pill wearing
+    /// it is a pill that says `everything`. A subject earns its place by
+    /// telling one story apart from the rest, and a word that would fit every
+    /// article ever published cannot do that whatever else is true of it.
+    ///
+    /// The same argument as the one that rules a headline : every word has to
+    /// carry information, and `Le numérique en question` carries none. This is
+    /// that rule applied to a single word, where it is at its sharpest.
+    ///
+    /// Whole names only, folded. `Actualité internationale` is narrower than
+    /// the page and is left alone ; it is `Actualité` on its own that says
+    /// nothing.
+    static let namesForNewsItself: [LocalizedStringResource] = [
+        "Actualité",
+        "Actualités",
+        "Informations",
+        "Divers",
+        "Général",
+        "Résumé",
+        "Titres",
+        "Sujets",
+    ]
+
+    /// The words for news in general, as this reader reads them and as the
+    /// catalogue's own language spells them.
+    ///
+    /// Both, because a model asked for French answers in English often enough
+    /// to be worth the second list, and a subject that says nothing says
+    /// nothing in either language.
+    static func generalNames(for locale: Locale = .current) -> [String] {
+        resolve(namesForNewsItself, in: locale) + resolve(namesForNewsItself, in: Locale(identifier: "en"))
+    }
+
+    private static func resolve(_ names: [LocalizedStringResource], in locale: Locale) -> [String] {
+        names.map {
             var resource = $0
             resource.locale = locale
             return String(localized: resource)

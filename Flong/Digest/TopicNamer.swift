@@ -91,7 +91,9 @@ nonisolated struct TopicNamer: Sendable {
         You file one news headline under the subjects a reader already has.
         A subject is a field of interest, not a single event.
         Choose only from the subjects you are given. Choose the fewest that fit.
-        Every headline belongs under at least one of them : choose the closest         when none is exact, and never answer with nothing.
+        Prefer the most exact subject over a broader one that would also do.
+        Every headline belongs under at least one of them : choose the closest \
+        when none is exact, and never answer with nothing.
         Never mention that you are a model or that you were asked anything.
         """
     }
@@ -179,7 +181,9 @@ nonisolated struct TopicNamer: Sendable {
                 instructions: """
                     You name the field of interest a news headline belongs to.
                     A field is what a section of a newspaper is called : it outlives any one story.
-                    One or two words. Never the headline, never a name, never a date.
+                    It must tell this story apart from the rest of the news.
+                    Never a word that would fit every article ever published, such as news or information.
+                    One or two words, each carrying information. Never the headline, never a name, never a date.
                     \(OnDeviceModel.languageInstruction(for: locale))
                     Answer with the field and nothing else.
                     """
@@ -198,10 +202,12 @@ nonisolated struct TopicNamer: Sendable {
             var name = response.content.name.trimmingCharacters(in: .whitespacesAndNewlines)
 
             // Measured : asked once, it answers with the headline about half
-            // the time. `Les macros Swift` is not a field ; `Logiciel` is.
-            if !Self.isField(name, of: headline) {
+            // the time. `Les macros Swift` is not a field ; `Logiciel` is. And
+            // asked not to do that, it reaches for `Actualité`, which is the
+            // opposite fault and needs the opposite thing said about it.
+            if let fault = Self.fault(in: name, of: headline, locale: locale) {
                 response = try await session.respond(
-                    to: "That is the story, not the field it belongs to. Answer with the field.",
+                    to: Self.complaint(about: fault),
                     generating: GeneratedTopic.self,
                     options: OnDeviceModel.options(maximumTokens: Self.namingTokens)
                 )
@@ -209,32 +215,74 @@ nonisolated struct TopicNamer: Sendable {
             }
 
             OnDeviceModel.succeeded()
-            guard Self.isField(name, of: headline) else {
-                Log.enrich.notice("The model named a story rather than a subject, twice")
-                return nil
-            }
-            return name
+            guard let fault = Self.fault(in: name, of: headline, locale: locale) else { return name }
+
+            // Twice is enough. The story keeps the section it was filed under,
+            // which is a real subject a reader recognizes ; a second one of the
+            // model's own is a nicety, and a bad one is worse than none.
+            Log.enrich.notice("The model would not name a subject : \(String(describing: fault), privacy: .public)")
+            return nil
         } catch {
             OnDeviceModel.refused(error)
             return nil
         }
     }
 
-    /// Whether a proposed subject is a field rather than the story itself.
+    /// Why a proposed subject is not one.
     ///
-    /// Short, and not lifted out of the headline. A model asked for a field
+    /// Two faults, and they need different things said about them : a model
+    /// that answered with the headline has to be told to step back, and one
+    /// that answered with a word for news itself has to be told to step in.
+    /// Telling it the wrong one of those gets the other fault back.
+    nonisolated enum NotASubject: Sendable {
+        /// The headline again, or something too long to be a field.
+        case theStoryItself
+        /// A word that would fit every article ever published.
+        case theWholePage
+    }
+
+    /// What is wrong with a proposed subject, or nothing.
+    ///
+    /// **Short, and not lifted out of the headline.** A model asked for a field
     /// and given one headline answers with that headline about half the time,
     /// and a vocabulary of headlines is a vocabulary with one story in each.
-    static func isField(_ name: String, of headline: String) -> Bool {
+    ///
+    /// **And narrower than the page.** `Actualité` is true of every story there
+    /// is, so filing under it sorts nothing and a pill wearing it says
+    /// `everything`. It is the same rule that governs a headline, that every
+    /// word must carry information, applied to a single word where it is at its
+    /// sharpest. Whole names only : `Actualité internationale` is narrower than
+    /// the page and is left alone.
+    static func fault(in name: String, of headline: String, locale: Locale = .current) -> NotASubject? {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, name.count <= 30 else { return false }
+        guard !name.isEmpty, name.count <= 30 else { return .theStoryItself }
 
-        let words = TopicPreferences.fold(name).split(separator: " ")
-        guard (1...3).contains(words.count) else { return false }
+        let folded = TopicPreferences.fold(name)
+        guard (1...3).contains(folded.split(separator: " ").count) else { return .theStoryItself }
+        guard !TopicPreferences.fold(headline).contains(folded) else { return .theStoryItself }
 
-        // Nothing the headline already says.
-        let folded = TopicPreferences.fold(headline)
-        return !folded.contains(TopicPreferences.fold(name))
+        let general = StandardTopics.generalNames(for: locale).map(TopicPreferences.fold)
+        guard !general.contains(folded) else { return .theWholePage }
+
+        return nil
+    }
+
+    /// Whether a proposed subject is one at all.
+    static func isField(_ name: String, of headline: String, locale: Locale = .current) -> Bool {
+        fault(in: name, of: headline, locale: locale) == nil
+    }
+
+    /// What to tell the model about the subject it just proposed.
+    private static func complaint(about fault: NotASubject) -> String {
+        switch fault {
+        case .theStoryItself:
+            "That is the story, not the field it belongs to. Answer with the field."
+        case .theWholePage:
+            """
+            That word fits every article ever published, so it sorts nothing. \
+            Answer with the field this story belongs to and no other.
+            """
+        }
     }
 
     /// A schema the model cannot answer outside of.

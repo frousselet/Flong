@@ -130,6 +130,15 @@ The second lets it name what the story is actually about, which every story gets
 
 **The model's own wear its mark.** A `sparkles` before the name, on the pills, in the rubric above a headline, and in the list of subjects, which is the mark the model wears everywhere else in the application. A standard section and one the reader wrote are things they decided ; a smart one is the model's reading of their page, and a reader is owed the difference before they form an opinion about it.
 
+**A subject is held to the rules a headline is held to.** They are the same job at different lengths : a headline says what one story is, a subject says what a run of them is about, and both fail the same way, by using words that carry no information.
+
+- **It must tell this story apart from the rest of the news.** `Actualité` is true of every story on the page, so filing under it sorts nothing and a pill wearing it says `everything`. Words that name the news itself rather than a field of it are refused outright, whole names only : `Actualité internationale` says which news and is left alone.
+- **It must not be the story.** A model asked for a field and shown one headline answers with that headline about half the time, and a vocabulary of headlines is a vocabulary with one story in each.
+- **One or two words, three at the outside**, each of them working.
+- **The most exact subject that fits, not the broadest that would do.** Filing a school-calendar reform under `Politique` when `Éducation` is on the list is filing it where nobody will look for it.
+
+The two faults need opposite advice, so they are told apart rather than met with one complaint : a model told to step back from the headline reaches for a word that fits everything, and one told to step in reaches for the headline again. Each gets its own sentence, once, in the same session so it can see what it just wrote. A second bad answer is dropped and the story keeps the section it was already filed under, which is a real subject a reader recognizes ; a second subject of the model's own is a nicety, and a bad one is worse than none.
+
 **A subject is a thing, not a reading.** The model used to name the subjects of the whole page on every rebuild, so they drifted : `Sécurité informatique` one run and `Cybersécurité` the next, and the preference the reader had attached to the first was left hanging off a name nothing used any more. There is a vocabulary now. It is written once, it stays, and a story is filed into it once and keeps it.
 
 **Filing is a resumable job**, like the briefs and the vectors. **A story is asked about once, and answered about once**, which is not the same thing : the first version stamped a story as asked whatever had happened, so one guardrail refusal, one rate limit or one moment with the assets unloaded left a fil with no thématique for good, never asked again and with no way for the reader to give it one. That was the reader's report, and it was right.
