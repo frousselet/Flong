@@ -132,6 +132,12 @@ They are stored in the reader's language, like everything else the model writes,
 
 **The model is never shown its own subjects.** Offering them back turns a page into a drift of near synonyms : it reaches for whatever is nearest, and what is nearest is whatever it said last. It chooses from the settled ones, the reader's own first.
 
+**It is shown the settled ones while it names a new one, and that fixes two faults at once.** It was answering in English : `Science` where the reader's section is `Sciences`, `Sports` where it is `Sport`, each one a second pill for a subject they already had and wearing the model's own mark. The language is demanded twice already, in the instructions and again after the headline, and it was not enough. The reason is written down elsewhere on this page : a model answers in the language of the words nearest its answer, and the words nearest this answer were an English headline from the English press.
+
+A dozen of the reader's own subjects, in the reader's own language, standing between the headline and the answer are what a demand about language cannot be, which is an example of it. They also say what already exists, so the model reaches past it for something finer rather than translating a section that was already there. A proposal that is one of them after folding is refused and asked for again : the vocabulary would fold it away, and the story would end up with no subject of its own.
+
+Still never its own subjects, only the settled ones. That part of the argument is untouched.
+
 **Filing is two passes, and they ask different questions.** The first files the story under something a reader recognizes and **has no way out** : the list is the sections every newspaper has plus whatever the reader wrote, and a headline belonging under none of those is rare enough that an escape costs more than it saves. Measured before this, the model took the escape constantly, and a page where half the stories are filed under nothing is a page whose pills say nothing. It cannot invent here either, the schema being an enumeration of the names it was given.
 
 The second lets it name what the story is actually about, which every story gets and not only the ones that fit nothing. `Politique` and `Réforme des retraites` are both true of one story : the first says what kind of news it is, the second says what it is, and a page wants both. What comes back is folded against the whole vocabulary before it is kept.

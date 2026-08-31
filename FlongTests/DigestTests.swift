@@ -664,6 +664,55 @@ struct DigestTests {
             TopicNamer.fault(in: "Actualité", of: "Les macros Swift, deux ans après", locale: french) == .theWholePage)
     }
 
+    @Test("A section the reader already has is not a new subject")
+    func notASectionAgain() {
+        let french = Locale(identifier: "fr_FR")
+        let settled = ["Politique", "Sciences", "Sport"]
+
+        // What the model was doing : answering in English, so the reader's
+        // `Sciences` came back as `Science` and their `Sport` as `Sports`, each
+        // one a second pill for a subject they already had.
+        #expect(
+            TopicNamer.fault(in: "Sciences", of: "Une découverte", besides: settled, locale: french)
+                == .alreadyASection
+        )
+        #expect(
+            TopicNamer.fault(in: "politique", of: "Une découverte", besides: settled, locale: french)
+                == .alreadyASection
+        )
+
+        // Something narrower is what was asked for.
+        #expect(TopicNamer.fault(in: "Astronomie", of: "Une découverte", besides: settled, locale: french) == nil)
+    }
+
+    @Test("The reader's own subjects stand between the headline and the answer")
+    func namingIsAnchoredInTheirLanguage() {
+        let asked = TopicNamer.naming(
+            "US strikes Iranian launchers in strait of Hormuz",
+            summary: "US says it attacked Larak Island to prevent launch of sea mines.",
+            besides: ["Politique", "Sciences", "Sport"],
+            locale: Locale(identifier: "fr_FR")
+        )
+
+        // A model answers in the language of the words nearest its answer, and
+        // the words nearest this one were an English headline from the English
+        // press : that is how `Sciences` came back as `Science`. The reader's
+        // own subjects, in the reader's own language, are what a demand about
+        // language cannot be : an example of it.
+        #expect(asked.contains("Politique"))
+        #expect(asked.contains("Sciences"))
+
+        // And the demand is the last thing before the answer, in their language.
+        #expect(asked.hasSuffix(OnDeviceModel.languageReminder(for: Locale(identifier: "fr_FR"))))
+        #expect(asked.range(of: "Politique")!.lowerBound > asked.range(of: "Hormuz")!.lowerBound)
+    }
+
+    @Test("A reader with no subjects yet is asked without a list")
+    func namingWithoutAVocabulary() {
+        let asked = TopicNamer.naming("Une découverte", summary: nil, besides: [], locale: Locale(identifier: "fr_FR"))
+        #expect(!asked.contains("The subjects this reader already has"))
+    }
+
     @Test("A headline dressed as a subject is not a subject")
     func fieldsRatherThanStories() {
         let headline = "Les macros Swift, deux ans après"

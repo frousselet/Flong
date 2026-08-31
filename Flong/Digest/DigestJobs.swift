@@ -125,7 +125,7 @@ nonisolated struct FileStoriesJob: ResumableJob {
                 // And then one of the model's own, beside it. Folded against
                 // the whole vocabulary before it is kept, so a second spelling
                 // of something that exists is not a second subject.
-                if let proposed = await namer.newSubject(for: story.title, summary: story.summary),
+                if let proposed = await namer.newSubject(for: story.title, summary: story.summary, besides: settled),
                     let smart = try? await preferences.record(proposed), !filed.contains(smart)
                 {
                     filed.append(smart)
