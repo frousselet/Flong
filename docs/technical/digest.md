@@ -34,6 +34,28 @@ The vectors keep the job they are good at, which is finding a kept article by me
 
 A story is live when **three articles from at least two rooms** arrived in the last six hours. Ten articles from one room is not an event ; it is one newsroom having a busy afternoon. The sparkline on each row shows the shape of the arrival, which is the one thing a number cannot say.
 
+## What a headline has to be
+
+A headline does two things at once : it says in a few words what the piece contains, and it makes somebody want to read it. The second is worthless without the first, which is why almost every rule below is about the first. What the model is told is the same thing a desk tells a new sub, put in the fewest words a small model can hold.
+
+**Every word carries information.** The headline holds the most important words of the story and no others. `Le numérique en question` says nothing at all ; a fact, a figure, a named actor or a verb of action says something. Jargon is out.
+
+**Short.** Up to about ten words sits comfortably in a reader's immediate memory ; past twelve it has stopped being a headline and become a sentence. Twelve is where the line is drawn rather than ten, so a good headline of eleven is not thrown away for being one over the ideal. The instruction alone does not hold it : asked for ten words a small model gives fifteen about as often as not, so the length is checked and a headline that overruns is asked for again.
+
+**Clear before clever.** A plain headline barely trying to tempt anybody beats a pun nobody can parse. Wordplay, metaphor and reversal are legitimate craft and they need a readership and an editorial line to land ; a model writing for one reader it has never met has neither, so it is told not to try.
+
+**Read out of context.** A headline here arrives in a list, with no page around it, and is often cut short, so the words a reader would look for go at the front.
+
+**Never more than the articles say.** The gap between what a headline promises and what the piece delivers is what destroys the credit of a publication over time, and a reader's own front page is no different : one that oversells is one they stop believing. It is the single worst thing a generated headline can do, since nobody chose it and nobody is accountable for it.
+
+**The headline and the line under it share the work.** They are one piece of furniture. The headline says what happened ; the standfirst states the angle and answers what the headline had no room for, which is most of the who, what, where and why. A standfirst that restates the headline has spent the only line the story gets saying nothing new, so that is checked too, narrowly : the shape that actually comes back is the headline repeated with a clause bolted on, and a line that names the same subject and then goes on to say something is left alone. Rejecting the second would reject most of what the model writes correctly.
+
+**The picture cannot be taken into account, and that settles the question rather than leaving it open.** A desk can let a headline lean on an explicit photograph and be the more tempting for it, and must load the headline with information when the photograph is metaphorical. Here the row's picture is whatever the publisher happened to attach and nothing has read it, so the headline carries the information every time.
+
+**A story that resists a headline is usually a story that should not have been one.** On a desk, struggling to title a piece is a sign the piece has a problem. The same holds here : the grouping decides what a story is, and a group the model cannot name in ten words is often a group that put two events together.
+
+The checks are one retry and no more, shared with the checks on dates and on language : whichever fault is found first is put to the model once, in the same session so it can see what it just wrote, and a second bad answer is left to the article's own headline. A third call is a second and a half nobody has, and it comes out of the same budget as the subjects.
+
 ## Titles and summaries
 
 The model names each story and writes its one-line summary, through guided generation : a model asked for prose returns prose, sometimes with a preamble in it ; asked for two fields, it returns two fields.

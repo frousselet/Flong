@@ -1211,6 +1211,58 @@ struct ModelFailureTests {
         )
     }
 
+    // MARK: - What a headline has to be
+
+    @Test("A headline stops being one somewhere past a dozen words")
+    func headlineLength() {
+        // Up to about ten sits in a reader's immediate memory. Twelve is where
+        // the line is drawn rather than ten, so a good headline of eleven is
+        // not thrown away for being one over the ideal.
+        #expect(StorySummarizer.isShort("Le ministère avance la rentrée scolaire dans trois académies pilotes"))
+        #expect(StorySummarizer.isShort(String(repeating: "mot ", count: StorySummarizer.maximumTitleWords)))
+        #expect(!StorySummarizer.isShort(String(repeating: "mot ", count: StorySummarizer.maximumTitleWords + 1)))
+    }
+
+    @Test("An elision is one word, not two")
+    func elisionsCountOnce() {
+        // Counted on whitespace : a rule that split on apostrophes would make
+        // every French headline half as long as it is.
+        #expect(StorySummarizer.isShort("L'étude de l'impact de l'ozone sur l'agriculture d'altitude l'an prochain"))
+    }
+
+    @Test("A standfirst that says the headline again has said nothing")
+    func standfirstMustAdd() {
+        let title = "La rentrée avancée à la mi-août"
+
+        // The shape that actually comes back : the headline repeated with a
+        // clause bolted on.
+        #expect(StorySummarizer.repeats(title, in: "La rentrée avancée à la mi-août, selon le ministère."))
+        #expect(StorySummarizer.repeats(title, in: "LA RENTRÉE AVANCÉE À LA MI-AOÛT."))
+    }
+
+    @Test("A standfirst that names the same subject and then says something is kept")
+    func standfirstMayNameTheSubject() {
+        let title = "La rentrée avancée à la mi-août"
+
+        // Rejecting this would reject most of what the model writes correctly :
+        // a line about the reform will name the reform.
+        #expect(
+            !StorySummarizer.repeats(
+                title,
+                in: "La rentrée avancée à la mi-août concernerait trois académies pilotes, contre l'avis des syndicats."
+            )
+        )
+        #expect(
+            !StorySummarizer.repeats(
+                title, in: "Trois académies désigneront leurs établissements avant la fin du mois."))
+    }
+
+    @Test("A headline with nothing under it is not a repeat of itself")
+    func nothingIsNotARepeat() {
+        #expect(!StorySummarizer.repeats("", in: ""))
+        #expect(!StorySummarizer.repeats("Une réforme", in: ""))
+    }
+
     // MARK: - A filing that never happened
 
     @Test("A vocabulary with nothing in it is no answer at all")
