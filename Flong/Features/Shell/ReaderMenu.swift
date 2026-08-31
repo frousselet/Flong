@@ -26,11 +26,13 @@ import SwiftUI
 /// reader opens often : a thing opened often is a button, not a line in a menu.
 /// They sit in the opposite corner instead, where ``SourcesButton`` puts them.
 ///
-/// The notices are not in it either, and for the other half of the same reason.
-/// They are not opened often, but what a reader does when they open them is
-/// answer one question and go back to reading, which a line in a menu leading
-/// to a whole screen is a poor shape for. ``NotificationsButton`` stands beside
-/// the sources and opens a panel over the page.
+/// The notices are not in it either, nor the subjects, and for the other half
+/// of the same reason. Neither is opened often, but what a reader does in both
+/// is said about the page they are looking at : they answer one question, or
+/// nudge a subject and watch the page take it, and go back to reading. A line
+/// in a menu leading to a whole screen is a poor shape for that, however rarely
+/// it is done. ``NotificationsButton`` and ``TopicsButton`` stand beside the
+/// sources and open panels over the page.
 struct ReaderMenu: View {
     let model: AppModel
     let open: (Route) -> Void
@@ -52,12 +54,6 @@ struct ReaderMenu: View {
             }
 
             Divider()
-
-            Button {
-                open(.topics)
-            } label: {
-                Label("Subjects", systemImage: "square.stack.3d.up")
-            }
 
             Button {
                 open(.subscribedSites)
@@ -185,6 +181,34 @@ struct NotificationsButton: View {
         }
         .sheet(isPresented: $isOpen) {
             NotificationsPanel(model: model)
+        }
+    }
+}
+
+/// The way to every subject there is, beside the notices.
+///
+/// **The pills are the other half of this.** A reader forms an opinion about a
+/// subject while they are looking at the page it sorted, and saying it there
+/// costs one press. What the pills cannot hold is the subjects that have fallen
+/// off the page, and a preference nobody can find is a preference nobody can
+/// undo : this is where the whole list lives.
+///
+/// So it opens over the page rather than in place of it. Nudging a subject is
+/// said about the page behind the panel, and a screen pushed onto a stack put
+/// that page out of sight for the whole of it.
+struct TopicsButton: View {
+    let model: AppModel
+
+    @State private var isOpen = false
+
+    var body: some View {
+        Button {
+            isOpen = true
+        } label: {
+            Label("Subjects", systemImage: "circle.grid.2x2")
+        }
+        .sheet(isPresented: $isOpen) {
+            TopicsPanel(model: model)
         }
     }
 }

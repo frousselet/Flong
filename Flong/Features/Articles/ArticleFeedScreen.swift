@@ -141,6 +141,9 @@ struct ArticleFeedScreen: View {
                     SourcesButton(open: menu)
                 }
                 ToolbarItem(placement: .sectionLeading) {
+                    TopicsButton(model: model)
+                }
+                ToolbarItem(placement: .sectionLeading) {
                     NotificationsButton(model: model)
                 }
             }

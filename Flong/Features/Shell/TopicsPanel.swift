@@ -1,5 +1,5 @@
 //
-//  TopicsScreen.swift
+//  TopicsPanel.swift
 //  Flong
 //
 //  Created by François Rousselet on 30/08/2026.
@@ -19,13 +19,93 @@ import SwiftUI
 /// page, so that a reader who asked for less of something months ago can find it
 /// again and take it back. A preference nobody can find is a preference nobody
 /// can undo.
-struct TopicsScreen: View {
+///
+/// **A panel from the bottom, and no longer a page.** What a reader does here
+/// is said about the page they are looking at, so the page stays behind the
+/// panel while they say it : they nudge a subject, watch nothing happen to the
+/// list, and flick the panel away. A screen pushed onto a stack put the front
+/// page out of sight for the whole of that.
+///
+/// It stands taller than the notices beside it, which are one switch, and it
+/// pulls up to the whole screen : fifty sections and however many of the
+/// reader's own are a list to scroll, and a list to scroll wants the height a
+/// reader chooses.
+///
+/// **Nothing in it paints a background.** A sheet is already inset from the
+/// edges of the screen and rounded on all four corners ; a `List` paints its
+/// own background edge to edge, over the rounded corners and down past the safe
+/// area, which is what squares a floating panel off. The scroll view's own
+/// background is hidden so the shape the system draws is the shape that shows,
+/// and the rows keep theirs, which is what makes them read as rows.
+struct TopicsPanel: View {
     let model: AppModel
+
+    @Environment(\.dismiss) private var dismiss
 
     @State private var isAdding = false
     @State private var name = ""
 
+    /// How tall the panel stands before the reader asks for more.
+    ///
+    /// A height of its own rather than `.medium`, which is measured off the
+    /// bottom of the screen and takes the panel's lower corners with it : the
+    /// notices beside it float on all four, and a second panel that did not
+    /// would be two ideas of what a panel is. Tall enough to be worth
+    /// scrolling, and it pulls up to the whole screen for a reader going
+    /// through fifty sections.
+    private static let height: CGFloat = 520
+
     var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            head
+            subjects
+        }
+        .presentationDetents([.height(Self.height), .large])
+        .alert("Add a subject", isPresented: $isAdding) {
+            TextField("Subject", text: $name)
+            Button("Add") { Task { await model.addTopic(name) } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The model files stories under the subjects you have, and can write none of its own.")
+        }
+        .task { await model.loadKnownTopics() }
+    }
+
+    /// What the panel is, what can be added to it, and the way out of it.
+    ///
+    /// Its own row rather than a navigation bar : a bar brings a background
+    /// with it, and a background is the one thing a floating panel cannot have
+    /// inside it. The way out is a button as well as a flick, since a Mac sheet
+    /// cannot be flicked away.
+    private var head: some View {
+        HStack(spacing: 14) {
+            Text("Subjects")
+                .font(Editorial.headline(.title3))
+
+            Spacer(minLength: 8)
+
+            Button {
+                name = ""
+                isAdding = true
+            } label: {
+                Label("Add a subject", systemImage: "plus")
+                    .labelStyle(.iconOnly)
+                    .font(.body.weight(.medium))
+            }
+
+            Button {
+                dismiss()
+            } label: {
+                Text("Done").font(.subheadline.weight(.medium))
+            }
+        }
+        .buttonStyle(.borderless)
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+        .padding(.bottom, 6)
+    }
+
+    private var subjects: some View {
         List {
             // Two bands, in the order a reader meets them : the ones they
             // wrote, then the sections they already knew before opening this.
@@ -56,31 +136,11 @@ struct TopicsScreen: View {
                 }
             }
         }
-        .navigationTitle(Text("Subjects"))
-        .toolbar {
-            ToolbarItem {
-                Button {
-                    name = ""
-                    isAdding = true
-                } label: {
-                    Label("Add a subject", systemImage: "plus")
-                }
-            }
-        }
-        .alert("Add a subject", isPresented: $isAdding) {
-            TextField("Subject", text: $name)
-            Button("Add") { Task { await model.addTopic(name) } }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("The model files stories under the subjects you have, and can write none of its own.")
-        }
-        #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .scrollContentBackground(.hidden)
         .overlay {
             if model.knownTopics.isEmpty {
                 ContentUnavailableView {
-                    Label("No subjects yet", systemImage: "square.stack.3d.up")
+                    Label("No subjects yet", systemImage: "circle.grid.2x2")
                 } description: {
                     Text(
                         OnDeviceModel.absence
@@ -89,7 +149,6 @@ struct TopicsScreen: View {
                 }
             }
         }
-        .task { await model.loadKnownTopics() }
     }
 
     /// One band of the list, or nothing when that nature has no subjects.

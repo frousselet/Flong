@@ -256,6 +256,8 @@ Under Reduce Motion the indeterminate bar is a still tinted rule rather than one
 
 **Asking without the gesture is still possible.** `Actualiser` sits in the reader's own menu, beside the other things they ask for, keeps its `⌘R`, and is the only way on a Mac. It does what the pull does : every feed, and the grouping with it.
 
+**And the two end the same way.** The command reads the page back as the last thing it does ; the pull could not, since SwiftUI holds its control out until the gesture's work returns and replacing the content there has the scroll view retract against content it has never laid out. So the pull left the read-back to the watcher that follows the store, which reads back only when a change reaches it : a gesture that asked for the page and got it only if something happened to be written is not the command in the menu by another name. The page asks for the read-back itself now, a beat after the control has gone, which is the same read-back with the layout out of its way.
+
 ## Pictures, and the marks beside them
 
 **A hairline inside every picture's own edge.** A publisher's picture arrives at whatever contrast it was shot at, and one that ends in white sits on a white page with no edge at all : the line is what says where the picture stops.
@@ -280,9 +282,15 @@ An alignment guide was tried first, holding the whole text block to the left and
 
 `@concurrent` on the fetch is what takes it back to the pool. It never showed on a simulator, where a Mac decodes a photograph faster than a frame lasts ; it shows on a phone. The lesson is worth keeping rather than the fix : under approachable concurrency, `nonisolated` no longer means off the main actor, and anything expensive a view awaits has to say so.
 
-## The notices, in a panel
+## The panels, in the leading corner
 
-**A short sheet from the bottom, and no longer a page.** One switch does not want a navigation stack, a title bar and a way back : the reader came to answer a question about being interrupted, and the page they were reading is still behind the panel while they answer it. It goes with a flick, or with the button a Mac needs, since a Mac sheet cannot be flicked away and one way out on both platforms is one thing to learn rather than two.
+**Short sheets from the bottom, and no longer pages.** The notices and the subjects were lines in the reader's menu leading to screens of their own, which is two presses and a way back for what a reader does in a moment. Neither is going anywhere : one answers a question about being interrupted, the other nudges a subject and watches the page take it, and in both the page they were reading is still behind the panel while they do it. A panel goes with a flick, or with the button a Mac needs, since a Mac sheet cannot be flicked away and one way out on both platforms is one thing to learn rather than two.
+
+Three buttons stand in the leading corner now, in the order a reader meets what they hold : the sources they follow, the subjects the page is sorted into, the notices they may be interrupted by. The subject wears `circle.grid.2x2` wherever it appears, which is a grid of sections rather than the stack of cards it used to be.
+
+**The subjects panel stands taller and scrolls.** One switch has a height of its own ; fifty sections and however many the reader wrote are a list, and a list wants the height a reader chooses. It opens at a height of its own rather than at `.medium`, which is measured off the bottom of the screen and takes the panel's lower corners with it, and it pulls up to the whole screen.
+
+**A panel is not a page, and is not pulled.** `refreshable` puts its action in the environment, and a sheet inherits the environment of whatever presented it : declared under the front page's toolbar, the pull reached the panels the buttons up there open, and a list of subjects offered to fetch three hundred feeds. It is applied to the page it belongs to and above the toolbar, which is where its scope should have ended all along.
 
 **It floats, and the system draws that.** A sheet here is already inset from the edges of the screen and rounded on all four corners. What squared it off was what was put inside it : a `List` paints its own background edge to edge, over the rounded corners and down past the safe area, so the panel read as the page having been cut off rather than as something laid over it. A panel of one's own drawn inside the sheet is no better, being a second surface inside the one the system already drew. Nothing in it paints a background of its own now, and the shape the system draws is the shape that shows.
 
@@ -296,9 +304,9 @@ One button in the same corner of every section, holding what the reader has deci
 
 It is still not an account. There is no account and nothing to sign in to, and the face on the button is the reader's own picture rather than a sign that they are signed in to something. It is called `Réglages` in French.
 
-It holds the subjects, the sites the reader is signed in to, and `Actualiser`, which asks for a refresh from anywhere in the application and is the only way to ask on a Mac.
+It holds the sites the reader is signed in to and `Actualiser`, which asks for a refresh from anywhere in the application and is the only way to ask on a Mac.
 
-**The notices came out of it.** Not because they are opened often, which they are not, but because of the shape of what a reader does there : they answer one question about being interrupted and go back to reading. Two presses to reach a whole screen with a way back on it is the wrong shape for that, however rarely it is done. The bell stands beside the sources in the leading corner and opens a panel over the page, which the next section sets out.
+**The notices and the subjects came out of it.** Not because they are opened often, which they are not, but because of the shape of what a reader does in them : they say one thing about the page they are looking at and go back to reading it. Two presses to reach a whole screen with a way back on it is the wrong shape for that, however rarely it is done. Both stand beside the sources in the leading corner now and open panels over the page.
 
 It also holds `Forcer la synchronisation`, under `#if DEBUG` and nowhere else. The engine decides when to send and when to fetch and is right far more often than a button would be ; what that command is for is watching an exchange happen on demand while something is being built. It queues every record this device holds, which is the repair path and costs a few thousand records against a budget of three thousand, and that is why it does not ship.
 

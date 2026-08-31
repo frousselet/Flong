@@ -70,6 +70,32 @@ struct DigestScreen: View {
             isNearTop = near
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
+        // **The pull, on the front page and nowhere else.** The page does keep
+        // itself up to date : it follows the store, so anything that arrives
+        // reaches it, and a clock asks the publishers what politeness allows.
+        // The gesture is not how the page keeps up ; it is how a reader says
+        // now rather than soon, and it is the gesture every reader already
+        // reaches for on the page they open first. The wire needs none : it is
+        // a list of what has arrived, and what arrives reaches it on its own.
+        //
+        // It fetches every feed and groups what arrived, and it ends there. The
+        // model's work carries on behind it, and the page is read back once the
+        // control has retracted rather than under it.
+        //
+        // A Mac has no pull and keeps `⌘R` in the reader's own menu, which is
+        // where the command lives on every platform.
+        //
+        // **On the page and not on the toolbar.** `refreshable` puts its action
+        // in the environment, and a sheet inherits the environment of whatever
+        // presented it : declared below the toolbar, it reached the panels the
+        // buttons up there open, and a list of subjects offered to fetch three
+        // hundred feeds. Applied here it wraps the page it belongs to and
+        // nothing else.
+        .refreshable {
+            isPulling = true
+            await model.pullToRefresh()
+            isPulling = false
+        }
         // The date is the title of the page, where a newspaper puts it. Not the
         // name of the section : the tab bar says that already, and a page that
         // repeats its own label has spent a line saying nothing. A dateline says
@@ -85,30 +111,14 @@ struct DigestScreen: View {
                 SourcesButton(open: open)
             }
             ToolbarItem(placement: .sectionLeading) {
+                TopicsButton(model: model)
+            }
+            ToolbarItem(placement: .sectionLeading) {
                 NotificationsButton(model: model)
             }
             ToolbarItem(placement: .primaryAction) {
                 ReaderMenu(model: model, open: open)
             }
-        }
-        // **The pull, on the front page and nowhere else.** The page does keep
-        // itself up to date : it follows the store, so anything that arrives
-        // reaches it, and a clock asks the publishers what politeness allows.
-        // The gesture is not how the page keeps up ; it is how a reader says
-        // now rather than soon, and it is the gesture every reader already
-        // reaches for on the page they open first. The wire needs none : it is
-        // a list of what has arrived, and what arrives reaches it on its own.
-        //
-        // It fetches every feed and groups what arrived, and it ends there. The
-        // model's work carries on behind it, and the page is read back once the
-        // control has retracted rather than under it.
-        //
-        // A Mac has no pull and keeps `⌘R` in the reader's own menu, which is
-        // where the command lives on every platform.
-        .refreshable {
-            isPulling = true
-            await model.pullToRefresh()
-            isPulling = false
         }
         // **The page is put back where the pull started.**
         //
@@ -127,15 +137,32 @@ struct DigestScreen: View {
         //
         // A beat first, so it is not fighting the control on the way out.
         //
-        // And only when the reader is still near the top. A pull starts there,
-        // but a refresh takes seconds and they may have scrolled off to read
-        // something ; hauling them back would be the application taking the
-        // page away from them.
+        // **And the page is read back here, which is the other half of it.**
+        // `Actualiser` reads it back as the last thing it does, and the pull
+        // could not : SwiftUI holds the refresh control out until the gesture's
+        // work returns, so replacing the content just before returning has the
+        // scroll view begin its retraction against content it has never laid
+        // out. So the pull left it to the watcher that follows the store, which
+        // reads back only when a change reaches it, and a gesture that asked
+        // for the page and got it only if something happened to be written is
+        // not the same command as the one in the menu. It is asked for here
+        // instead, once the control is out of the way : the same read-back, a
+        // beat later.
+        //
+        // The scroll home is the part that waits on the reader still being near
+        // the top. A pull starts there, but a refresh takes seconds and they
+        // may have scrolled off to read something ; hauling them back would be
+        // the application taking the page away from them. The read-back is not
+        // conditional on that, since a page they scrolled into is a page that
+        // still has to be current.
         .onChange(of: isPulling) { _, pulling in
-            guard !pulling, isNearTop else { return }
+            guard !pulling else { return }
 
             Task { @MainActor in
                 try? await Task.sleep(for: .milliseconds(150))
+                await model.load()
+
+                guard isNearTop else { return }
                 withAnimation(.easeOut(duration: 0.2)) { position.scrollTo(edge: .top) }
             }
         }
@@ -261,7 +288,7 @@ struct DigestScreen: View {
             }
         } else if let name = model.digestTopic.name {
             ContentUnavailableView {
-                Label(title: { Text(verbatim: name) }, icon: { Image(systemName: "square.stack.3d.up") })
+                Label(title: { Text(verbatim: name) }, icon: { Image(systemName: "circle.grid.2x2") })
             } description: {
                 Text("Nothing has been filed under this subject yet.")
             } actions: {
