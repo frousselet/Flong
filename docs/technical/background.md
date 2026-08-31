@@ -77,6 +77,8 @@ Every identifier is declared in `Config/Info.plist` under `BGTaskSchedulerPermit
 
 Registration happens in the application's initializer, before launching finishes, or the system refuses the identifiers for the whole run. The window fills in what the tasks should call once it exists, which is the one link between a task registered at launch and a model created later.
 
+**And a task that finds no window does the work anyway.** The window fills the box in from its own `.task`, which runs when a view appears. An application the system launches into the background for a processing task may never render one, and the task then awaited a closure nobody had set and did nothing at all, silently : the one pass that fetches every feed a reader follows, skipped on exactly the occasions it exists for, with no log line to say so. The store is open by the time anything is registered, so the box keeps it and builds a model of its own when no window has offered a better one.
+
 **Background refresh is opportunistic and is treated as a bonus.** Section 25 is explicit : the system decides alone according to activity, battery and expected consumption, and the reader can turn it off. Returning to the foreground is the mechanism that actually refreshes, and the interface never presents an unread count as though it were real time.
 
 `BGContinuedProcessingTask` is submitted when the reader asks to finish an import, and a refusal is not a failure : the work carries on in the application instead, and again at the next launch. Section 15 says the API is not reliable in practice, and everything here is built so that it does not have to be.
