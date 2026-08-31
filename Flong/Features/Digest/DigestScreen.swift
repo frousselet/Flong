@@ -548,7 +548,7 @@ struct StoryRow: View {
     private var rooms: some View {
         HStack(spacing: 3) {
             ForEach(story.feedMarks) { mark in
-                FeedIconView(stated: mark.iconURL, site: mark.siteURL, side: 14)
+                SourceStamp(domain: mark.room, side: 14, showsName: false)
             }
 
             if story.feedCount > story.feedMarks.count {
@@ -652,10 +652,7 @@ struct ArticleRow: View {
                     }
 
                     HStack(spacing: 6) {
-                        FeedIconView(stated: article.feedIconURL, site: article.feedSiteURL, side: 13)
-
-                        Text(verbatim: article.feedTitle)
-                            .lineLimit(1)
+                        SourceStamp(domain: article.domain)
                             .padding(.trailing, 2)
                         ArticleMoment(article: article)
                         if article.isStarred {

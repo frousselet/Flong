@@ -291,6 +291,42 @@ struct SubscriptionStoreTests {
         #expect(try await store.feed(id: feed.id)?.isFavourite == false)
     }
 
+    @Test("A publisher's mark is one identity, whatever desk an article arrived through")
+    func identitiesAreOnePerPublisher() async throws {
+        try await store.subscribe(
+            to: Subscription(
+                address: "https://www.lemonde.fr/rss/une.xml",
+                title: "À la une",
+                siteURL: URL(string: "https://www.lemonde.fr")
+            )
+        )
+        try await store.subscribe(
+            to: Subscription(
+                address: "https://www.lemonde.fr/sport/rss.xml",
+                title: "Sport",
+                siteURL: URL(string: "https://www.lemonde.fr"),
+                iconURL: URL(string: "/img/logo.png")
+            )
+        )
+        try await store.subscribe(to: Subscription(address: "https://blog.example.com/feed"))
+        try await store.rename(domain: "lemonde.fr", to: "Le Monde")
+
+        let identities = try await store.identities()
+
+        // Two desks of one paper are one identity, so the favicon behind them
+        // is one address and one request rather than two of each.
+        #expect(identities.count == 2)
+
+        let paper = try #require(identities["lemonde.fr"])
+        #expect(paper.name == "Le Monde")
+        // Stated by whichever of its feeds states one.
+        #expect(paper.iconURL?.absoluteString == "/img/logo.png")
+        #expect(paper.siteURL?.absoluteString == "https://www.lemonde.fr")
+
+        // A publisher nobody renamed is called by its address, which is a name.
+        #expect(identities["blog.example.com"]?.name == "blog.example.com")
+    }
+
     @Test("A group knows whether the reader singled any of its sources out")
     func groupsCarryTheFavourites() async throws {
         let feed = try await store.subscribe(to: Subscription(address: "https://www.lemonde.fr/rss/une.xml")).feed

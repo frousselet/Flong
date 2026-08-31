@@ -55,6 +55,34 @@ nonisolated extension SourceName {
     }
 }
 
+/// What a publisher is called, and the mark it puts on its articles.
+///
+/// **One identity per group, and never one per feed.** A favicon is a property
+/// of a site, not of a file served from it : a paper with a feed per desk drew
+/// one logo, and asking six times for it is six requests to say one thing. The
+/// address asked for is worked out from the group, so every row of that
+/// publisher, on the front page, in the wire and at the head of an article,
+/// wants the same picture and the store answers all of them from the one fetch.
+///
+/// The name travels with it for the same reason. A reader who called
+/// `lemonde.fr` `Le Monde` did not rename one desk, and a page that showed
+/// `Le Monde - À la Une` beside `Le Monde` would be showing two publishers
+/// where the reader sees one.
+nonisolated struct SourceIdentity: Hashable, Sendable, Identifiable {
+    /// The host the group is keyed by.
+    let domain: String
+    /// What the reader calls it, or the address itself.
+    let name: String
+    /// The icon whichever of its feeds states one states, resolved against the
+    /// site the way a feed writes it.
+    let iconURL: URL?
+    /// One address of its own, since the well-known paths a mark also lives at
+    /// hang off the root of a site and not off a page.
+    let siteURL: URL?
+
+    var id: String { domain }
+}
+
 /// The sources of one publisher, as the sources list shows them.
 ///
 /// **The folders are gone and this is what replaced them.** A folder was a
@@ -84,6 +112,22 @@ nonisolated struct SourceGroup: Identifiable, Hashable, Sendable {
 
     /// Whether the reader has singled out any of its sources.
     var hasFavourite: Bool { feeds.contains(where: \.isFavourite) }
+
+    /// What this publisher is called and the mark it wears.
+    ///
+    /// The icon is whichever of its feeds states one, and the address is
+    /// whichever of them names a site with a host in it : both are questions
+    /// about the publisher, and any of its feeds may answer either. A group
+    /// whose feeds all state nothing falls back to the well-known paths on the
+    /// first address it has, which is what most publishers serve anyway.
+    var identity: SourceIdentity {
+        SourceIdentity(
+            domain: domain,
+            name: title,
+            iconURL: feeds.compactMap(\.iconURL).first,
+            siteURL: feeds.compactMap(\.siteURL).first { $0.host()?.isEmpty == false } ?? feeds.first?.url
+        )
+    }
 
     /// The order a reader expects their publishers in, which is their own
     /// locale's order over the names they are shown, not over the hosts.

@@ -162,6 +162,25 @@ struct ArticleStoreTests {
         #expect(try await articles.summaries(.today, now: now).map(\.title) == ["today", "starred"])
     }
 
+    @Test("An article carries the publisher it came from, and not only the desk")
+    func carriesItsPublisher() async throws {
+        let sport = try await subscriptions.subscribe(
+            to: Subscription(
+                address: "https://www.lemonde.fr/sport/rss.xml",
+                title: "Le Monde - Sport",
+                siteURL: URL(string: "https://www.lemonde.fr")
+            )
+        ).feed
+        try await add("Un match", feed: sport, published: now)
+
+        let summary = try #require(try await articles.summaries(.all, now: now).first)
+        #expect(summary.domain == "lemonde.fr")
+        #expect(summary.feedTitle == "Le Monde - Sport")
+
+        let article = try #require(await articles.article(id: summary.id))
+        #expect(article.domain == "lemonde.fr")
+    }
+
     @Test("An article carries the feed it came from")
     func joinsTheFeed() async throws {
         let feed = try await feed("https://a.example.com/f.xml", title: "The Feed")

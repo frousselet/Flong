@@ -88,6 +88,20 @@ nonisolated enum FeedURL {
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }
 
+    /// The publisher a source belongs to.
+    ///
+    /// The room of its site, or of the feed itself where the site says nothing
+    /// usable : a feed served from a syndication host belongs to the paper its
+    /// `htmlUrl` names, and a feed whose file states no site at all belongs to
+    /// whoever serves the file.
+    ///
+    /// One rule, in one place. The sources list, the front page, every article
+    /// row and the favicon behind each of them ask this same question, and two
+    /// spellings of the answer would be two publishers where there is one.
+    static func publisher(site: URL?, feed: URL?) -> String? {
+        room(of: site) ?? room(of: feed)
+    }
+
     /// Canonicalizes an address that is already a `URL`.
     static func canonical(_ url: URL) throws(FeedURLError) -> URL {
         try canonical(url.absoluteString)

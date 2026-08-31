@@ -31,9 +31,6 @@ nonisolated struct SidebarItem: Identifiable, Hashable, Sendable {
     /// in the reader's language.
     let title: String?
     let unreadCount: Int
-    /// Where a feed keeps its mark, when it is a feed and it states one.
-    var iconURL: URL?
-    var siteURL: URL?
     /// Whether the reader singled this source out, when it is a source.
     var isFavourite = false
     var children: [SidebarItem] = []
@@ -172,6 +169,8 @@ final class AppModel {
     private var archive: StreamArchive?
 
     private(set) var sidebar: [SidebarItem] = []
+    /// What each publisher is called and the mark it wears, by domain.
+    private(set) var publishers: [String: SourceIdentity] = [:]
     private(set) var summaries: [ArticleSummary] = []
 
     /// How many articles arrived in each hour of the view being shown, keyed by
@@ -644,7 +643,7 @@ final class AppModel {
         self.articles = articles
         self.collectionStore = CollectionStore(database)
         self.marks = MarkStore(database)
-        self.spotlight = SpotlightIndex(articles)
+        self.spotlight = SpotlightIndex(articles, subscriptions)
         self.digestService = DigestService(database)
         self.refresher = FeedRefresh(database: database, fetcher: fetcher, credentials: credentials)
         self.retention = Retention(database)
@@ -1386,7 +1385,9 @@ final class AppModel {
             // Every source sits under the publisher serving it, so there is no
             // loose row and no reader wondering where one went : a feed's group
             // is its own address, and it is right the moment the feed lands.
-            for group in SubscriptionStore.groups(of: feeds, named: try await subscriptions.names()) {
+            let groups = SubscriptionStore.groups(of: feeds, named: try await subscriptions.names())
+
+            for group in groups {
                 let children = group.feeds.map { item(for: $0, counts: counts) }
                 items.append(
                     SidebarItem(
@@ -1399,6 +1400,14 @@ final class AppModel {
             }
 
             sidebar = items
+            // What every list in the window shows about where an article came
+            // from, worked out once here rather than read off each row : the
+            // name and the mark belong to the publisher, and five hundred rows
+            // of one paper are one name and one favicon.
+            publishers = Dictionary(
+                groups.map { ($0.domain, $0.identity) },
+                uniquingKeysWith: { first, _ in first }
+            )
             feedCount = feeds.count
         } catch {
             Log.store.error("The sidebar could not be built : \(error, privacy: .public)")
@@ -1410,10 +1419,18 @@ final class AppModel {
             kind: .feed(feed.id),
             title: feed.title,
             unreadCount: counts[feed.id] ?? 0,
-            iconURL: feed.iconURL,
-            siteURL: feed.siteURL ?? feed.url,
             isFavourite: feed.isFavourite
         )
+    }
+
+    /// What the publisher an article came from is called and wears.
+    ///
+    /// `nil` only while the subscriptions are still being read, or for an
+    /// article whose feed has gone : a page shows the address itself then,
+    /// which is a name and not a hole.
+    func publisher(of domain: String?) -> SourceIdentity? {
+        guard let domain else { return nil }
+        return publishers[domain]
     }
 
     /// The name of a feed or a group, for a screen that only has its identity.

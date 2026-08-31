@@ -148,7 +148,7 @@ struct CoverImageTests {
         let stated = URL(string: "https://cdn.example.com/logo.png")!
         let site = URL(string: "https://www.example.com/blog/")!
 
-        let candidates = FeedIcon.candidates(stated: stated, site: site).map(\.absoluteString)
+        let candidates = SourceIcon.candidates(stated: stated, site: site).map(\.absoluteString)
 
         #expect(
             candidates == [
@@ -162,7 +162,7 @@ struct CoverImageTests {
 
     @Test("A source that states nothing is still looked for")
     func iconWithoutAStatedOne() throws {
-        let candidates = FeedIcon.candidates(
+        let candidates = SourceIcon.candidates(
             stated: nil,
             site: URL(string: "https://example.com:8443/feed.xml")
         )
@@ -175,12 +175,46 @@ struct CoverImageTests {
 
     @Test("A source with nowhere to look for a mark is not looked for")
     func iconWithNothingToGoOn() {
-        #expect(FeedIcon.candidates(stated: nil, site: nil).isEmpty)
+        #expect(SourceIcon.candidates(stated: nil, site: nil).isEmpty)
+    }
+
+    @Test("A publisher is asked for its mark once, however many feeds it serves")
+    func iconIsOnePerPublisher() throws {
+        let une = try Feed(
+            url: FeedURL.canonical("https://www.lemonde.fr/rss/une.xml"),
+            siteURL: URL(string: "https://www.lemonde.fr"),
+            title: "À la une"
+        )
+        let sport = try Feed(
+            url: FeedURL.canonical("https://www.lemonde.fr/sport/rss_full.xml"),
+            siteURL: URL(string: "https://www.lemonde.fr"),
+            iconURL: URL(string: "/img/logo.png"),
+            title: "Sport"
+        )
+
+        let group = SourceGroup(domain: "lemonde.fr", name: nil, feeds: [une, sport])
+        let candidates = SourceIcon.candidates(for: group.identity).map(\.absoluteString)
+
+        // One list for the paper, not one per desk : the icon one of its feeds
+        // states, then the well-known paths on the site they share. Every row
+        // of every desk asks for the same address, so the store answers all of
+        // them from one fetch.
+        #expect(
+            candidates == [
+                "https://www.lemonde.fr/img/logo.png",
+                "https://www.lemonde.fr/apple-touch-icon.png",
+                "https://www.lemonde.fr/favicon.ico",
+            ])
+    }
+
+    @Test("A publisher nothing is known about is not asked for a mark")
+    func iconForAnUnknownPublisher() {
+        #expect(SourceIcon.candidates(for: nil).isEmpty)
     }
 
     @Test("A stated mark that is already a well-known path is tried once")
     func iconWithoutDuplicates() throws {
-        let candidates = FeedIcon.candidates(
+        let candidates = SourceIcon.candidates(
             stated: URL(string: "https://example.com/favicon.ico"),
             site: URL(string: "https://example.com/")
         )
@@ -226,7 +260,7 @@ struct CoverImageTests {
 
     @Test("A feed's relatively stated icon is still found")
     func relativeIcon() throws {
-        let candidates = FeedIcon.candidates(
+        let candidates = SourceIcon.candidates(
             stated: URL(string: "/img/logo.png"),
             site: URL(string: "https://www.liberation.fr/")
         )
@@ -237,7 +271,7 @@ struct CoverImageTests {
 
     @Test("A stated icon nothing can fetch is skipped, and the site still tried")
     func unfetchableIcon() {
-        let candidates = FeedIcon.candidates(
+        let candidates = SourceIcon.candidates(
             stated: URL(string: "/img/logo.png"),
             site: nil
         )

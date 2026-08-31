@@ -47,6 +47,14 @@ Credentials in the URL are refused rather than stored : the row would hold a pas
 - `blog.example.com` is **its own group**, not part of `example.com`. Folding the two would need the public suffix list and would put a paper and its unrelated blog under one heading.
 - Nothing is stored. `SubscriptionStore.groups(of:named:)` is a grouping over the feeds, so there is no group to create, no group to keep in step with a subscription arriving or going, and no empty group left behind.
 
+### What a publisher is called, and the mark it wears
+
+`SourceIdentity` is the group seen from every page that shows where an article came from : its name, the icon whichever of its feeds states one, and one of its addresses for the well-known paths a favicon also lives at. It is resolved once per group, and that is the whole of the point.
+
+- A favicon is a property of a **site**. A paper drew one logo, and asking for it once per desk is six requests to say one thing, six entries in the cache and six chances of one coming back different.
+- The name is **looked up on the row** rather than carried on the article, so a publisher the reader renames is renamed on every row at once and no list has to be read back out of the database for it.
+- An article whose feed has gone still says where it came from : the address stands in, which is a name and not a hole.
+
 ### The name over a group
 
 The one thing that cannot be worked out is that `lemonde.fr` is called `Le Monde`, and it is the whole of the `source_name` table : one row per publisher the reader actually named, keyed by the domain, unique on it.

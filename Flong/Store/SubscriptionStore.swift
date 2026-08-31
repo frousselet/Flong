@@ -77,6 +77,14 @@ nonisolated struct SubscriptionStore: Sendable {
         return Self.groups(of: feeds, named: names)
     }
 
+    /// What each publisher is called and the mark it wears, by domain.
+    ///
+    /// One entry per group, which is the whole point : it is what lets a paper
+    /// with six feeds be one name and one favicon everywhere it is shown.
+    func identities() async throws -> [String: SourceIdentity] {
+        Dictionary(try await groups().map { ($0.domain, $0.identity) }, uniquingKeysWith: { first, _ in first })
+    }
+
     /// The names the reader wrote, which is all a group ever stores.
     func names() async throws -> [SourceName] {
         try await database.writer.read { db in

@@ -51,9 +51,15 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
 
     private let index: CSSearchableIndex
     private let articles: ArticleStore
+    private let subscriptions: SubscriptionStore
 
-    init(_ articles: ArticleStore, index: CSSearchableIndex = CSSearchableIndex(name: SpotlightIndex.indexName)) {
+    init(
+        _ articles: ArticleStore,
+        _ subscriptions: SubscriptionStore,
+        index: CSSearchableIndex = CSSearchableIndex(name: SpotlightIndex.indexName)
+    ) {
         self.articles = articles
+        self.subscriptions = subscriptions
         self.index = index
     }
 
@@ -64,7 +70,8 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
     /// Adds or replaces items in the index.
     func index(_ items: [ArticleStore.Marked]) async throws {
         guard Self.isAvailable, !items.isEmpty else { return }
-        try await index.indexSearchableItems(items.map(Self.searchableItem))
+        let publishers = try await subscriptions.identities()
+        try await index.indexSearchableItems(items.map { Self.searchableItem(for: $0, publishedBy: publishers) })
     }
 
     /// Takes items out of it.
@@ -83,11 +90,12 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
     func rebuild() async throws {
         guard Self.isAvailable else { return }
         let items = try await articles.marked()
+        let publishers = try await subscriptions.identities()
 
         index.beginBatch()
         try await index.deleteAllSearchableItems()
         if !items.isEmpty {
-            try await index.indexSearchableItems(items.map(Self.searchableItem))
+            try await index.indexSearchableItems(items.map { Self.searchableItem(for: $0, publishedBy: publishers) })
         }
         try await endBatch(state: Self.state(of: items))
 
@@ -108,7 +116,14 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
     // MARK: - Shapes
 
     /// What Spotlight is told about a marked article.
-    static func searchableItem(for item: ArticleStore.Marked) -> CSSearchableItem {
+    ///
+    /// - Parameter publishedBy: what each publisher is called, so the system
+    ///   search names an article's source the way the application does. The
+    ///   feed's own title stands in where the publisher is not known.
+    static func searchableItem(
+        for item: ArticleStore.Marked,
+        publishedBy publishers: [String: SourceIdentity] = [:]
+    ) -> CSSearchableItem {
         let attributes = CSSearchableItemAttributeSet(contentType: .text)
         attributes.title = item.title
         attributes.displayName = item.title
@@ -124,7 +139,10 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
         attributes.identifier = item.id.uuidString
 
         if let author = item.author { attributes.authorNames = [author] }
-        if let feedTitle = item.feedTitle { attributes.contentSources = [feedTitle] }
+        // The publisher rather than the desk, as everywhere else : an article
+        // from `Le Monde - Sport` was published by Le Monde.
+        let source = item.domain.flatMap { publishers[$0]?.name } ?? item.domain ?? item.feedTitle
+        if let source, !source.isEmpty { attributes.contentSources = [source] }
 
         let searchable = CSSearchableItem(
             uniqueIdentifier: item.id.uuidString,

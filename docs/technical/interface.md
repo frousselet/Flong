@@ -51,15 +51,21 @@ Beside a picture on a phone the facts line runs out of room, and a line that wra
 
 A picture occupies nothing until it has something to show, and nothing again if the address turns out to be dead : a grey rectangle where a photograph failed is worse than no photograph, and a page of them looks broken. It is decorative and hidden from VoiceOver, since feeds almost never carry alternative text and reading a headline out twice helps nobody.
 
-## The mark of a source
+## The mark of a publisher
 
-A list of feeds is a list of names, and names take reading. A mark is recognized before it is read, which is the whole of what a favicon is for. It stands beside a feed in the sources list, in place of the generic symbol, and beside the name of the room on every article row.
+A list of articles is a list of names, and names take reading. A mark is recognized before it is read, which is the whole of what a favicon is for. It stands beside the publisher's name on every article row, at the head of an article, and once at the head of each group in the sources list.
 
-On the digest it stands **in place of the count of rooms**. `4 rédactions` is a number the reader has to turn back into rooms ; four marks are the rooms, and they say which ones, which is the question behind the number : a story every paper is running and a story only the trade press is running are not the same story. Four are shown, and a fifth room becomes a `+1`. The count survives for anyone listening to the page rather than looking at it, since the row of marks carries it as its accessibility label.
+**It belongs to the publisher and not to the feed, and so does the name beside it.** A row used to carry the title of the feed an article arrived through, which is how a reader following three desks of one paper met `Le Monde - À la Une`, `Le Monde - International` and `Le Monde - Sport` down one page and had to work out that they were one paper. The desk is a detail of how the paper publishes ; who wrote it is what the reader wants. The desks are still named in the sources list, which is where a subscription is managed and where the distinction is the point.
 
-Three addresses are tried, in order : **what the feed states**, since the publisher chose it ; **`apple-touch-icon.png`**, a well-known path, square by convention and large enough to stay crisp where a sixteen pixel favicon would not ; and **`favicon.ico`**, the oldest well-known path and still the most widely served, since browsers ask for it whether a page mentions it or not. The well-known ones hang off the root of the site, never off the page the feed happens to point at.
+**One favicon per publisher, asked for once.** A favicon is a property of a site, not of a file served from it : a paper drew one logo, and asking for it once per desk is six requests to say one thing, six entries in the cache and six chances of one of them coming back different. `SourceIdentity` is resolved once per group and is what the address is worked out from, so every row of that publisher wants the same picture and the store answers all of them from the one fetch.
 
-Nothing is asked for until a row is on screen, and what comes back is kept on disk, so a feed costs one request rather than one per appearance. A feed that answers none of the three wears the generic mark : a list of sources must keep its column of marks whether a publisher serves one or not, which is the one place a picture does not simply vanish when it fails.
+The name is looked up on the row rather than carried on the article, which is what lets a publisher the reader renames be renamed on every row at once, without five hundred rows being read back out of the database. It rides in the environment, since every list in the application asks for it and threading a dictionary through five screens would be five signatures carrying something none of them is about.
+
+On the digest the mark stands **in place of the count of rooms**. `4 rédactions` is a number the reader has to turn back into rooms ; four marks are the rooms, and they say which ones, which is the question behind the number : a story every paper is running and a story only the trade press is running are not the same story. Four are shown, and a fifth room becomes a `+1`. The count survives for anyone listening to the page rather than looking at it, since the row of marks carries it as its accessibility label. A story two desks of one paper ran draws one mark there too, for the same reason it counts as one room.
+
+Three addresses are tried, in order : **what one of its feeds states**, since the publisher chose it ; **`apple-touch-icon.png`**, a well-known path, square by convention and large enough to stay crisp where a sixteen pixel favicon would not ; and **`favicon.ico`**, the oldest well-known path and still the most widely served, since browsers ask for it whether a page mentions it or not. The well-known ones hang off the root of the site, never off the page a feed happens to point at.
+
+Nothing is asked for until a row is on screen, and what comes back is kept on disk, so a publisher costs one request rather than one per appearance. One that answers none of the three wears the generic mark : a list must keep its column of marks whether a publisher serves one or not, which is the one place a picture does not simply vanish when it fails.
 
 ## Motion that says something
 
@@ -144,6 +150,8 @@ Notes and the months are in neither menu. An article joins notes by being writte
 It is the same host the front page counts as a room, computed by the same function, so a paper with a feed per desk is one heading here exactly as it is one voice there. `blog.example.com` keeps a heading of its own : folding it into `example.com` would need the public suffix list and would file a paper and its unrelated blog together.
 
 **A group is keyed by its address and shown by its name.** A reader who calls `lemonde.fr` `Le Monde` has renamed a heading in their list, not moved a feed anywhere ; the group sorts under `L` and the selection survives. Clearing the name puts the address back, which is what lets a naming be undone by somebody who no longer remembers the address. Only the names actually written are stored, one small row apiece, so a reader following three hundred feeds spends a handful of records and not one per publisher.
+
+**The favicon stands at the head of the group and nowhere else in the list.** It is the publisher's, so six desks of one paper wearing six copies of one picture would be a column saying the same thing six times over. The rows under it are desks, named and nothing more.
 
 **Every source is under a heading, the ones alone under theirs included.** A list where some rows are grouped and others sit loose is a list where the reader cannot tell in advance where a source will be. The heading is also the only place a group is acted on, so a group of one has to have one : it is a menu rather than a heading carrying a button, since a button beside every heading in a list of two hundred sources is two hundred buttons saying the same thing, and a heading that opens is learnt once. A chevron is what says it opens at all.
 
@@ -232,7 +240,7 @@ The separator's own colour rather than a white highlight. White is the glass idi
 
 Half a point wide, at half the separator's opacity. A point was tried and read as too much : on a two times screen half a point is a single device pixel, which is exactly what an edge is. The separator's own colour is drawn to be read as a rule between two things and this is not that, it is the last pixel of the picture, so half of it says where the edge is without ever being the thing one looks at.
 
-**A source's mark is round**, with the same hairline inside it. A favicon arrives as whatever square its publisher drew, dark on dark as often as not, and a round crop is what makes a column of them read as one column rather than as a row of unrelated stamps. The generic mark, for a source that serves none, keeps its bare glyph : an edge around it would make an absence look like a mark.
+**A publisher's mark is round**, with the same hairline inside it. A favicon arrives as whatever square its publisher drew, dark on dark as often as not, and a round crop is what makes a column of them read as one column rather than as a row of unrelated stamps. The generic mark, for a source that serves none, keeps its bare glyph : an edge around it would make an absence look like a mark.
 
 **The headline crosses the whole measure ; the picture comes in beside what follows it.** A headline is the widest thing a story says and the thing a reader scans for, and one squeezed into the column a thumbnail leaves over breaks across three lines where it would have taken two.
 
