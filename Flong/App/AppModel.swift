@@ -956,7 +956,6 @@ final class AppModel {
 
         await countOutstandingWork()
         await load()
-        show(nil)
     }
 
     /// Starts the long work with the system watching over it.
@@ -972,6 +971,7 @@ final class AppModel {
         guard !accepted else { return }
 
         await exclusively("Finishing the setup") { await self.doOutstandingWork() }
+        show(nil)
     }
 
     private func enqueueVectors(for entries: [Entry]) async {
@@ -1130,6 +1130,18 @@ final class AppModel {
         // Opened again from nothing, since the ledger of what has been read has
         // just been thrown away.
         archive = nil
+
+        // **And what the model wrote goes with it.** Forgetting the change
+        // tokens repairs what came from iCloud and nothing else : every story
+        // still had its headline, its summary and its subjects, so the two jobs
+        // that write them found nothing to do and returned in milliseconds. A
+        // repair that leaves the whole of the enrichment untouched is not a
+        // repair from nothing, and it is the half a reader watching it most
+        // wants to see happen.
+        //
+        // A headline the reader settled themselves is left alone, subject
+        // included : that is theirs, and it is not what has gone wrong.
+        await digestService.discardWhatTheModelWrote()
 
         // And then the whole of the ordinary pass, which is what makes this a
         // repair rather than an exchange : every feed asked again, the stories

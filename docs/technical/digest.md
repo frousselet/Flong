@@ -52,7 +52,9 @@ The rule for asking is one thing : **has the model been asked about this story, 
 
 **Where there is no model at all, the sources list says so**, and says which of the three reasons it is. A page whose stories are all named after their own articles and which carries no subjects is a page working exactly as section 14 says it should, and it looks exactly like a page that is broken. One line separates the two.
 
-Nothing in the interface asks the model to re-read a page it has already read, and the command that once did is gone : stories already filed are never re-read, which is what makes the page stable. `DigestService.discardWhatTheModelWrote()` remains as the primitive behind that decision, sparing a headline the reader settled themselves, subject included, and is not reachable from any screen. What used to need it is handled without asking : giving up on the model is a pause rather than a latch, and seeding the sections asks again about the stories that were shown none.
+Nothing in the ordinary interface asks the model to re-read a page it has already read : stories already filed are never re-read, which is what makes the page stable. What used to need such a command is handled without asking, giving up on the model being a pause rather than a latch and the seeding of the sections asking again about the stories that were shown none.
+
+`DigestService.discardWhatTheModelWrote()` survives as the primitive, sparing a headline the reader settled themselves, subject included. The one thing that calls it is the development repair of `docs/technical/sync.md`, which is meant to redo the whole of the work and would otherwise redo none of the model's half.
 
 The prompt is bounded before it is sent : six articles and two hundred and forty characters each, and where the system can count tokens exactly, a prompt that would leave no room for an answer is not sent at all. The cost of asking anyway is a refusal, and the cost of a refusal is a story with no headline.
 
