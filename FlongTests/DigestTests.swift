@@ -624,6 +624,46 @@ struct DigestTests {
         #expect(page.topics.contains("Éducation"))
     }
 
+    @Test("A word that fits every article is not a subject")
+    func aSubjectNarrowerThanThePage() {
+        let french = Locale(identifier: "fr_FR")
+
+        // `Actualité` is true of every story on the page, so filing under it
+        // sorts nothing and a pill wearing it says `everything`. It is the rule
+        // that governs a headline, that every word must carry information,
+        // applied to a single word.
+        #expect(TopicNamer.fault(in: "Actualité", of: "Une réforme", locale: french) == .theWholePage)
+        #expect(TopicNamer.fault(in: "Informations", of: "Une réforme", locale: french) == .theWholePage)
+        #expect(TopicNamer.fault(in: "Divers", of: "Une réforme", locale: french) == .theWholePage)
+
+        // Answered in the wrong language, it says just as little.
+        #expect(TopicNamer.fault(in: "News", of: "Une réforme", locale: french) == .theWholePage)
+    }
+
+    @Test("A subject that merely begins with such a word is narrower than the page")
+    func onlyTheWholeName() {
+        let french = Locale(identifier: "fr_FR")
+
+        // Whole names only : this one says which news, which is a field.
+        #expect(TopicNamer.fault(in: "Actualité internationale", of: "Une réforme", locale: french) == nil)
+        #expect(TopicNamer.fault(in: "Éducation", of: "Une réforme", locale: french) == nil)
+    }
+
+    @Test("The two faults are told apart, since they need opposite advice")
+    func faultsAreDistinct() {
+        let french = Locale(identifier: "fr_FR")
+
+        // A model told to step back from the headline reaches for a word that
+        // fits everything ; one told to step in reaches for the headline. Being
+        // told the wrong one gets the other fault back.
+        #expect(
+            TopicNamer.fault(in: "Les macros Swift", of: "Les macros Swift, deux ans après", locale: french)
+                == .theStoryItself
+        )
+        #expect(
+            TopicNamer.fault(in: "Actualité", of: "Les macros Swift, deux ans après", locale: french) == .theWholePage)
+    }
+
     @Test("A headline dressed as a subject is not a subject")
     func fieldsRatherThanStories() {
         let headline = "Les macros Swift, deux ans après"
