@@ -30,7 +30,14 @@ nonisolated struct SidebarItem: Identifiable, Hashable, Sendable {
     /// The name of a group or a feed. Smart lists are named by the interface,
     /// in the reader's language.
     let title: String?
-    let unreadCount: Int
+    /// How many articles it holds : every one of them, for a source or a
+    /// publisher, and nothing at all for the views above them.
+    ///
+    /// It was what is unread, which is a number that only ever grows and that
+    /// nobody owes their feeds. What the views above want said about them is
+    /// their own name : a count beside `Tous les articles` is the size of the
+    /// whole corpus, which answers nothing a reader was asking.
+    let articleCount: Int
     /// Whether the reader singled this source out, when it is a source.
     var isFavourite = false
     var children: [SidebarItem] = []
@@ -1392,14 +1399,14 @@ final class AppModel {
     func loadSidebar() async {
         do {
             let feeds = try await subscriptions.feeds()
-            let counts = try await articles.unreadCounts()
+            let counts = try await articles.counts()
 
             var items: [SidebarItem] = [
-                SidebarItem(kind: .digest, title: nil, unreadCount: 0),
-                SidebarItem(kind: .unread, title: nil, unreadCount: try await articles.count(.unread)),
-                SidebarItem(kind: .today, title: nil, unreadCount: try await articles.count(.today)),
-                SidebarItem(kind: .starred, title: nil, unreadCount: 0),
-                SidebarItem(kind: .all, title: nil, unreadCount: 0),
+                SidebarItem(kind: .digest, title: nil, articleCount: 0),
+                SidebarItem(kind: .unread, title: nil, articleCount: 0),
+                SidebarItem(kind: .today, title: nil, articleCount: 0),
+                SidebarItem(kind: .starred, title: nil, articleCount: 0),
+                SidebarItem(kind: .all, title: nil, articleCount: 0),
             ]
 
             // Every source sits under the publisher serving it, so there is no
@@ -1413,7 +1420,7 @@ final class AppModel {
                     SidebarItem(
                         kind: .group(group.domain),
                         title: group.title,
-                        unreadCount: children.reduce(0) { $0 + $1.unreadCount },
+                        articleCount: children.reduce(0) { $0 + $1.articleCount },
                         children: children
                     )
                 )
@@ -1438,7 +1445,7 @@ final class AppModel {
         SidebarItem(
             kind: .feed(feed.id),
             title: feed.title,
-            unreadCount: counts[feed.id] ?? 0,
+            articleCount: counts[feed.id] ?? 0,
             isFavourite: feed.isFavourite
         )
     }

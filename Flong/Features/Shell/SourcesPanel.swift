@@ -288,8 +288,8 @@ struct SourcesPanel: View {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .semibold))
                 Spacer(minLength: 8)
-                if group.unreadCount > 0 {
-                    Text(group.unreadCount, format: .number)
+                if group.articleCount > 0 {
+                    Text(group.articleCount, format: .number)
                 }
             }
             .contentShape(.rect)
@@ -362,8 +362,12 @@ struct SourcesPanel: View {
                     .accessibilityLabel(Text("Favourite source"))
             }
             Spacer(minLength: 8)
-            if item.unreadCount > 0 {
-                Text(item.unreadCount, format: .number)
+            // Nought for the views above the sources, which is what takes
+            // their counts off the list : `Non lus` is a number a reader is
+            // shown everywhere else already, and `Tous les articles` beside a
+            // count is the size of the corpus answering nothing.
+            if item.articleCount > 0 {
+                Text(item.articleCount, format: .number)
                     .font(Editorial.metadata)
                     .foregroundStyle(.secondary)
             }
