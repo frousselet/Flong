@@ -79,7 +79,7 @@ struct DigestScreen: View {
             // behind the scroll view, so it scrolls away with the head of the
             // page it belongs to instead of staying on as chrome.
             .background(alignment: .top) {
-                DigestWash(url: model.digest.lead?.imageURL)
+                PageWash(url: model.digest.lead?.imageURL)
             }
         }
         .scrollPosition($position)
