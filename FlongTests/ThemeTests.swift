@@ -23,16 +23,15 @@ import Testing
 /// carries it.
 @Suite("Themes")
 struct ThemeTests {
-    @Test("Each theme sets headlines in a face of its own")
+    @Test("Two faces for three themes, and the third is what changes the face")
     func faces() {
-        // The whole point of there being three : a reader tells them apart in
-        // the first second, and they tell them apart by this.
-        let headlines = Theme.allCases.map { $0.headline(.title) }
-        #expect(Set(headlines).count == Theme.allCases.count)
-
-        #expect(Theme.standard.headline(.title) == .system(.title, design: .default, weight: .semibold))
-        #expect(Theme.paper.headline(.title) == .system(.title, design: .serif, weight: .semibold))
+        // Serif is what this application was set in before there was a choice.
+        // The standard theme and the paper one keep it and are told apart by
+        // their colours ; only Solarized changes the face as well.
+        #expect(Theme.standard.headline(.title) == .system(.title, design: .serif, weight: .semibold))
+        #expect(Theme.paper.headline(.title) == Theme.standard.headline(.title))
         #expect(Theme.solarized.headline(.title) == .system(.title, design: .monospaced, weight: .semibold))
+        #expect(Theme.solarized.headline(.title) != Theme.standard.headline(.title))
     }
 
     @Test("A theme speaks in the headline and nowhere else")
@@ -146,8 +145,7 @@ struct ThemedDocumentTests {
     @Test("The page is set in the theme's own faces")
     func faces() {
         let plain = ArticleDocument.html(for: article(), theme: .standard)
-        #expect(plain.contains("--headline: \(Theme.sansStack);"))
-        #expect(plain.contains("--body: \(Theme.sansStack);"))
+        #expect(plain.contains("--headline: \(Theme.serifStack);"))
 
         let printed = ArticleDocument.html(for: article(), theme: .paper)
         #expect(printed.contains("--headline: \(Theme.serifStack);"))
