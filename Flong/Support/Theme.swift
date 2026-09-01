@@ -211,13 +211,23 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
         // and the paper is not white : a page of text at full contrast is a
         // page that is looked at rather than read, which is the one thing this
         // theme is for.
+        //
+        // **The accent is dark and barely coloured, rather than cool.** It was
+        // a terracotta at half saturation and at the lightness of a
+        // photograph, which made the glyphs in the bar read as brown objects
+        // rather than as things that can be pressed. The trouble was never the
+        // hue : cooling it took the theme apart, the one thing this theme is
+        // for being that everything on the page belongs to one warmth. It was
+        // the chroma, and the lightness that let the chroma speak. Taken down
+        // to where ink lives and to a third of its saturation, the same warmth
+        // reads as ink that happens to be warm.
         case .paper:
             Palette(
                 paper: Ink(0xF5EFE4),
                 ink: Ink(0x33302B),
                 muted: Ink(0x7B7368),
                 rule: Ink(0xDED4C2),
-                accent: Ink(0x9C5B33),
+                accent: Ink(0x5F4533),
                 edge: Ink(0x554A3A, alpha: 0.18),
                 surface: Ink(0xFBF7EF)
             )
@@ -256,13 +266,20 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
 
         // Not black : the paper is warm at night as well, or the theme is a
         // serif face and nothing else once the sun goes down.
+        //
+        // The accent goes the other way here, since ink on a dark ground is
+        // the light thing : the same warmth lifted, and left a little more of
+        // its colour than the light one keeps, since a desaturated tone on a
+        // dark ground reads as dust. Kept well clear of the cream the page is
+        // set in, so a control is still a control and not a slightly different
+        // word.
         case .paper:
             Palette(
                 paper: Ink(0x181510),
                 ink: Ink(0xECE3D3),
                 muted: Ink(0x9A9083),
                 rule: Ink(0x3A342B),
-                accent: Ink(0xD99A6C),
+                accent: Ink(0xB98D70),
                 edge: Ink(0xA09480, alpha: 0.28),
                 surface: Ink(0x221E17)
             )

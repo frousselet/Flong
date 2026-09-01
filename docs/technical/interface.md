@@ -32,12 +32,18 @@ The headline face used to be serif and nothing else, which was a decision about 
 | Theme | Faces | Paper |
 | ----- | ----- | ----- |
 | `Défaut` | Sans throughout | The system's own |
-| `Papier` | Serif headlines and standfirsts | Warm cream, warm near-black at night, every colour pulled back from the contrast a screen defaults to |
+| `Papier` | Serif headlines and standfirsts | Warm cream, warm near-black at night, every colour in it warm and pulled back from the contrast a screen defaults to |
 | `Solarized` | Monospace headlines over a sans body | base3 and base03, with base01 and base1 for the ink |
 
 **Three, and three is the number.** Past three they stop being opinions. Each says something the other two do not, and each says it in the two halves a theme has : what it is set in, and what it is printed on.
 
 **The face is the loud half.** A reader can name a theme's colours after a while ; they tell the face apart in the first second, and it is what says whether this is a place where things are read or a place where things are managed. So the panel sets each theme's name in that theme's own headline face : a list of three words in one face asks the reader to remember what `Solarized` looked like, and a specimen asks them to remember nothing. The line under each name says what the colours do, which is the half a row cannot show.
+
+**`Papier`'s accent is dark and barely coloured, rather than cool.** It began as a terracotta, `#9C5B33`, half saturated and at the lightness of a photograph, and the glyphs in the bar read as brown objects rather than as things that can be pressed.
+
+The instinct is to cool the hue, and it is wrong : a blue accent was tried and it took the theme apart, the one thing `Papier` is for being that everything on the page belongs to one warmth. The trouble was the chroma, and the lightness that let the chroma speak. Taken down to where ink lives and to a third of its saturation, `#5F4533`, the same warmth reads as ink that happens to be warm.
+
+At night it goes the other way, since ink on a dark ground is the light thing : the same warmth lifted to `#B98D70`, and left a little more of its colour than the light one keeps, since a desaturated tone on a dark ground reads as dust. Kept well clear of the cream the page is set in, so that a control is still a control and not a slightly different word. The live dot stays brick red in both, being the one thing in the application that is meant to be the loudest.
 
 **The metadata is sans in all three.** It is the application's own voice, and a theme that set it in the headline's face would have thrown away the one distinction the typography exists to make. A monospace caption under every story would also be the loudest quiet thing on the page.
 
