@@ -59,7 +59,10 @@ struct NotificationsPanel: View {
     /// It is the height of the sheet and not of the panel : the system insets
     /// the one inside the other, so the panel stands a little taller than the
     /// number here.
-    private var height: CGFloat { isRefused ? 250 : 132 }
+    private var height: CGFloat {
+        let switches: CGFloat = model.hasSharedCollections ? 62 : 0
+        return (isRefused ? 250 : 132) + switches
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -80,6 +83,26 @@ struct NotificationsPanel: View {
             // system's secondary background : a grey card is the right card
             // under the standard theme and a foreign one on warm paper.
             .background(theme.surface(in: scheme), in: .rect(cornerRadius: 14))
+
+            // **Only where there is somebody to collaborate with.** A switch
+            // about shared collections, on a device that is in none, is a
+            // question about something the reader has never seen : the panel
+            // says nothing rather than offering it. It appears the moment they
+            // share one or are invited to one.
+            if model.hasSharedCollections {
+                Toggle(
+                    isOn: Binding(
+                        get: { model.wantsCollaborationNotices },
+                        set: { wanted in Task { await model.setWantsCollaborationNotices(wanted) } }
+                    )
+                ) {
+                    Label("Additions to shared collections", systemImage: "folder.badge.person.crop")
+                }
+                .disabled(isRefused)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(theme.surface(in: scheme), in: .rect(cornerRadius: 14))
+            }
 
             if isRefused {
                 refusal

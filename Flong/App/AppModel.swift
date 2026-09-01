@@ -764,6 +764,8 @@ final class AppModel {
         self.articleBody = preferences.articleBody
         self.theme = preferences.theme
         self.wantsNewStoryNotices = preferences.wantsNewStoryNotices
+        self.wantsCollaborationNotices = preferences.wantsCollaborationNotices
+        self.mutedSharedCollections = preferences.mutedSharedCollections
         self.firstName = preferences.firstName
         self.lastName = preferences.lastName
         self.picture = preferences.picture.flatMap(ProfilePicture.image)
@@ -1064,6 +1066,109 @@ final class AppModel {
         notificationStatus = await announcer.status()
     }
 
+    // MARK: - When somebody adds to a shared collection
+
+    private(set) var wantsCollaborationNotices = false
+    /// The shared collections the reader has asked to hear nothing about.
+    private(set) var mutedSharedCollections: Set<String> = []
+
+    /// Whether this reader is in any shared collection at all.
+    ///
+    /// What the notifications panel asks before offering a switch about them :
+    /// a question about something the reader has never seen is a question they
+    /// cannot answer.
+    var hasSharedCollections: Bool {
+        !sharedCollectionNames.isEmpty || !invitedCollections.isEmpty
+    }
+
+    /// Says whether the reader wants to hear about collaborations, asking the
+    /// system when they do.
+    ///
+    /// The same shape as the story switch, and for the same reasons : the
+    /// switch is the request, a refusal at the system level cannot be talked
+    /// round from here, and the watermark is stamped now so that what is
+    /// already in their collections is not announced as though it had just
+    /// arrived.
+    func setWantsCollaborationNotices(_ wanted: Bool) async {
+        guard wanted else {
+            preferences.wantsCollaborationNotices = false
+            wantsCollaborationNotices = false
+            return
+        }
+
+        let allowed = await announcer.authorize()
+        notificationStatus = await announcer.status()
+        guard allowed else {
+            wantsCollaborationNotices = false
+            return
+        }
+
+        preferences.collaborationsAnnouncedAt = Date()
+        preferences.wantsCollaborationNotices = true
+        wantsCollaborationNotices = true
+    }
+
+    /// Turns one collection quiet, or lets it speak again.
+    ///
+    /// Per collection rather than per person : a reader who is in four shared
+    /// collections is usually loud about one of them, and muting a person would
+    /// mute them everywhere including where they are wanted.
+    func setNotices(_ wanted: Bool, forSharedCollection zone: String) {
+        if wanted {
+            mutedSharedCollections.remove(zone)
+        } else {
+            mutedSharedCollections.insert(zone)
+        }
+        preferences.mutedSharedCollections = mutedSharedCollections
+    }
+
+    /// Tells the reader what other people have just put in their collections.
+    ///
+    /// **The watermark moves whether anything was said or not**, exactly as it
+    /// does for the stories : what it records is that the filing reached this
+    /// device, not that a notification was posted. A reader who had the page
+    /// open watched it arrive.
+    ///
+    /// Nothing about the reader's own filings, and nothing about a collection
+    /// they have asked to be quiet.
+    func announceCollaborations() async {
+        guard wantsCollaborationNotices, let since = preferences.collaborationsAnnouncedAt else { return }
+
+        let mine = await sharedCloud?.myListKey()
+        let arrived =
+            (try? await sharedEntries.arrived(
+                since: since, excluding: mine, muted: mutedSharedCollections
+            )) ?? []
+        preferences.collaborationsAnnouncedAt = Date()
+
+        guard !isReading, !arrived.isEmpty else { return }
+
+        // The collection each was filed into, and whoever filed it. Both come
+        // from the zone rather than from the row, which holds an identifier
+        // that means nothing to a reader.
+        let titles = ((try? await sharedCollections.all()) ?? [])
+            .reduce(into: [String: String]()) { found, shared in found[shared.zoneName] = shared.title }
+
+        var names: [String: [String: String]] = [:]
+        for zone in Set(arrived.map(\.zone)) where names[zone] == nil {
+            let owner = (try? await sharedCollections.all())?.first { $0.zoneName == zone }
+            names[zone] = await sharing.attribution(
+                inZone: zone, ownedBy: (owner?.isOwned ?? false) ? nil : owner?.ownerName
+            )
+        }
+
+        let filings = arrived.map { filed in
+            (
+                collection: titles[filed.zone] ?? String(localized: "Shared collection"),
+                by: names[filed.zone]?[filed.entry.guid],
+                title: filed.entry.title
+            )
+        }
+
+        guard let announcement = Announcement.filings(filings) else { return }
+        await announcer.post(announcement)
+    }
+
     /// Tells the reader about the stories that have just opened.
     ///
     /// **The watermark moves whether anything was said or not.** A story the
@@ -1306,6 +1411,7 @@ final class AppModel {
             }
         )
         await announceNewStories()
+        await announceCollaborations()
 
         moveWork(to: .tidying)
         _ = try? await Retention(database).purge()
@@ -2428,6 +2534,7 @@ final class AppModel {
             )
             await loadDigest()
             await announceNewStories()
+            await announceCollaborations()
             endWork()
             enriching = nil
         }

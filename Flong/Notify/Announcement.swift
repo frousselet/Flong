@@ -66,7 +66,58 @@ nonisolated struct Announcement: Hashable, Sendable {
         )
     }
 
+    /// Somebody has put something in a collection the reader is in.
+    ///
+    /// **The one notice here that is a person and not a calculation.** Every
+    /// other thing Flong may say is something it worked out from feeds nobody
+    /// else touched ; this is somebody doing something, so the person leads and
+    /// the collection follows. A notice that opened `2 new articles` and left
+    /// the reader to work out who and where would be the least useful way to
+    /// say the most interesting thing in the application.
+    ///
+    /// **The people are counted, not the filings**, when there are several :
+    /// one person adding four pieces is one thing happening, and four names
+    /// would be four. Where one person did it all, they are named.
+    ///
+    /// A collection with nothing new in it says nothing, which is the ordinary
+    /// case for a pass that fetched somebody's unchanged list.
+    static func filings(
+        _ filings: [(collection: String, by: String?, title: String)]
+    ) -> Announcement? {
+        guard let first = filings.first else { return nil }
+
+        let collections = Set(filings.map(\.collection))
+        let people = Set(filings.compactMap(\.by))
+
+        // One filing, which is the case worth writing well : the headline is
+        // the news and everything else is where it came from.
+        if filings.count == 1 {
+            return Announcement(
+                title: first.by.map { String(localized: "\($0) added to \(first.collection)") }
+                    ?? String(localized: "Added to \(first.collection)"),
+                body: first.title,
+                thread: Thread.filings
+            )
+        }
+
+        let title =
+            collections.count == 1
+            ? String(localized: "\(filings.count) added to \(first.collection)")
+            : String(localized: "\(filings.count) added to your shared collections")
+
+        // Whoever did it, where the answer is short enough to be worth saying.
+        // A list of every headline would be a paragraph ; the names are the
+        // part a reader acts on.
+        let body =
+            people.isEmpty
+            ? filings.map(\.title).joined(separator: " · ")
+            : ListFormatter.localizedString(byJoining: people.sorted())
+
+        return Announcement(title: title, body: body, thread: Thread.filings)
+    }
+
     enum Thread {
         static let newStories = "new-stories"
+        static let filings = "shared-filings"
     }
 }

@@ -55,11 +55,15 @@ nonisolated final class Preferences: @unchecked Sendable {
         static let device = "device.identifier"
         static let newStoryNotices = "notify.new-stories"
         static let storiesAnnouncedAt = "notify.stories-announced-at"
+        static let collaborationNotices = "notify.collaborations"
+        static let mutedCollections = "notify.muted-collections"
+        static let collaborationsAnnouncedAt = "notify.collaborations-announced-at"
 
         /// Every key, for the one operation that has to name all of them.
         static let all = [
             articleBody, theme, firstName, lastName, picture, city, country, countryCode, device,
-            newStoryNotices, storiesAnnouncedAt,
+            newStoryNotices, storiesAnnouncedAt, collaborationNotices, mutedCollections,
+            collaborationsAnnouncedAt,
         ]
     }
 
@@ -200,6 +204,67 @@ nonisolated final class Preferences: @unchecked Sendable {
     var wantsNewStoryNotices: Bool {
         get { flag(for: Key.newStoryNotices) }
         set { set(newValue, for: Key.newStoryNotices) }
+    }
+
+    /// Whether the reader wants to hear when somebody adds to a collection they
+    /// share.
+    ///
+    /// Off until they say otherwise, like every other switch in that panel, and
+    /// carried between their devices for the same reason : it is a decision
+    /// about themselves and not about a device.
+    ///
+    /// **A collaboration is the one thing here somebody else caused.** Every
+    /// other notice Flong may post is about something it worked out on its own
+    /// from feeds nobody else touched ; this one is a person doing something,
+    /// which is exactly why a reader may want it and exactly why they may want
+    /// it only for some collections. See ``mutedSharedCollections``.
+    var wantsCollaborationNotices: Bool {
+        get { flag(for: Key.collaborationNotices) }
+        set { set(newValue, for: Key.collaborationNotices) }
+    }
+
+    /// The shared collections the reader has asked to hear nothing about.
+    ///
+    /// **A list of the quiet ones rather than of the loud ones.** A reader who
+    /// turns the switch on means the collections they are in, including the
+    /// ones they have not been invited to yet ; storing the opposite would have
+    /// every new collection arrive silent and look broken.
+    ///
+    /// By zone, because that is what a shared collection is. A name would go
+    /// wrong the moment two people called theirs the same thing.
+    /// **Written locally as well as to iCloud**, like every other preference
+    /// here : a reader with no iCloud account is a reader section 3 says the
+    /// application is fully usable for, and a switch that did nothing at all
+    /// for them would be a switch that lied.
+    var mutedSharedCollections: Set<String> {
+        get {
+            if let cloud, let carried = cloud.array(forKey: Key.mutedCollections) as? [String] {
+                return Set(carried)
+            }
+            return Set(local.array(forKey: Key.mutedCollections) as? [String] ?? [])
+        }
+        set {
+            let names = Array(newValue).sorted()
+            local.set(names, forKey: Key.mutedCollections)
+            cloud?.set(names, forKey: Key.mutedCollections)
+            cloud?.synchronize()
+        }
+    }
+
+    /// The last moment this device said anything about a collaboration.
+    ///
+    /// Local and never carried, for the same reason the story watermark is not :
+    /// each device tells its own reader, and a watermark that travelled would
+    /// have the second device stay silent about what only the first announced.
+    var collaborationsAnnouncedAt: Date? {
+        get { local.object(forKey: Key.collaborationsAnnouncedAt) as? Date }
+        set {
+            guard let newValue else {
+                local.removeObject(forKey: Key.collaborationsAnnouncedAt)
+                return
+            }
+            local.set(newValue, forKey: Key.collaborationsAnnouncedAt)
+        }
     }
 
     /// The last moment this device said anything about a new story.

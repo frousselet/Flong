@@ -198,6 +198,19 @@ nonisolated struct SharedEntryStore: Sendable {
         at date: Date = Date()
     ) async throws {
         try await database.writer.write { db in
+            // **When a thing arrived is not changed by somebody editing their
+            // list.** A list is rewritten whole every time any of it changes,
+            // so an article that has been here for a week would be stamped as
+            // new the moment its filer added something else, and every notice
+            // built on the stamp would announce it again. What was here keeps
+            // the moment it turned up.
+            let arrived = try Row.fetchAll(
+                db,
+                sql: "SELECT guid, received_at FROM shared_entry WHERE zone_name = ? AND list_key = ?",
+                arguments: [zoneName, listKey]
+            )
+            .reduce(into: [String: Date]()) { found, row in found[row["guid"] as String] = row["received_at"] as Date }
+
             try db.execute(
                 sql: "DELETE FROM shared_entry WHERE zone_name = ? AND list_key = ?",
                 arguments: [zoneName, listKey]
@@ -217,10 +230,38 @@ nonisolated struct SharedEntryStore: Sendable {
                     arguments: [
                         UUID.v7(), zoneName, listKey, author, entry.guid, entry.title, entry.url,
                         entry.excerpt, entry.author, entry.publishedAt, entry.imageURL,
-                        entry.feedURL, entry.sourceTitle, date,
+                        entry.feedURL, entry.sourceTitle, arrived[entry.guid] ?? date,
                     ]
                 )
             }
+        }
+    }
+
+    /// What has turned up in the shared collections since a moment.
+    ///
+    /// **Not the reader's own**, which is what `excluding` is for : being told
+    /// about what you filed yourself is being told what you already know.
+    ///
+    /// `muted` are the collections the reader has asked to hear nothing about,
+    /// left out here rather than filtered afterwards so that a muted collection
+    /// cannot move the watermark past a collection that is not.
+    func arrived(
+        since: Date,
+        excluding listKey: String?,
+        muted: Set<String> = []
+    ) async throws -> [(zone: String, author: String, entry: SharedEntry)] {
+        try await database.writer.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT * FROM shared_entry
+                    WHERE received_at > ? AND (? IS NULL OR list_key <> ?)
+                    ORDER BY received_at
+                    """,
+                arguments: [since, listKey, listKey]
+            )
+            .filter { !muted.contains($0["zone_name"] as String) }
+            .map { (zone: $0["zone_name"] as String, author: $0["author_name"] as String, entry: Self.entry(from: $0)) }
         }
     }
 
