@@ -242,18 +242,28 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
             )
 
         // Solarized, by its own names : base3 for the paper, base01 for the
-        // ink, base00 for what is said about the page, blue for what can be
+        // ink, base00 for what is said about the page, violet for what can be
         // pressed. Not base00 for the ink, which is the palette's body text and
         // sits at four and a half to one against base3 : it passes, barely, and
         // this application has a screen where the contrast has to hold at a
         // caption size.
+        //
+        // **Violet rather than the blue everybody uses.** The palette has eight
+        // accents and the light paper rules out most of them : yellow, green
+        // and cyan all sit near three to one against base3, which is a glyph
+        // one has to look for, and red, orange and magenta are the colour the
+        // live dot already is, or near enough that a row of controls would read
+        // as an alarm. Blue is what Solarized itself reaches for and it is the
+        // weakest of the four that are left, at 3.4 to one ; violet is 4.1,
+        // which is a control one can see, and it is as much Solarized's own as
+        // the blue was.
         case .solarized:
             Palette(
                 paper: Ink(0xFDF6E3),
                 ink: Ink(0x586E75),
                 muted: Ink(0x657B83),
                 rule: Ink(0x93A1A1, alpha: 0.45),
-                accent: Ink(0x268BD2),
+                accent: Ink(0x6C71C4),
                 edge: Ink(0x586E75, alpha: 0.20),
                 surface: Ink(0xEEE8D5)
             )
@@ -296,13 +306,19 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
         // base03 and base02 for the two grounds, base1 for the ink and base0
         // for what is said about the page : the palette's own dark, in the
         // order it names them.
+        //
+        // The same violet, lifted. Solarized's whole claim is that its eight
+        // accents hold against either ground, and against base03 the violet
+        // holds at 3.4 to one, which is the floor rather than a margin. Raised
+        // in lightness alone, hue and saturation untouched, it is 5 to one and
+        // still recognizably the colour the light page uses.
         case .solarized:
             Palette(
                 paper: Ink(0x002B36),
                 ink: Ink(0x93A1A1),
                 muted: Ink(0x839496),
                 rule: Ink(0x586E75, alpha: 0.55),
-                accent: Ink(0x389CE0),
+                accent: Ink(0x8B8FD0),
                 edge: Ink(0x93A1A1, alpha: 0.22),
                 surface: Ink(0x073642)
             )
