@@ -510,6 +510,8 @@ Not a list of articles : a list of **stories**, each one several articles from s
 
 The first story on the page runs its picture across the column, above a larger headline ; the others keep theirs to a square at the side. A page where every story is the same size is a list, and a list makes the reader do the ranking the digest exists to do.
 
+**The top of the page takes the colours of that picture**, under the standard theme alone : the head of the digest, the bar over it and the dateline in it are washed in three bands read from the lead's own photograph, and the colour is spent by the time the photograph itself comes into view. The other two themes state what the page is printed on and a wash over either would be a second opinion about the paper ; the standard theme states nothing, which leaves it the one page a picture has room to speak on. Nothing at all where the reader has asked for more contrast. `docs/technical/interface.md` records how the bands are read and why the colour is not the picture's own lightness.
+
 Each story carries its name, one line saying what happened, the marks of the rooms talking about it rather than a count of them, the number of articles, the shape of their arrival and how long ago the last one came. Opening a story lists its articles ; opening an article reads it. Not a card : a rule, a headline, a line and the facts underneath.
 
 The model names and summarizes ; without one, a story takes the title and standfirst of its most central article, and the page says which of the two it is. `docs/technical/digest.md` records how stories are grouped, and why it is not by the vectors of section 11.
