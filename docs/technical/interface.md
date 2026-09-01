@@ -33,7 +33,7 @@ The headline face used to be serif and nothing else, which was a decision about 
 | ----- | ----- | ----- |
 | `Défaut` | Sans throughout | The system's own |
 | `Papier` | Serif headlines and standfirsts | Warm cream, warm near-black at night, every colour in it warm and pulled back from the contrast a screen defaults to |
-| `Solarized` | Monospace headlines over a sans body | base3 and base03, with base01 and base1 for the ink |
+| `Solarized` | Monospace headlines over a sans body | base3 and base03, base01 and base1 for the ink, violet for a control |
 
 **Three, and three is the number.** Past three they stop being opinions. Each says something the other two do not, and each says it in the two halves a theme has : what it is set in, and what it is printed on.
 
@@ -62,6 +62,21 @@ The paper itself is laid in three places, and each is a place the system would o
 - **On the rows of a list**, by `themedRows()`, said on the list itself. A row's ground is the one thing a form's surroundings cannot state on its behalf, and the system's white card on warm paper is the brightest thing on the screen and the only thing in the panel out of theme.
 
 The ink is set once, as the foreground style, and everything follows from it : a view asking for `.secondary` is asking for less of whatever the ink is, so the whole application follows without a screen having heard of a palette.
+
+**`Solarized`'s accent is violet, not the blue everybody uses.** The palette has eight accents and the light paper rules out most of them. Yellow, green and cyan all sit near three to one against base3, which is a glyph one has to look for. Red, orange and magenta are the colour the live dot already is, or near enough that a row of controls reads as an alarm. That leaves blue, which is what Solarized itself reaches for and which is the weakest of the four survivors at 3.4 to one, and violet at 4.1, which is a control one can see. Violet is as much the palette's own as the blue was, so nothing is borrowed from outside it.
+
+At night it is the same violet raised in lightness, hue and saturation untouched : against base03 the stated violet holds at 3.4 to one, which is the floor rather than a margin, and `#8B8FD0` is 5 to one and still recognizably the colour the light page uses. This is the one place Solarized's own claim, that its eight accents hold against either ground, is not quite taken at its word.
+
+| Accent | On base3 | On base03 |
+| ------ | -------- | --------- |
+| yellow | 3.0 | 4.7 |
+| orange | 4.3 | 3.3 |
+| red | 4.3 | 3.3 |
+| magenta | 4.2 | 3.3 |
+| **violet** | **4.1** | **3.4**, lifted to 5.0 |
+| blue | 3.4 | 4.1 |
+| cyan | 2.9 | 4.8 |
+| green | 3.0 | 4.7 |
 
 ### A tint stops at the edge of a photograph
 
