@@ -82,9 +82,29 @@ struct StorySummary: View {
         let sentence = Text(verbatim: summary)
         guard isGenerated else { return sentence }
 
-        // A step quieter than the words it stands in front of : it says who
-        // wrote them and is not one of them.
-        return Text(Image(systemName: "text.line.3.summary")).foregroundStyle(.tertiary)
+        // A step quieter than the words it stands in front of, and a size
+        // under them : it says who wrote them and is not one of them.
+        return Text(Image(systemName: "text.line.3.summary"))
+            .font(markFont)
+            .foregroundStyle(.tertiary)
             + Text(verbatim: " ") + sentence
+    }
+
+    /// The step of the scale the mark is set at, which is under the words it
+    /// stands in front of and the same distance under them at either size.
+    ///
+    /// **A symbol is not a letter.** Set at the font of the line it fills the
+    /// cap height and comes out heavier than anything beside it, so a mark at
+    /// the size of the sentence is the loudest thing in the sentence. About
+    /// four fifths puts it where Mail sets its own : read before the line,
+    /// never instead of it. A step of the scale rather than a size in points,
+    /// so it still grows with the reader's type.
+    private var markFont: Font {
+        switch style {
+        case .body: .footnote
+        // The row's own `subheadline`, and a floor for anything else : a mark
+        // that grew with a title would be a title.
+        default: .caption
+        }
     }
 }
