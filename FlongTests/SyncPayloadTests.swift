@@ -315,6 +315,80 @@ struct SyncPayloadTests {
         #expect(try await second.subscriptions.groups().map(\.title) == ["Le Monde"])
     }
 
+    @Test("A name written on one device is what the other calls the source")
+    func namesTravel() async throws {
+        let first = try Device(zone: zone)
+        let second = try Device(zone: zone)
+
+        let feed = try await first.subscriptions.subscribe(
+            to: Subscription(address: "https://www.lemonde.fr/rss/une.xml", title: "À la une")
+        ).feed
+        _ = try await second.payload.apply(try await first.payload.everything())
+
+        // The upsert never overwrites what is already followed, so this is the
+        // case that would leave the second device calling it the old name for
+        // ever.
+        try await first.subscriptions.rename(feed.id, to: "Une")
+        _ = try await second.payload.apply(try await first.payload.everything())
+
+        let titles = try await second.subscriptions.feeds().map(\.title)
+        #expect(titles == ["Une"])
+    }
+
+    @Test("A source moved on one device is moved on the other, not replaced")
+    func aMoveTravels() async throws {
+        let first = try Device(zone: zone)
+        let second = try Device(zone: zone)
+
+        let feed = try await first.subscriptions.subscribe(
+            to: Subscription(address: "https://feeds.example.com/old.xml", title: "Example")
+        ).feed
+        _ = try await second.payload.apply(try await first.payload.everything())
+
+        let here = try #require(await second.subscriptions.feeds().first)
+        try await second.add("urn:1", to: here, title: "First", published: now)
+
+        try await first.subscriptions.edit(
+            feed.id,
+            to: SourceEdit(title: "Example", address: "https://feeds.example.com/new.xml")
+        )
+        _ = try await second.payload.apply(try await first.payload.everything())
+
+        // The record under the new name arrives with the deletion of the old
+        // one, and the deletion has to find nothing left to take : it is the
+        // same source, and its articles are the whole reason for moving it
+        // rather than following it again.
+        let removed = try await second.payload.apply(deletions: [SyncRecords.name(forFeed: feed.url)])
+
+        let feeds = try await second.subscriptions.feeds()
+        #expect(feeds.count == 1)
+        #expect(feeds.first?.id == here.id)
+        #expect(feeds.first?.url.absoluteString == "https://feeds.example.com/new.xml")
+        #expect(removed.removed == 0)
+
+        let entries = try await second.database.writer.read { db in try Entry.fetchCount(db) }
+        #expect(entries == 1)
+    }
+
+    @Test("A move a device knows nothing about leaves it with one source, not two")
+    func aMoveOfSomethingNeverFollowed() async throws {
+        let first = try Device(zone: zone)
+        let second = try Device(zone: zone)
+
+        let feed = try await first.subscriptions.subscribe(
+            to: Subscription(address: "https://feeds.example.com/old.xml", title: "Example")
+        ).feed
+        try await first.subscriptions.edit(
+            feed.id,
+            to: SourceEdit(title: "Example", address: "https://feeds.example.com/new.xml")
+        )
+
+        _ = try await second.payload.apply(try await first.payload.everything())
+
+        let feeds = try await second.subscriptions.feeds().map(\.url.absoluteString)
+        #expect(feeds == ["https://feeds.example.com/new.xml"])
+    }
+
     @Test("A favourite taken back on one device is taken back on the other")
     func unfavouritingTravels() async throws {
         let first = try Device(zone: zone)

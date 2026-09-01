@@ -61,6 +61,24 @@ struct LocalizationTests {
         #expect(String(localized: "Authors", locale: french) == "Auteurs")
     }
 
+    @Test("The editor of a source is in French too")
+    func editingASource() {
+        #expect(String(localized: "Edit the source", locale: french) == "Modifier la source")
+        #expect(String(localized: "Address of the feed", locale: french) == "Adresse du flux")
+        #expect(String(localized: "Address of the site", locale: french) == "Adresse du site")
+        #expect(String(localized: "New secret address", locale: french) == "Nouvelle adresse secrète")
+        #expect(String(localized: "How often", locale: french) == "Fréquence")
+        #expect(String(localized: "Automatic", locale: french) == "Automatique")
+        #expect(String(localized: "Failures in a row", locale: french) == "Échecs consécutifs")
+
+        // The one refusal this screen has of its own, read by somebody who has
+        // just typed an address a second source is already served at.
+        #expect(
+            String(localized: "Another source is already followed at this address.", locale: french)
+                == "Une autre source est déjà suivie à cette adresse."
+        )
+    }
+
     @Test("The one command that cannot be undone says so in French")
     func dangerZone() {
         #expect(String(localized: "Danger zone", locale: french) == "Zone de danger")

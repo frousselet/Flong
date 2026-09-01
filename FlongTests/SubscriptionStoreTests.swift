@@ -197,6 +197,278 @@ struct SubscriptionStoreTests {
         await #expect(throws: SubscriptionError.unknownFeed(id)) { try await store.unsubscribe(id) }
     }
 
+    // MARK: - Editing a source
+
+    @Test("Editing renames a source without moving it")
+    func editingRenames() async throws {
+        let feed = try await store.subscribe(
+            to: Subscription(address: "https://feeds.example.com/1.xml", title: "Example")
+        ).feed
+
+        let change = try await store.edit(
+            feed.id,
+            to: SourceEdit(title: "My own name", address: feed.url.absoluteString, isFavourite: true)
+        )
+
+        #expect(!change.movedAddress)
+        #expect(change.feed.url == feed.url)
+        #expect(change.feed.title == "My own name")
+        #expect(change.feed.isFavourite)
+        #expect(change.marked.isEmpty)
+    }
+
+    @Test("An edited name with nothing in it falls back to the host it now has")
+    func editingWithNoName() async throws {
+        let feed = try await store.subscribe(
+            to: Subscription(address: "https://feeds.example.com/1.xml", title: "Example")
+        ).feed
+
+        let change = try await store.edit(feed.id, to: SourceEdit(address: "https://news.example.org/2.xml"))
+
+        #expect(change.feed.title == "news.example.org")
+    }
+
+    @Test("A source that moves keeps its articles and says where it came from")
+    func movingKeepsTheArticles() async throws {
+        let feed = try await store.subscribe(
+            to: Subscription(address: "https://feeds.example.com/1.xml", title: "Example")
+        ).feed
+        try await database.writer.write { db in
+            try Entry(feedID: feed.id, guid: "urn:example:1", title: "First", isStarred: true).insert(db)
+        }
+
+        let change = try await store.edit(
+            feed.id,
+            to: SourceEdit(title: "Example", address: "https://feeds.example.com/2.xml")
+        )
+
+        #expect(change.previousURL == feed.url)
+        #expect(change.feed.previousURL == feed.url)
+        #expect(change.feed.url.absoluteString == "https://feeds.example.com/2.xml")
+        #expect(change.feed.id == feed.id)
+        // The marked ones come back, since every record naming them is named
+        // after the address they arrived at.
+        #expect(change.marked.map(\.guid) == ["urn:example:1"])
+
+        let remaining = try await database.writer.read { db in try Entry.fetchCount(db) }
+        #expect(remaining == 1)
+        let actual = try await store.count()
+        #expect(actual == 1)
+    }
+
+    @Test("A source cannot be moved onto an address already followed")
+    func movingOntoAnotherSource() async throws {
+        let first = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml")).feed
+        let second = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/2.xml")).feed
+
+        await #expect(throws: SubscriptionError.addressAlreadyFollowed(second.id)) {
+            try await store.edit(first.id, to: SourceEdit(address: "https://feeds.example.com/2.xml"))
+        }
+
+        let stored = try await store.feed(id: first.id)
+        #expect(stored?.url == first.url)
+        let actual = try await store.count()
+        #expect(actual == 2)
+    }
+
+    @Test("An address that is not one Flong can follow is refused")
+    func movingToAnImpossibleAddress() async throws {
+        let feed = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml")).feed
+
+        await #expect(throws: FeedURLError.embeddedCredentials) {
+            try await store.edit(feed.id, to: SourceEdit(address: "https://user:secret@feeds.example.com/1.xml"))
+        }
+    }
+
+    @Test("A source that moves forgets what the server it left had said")
+    func movingForgetsTheConditionalState() async throws {
+        let feed = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml")).feed
+        try await database.writer.write { db in
+            var stored = feed
+            stored.etag = "\"abc\""
+            stored.lastModified = "Mon, 01 Sep 2026 00:00:00 GMT"
+            stored.fetchCount = 10
+            stored.notModifiedCount = 9
+            stored.failureCount = 3
+            stored.lastFailureReason = "gone (410)"
+            stored.quarantinedAt = Date()
+            try stored.update(db)
+        }
+
+        let change = try await store.edit(feed.id, to: SourceEdit(address: "https://feeds.example.com/2.xml"))
+
+        #expect(change.feed.etag == nil)
+        #expect(change.feed.lastModified == nil)
+        #expect(change.feed.fetchCount == 0)
+        #expect(change.feed.notModifiedCount == 0)
+        // The quarantine is exactly what a reader editing a broken address is
+        // undoing, so it does not survive the move either.
+        #expect(change.feed.failureCount == 0)
+        #expect(change.feed.lastFailureReason == nil)
+        #expect(change.feed.quarantinedAt == nil)
+    }
+
+    @Test("A mark still waiting for its article follows the source that moves")
+    func movingTakesTheWaitingMarks() async throws {
+        let feed = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml")).feed
+        let other = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/other.xml")).feed
+        try await database.writer.write { db in
+            for url in [feed.url, other.url] {
+                try db.execute(
+                    sql: """
+                        INSERT INTO pending_mark (feed_url, guid, payload, received_at)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                    arguments: [url.absoluteString, "urn:example:1", Data(), Date()]
+                )
+            }
+        }
+
+        try await store.edit(feed.id, to: SourceEdit(address: "https://feeds.example.com/2.xml"))
+
+        let waiting = try await database.writer.read { db in
+            try String.fetchAll(db, sql: "SELECT feed_url FROM pending_mark ORDER BY feed_url")
+        }
+        #expect(waiting == ["https://feeds.example.com/2.xml", "https://feeds.example.com/other.xml"])
+    }
+
+    @Test("A source that leaves its publisher takes the name written over it")
+    func movingEmptiesAPublisher() async throws {
+        let feed = try await store.subscribe(to: Subscription(address: "https://www.lemonde.fr/rss/une.xml")).feed
+        try await store.rename(domain: "lemonde.fr", to: "Le Monde")
+
+        let change = try await store.edit(feed.id, to: SourceEdit(address: "https://feeds.example.com/1.xml"))
+
+        #expect(change.forgottenName == "lemonde.fr")
+        let written = try await store.names()
+        #expect(written.isEmpty)
+    }
+
+    @Test("A publisher another source still serves keeps its name")
+    func movingOneOfSeveralDesks() async throws {
+        let feed = try await store.subscribe(to: Subscription(address: "https://www.lemonde.fr/rss/une.xml")).feed
+        try await store.subscribe(to: Subscription(address: "https://www.lemonde.fr/rss/sport.xml"))
+        try await store.rename(domain: "lemonde.fr", to: "Le Monde")
+
+        let change = try await store.edit(feed.id, to: SourceEdit(address: "https://feeds.example.com/1.xml"))
+
+        #expect(change.forgottenName == nil)
+        let written = try await store.names().map(\.name)
+        #expect(written == ["Le Monde"])
+    }
+
+    @Test("The site is what a source is grouped under")
+    func editingTheSiteRegroups() async throws {
+        let feed = try await store.subscribe(
+            to: Subscription(address: "https://feeds.feedburner.com/lemonde", title: "Le Monde")
+        ).feed
+
+        let change = try await store.edit(
+            feed.id,
+            to: SourceEdit(title: "Le Monde", siteAddress: "https://www.lemonde.fr")
+        )
+
+        #expect(change.feed.domain == "lemonde.fr")
+        let groups = try await store.groups().map(\.domain)
+        #expect(groups == ["lemonde.fr"])
+    }
+
+    @Test("A manual interval is held inside the bounds of section 8")
+    func theIntervalIsBounded() async throws {
+        let feed = try await store.subscribe(
+            to: Subscription(address: "https://feeds.example.com/1.xml", title: "Example")
+        ).feed
+
+        let hurried = try await store.edit(feed.id, to: SourceEdit(title: "Example", refreshInterval: 5))
+        #expect(hurried.feed.refreshInterval == RefreshSchedule.minimumInterval)
+
+        let idle = try await store.edit(feed.id, to: SourceEdit(title: "Example", refreshInterval: 7 * 24 * 60 * 60))
+        #expect(idle.feed.refreshInterval == RefreshSchedule.maximumInterval)
+
+        let automatic = try await store.edit(feed.id, to: SourceEdit(title: "Example"))
+        #expect(automatic.feed.refreshInterval == nil)
+    }
+
+    @Test("A move arriving from another device moves the row rather than adding one")
+    func readdressingFromAnotherDevice() async throws {
+        let feed = try await store.subscribe(
+            to: Subscription(address: "https://feeds.example.com/1.xml", title: "Example")
+        ).feed
+        let url = try #require(URL(string: "https://feeds.example.com/2.xml"))
+        let moved = try await store.readdress(from: feed.url, to: url)
+
+        #expect(moved?.previousURL == feed.url)
+        #expect(moved?.feed.id == feed.id)
+        let actual = try await store.count()
+        #expect(actual == 1)
+    }
+
+    @Test("A move that arrives twice changes nothing the second time")
+    func readdressingIsIdempotent() async throws {
+        let feed = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml")).feed
+        let url = try #require(URL(string: "https://feeds.example.com/2.xml"))
+
+        try await store.readdress(from: feed.url, to: url)
+        let again = try await store.readdress(from: feed.url, to: url)
+
+        #expect(again == nil)
+        let actual = try await store.count()
+        #expect(actual == 1)
+    }
+
+    @Test("A move onto an address this device already follows is left alone")
+    func readdressingOntoAnotherSource() async throws {
+        let first = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml")).feed
+        let second = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/2.xml")).feed
+
+        let moved = try await store.readdress(from: first.url, to: second.url)
+
+        #expect(moved == nil)
+        let stored = try await store.feed(id: first.id)
+        #expect(stored?.url == first.url)
+    }
+
+    @Test("What another device decided about a source outranks what is stored")
+    func adoptingWhatAnotherDeviceDecided() async throws {
+        let feed = try await store.subscribe(
+            to: Subscription(address: "https://feeds.example.com/1.xml", title: "Example")
+        ).feed
+
+        let changed = try await store.adopt(
+            Subscription(
+                address: "https://feeds.example.com/1.xml",
+                title: "My own name",
+                siteURL: URL(string: "https://example.com")
+            ),
+            isFavourite: true,
+            at: feed.id
+        )
+
+        #expect(changed)
+        let stored = try await store.feed(id: feed.id)
+        #expect(stored?.title == "My own name")
+        #expect(stored?.siteURL?.absoluteString == "https://example.com")
+        #expect(stored?.isFavourite == true)
+    }
+
+    @Test("A record that says nothing about a favourite does not take one back")
+    func adoptingSaysNothingAboutAFavourite() async throws {
+        let feed = try await store.subscribe(
+            to: Subscription(address: "https://feeds.example.com/1.xml", title: "Example")
+        ).feed
+        try await store.setFavourite(feed.id, true)
+
+        let changed = try await store.adopt(
+            Subscription(address: "https://feeds.example.com/1.xml", title: "Example"),
+            isFavourite: nil,
+            at: feed.id
+        )
+
+        #expect(!changed)
+        let stored = try await store.feed(id: feed.id)
+        #expect(stored?.isFavourite == true)
+    }
+
     @Test("Unsubscribing takes the articles with it")
     func unsubscribingCascades() async throws {
         let feed = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml")).feed

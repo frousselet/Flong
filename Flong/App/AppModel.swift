@@ -71,6 +71,7 @@ nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
     case notSignedIn
     case notDeleted
     case notRemoved
+    case addressAlreadyFollowed
 
     var id: Self { self }
 
@@ -85,6 +86,7 @@ nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
         case .notSignedIn: "This site left no session. Sign in on its page, then say so."
         case .notDeleted: "Not everything could be deleted. Try again in a moment."
         case .notRemoved: "This source could not be removed. Try again in a moment."
+        case .addressAlreadyFollowed: "Another source is already followed at this address."
         }
     }
 }
@@ -2755,6 +2757,118 @@ final class AppModel {
             }
         } catch {
             failure = .notSaved
+        }
+    }
+
+    /// One source, whole, for the screen that edits it.
+    func source(_ id: UUID) async -> Feed? {
+        try? await subscriptions.feed(id: id)
+    }
+
+    /// Edits a source : its name, its address, the site it belongs to, how
+    /// often it is asked and whether it is one of the reader's own.
+    ///
+    /// **The address is the reason this exists.** A publisher that moves their
+    /// feed used to cost the reader everything under it : the only repair was
+    /// to unsubscribe and subscribe again, which takes the articles, the stars,
+    /// the notes and the filings with it, on every device. Editing the address
+    /// moves the row and leaves all of that where it is.
+    ///
+    /// A new secret address is written to the keychain first. Should the edit
+    /// then fail, a feed fetched with the secret it was given goes on working
+    /// under an identity that is one move behind ; the other order would leave
+    /// a source at an address whose secret nothing knows, which is a source
+    /// that is simply broken.
+    func editSource(_ id: UUID, to edit: SourceEdit, secretAddress: String? = nil) async {
+        var edit = edit
+
+        if let secretAddress, !secretAddress.trimmingCharacters(in: .whitespaces).isEmpty {
+            do {
+                let url = try FeedURL.canonical(secretAddress)
+                guard let masked = MaskedURL.mask(url) else {
+                    failure = .invalidAddress
+                    return
+                }
+                try credentials.setCredential(.secretURL(url), for: id)
+                edit.address = masked.absoluteString
+            } catch is FeedURLError {
+                failure = .invalidAddress
+                return
+            } catch {
+                // Never the address : an error message is one of the places
+                // section 9 says a secret must not appear.
+                failure = .notSaved
+                return
+            }
+        }
+
+        do {
+            let change = try await subscriptions.edit(id, to: edit)
+            await carry(change)
+        } catch is FeedURLError {
+            failure = .invalidAddress
+        } catch SubscriptionError.addressAlreadyFollowed {
+            failure = .addressAlreadyFollowed
+        } catch {
+            failure = .notSaved
+            Log.store.error("The source could not be edited : \(error, privacy: .public)")
+        }
+    }
+
+    /// Carries an edited source everywhere the store cannot reach.
+    ///
+    /// **A source that moved is a new set of names.** Everything the reader's
+    /// iCloud holds about a source is named after the address it is served at,
+    /// so the old records are deleted and the new ones queued : the
+    /// subscription, one record for each article marked under it, and every
+    /// block of the stream this device wrote at the old address. The record that
+    /// goes up says where the source came from, which is what has the reader's
+    /// other devices move the row they already hold rather than remove it.
+    ///
+    /// The read states need nothing. They are fingerprints of the address and
+    /// the article together, so they are all wrong the moment a source moves ;
+    /// the next compaction reads them off the feed as it now stands and unions
+    /// the new ones in, and the old ones are a few bytes nobody will ever match.
+    private func carry(_ change: SourceChange) async {
+        let feed = SyncRecords.name(forFeed: change.feed.url)
+        let forgotten = change.forgottenName.map(SyncRecords.name(forSourceNamedDomain:))
+
+        if let previous = change.previousURL {
+            await cloud?.enqueueRemoval(
+                ofFeed: previous,
+                marks: change.marked.map { SyncRecords.name(forMarkWithGUID: $0.guid, feedURL: previous) },
+                sourceName: forgotten
+            )
+            await cloud?.enqueue(
+                recordNames: [feed]
+                    + change.marked.map { SyncRecords.name(forMarkWithGUID: $0.guid, feedURL: change.feed.url) }
+            )
+        } else {
+            await cloud?.enqueue(recordNames: [feed])
+            if let forgotten { await cloud?.enqueue(deletions: [forgotten]) }
+        }
+
+        await loadSidebar()
+
+        // A source that changed site changed publisher, and the heading it used
+        // to sit under may have gone with it. The whole stream is where a
+        // reader lands then, as it is when a source is removed, rather than on
+        // a heading with nothing under it.
+        if case .group(let domain) = selection, !sourceGroups.contains(where: { $0.kind == .group(domain) }) {
+            selection = .all
+        }
+
+        await loadCollections()
+        // The name of a publisher is on every article of theirs the index
+        // holds, and a favourite source is what put those articles in it at
+        // all, so one line typed here is a decision about thousands of rows.
+        await synchronizeSpotlight()
+
+        // An address nothing has ever asked, edited by somebody who is watching
+        // to see whether it works. Everything else can wait for the clock.
+        if change.movedAddress {
+            _ = await refresher.refresh(change.feed)
+            await load()
         }
     }
 

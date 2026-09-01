@@ -227,6 +227,11 @@ nonisolated enum SyncRecords {
         record["url"] = feed.url.absoluteString
         record["title"] = feed.title
         record["isFavourite"] = feed.isFavourite ? 1 : 0
+        // Where it used to be served, so that a device holding it there moves
+        // the row it already has. Without it the pair of a record under a new
+        // name and a deletion under the old one is a removal followed by a
+        // subscription, and the removal takes the articles.
+        record["previousURL"] = feed.previousURL?.absoluteString
         record["siteURL"] = feed.siteURL?.absoluteString
         record["iconURL"] = feed.iconURL?.absoluteString
         record["createdAt"] = feed.createdAt
@@ -242,6 +247,15 @@ nonisolated enum SyncRecords {
             siteURL: (record["siteURL"] as? String).flatMap(URL.init(string:)),
             iconURL: (record["iconURL"] as? String).flatMap(URL.init(string:))
         )
+    }
+
+    /// The address the source was served at before it moved, when it has.
+    ///
+    /// `nil` for a source that has always been where it is, and for a record
+    /// written before a source could be moved at all.
+    static func previousURL(from record: CKRecord) -> URL? {
+        guard record.recordType == RecordType.feed else { return nil }
+        return (record["previousURL"] as? String).flatMap(URL.init(string:))
     }
 
     /// Whether the record says the reader singled that source out.

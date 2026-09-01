@@ -598,6 +598,27 @@ nonisolated extension AppDatabase {
             )
         }
 
+        // Where a source used to be served.
+        //
+        // **A column, because a move has to travel.** Every record about a
+        // source is named after the address it is served at, so a source that
+        // moves is a record under a new name and a deletion under the old one,
+        // which on another device reads as one subscription removed and another
+        // one added : the articles of the old row would go, and with them
+        // everything the reader had ever said about the ones the new address no
+        // longer serves. The record carries where the source came from instead,
+        // so a device that receives it moves the row it already has and the
+        // deletion that follows finds nothing left to take.
+        //
+        // It is never cleared. A device that has been switched off for a year
+        // is exactly the one that needs it, and one that has already followed
+        // the move finds nothing at the old address and does nothing.
+        migrator.registerMigration("v29.aSourceThatMoved") { db in
+            try db.alter(table: "feed") { table in
+                table.add(column: "previous_url", .text)
+            }
+        }
+
         return migrator
     }
 
