@@ -228,7 +228,11 @@ Where the picture itself comes from is in `docs/technical/ingestion.md`, and how
 
 ## What is not a story
 
-Articles that grouped with nothing are still there, under the tail, as the ordinary articles they are. A digest that hid them would be a digest that decides for the reader what they are allowed to have missed.
+Articles that grouped with nothing are still there, in the wire, as the ordinary articles they are. A digest that hid them would be a digest that decides for the reader what they are allowed to have missed.
+
+**They were under a tail on the front page, and the tail is gone.** The argument above is why it existed and it is still the argument ; what changed is that the wire answers it. The section beside the digest shows everything, newest first, read or not, so the bottom of the front page was a shorter copy of the page next door, and a reader who scrolled past the stories arrived at the same list they would have found by moving one tab across. A front page carries what is happening. What merely arrived has a section of its own, and nothing is decided for anybody by saying so.
+
+The count went with it. `Digest.isEmpty` asked whether there were stories *or* loose articles, which was right while the tail was drawn and would now leave a page rendering blank while insisting it is not empty.
 
 ## Where it runs
 

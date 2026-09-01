@@ -86,7 +86,7 @@ Two articles are the same article when their **canonical key** matches. The key 
 
 Where a feed gives no address at all, the key is the headline, folded to its letters, **scoped to the newsroom and to the day**. That scope is not a detail : two papers covering one event write two articles, and collapsing those would destroy the one thing the digest is for, which is that several rooms saying the same thing is the story.
 
-The second copy **keeps its row** and points at the first. It belongs to a feed the reader follows, and unsubscribing from that feed must take its own article away rather than someone else's. It is shown nowhere : not in a list, not in a count of unread, not in the stories, not in the tail. `ON DELETE SET NULL` on the pointer means that when the first copy is purged by age, the second stops being a duplicate of anything and becomes the article.
+The second copy **keeps its row** and points at the first. It belongs to a feed the reader follows, and unsubscribing from that feed must take its own article away rather than someone else's. It is shown nowhere : not in a list, not in a count of unread, not in the stories. `ON DELETE SET NULL` on the pointer means that when the first copy is purged by age, the second stops being a duplicate of anything and becomes the article.
 
 A duplicate is found **wherever it is**, this feed included. A feed whose builder gives its articles a fresh identifier every time hands the same piece over again and again, and the identifier is exactly what stops the ordinary path from noticing ; the key notices. A third copy points at the original rather than at the second.
 
