@@ -1,5 +1,7 @@
 # Flong
 
+<img src="docs/images/icon.png" alt="The Flong icon" width="128" align="right">
+
 A feed reader for iOS, iPadOS and macOS, written in Swift with SwiftUI and SQLite.
 
 No server, no account, no hosting. Every device collects the feeds itself and keeps them in a local database ; what you choose to keep propagates through your own private CloudKit database.

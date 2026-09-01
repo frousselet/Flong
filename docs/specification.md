@@ -624,6 +624,12 @@ Two ways to answer it. **Typing is the road** : the town is completed by MapKit 
 
 A refusal leaves the reader in front of the search, which is the thing that works in every case, and leaves whatever they had chosen by hand alone. `docs/technical/place.md` records the two paths, what is sent to Apple while they choose, and what is not.
 
+### The icon
+
+The mark is an ornate **F**, drawn once, black on nothing. It is kept as an Icon Composer document at `Flong/AppIcon.icon` rather than as a folder of exported squares : the system lays the glyph on the plate, cuts the shape each platform asks for, lights it and casts its shadow, and derives the light, dark and tinted appearances from that one layer. So iPhone, iPad and Mac wear the same icon, and changing it is changing one file rather than reconciling a dozen.
+
+In the dark appearance the glyph is filled white and in the tinted one it is filled with the accent, rather than either being redrawn : a mark drawn twice is two marks, and the second one is the one that goes stale. The source artwork is a transparent 1024 square carrying nothing but the letter, since every background the icon is ever seen on is the system's to draw.
+
 ---
 
 ## 17. Accessibility and internationalization
