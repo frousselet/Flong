@@ -176,6 +176,7 @@ struct ArticleScreen: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var scheme
 
     @State private var isNamingCollection = false
     @State private var collectionName = ""
@@ -289,6 +290,18 @@ struct ArticleScreen: View {
             // nothing to run under it and its words start where they always
             // did, below the bar.
             .ignoresSafeArea(edges: hasHeadPicture ? [.top, .bottom] : .bottom)
+            // **And the theme's colour stops at the edge of that picture.**
+            // Glass decides what to draw from what is behind it, which is the
+            // whole reason these controls may float over a photograph nobody
+            // chose. A tint is an instruction and it overrides that : the
+            // cross over a dark red photograph came out warm brown on dark
+            // red, which is a way out the reader cannot find.
+            //
+            // So the accent reaches this bar only where the bar has the
+            // application's own paper behind it. Where there is a lead, the
+            // controls are the system's, exactly as the note above says they
+            // are, and the theme says nothing about them.
+            .tint(hasHeadPicture ? nil : theme.accent(in: scheme))
             // **No bar behind them, and no title in it.** The controls are
             // already on glass of the system's own, which is what keeps them
             // legible over a photograph ; a band of paper behind them would be

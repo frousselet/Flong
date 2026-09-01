@@ -63,6 +63,14 @@ The paper itself is laid in three places, and each is a place the system would o
 
 The ink is set once, as the foreground style, and everything follows from it : a view asking for `.secondary` is asking for less of whatever the ink is, so the whole application follows without a screen having heard of a palette.
 
+### A tint stops at the edge of a photograph
+
+Glass decides what to draw from what is behind it. That adaptation is the whole reason the controls on an article may float over a picture nobody chose, and it is the first thing a theme breaks : a tint is an instruction, an instruction overrides the adaptation, and the cross over a dark red photograph came out warm brown on dark red, which is a way out the reader cannot find.
+
+So the accent reaches the article's bar only where the bar has the application's own paper behind it. Where the page has a lead running under the controls, the tint is handed back with `tint(nil)`, and the glyphs go back to flipping between dark and light with the picture, exactly as they do under `Défaut`. `Theme.accent(in:)` answers `nil` for that case as it does for the standard theme, which is the same answer for the same reason : the system is better placed to decide than the theme is.
+
+The rule generalizes and is worth stating as one : **the theme paints what the application drew, and hands back anything drawn over something it did not choose.** A photograph belongs to a publisher, its colours are unknown until it has been fetched, and nothing decided months earlier in a palette can be right over all of them.
+
 ### What a theme does not reach
 
 **The navigation layer stays the system's**, which is the same rule as the one above about Liquid Glass. A section's large title and the tab bar's labels are drawn by the system and take the system's colour ; neither `foregroundStyle` nor a styled `Text` passed to `navigationTitle` reaches them, and the only thing that would is a global appearance proxy, which is mutable state shared with every bar in the process, does not answer to a theme changed while the application is running, and has no macOS counterpart. So the dateline over the front page is the system's black on `Papier`'s cream, deliberately, and the application's own page begins underneath it.
