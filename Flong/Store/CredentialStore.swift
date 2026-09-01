@@ -21,6 +21,21 @@ nonisolated protocol CredentialStoring: Sendable {
     func credential(for id: UUID) throws -> FeedCredential?
     func setCredential(_ credential: FeedCredential?, for id: UUID) throws
     func identifiers() throws -> Set<UUID>
+
+    /// Which parameters of one feed's addresses the reader said are theirs.
+    ///
+    /// Beside the credential rather than part of it : a feed authenticated by a
+    /// password can still put a subscriber's token on the links inside it, and
+    /// a feed with no credential at all can too.
+    func secretParameters(for id: UUID) throws -> SecretParameters?
+    func setSecretParameters(_ parameters: SecretParameters?, for id: UUID) throws
+    /// Every designation there is, for a pass with many feeds to consider.
+    ///
+    /// Filing a hundred articles into a shared collection touches as many feeds
+    /// as they came from, and asking the keychain once per article is asking it
+    /// a hundred times for an answer that did not change.
+    func everySecretParameter() throws -> [UUID: SecretParameters]
+
     /// Deletes every secret this application put in there, for a reset.
     func removeEverything() throws
 }
@@ -58,12 +73,72 @@ nonisolated struct KeychainCredentials: CredentialStoring {
 
     private let service: String
 
+    /// Where the designations of ``SecretParameters`` go.
+    ///
+    /// A service of its own rather than a second field on the credential : the
+    /// keychain keys an item by its service and its account, and the account is
+    /// already the feed. Two things about one feed are therefore two items, and
+    /// a feed may perfectly well have the second without the first.
+    private let parameterService: String
+
     init(service: String = KeychainCredentials.service) {
         self.service = service
+        self.parameterService = service + ".parameters"
     }
 
     func credential(for id: UUID) throws -> FeedCredential? {
-        var query = baseQuery(for: id)
+        try read(FeedCredential.self, from: service, for: id)
+    }
+
+    func setCredential(_ credential: FeedCredential?, for id: UUID) throws {
+        try write(credential, to: service, for: id)
+    }
+
+    func secretParameters(for id: UUID) throws -> SecretParameters? {
+        try read(SecretParameters.self, from: parameterService, for: id)
+    }
+
+    func setSecretParameters(_ parameters: SecretParameters?, for id: UUID) throws {
+        // A designation of nothing is no designation, so it is deleted rather
+        // than stored as an empty set nobody would ever read as absent.
+        try write((parameters?.isEmpty ?? true) ? nil : parameters, to: parameterService, for: id)
+    }
+
+    func everySecretParameter() throws -> [UUID: SecretParameters] {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: parameterService,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
+            kSecReturnAttributes as String: true,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+        ]
+
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+
+        switch status {
+        case errSecSuccess:
+            let items = result as? [[String: Any]] ?? []
+            return items.reduce(into: [:]) { found, item in
+                guard let account = item[kSecAttrAccount as String] as? String,
+                    let id = UUID(uuidString: account),
+                    let data = item[kSecValueData as String] as? Data,
+                    let parameters = try? JSONDecoder().decode(SecretParameters.self, from: data)
+                else { return }
+                found[id] = parameters
+            }
+        case errSecItemNotFound:
+            return [:]
+        default:
+            throw CredentialError.keychain(status)
+        }
+    }
+
+    // MARK: - The keychain itself
+
+    private func read<Value: Decodable>(_ type: Value.Type, from service: String, for id: UUID) throws -> Value? {
+        var query = baseQuery(for: id, in: service)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
 
@@ -73,10 +148,10 @@ nonisolated struct KeychainCredentials: CredentialStoring {
         switch status {
         case errSecSuccess:
             guard let data = result as? Data else { throw CredentialError.unreadable }
-            guard let credential = try? JSONDecoder().decode(FeedCredential.self, from: data) else {
+            guard let value = try? JSONDecoder().decode(Value.self, from: data) else {
                 throw CredentialError.unreadable
             }
-            return credential
+            return value
         case errSecItemNotFound:
             return nil
         default:
@@ -84,23 +159,23 @@ nonisolated struct KeychainCredentials: CredentialStoring {
         }
     }
 
-    func setCredential(_ credential: FeedCredential?, for id: UUID) throws {
-        guard let credential else {
-            let status = SecItemDelete(baseQuery(for: id) as CFDictionary)
+    private func write(_ value: (some Encodable)?, to service: String, for id: UUID) throws {
+        guard let value else {
+            let status = SecItemDelete(baseQuery(for: id, in: service) as CFDictionary)
             guard status == errSecSuccess || status == errSecItemNotFound else {
                 throw CredentialError.keychain(status)
             }
             return
         }
 
-        let data = try JSONEncoder().encode(credential)
+        let data = try JSONEncoder().encode(value)
         let update = [kSecValueData as String: data]
 
-        let updated = SecItemUpdate(baseQuery(for: id) as CFDictionary, update as CFDictionary)
+        let updated = SecItemUpdate(baseQuery(for: id, in: service) as CFDictionary, update as CFDictionary)
         if updated == errSecSuccess { return }
         guard updated == errSecItemNotFound else { throw CredentialError.keychain(updated) }
 
-        var item = baseQuery(for: id)
+        var item = baseQuery(for: id, in: service)
         item[kSecValueData as String] = data
         // The class that lets a background refresh read it : see the note above.
         item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
@@ -142,20 +217,27 @@ nonisolated struct KeychainCredentials: CredentialStoring {
     /// By service rather than feed by feed, so a secret whose subscription is
     /// already gone goes with the rest : a reset that left an orphan behind
     /// would leave the one thing section 20 is most careful about.
+    ///
+    /// **Both services**, since the designations are secrets of a kind too : a
+    /// list of exactly which parameters carry a subscription is worth having if
+    /// you are looking for one, and a reset that emptied everything else and
+    /// left it behind would have missed the point.
     func removeEverything() throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
-        ]
+        for service in [service, parameterService] {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: service,
+                kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
+            ]
 
-        let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw CredentialError.keychain(status)
+            let status = SecItemDelete(query as CFDictionary)
+            guard status == errSecSuccess || status == errSecItemNotFound else {
+                throw CredentialError.keychain(status)
+            }
         }
     }
 
-    private func baseQuery(for id: UUID) -> [String: Any] {
+    private func baseQuery(for id: UUID, in service: String) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -171,6 +253,7 @@ nonisolated struct KeychainCredentials: CredentialStoring {
 nonisolated final class MemoryCredentials: CredentialStoring, @unchecked Sendable {
     private let lock = NSLock()
     private var credentials: [UUID: FeedCredential] = [:]
+    private var parameters: [UUID: SecretParameters] = [:]
 
     init() {}
 
@@ -186,7 +269,22 @@ nonisolated final class MemoryCredentials: CredentialStoring, @unchecked Sendabl
         lock.withLock { Set(credentials.keys) }
     }
 
+    func secretParameters(for id: UUID) throws -> SecretParameters? {
+        lock.withLock { parameters[id] }
+    }
+
+    func setSecretParameters(_ parameters: SecretParameters?, for id: UUID) throws {
+        lock.withLock { self.parameters[id] = (parameters?.isEmpty ?? true) ? nil : parameters }
+    }
+
+    func everySecretParameter() throws -> [UUID: SecretParameters] {
+        lock.withLock { parameters }
+    }
+
     func removeEverything() throws {
-        lock.withLock { credentials.removeAll() }
+        lock.withLock {
+            credentials.removeAll()
+            parameters.removeAll()
+        }
     }
 }
