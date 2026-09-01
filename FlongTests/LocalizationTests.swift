@@ -136,7 +136,7 @@ struct LocalizationTests {
         // The line under each name, which is what says what the colours do. A
         // key that drifted would leave the English standing under a French
         // name, which is the one place a reader is comparing three lines.
-        #expect(inFrench(Theme.standard.explanation).hasPrefix("Tout en linéale"))
+        #expect(inFrench(Theme.standard.explanation).hasPrefix("Titres à empattements, dans"))
         #expect(inFrench(Theme.paper.explanation).hasPrefix("Titres à empattements"))
         #expect(inFrench(Theme.solarized.explanation).hasPrefix("Titres en chasse fixe"))
     }

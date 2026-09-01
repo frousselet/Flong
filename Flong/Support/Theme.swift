@@ -84,8 +84,8 @@ nonisolated struct Palette: Hashable, Sendable {
 /// do not, and each says it in the two halves a theme has : what it is set in,
 /// and what it is printed on.
 ///
-/// - ``standard`` is the system's own : its colours, its contrast, its
-///   accent, set throughout in the face the system uses for everything else.
+/// - ``standard`` is the system's own : its colours, its contrast, its accent,
+///   and nothing said about any of them.
 /// - ``paper`` is the one that looks like something that was printed. Serif
 ///   headlines on warm paper, and every colour in it pulled back from the
 ///   contrast a screen defaults to.
@@ -93,18 +93,16 @@ nonisolated struct Palette: Hashable, Sendable {
 ///   reading text for hours and is the reason anybody has heard of it, with
 ///   headlines set in the monospace face that palette grew up in.
 ///
-/// **The face is the loud half.** A reader can name the colours of a theme
-/// after a while ; they can tell the face apart in the first second, and it is
-/// what says whether this is a place where things are read or a place where
-/// things are managed. So each theme states its own answer for headlines, and
-/// no screen sets a face of its own.
-///
 /// **A theme speaks in the headline and gets out of the way underneath it.**
 /// The standfirst, the body of an article and everything the application says
 /// about one are sans in all three : a newspaper sets its headline in the
 /// display face it paid for and its columns in whatever reads best down a
 /// column, and it has never set both in the same. What is left to a theme is
 /// the one line that is glanced at, which is the line a face is for.
+///
+/// **And two of the three say the same thing there.** ``standard`` and
+/// ``paper`` are set in the same faces and are told apart by their colours ;
+/// only ``solarized`` changes the headline as well. See ``headline(_:)``.
 nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
     case standard
     case paper
@@ -128,7 +126,7 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
     /// two halves in the order they will be noticed : the face, then the paper.
     var explanation: LocalizedStringResource {
         switch self {
-        case .standard: "Sans serif throughout, in the colours of the system."
+        case .standard: "Serif headlines, in the colours of the system."
         case .paper: "Serif headlines on warm paper, with the contrast pulled back."
         case .solarized: "Headlines in monospace, on the Solarized palette."
         }
@@ -137,10 +135,16 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
     // MARK: - The faces
 
     /// Headlines, and the one decision a reader notices first.
+    ///
+    /// **Two faces for three themes.** ``standard`` and ``paper`` are set the
+    /// same and differ in their colours alone ; ``solarized`` is the one that
+    /// changes the face as well. That is the right shape rather than a
+    /// shortfall : serif headlines are what this application was set in before
+    /// there was a choice, for the reason the whole page is set the way it is,
+    /// and a reader who asks for warm paper is asking about the paper.
     func headline(_ style: Font.TextStyle) -> Font {
         switch self {
-        case .standard: .system(style, design: .default, weight: .semibold)
-        case .paper: .system(style, design: .serif, weight: .semibold)
+        case .standard, .paper: .system(style, design: .serif, weight: .semibold)
         case .solarized: .system(style, design: .monospaced, weight: .semibold)
         }
     }
@@ -358,8 +362,7 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
     /// The face a rendered article's headline is set in.
     var pageHeadline: String {
         switch self {
-        case .standard: Self.sansStack
-        case .paper: Self.serifStack
+        case .standard, .paper: Self.serifStack
         case .solarized: Self.monoStack
         }
     }

@@ -287,8 +287,8 @@ A secret URL is treated as a secret in its own right : masked in the interface, 
 
 | Theme | Faces | Colours |
 | ----- | ----- | ------- |
-| `Défaut` | Sans serif throughout | The system's own, which it states none of |
-| `Papier` | Serif headlines over a sans body | Warm paper, with the contrast pulled back |
+| `Défaut` | Serif headlines over a sans body | The system's own, which it states none of |
+| `Papier` | The same faces | Warm paper, with the contrast pulled back |
 | `Solarized` | Monospace headlines, sans body | Ethan Schoonover's palette |
 
 Light and dark stay the system's answer rather than becoming themes of their own, so each of the three states both and follows the device. Sepia is `Papier` under another name. The choice is carried between the reader's devices by the iCloud key-value store, like the body an article opens on, and never by a CloudKit record.

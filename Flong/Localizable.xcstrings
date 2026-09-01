@@ -1866,16 +1866,6 @@
         }
       }
     },
-    "Sans serif throughout, in the colours of the system." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tout en linéale, dans les couleurs du système."
-          }
-        }
-      }
-    },
     "Science" : {
       "localizations" : {
         "fr" : {
@@ -1952,6 +1942,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Titres à empattements sur papier chaud, contraste adouci."
+          }
+        }
+      }
+    },
+    "Serif headlines, in the colours of the system." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Titres à empattements, dans les couleurs du système."
           }
         }
       }

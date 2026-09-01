@@ -31,11 +31,13 @@ The headline face used to be serif and nothing else, which was a decision about 
 
 | Theme | Faces | Paper |
 | ----- | ----- | ----- |
-| `Défaut` | Sans throughout | The system's own |
-| `Papier` | Serif headlines over a sans body | Warm cream, warm near-black at night, every colour in it warm and pulled back from the contrast a screen defaults to |
+| `Défaut` | Serif headlines over a sans body | The system's own |
+| `Papier` | The same faces | Warm cream, warm near-black at night, every colour in it warm and pulled back from the contrast a screen defaults to |
 | `Solarized` | Monospace headlines over a sans body | base3 and base03, base01 and base1 for the ink, violet for a control |
 
-**Three, and three is the number.** Past three they stop being opinions. Each says something the other two do not, and each says it in the two halves a theme has : what it is set in, and what it is printed on.
+**Three, and three is the number.** Past three they stop being opinions.
+
+**Two faces for the three of them.** `Défaut` and `Papier` are set the same and are told apart by their colours alone ; only `Solarized` changes the headline face as well. That is the right shape rather than a shortfall. Serif headlines are what this application was set in before there was a choice, for the same reason the whole page is set the way it is, and a reader who asks for warm paper is asking about the paper. A theme obliged to change the face in order to justify being a theme would be changing it for that reason and no other.
 
 **The face is the loud half.** A reader can name a theme's colours after a while ; they tell the face apart in the first second, and it is what says whether this is a place where things are read or a place where things are managed. So the panel sets each theme's name in that theme's own headline face : a list of three words in one face asks the reader to remember what `Solarized` looked like, and a specimen asks them to remember nothing. The line under each name says what the colours do, which is the half a row cannot show.
 
@@ -45,7 +47,7 @@ The instinct is to cool the hue, and it is wrong : a blue accent was tried and i
 
 At night it goes the other way, since ink on a dark ground is the light thing : the same warmth lifted to `#B98D70`, and left a little more of its colour than the light one keeps, since a desaturated tone on a dark ground reads as dust. Kept well clear of the cream the page is set in, so that a control is still a control and not a slightly different word. The live dot stays brick red in both, being the one thing in the application that is meant to be the loudest.
 
-**A theme speaks in the headline and gets out of the way underneath it.** The standfirst, the body of an article, and everything the application says about one are sans in all three. A newspaper sets its headline in the display face it paid for and its columns in whatever reads best down a column, and it has never set both in the same : what is left to a theme is the one line that is glanced at, which is the line a face is for. `Papier` set its standfirsts and its article bodies in serif to begin with, and a page of prose in a display face is a page that is looked at rather than read.
+**A theme speaks in the headline and gets out of the way underneath it.** The standfirst, the body of an article, and everything the application says about one are sans in all three. A newspaper sets its headline in the display face it paid for and its columns in whatever reads best down a column, and it has never set both in the same : what is left to a theme is the one line that is glanced at, which is the line a face is for. `Papier` set its standfirsts and its article bodies in serif to begin with, and a page of prose in a display face is a page that is looked at rather than read. `Défaut` went the other way and set even its headlines in sans, which threw away the distinction rather than misplacing it.
 
 The metadata is part of that, and doubly so : it is the application's own voice, and a theme that set it in the headline's face would have thrown away the one distinction the typography exists to make. A monospace caption under every story would also be the loudest quiet thing on the page.
 
