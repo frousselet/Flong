@@ -531,6 +531,7 @@ struct StoryRow: View {
             VStack(alignment: .leading, spacing: 7) {
                 masthead(headline: .title)
                 whatHappened(standfirst: .body)
+                facts
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -556,6 +557,16 @@ struct StoryRow: View {
                     RemoteImage(url: story.imageURL, credit: story.imageCredit, width: Self.thumbnailWidth)
                 }
             }
+
+            // **Under the picture and not beside it.** The facts end in the
+            // moment the story was last added to, which is pushed to the far
+            // end of the line ; beside a thumbnail that end is the thumbnail's
+            // edge, and without one it is the measure. So the times marched
+            // down the page in two columns, alternating with whichever stories
+            // happened to carry a picture, and a column that moves is a column
+            // a reader stops reading. Across the measure there is one edge for
+            // every row, the lead included.
+            facts
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -598,24 +609,28 @@ struct StoryRow: View {
         Text(verbatim: story.topics.joined(separator: " · "))
     }
 
-    /// What happened and who is saying it, which is what a picture sits beside.
+    /// What happened, which is what a picture sits beside.
     ///
     /// It is set larger on the lead, for the reason the headline above it is :
     /// see ``lead``.
+    ///
+    /// The facts used to be under it, inside this column. They are under the
+    /// whole row now, for the reason ``standard`` gives.
+    @ViewBuilder
     private func whatHappened(standfirst: Font.TextStyle = .subheadline) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            if let summary = story.summary, !summary.isEmpty {
-                StorySummary(
-                    summary: summary,
-                    isGenerated: story.isGenerated,
-                    style: standfirst,
-                    lines: 3
-                )
-            }
-
-            facts
+        if let summary = story.summary, !summary.isEmpty {
+            StorySummary(
+                summary: summary,
+                isGenerated: story.isGenerated,
+                style: standfirst,
+                lines: 3
+            )
+        } else {
+            // A story the model said nothing about still has its picture at
+            // the end of the line rather than at the start of it : an empty
+            // column of the full width is what keeps it there.
+            Color.clear.frame(maxWidth: .infinity, maxHeight: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Who is saying it, by their marks rather than by a count of them.
@@ -681,8 +696,7 @@ struct StoryRow: View {
             // What a model wrote is said in front of the line it wrote, by
             // ``StorySummary``, and not at the far end of the facts : the mark
             // used to be a screen's width from the sentence it was about.
-            Text(story.lastAt, format: .relative(presentation: .numeric))
-                .lineLimit(1)
+            StoryMoment(date: story.lastAt)
         }
     }
 }

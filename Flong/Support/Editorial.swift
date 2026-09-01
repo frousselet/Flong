@@ -125,6 +125,36 @@ struct Sparkline: View {
     }
 }
 
+/// When a story was last added to, which is the only time it has.
+///
+/// **A glyph rather than the words.** The line under a story is the one place
+/// on the front page where everything is abbreviated already : the rooms are
+/// marks rather than names and the arrivals are a sparkline rather than a
+/// count, and `mis à jour il y a 21 minutes` in the middle of that is a
+/// sentence in a row of shorthand. The mark is the one an article's own page
+/// wears for a revision, `clock` turned back on itself, so a reader who has
+/// opened one article knows what it means here : see `ArticleDocument.Moment`.
+///
+/// **And it stays relative, where an article's moment became absolute.** What
+/// a front page says about a story is how fresh it is, and `il y a 3 minutes`
+/// is exactly that ; an article is a thing with a date, and the date is what a
+/// reader wants of it. See ``ArticleMoment``.
+struct StoryMoment: View {
+    let date: Date
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: "clock.arrow.circlepath")
+            Text(date, format: .relative(presentation: .numeric))
+        }
+        .lineLimit(1)
+        // A shape says nothing to a reader who is not looking at it, and a
+        // time on its own says nothing about what happened then.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Updated \(date, format: .relative(presentation: .named))"))
+    }
+}
+
 /// When an article happened, said as precisely as what is known allows.
 ///
 /// **Three different things wear the same shape, and saying so is the point.**
@@ -148,6 +178,21 @@ struct Sparkline: View {
 /// The update's own time is dropped before the fact of it is, since a row has
 /// one line and knowing that a piece was revised matters more than knowing to
 /// the minute when. The article's own page has room for both.
+///
+/// **The moment is written out and no longer counted back from now.** It read
+/// `il y a 2 heures`, which is one thing a reader wants to know and a poor way
+/// to be told it : a list of a morning's articles came out as twenty
+/// phrasings of the same hour, none of them comparable at a glance, all of
+/// them going stale while the page sat open. Two articles an hour apart are
+/// `9:05` and `10:12`, and the reader does the subtraction they were going to
+/// do anyway. A story is the other case and keeps its relative time : what a
+/// front page says about a story is how fresh it is, and `il y a 3 minutes` is
+/// exactly that.
+///
+/// The day and the month with it, and the year only where it is not this one :
+/// a stamp reading `11:15` is unreadable in a list that reaches back three
+/// days, and one carrying `2026` on every line of today's news is a column of
+/// noise.
 struct ArticleMoment: View {
     let article: ArticleSummary
 
@@ -168,7 +213,7 @@ struct ArticleMoment: View {
             if let updated = article.updatedAt {
                 Text(verbatim: "·")
                 if sayingWhen {
-                    Text("updated \(updated, format: .relative(presentation: .numeric))")
+                    Text("updated on \(updated, format: Self.stamp(updated))")
                 } else {
                     Text("updated")
                 }
@@ -179,19 +224,39 @@ struct ArticleMoment: View {
     @ViewBuilder
     private var published: some View {
         if article.isDated {
-            Text(article.date, format: .relative(presentation: .numeric))
+            Text(article.date, format: Self.stamp(article.date))
         } else {
-            Text("Received \(article.date, format: .relative(presentation: .numeric))")
+            Text("Received on \(article.date, format: Self.stamp(article.date))")
         }
     }
 
     private var spoken: Text {
         let when =
             article.isDated
-            ? Text("Published \(article.date, format: .relative(presentation: .named))")
-            : Text("Received \(article.date, format: .relative(presentation: .named))")
+            ? Text("Published on \(article.date, format: Self.spelled)")
+            : Text("Received on \(article.date, format: Self.spelled)")
 
         guard let updated = article.updatedAt else { return when }
-        return when + Text(verbatim: ". ") + Text("updated \(updated, format: .relative(presentation: .named))")
+        return when + Text(verbatim: ". ") + Text("updated on \(updated, format: Self.spelled)")
     }
+
+    /// How a moment is written in a row : the day, the month and the hour, with
+    /// the year only where it is not this one.
+    ///
+    /// A style built for the moment it is about rather than one constant, since
+    /// what a row shows depends on which year the article is from, and a stamp
+    /// that carried `2026` on every line of today's news would be a column of
+    /// noise.
+    static func stamp(_ date: Date, now: Date = .now) -> Date.FormatStyle {
+        let style = Date.FormatStyle.dateTime.day().month(.abbreviated).hour().minute()
+        return Calendar.current.isDate(date, equalTo: now, toGranularity: .year) ? style : style.year()
+    }
+
+    /// The same moment for anyone listening rather than looking, spelled out.
+    ///
+    /// A row is glanced at and abbreviates ; a sentence read aloud has no such
+    /// pressure, and `sam. 1 sept.` is a worse thing to hear than the day said
+    /// in full.
+    static let spelled = Date.FormatStyle.dateTime
+        .weekday(.wide).day().month(.wide).year().hour().minute()
 }

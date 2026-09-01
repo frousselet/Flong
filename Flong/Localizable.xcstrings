@@ -1877,12 +1877,12 @@
         }
       }
     },
-    "Published %@" : {
+    "Published on %@" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Publié %@"
+            "value" : "Publié le %@"
           }
         }
       }
@@ -1897,12 +1897,12 @@
         }
       }
     },
-    "Received %@" : {
+    "Received on %@" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reçu %@"
+            "value" : "Reçu le %@"
           }
         }
       }
@@ -2702,6 +2702,16 @@
         }
       }
     },
+    "Updated %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mis à jour %@"
+          }
+        }
+      }
+    },
     "Untitled" : {
       "localizations" : {
         "fr" : {
@@ -2722,12 +2732,12 @@
         }
       }
     },
-    "updated %@" : {
+    "updated on %@" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "modifié %@"
+            "value" : "modifié le %@"
           }
         }
       }

@@ -138,15 +138,37 @@ struct LocalizationTests {
     @Test("What is known about an article's moment reaches its French")
     func articleMoments() {
         let moment = Date(timeIntervalSince1970: 1_787_646_600)
-        let relative = moment.formatted(.relative(presentation: .numeric))
+        let written = moment.formatted(ArticleMoment.stamp(moment, now: moment))
 
         // Three different things wear the same shape, and the word is what
         // tells them apart : a publisher's own date, a publisher's own change
         // to it, and the moment an undated article reached this device.
-        #expect(String(localized: "Received \(relative)", locale: french).hasPrefix("Reçu"))
-        #expect(String(localized: "Published \(relative)", locale: french).hasPrefix("Publié"))
-        #expect(String(localized: "updated \(relative)", locale: french).hasPrefix("modifié"))
+        //
+        // **The moment is written out and no longer counted back from now**,
+        // and French wants the article the relative form did not : `Reçu le 1
+        // sept.`, where `Reçu il y a deux heures` took none. A key that kept
+        // the old shape would read `Reçu 1 sept.`, which is not French.
+        #expect(String(localized: "Received on \(written)", locale: french).hasPrefix("Reçu le"))
+        #expect(String(localized: "Published on \(written)", locale: french).hasPrefix("Publié le"))
+        #expect(String(localized: "updated on \(written)", locale: french).hasPrefix("modifié le"))
         #expect(String(localized: "updated", locale: french) == "modifié")
+
+        // What a story's moment says to anyone listening, which is the one
+        // place its glyph can be read out.
+        let ago = moment.formatted(.relative(presentation: .named))
+        #expect(String(localized: "Updated \(ago)", locale: french).hasPrefix("Mis à jour"))
+    }
+
+    @Test("An article's moment carries the year only where it is not this one")
+    func articleYears() {
+        let now = Date(timeIntervalSince1970: 1_787_646_600)
+        let lastYear = now.addingTimeInterval(-400 * 24 * 60 * 60)
+
+        // A stamp carrying `2026` on every line of today's news is a column of
+        // noise ; one that drops the year on an article from another year is a
+        // date that lies about which day it was.
+        #expect(!now.formatted(ArticleMoment.stamp(now, now: now)).contains("2026"))
+        #expect(lastYear.formatted(ArticleMoment.stamp(lastYear, now: now)).contains("2025"))
     }
 
     @Test("Every theme is named and explained in French")

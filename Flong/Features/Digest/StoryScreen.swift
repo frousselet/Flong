@@ -178,7 +178,7 @@ struct StoryScreen: View {
                 .frame(width: 44, height: 10)
 
             Spacer(minLength: 4)
-            Text(story.lastAt, format: .relative(presentation: .numeric))
+            StoryMoment(date: story.lastAt)
         }
         .font(theme.metadata)
         .foregroundStyle(.tertiary)
