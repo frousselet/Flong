@@ -107,9 +107,7 @@ struct CollectionsScreen: View {
                     Label("New collection", systemImage: "plus")
                 }
             }
-            ToolbarItem(placement: .primaryAction) {
-                ReaderButton(model: model)
-            }
+            ReaderCorner(model: model, work: model.currentWork)
         }
         .overlay {
             if model.collections.isEmpty {

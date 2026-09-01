@@ -154,10 +154,10 @@ struct ArticleFeedScreen: View {
                     NotificationsButton(model: model)
                 }
             }
-            ToolbarItem(placement: .primaryAction) {
-                if let menu {
-                    ReaderButton(model: model)
-                } else {
+            if menu != nil {
+                ReaderCorner(model: model, work: model.currentWork)
+            } else {
+                ToolbarItem(placement: .primaryAction) {
                     Button {
                         Task { await model.markAllRead() }
                     } label: {

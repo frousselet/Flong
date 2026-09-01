@@ -47,6 +47,48 @@ struct ReaderButton: View {
     }
 }
 
+/// The reader's own corner, and what the machinery is doing beside it.
+///
+/// Two items rather than one, so that the ring is there only while there is
+/// something to say. A place kept for it permanently is a hole in the bar of
+/// every section for a measure that runs a few seconds an hour.
+///
+/// **The pass is read by the page and handed down.** The ring moves with every
+/// batch that lands, and a toolbar that went and asked the model for it would
+/// be a toolbar nothing tells when the answer changes : the section reads it in
+/// its own body, where the observation is, and passes it in.
+///
+/// One corner for the whole application. The reader's button is in the same
+/// place in every section, so the one measure of what Flong is doing is in the
+/// same place too, rather than on the front page alone as the band it replaces
+/// was.
+struct ReaderCorner: ToolbarContent {
+    let model: AppModel
+    /// The pass as it stands, or nothing at all when nothing is running.
+    let work: WorkPlan?
+
+    var body: some ToolbarContent {
+        if let work {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    // Nothing. It reports and does not act : the pull is the
+                    // gesture, and a control that did both would be one the
+                    // reader cannot aim.
+                } label: {
+                    WorkRing(work: work)
+                }
+                .disabled(true)
+                // What the ring cannot say in a shape, said in words to a
+                // pointer resting on it.
+                .help(Text(work.phase.title))
+            }
+        }
+        ToolbarItem(placement: .primaryAction) {
+            ReaderButton(model: model)
+        }
+    }
+}
+
 /// The reader, as one small round thing.
 ///
 /// Three states, in the order a reader arrives at them : the picture they

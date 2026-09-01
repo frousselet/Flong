@@ -150,19 +150,6 @@ nonisolated enum CatchUp: Hashable, Sendable {
     /// to be spent.
     var sparingly: Bool { self == .background }
 
-    /// Whether the page is replaced before the catch-up returns.
-    ///
-    /// **Not under a pull, and not because the pull wants the page less.**
-    /// SwiftUI holds the refresh control out until the gesture's work returns,
-    /// so replacing the page's content as the last thing before returning has
-    /// the scroll view begin its retraction against content it has never laid
-    /// out. It was left to the watcher that follows the store, which reads back
-    /// only when a change reaches it : a gesture that asked for the page and
-    /// got it only if something happened to be written is not the command in
-    /// the menu by another name. `DigestScreen` asks for the same read-back
-    /// itself, a beat after the control has gone.
-    var readsBackAtOnce: Bool { self != .pull }
-
     /// Whether this is a moment to run the on-device model.
     ///
     /// **Not in the twenty-five seconds of a background refresh.** The system
@@ -2469,9 +2456,16 @@ final class AppModel {
         // waiting to be grouped may have come from iCloud, from a shared
         // archive, or from a pass that ran while the window was away, and
         // grouping is a single query when there is nothing to group.
+        // **Every pass reads the page back, the pull included.** It was the one
+        // exception : SwiftUI held its refresh control out until the gesture's
+        // work returned, so replacing the content there had the scroll view
+        // retract against content it had never laid out, and the pull was left
+        // waiting on the watcher that follows the store, which reads back only
+        // when something happens to be written. The control lets go on the beat
+        // now, so there is nothing to lay out against and nothing to except.
         moveWork(to: .grouping)
         await digestService.buildStories()
-        if reason.readsBackAtOnce { await load() }
+        await load()
 
         // An article from a favourite source or a favourite writer is chosen
         // the moment it lands, without the reader touching it, so a pass that

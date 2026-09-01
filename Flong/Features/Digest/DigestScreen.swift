@@ -30,19 +30,6 @@ struct DigestScreen: View {
     /// Carries a pill's glass from one state to the next.
     @Namespace private var pills
 
-    /// Where the page is, so it can be put back after a pull.
-    @State private var position = ScrollPosition()
-    /// Whether the page is still near its top, for deciding whether putting it
-    /// back after a pull is a kindness or an interruption.
-    ///
-    /// **A flag and not a measurement.** It held the offset itself, which
-    /// changes every frame of every scroll, so the whole page was rebuilt
-    /// continuously while the reader's thumb was on it, and rebuilt hardest
-    /// during the one gesture that must not be disturbed.
-    @State private var isNearTop = true
-    /// Whether the gesture's work is still running.
-    @State private var isPulling = false
-
     var body: some View {
         ScrollView {
             // The gesture, from UIKit. It draws nothing and takes no room here ;
@@ -50,9 +37,7 @@ struct DigestScreen: View {
             // is inside and hand it a control. `PullToRefresh` sets out why
             // SwiftUI's own modifier is not what does this.
             PullToRefresh {
-                isPulling = true
                 await model.pullToRefresh()
-                isPulling = false
             }
 
             // A pinned section header rather than a bar in the safe area : the
@@ -63,12 +48,7 @@ struct DigestScreen: View {
                 Section {
                     stories
                 } header: {
-                    VStack(alignment: .leading, spacing: 0) {
-                        topics
-                        // It grows into its height and shrinks out of it again,
-                        // rather than keeping a place it does not need.
-                        ActivityLine(work: model.currentWork)
-                    }
+                    topics
                 }
             }
             .editorialColumn()
@@ -82,12 +62,6 @@ struct DigestScreen: View {
                 PageWash(url: model.digest.lead?.imageURL)
             }
         }
-        .scrollPosition($position)
-        .onScrollGeometryChange(for: Bool.self) { geometry in
-            geometry.contentOffset.y + geometry.contentInsets.top < Self.stillAtTheTop
-        } action: { _, near in
-            isNearTop = near
-        }
         .scrollEdgeEffectStyle(.soft, for: .top)
         // **The pull, on the front page and nowhere else.** The page does keep
         // itself up to date : it follows the store, so anything that arrives
@@ -98,8 +72,15 @@ struct DigestScreen: View {
         // a list of what has arrived, and what arrives reaches it on its own.
         //
         // It fetches every feed and groups what arrived, and it ends there. The
-        // model's work carries on behind it, and the page is read back once the
-        // control has retracted rather than under it.
+        // model's work carries on behind it.
+        //
+        // **The gesture takes and lets go.** The control used to be held out
+        // for the whole of the fetching, which is what dragged the page down,
+        // sometimes left it there, and made every question about this page a
+        // question about an inset. It reports the pull was heard and retracts
+        // on the beat now ; ``WorkRing``, up in the corner, is what says the
+        // work is running, and it says it on every page rather than on this one
+        // alone.
         //
         // A Mac has no pull and no command either, since the command came out
         // of the reader's menu : it keeps up through the clock, the full pass
@@ -110,6 +91,7 @@ struct DigestScreen: View {
         // unreliable, and on this one it never drew anything at all. A reader
         // pulling a page that does not flinch, while the same work runs
         // perfectly from the menu, is one of the two paths never being called.
+
         // The date is the title of the page, where a newspaper puts it. Not the
         // name of the section : the tab bar says that already, and a page that
         // repeats its own label has spent a line saying nothing. A dateline says
@@ -130,55 +112,7 @@ struct DigestScreen: View {
             ToolbarItem(placement: .sectionLeading) {
                 NotificationsButton(model: model)
             }
-            ToolbarItem(placement: .primaryAction) {
-                ReaderButton(model: model)
-            }
-        }
-        // **The page is put back where the pull started.**
-        //
-        // SwiftUI holds the refresh control out until the gesture's work
-        // returns, and the space it held is not always given back : the page
-        // stays pushed down by exactly its height, with the large title still
-        // open, until anything at all touches the screen and forces a layout.
-        // That fault is why the gesture was taken out of the application once
-        // already, and four attempts at its cause missed. None of them could be
-        // reproduced on a simulator either, where a synthesised drag never
-        // engages the control at all.
-        //
-        // So this does not try to diagnose it. It asks for the one outcome the
-        // reader wants, which is the page back at its top, and asking moves the
-        // scroll view whether or not it had reclaimed the inset on its own.
-        //
-        // A beat first, so it is not fighting the control on the way out.
-        //
-        // **And the page is read back here, which is the other half of it.**
-        // A catch-up the reader asked for reads the page back as the last thing
-        // it does, and the pull could not : SwiftUI holds the refresh control out until the gesture's
-        // work returns, so replacing the content just before returning has the
-        // scroll view begin its retraction against content it has never laid
-        // out. So the pull left it to the watcher that follows the store, which
-        // reads back only when a change reaches it, and a gesture that asked
-        // for the page and got it only if something happened to be written is
-        // not the same command as the one in the menu. It is asked for here
-        // instead, once the control is out of the way : the same read-back, a
-        // beat later.
-        //
-        // The scroll home is the part that waits on the reader still being near
-        // the top. A pull starts there, but a refresh takes seconds and they
-        // may have scrolled off to read something ; hauling them back would be
-        // the application taking the page away from them. The read-back is not
-        // conditional on that, since a page they scrolled into is a page that
-        // still has to be current.
-        .onChange(of: isPulling) { _, pulling in
-            guard !pulling else { return }
-
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(150))
-                await model.load()
-
-                guard isNearTop else { return }
-                withAnimation(.easeOut(duration: 0.2)) { position.scrollTo(edge: .top) }
-            }
+            ReaderCorner(model: model, work: model.currentWork)
         }
         // Not while something is being brought in. `Nothing has come in yet`
         // over a page that is at that moment fetching sixty feeds is untrue,
@@ -311,13 +245,6 @@ struct DigestScreen: View {
             }
         }
     }
-
-    /// How far down the page still counts as being at the top of it.
-    ///
-    /// About a story's worth. Inside that the reader has not gone anywhere and
-    /// is looking at a page pushed out of place ; past it they have left the
-    /// head of the page deliberately.
-    private static let stillAtTheTop: CGFloat = 240
 
     /// Today, spelled the way the reader's language spells it.
     ///
@@ -804,152 +731,5 @@ private struct PillShape: ViewModifier {
             )
             .glassEffectID(topic, in: namespace)
             .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
-    }
-}
-
-/// What the machinery is doing, said in one line over a rule that fills.
-///
-/// **The page said nothing about any of it.** A pass that fetched three hundred
-/// feeds, wrote sixty headlines and exchanged with iCloud was, to the reader,
-/// a page that changed under them for no stated reason, or worse, a page that
-/// had not changed yet and gave no sign that it was about to.
-///
-/// **One bar for the whole pass, and the words above it change.** Every stage
-/// used to carry its own count, so a single pass ran a bar from nothing to full
-/// five times over. A reader doing one thing and waiting for one answer does
-/// not read that as progress ; they read it as an application that keeps
-/// starting over. ``WorkPlan`` weighs the stages against each other so the bar
-/// crosses the lot once.
-///
-/// **It keeps its place whether or not there is anything to say.** A row that
-/// appears and disappears moves the whole page under the reader's thumb twice
-/// per pass. The band stays and its contents fade, which costs one line of
-/// quiet under the pills and takes the jolt out of every refresh.
-///
-/// It lives inside the pinned header rather than in the safe area, for the same
-/// reason the pills do : a bar in the safe area lays itself out under the large
-/// title and draws itself somewhere else entirely.
-private struct ActivityLine: View {
-    let work: WorkPlan?
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.theme) private var theme
-
-    /// How tall the band is while there is something in it.
-    ///
-    /// It follows the type size, since what sits in it is one line of type over
-    /// a rule inside a capsule. Nought the rest of the time : a place kept
-    /// permanently is a hand's width of nothing under the subjects on every
-    /// page, for a line that is there a few seconds an hour.
-    @ScaledMetric(relativeTo: .caption) private var open: CGFloat = 40
-
-    /// What the band is worth right now.
-    private var height: CGFloat { work == nil ? 0 : open }
-
-    var body: some View {
-        ZStack(alignment: .top) {
-            if let work {
-                content(work)
-                    // Glass of its own, like the pills above it, rather than a
-                    // slab of the page's own ground running the full width. The
-                    // header is pinned and the stories pass behind it, so
-                    // something has to come between the two ; a band of opaque
-                    // paper reads as a shelf bolted to the page, and this is a
-                    // control floating over it, which is the layer the material
-                    // is for.
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 7)
-                    .glassEffect(.regular, in: .capsule)
-                    // **It grows out of the top rather than materializing.**
-                    // A fade on its own put the capsule on screen at full size
-                    // in a band that was still opening, which reads as a thing
-                    // arriving from nowhere over a page that has not made room
-                    // for it yet. Anchored at the top, the capsule comes up out
-                    // of the edge the room is opening from, which is the same
-                    // motion the band is making.
-                    //
-                    // Fading as it goes as well, which is what lets the band be
-                    // measured without being clipped : see below.
-                    .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .top)))
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        // **It takes the room it needs and gives it back.** A place kept for it
-        // whether or not anything is happening is quiet under the subjects on
-        // every page ; a row that simply appears moves the whole page under the
-        // reader's thumb. So the band grows into its height and shrinks out of
-        // it, over a third of a second, which is a page making room rather than
-        // a page jumping. The height is what is animated rather than the row's
-        // presence, since a pinned header measuring a child that has just been
-        // inserted lands on the answer a frame late and that frame is the jolt.
-        //
-        // **And it is not clipped to that height.** Glass casts a soft shadow,
-        // and a rectangular clip cuts it off where it is still dark : what the
-        // reader saw was a grey oblong with hard edges sitting behind a
-        // capsule with round ones. Unclipped, the capsule spills a little
-        // during the third of a second it is growing or shrinking, which is
-        // covered by the fade happening over exactly the same third of a
-        // second, and it spills downwards into the rubric's own top rhythm
-        // rather than upwards into the subjects.
-        .frame(height: height, alignment: .top)
-        .animation(reduceMotion ? nil : .snappy(duration: 0.32), value: height)
-        // The same curve and the same third of a second for the capsule's own
-        // coming and going, so the room and the thing in it move together : two
-        // animations of different lengths on one event is a capsule that lands
-        // before the space exists or hangs about after it has gone.
-        .animation(reduceMotion ? nil : .snappy(duration: 0.32), value: work == nil)
-        .animation(.snappy(duration: 0.28), value: work?.phase)
-        // Nothing here answers to a finger : the pull underneath it is the
-        // gesture, and two in one place is one the reader cannot aim.
-        .allowsHitTesting(false)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(work.map { Text($0.phase.title) } ?? Text(""))
-        .accessibilityValue(value)
-        .accessibilityHidden(work == nil)
-        // So VoiceOver does not read every batch out as it lands.
-        .accessibilityAddTraits(.updatesFrequently)
-    }
-
-    private func content(_ work: WorkPlan) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // **The words and the rule, and no figures.** A count beside them
-            // is a second measure of the same thing, disagreeing with the first
-            // : the rule is the whole pass and a figure can only ever be the
-            // step, so `9 of 112` sat under a bar four fifths of the way along
-            // and the reader had to work out which of the two to believe. The
-            // bar says how far ; the words say what.
-            Text(work.phase.title)
-                .lineLimit(1)
-                .font(theme.metadata)
-                .foregroundStyle(.secondary)
-            bar(work)
-        }
-        // The capsule runs the measure of the column, like the row of pills
-        // above it, so the rule inside it has something to fill.
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// A rule that fills, which is the page's own idiom : the stories are
-    /// separated by rules, and this is one of them saying how far along the
-    /// pass is by how much of it is inked.
-    @ViewBuilder
-    private func bar(_ work: WorkPlan) -> some View {
-        if let fraction = work.fraction {
-            ProgressView(value: fraction)
-                .progressViewStyle(.linear)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: fraction)
-        } else if reduceMotion {
-            // A bar that runs for ever is motion for its own sake, and the line
-            // above has already said what is happening.
-            Capsule().fill(.tint.opacity(0.35)).frame(height: 3)
-        } else {
-            ProgressView().progressViewStyle(.linear)
-        }
-    }
-
-    private var value: Text {
-        guard let work else { return Text("") }
-        guard let fraction = work.fraction else { return Text("In progress") }
-        return Text(fraction.formatted(.percent.precision(.fractionLength(0))))
     }
 }
