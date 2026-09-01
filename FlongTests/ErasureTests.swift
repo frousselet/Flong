@@ -87,6 +87,7 @@ struct ErasureTests {
 
         store.firstName = "Ada"
         store.lastName = "Lovelace"
+        store.place = Place(city: "Paris", country: "France", countryCode: "FR")
         store.articleBody = .page
         store.theme = .solarized
         store.wantsNewStoryNotices = true
@@ -98,6 +99,7 @@ struct ErasureTests {
         #expect(store.firstName.isEmpty)
         #expect(store.lastName.isEmpty)
         #expect(store.picture == nil)
+        #expect(store.place == nil)
         #expect(store.articleBody == .feed)
         #expect(store.theme == .standard)
         #expect(!store.wantsNewStoryNotices)
@@ -190,6 +192,7 @@ struct ErasedWindowTests {
 
         model.firstName = "Ada"
         model.lastName = "Lovelace"
+        model.setPlace(Place(city: "Paris", country: "France", countryCode: "FR"))
         await model.makeCollection(named: "Read later")
         await model.load()
         await model.loadSubscribedSites()
@@ -214,7 +217,9 @@ struct ErasedWindowTests {
         #expect(try sessions.hosts().isEmpty)
         #expect(model.name == nil)
         #expect(model.picture == nil)
+        #expect(model.place == nil)
         #expect(preferences.firstName.isEmpty)
+        #expect(preferences.place == nil)
 
         // Where they were, which is where a first launch puts them.
         #expect(model.selection == .all)

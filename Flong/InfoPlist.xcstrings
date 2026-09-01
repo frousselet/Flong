@@ -1,0 +1,35 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Flong"
+          }
+        }
+      }
+    },
+    "NSLocationWhenInUseUsageDescription" : {
+      "comment" : "Shown by the system when the reader presses \"Use my location\" in their own panel.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flong fills in the city and country of your profile from where you are. The town is kept, never the coordinate, and it goes nowhere but your own iCloud."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flong renseigne la ville et le pays de votre profil à partir de l'endroit où vous êtes. Seule la ville est conservée, jamais la coordonnée, et elle ne va nulle part ailleurs que dans votre iCloud."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.1"
+}

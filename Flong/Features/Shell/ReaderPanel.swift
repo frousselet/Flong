@@ -55,6 +55,7 @@ struct ReaderPanel: View {
 
     @State private var isNotAnImage = false
     @State private var isAddingSite = false
+    @State private var isChoosingPlace = false
     @State private var host = ""
     @State private var signingInTo: SigningIn?
     @State private var isAskingToDeleteEverything = false
@@ -73,6 +74,7 @@ struct ReaderPanel: View {
             Form {
                 face
                 name
+                whereabouts
                 appearance
                 sites
 
@@ -121,6 +123,9 @@ struct ReaderPanel: View {
             Text(
                 "Your subscriptions, every article, everything you kept and every site you are signed in to, on this device and in your iCloud. This cannot be undone. Another device that still has them will put its own copy back."
             )
+        }
+        .sheet(isPresented: $isChoosingPlace) {
+            PlacePicker(model: model)
         }
         .sheet(item: $signingInTo) { signing in
             SiteLoginView(host: signing.host) { cookies in
@@ -182,6 +187,60 @@ struct ReaderPanel: View {
             Text("Your name")
         } footer: {
             Text("Kept on your own devices, through your iCloud. Flong has no account and nowhere to send them.")
+        }
+    }
+
+    /// Where the reader reads from, which is a fact about them like their name.
+    ///
+    /// **A town and a country, and never a street or a coordinate.** It sits
+    /// under the reader's own face because it belongs to the person rather than
+    /// to any page, and it is as coarse as it is because the question is which
+    /// region somebody reads from. ``Place`` records why nothing finer is kept.
+    ///
+    /// **One row that opens the picker, rather than two fields.** A town typed
+    /// by hand is a spelling, and two readers who both live in Lyon would
+    /// spell it two ways ; what the picker gives back is a place MapKit
+    /// recognizes, with the country code that goes with it. The row shows what
+    /// was chosen, and taking it back is a line of its own so that it is never
+    /// done by pressing the same row twice.
+    private var whereabouts: some View {
+        Section {
+            Button {
+                isChoosingPlace = true
+            } label: {
+                HStack(spacing: 12) {
+                    Text("City and country")
+                    Spacer(minLength: 0)
+                    Group {
+                        if let place = model.place {
+                            // Verbatim : a place name is a proper noun, and the
+                            // catalogue is for what Flong says rather than for
+                            // what MapKit named a town.
+                            Text(verbatim: place.line)
+                        } else {
+                            Text("Not set")
+                        }
+                    }
+                    .foregroundStyle(.secondary)
+                    Image(systemName: "chevron.forward")
+                        .font(.footnote)
+                        .foregroundStyle(.tertiary)
+                }
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+
+            if model.place != nil {
+                Button(role: .destructive) {
+                    model.setPlace(nil)
+                } label: {
+                    Text("Remove where you are")
+                }
+            }
+        } header: {
+            Text("Where you are")
+        } footer: {
+            Text("Kept beside your name, in your own iCloud. Flong has nowhere to send it.")
         }
     }
 
