@@ -1,5 +1,5 @@
 //
-//  DigestWash.swift
+//  PageWash.swift
 //  Flong
 //
 //  Created by François Rousselet on 01/09/2026.
@@ -11,14 +11,20 @@
 
 import SwiftUI
 
-/// The light of the lead's picture, spilled over the top of the front page.
+/// The light of a picture, spilled over the top of the page it belongs to.
 ///
 /// A front page is one photograph and everything else set around it, and the
 /// picture gives the page its temperature before a word of it is read. A screen
 /// cannot print in colour on the paper, but it can let the picture light what
-/// is above it : the head of the page, the bar over it and the date in it take
-/// the colours of the story the page leads on, and the colour is spent by the
-/// time the picture that gave it comes into view.
+/// is above it : the head of the page, the bar over it and the title in it take
+/// the colours of the photograph the page is built around.
+///
+/// **Two pages ask for it, and they ask with different pictures.** The front
+/// page hands it the story it leads on, and the colour is spent by the time
+/// that photograph comes into view. A story's own page hands it its own
+/// picture, which is the very one the row that was tapped was carrying : the
+/// page opens in the colour the reader pressed, and the colour carries across
+/// the tap rather than starting again.
 ///
 /// **The picture's own bands, and not one average of it.** See ``Wash`` : a
 /// photograph averages its sky into its ground and comes out the colour of
@@ -35,8 +41,8 @@ import SwiftUI
 /// gentle enough to leave the largest type on the page legible over it, and it
 /// is still something between that type and the paper, which is the thing
 /// increased contrast is a request to stop doing.
-struct DigestWash: View {
-    /// The picture the page leads on. No picture, no colour, no wash.
+struct PageWash: View {
+    /// The picture the page is built around. No picture, no colour, no wash.
     let url: URL?
 
     @Environment(\.theme) private var theme
@@ -83,10 +89,13 @@ struct DigestWash: View {
 
     /// How far into the page the colour lasts.
     ///
-    /// About the subjects, the first heading and the top of the lead's picture.
-    /// It is gone by the time that picture arrives, which is the point : a wash
-    /// still going at the photograph would be a tinted photograph rather than a
-    /// lit page.
+    /// On the front page, about the subjects, the first heading and the top of
+    /// the lead's picture : it is gone by the time that picture arrives, which
+    /// is the point, a wash still going at the photograph being a tinted
+    /// photograph rather than a lit page. On a story's page the photograph is
+    /// at the top and the same distance carries the colour down beside it,
+    /// running out around its foot, which is the same idea from the other end :
+    /// the light comes off the picture and stops where the picture does.
     private static let fade: CGFloat = 380
 
     /// How much of the colour the paper takes at the top.

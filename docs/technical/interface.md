@@ -130,9 +130,11 @@ Beside a picture on a phone the facts line runs out of room, and a line that wra
 
 A picture occupies nothing until it has something to show, and nothing again if the address turns out to be dead : a grey rectangle where a photograph failed is worse than no photograph, and a page of them looks broken. It is decorative and hidden from VoiceOver, since feeds almost never carry alternative text and reading a headline out twice helps nobody.
 
-## The colour of the lead, at the top of the page
+## The colour of a picture, at the top of its page
 
-A front page is one photograph and everything else set around it, and the picture gives the page its temperature before a word of it is read. `DigestWash` is that, on a screen : the top of the digest, the bar over it and the dateline in it are washed in the colours of the story the page leads on, and the colour is spent by the time the picture that gave it comes into view. A wash still going at the photograph would be a tinted photograph rather than a lit page.
+A front page is one photograph and everything else set around it, and the picture gives the page its temperature before a word of it is read. `PageWash` is that, on a screen : the top of the digest, the bar over it and the dateline in it are washed in the colours of the story the page leads on, and the colour is spent by the time the picture that gave it comes into view. A wash still going at the photograph would be a tinted photograph rather than a lit page.
+
+**A story's own page asks for the same thing with its own picture**, which is the very one the row that was tapped was carrying : the page opens in the colour the reader pressed, and the colour carries across the tap rather than starting again in white. The photograph is at the top of that page rather than a screen down it, so the same distance carries the colour beside the picture and runs out around its foot. That is the same idea from the other end : the light comes off the picture and stops where the picture does.
 
 **Three bands and not one average.** A photograph averages its sky into its ground and comes out the colour of neither, which is why `ImageStore.average(of:)` is used for a favicon and would be useless here. The picture is resampled to a column of three pixels, top, middle and foot, and the page takes them in that order : the light in the picture at the top of the screen, what the picture is of where the page begins, and its foot fading into the paper.
 

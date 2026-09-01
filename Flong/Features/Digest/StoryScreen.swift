@@ -52,6 +52,12 @@ struct StoryScreen: View {
             .editorialColumn()
             .padding(.horizontal, 22)
             .padding(.bottom, 90)
+            // The same light as the front page, from this story's own picture,
+            // which is the one the row that was tapped was carrying : the page
+            // opens in the colour the reader pressed rather than in white.
+            .background(alignment: .top) {
+                PageWash(url: story?.imageURL)
+            }
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         .navigationTitle(Text("Story"))
