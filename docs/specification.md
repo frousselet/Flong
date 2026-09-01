@@ -34,11 +34,13 @@ The product rests on three commitments.
 
 ### Non-goals
 
-- Server, account, multi-user, social sharing.
+- Server, account, multi-user.
 - Web client, Android client.
 - Permanent freshness and notification on publication.
-- Receiving e-mail, full read-it-later of the Wallabag kind, collaborative annotation.
+- Receiving e-mail, full read-it-later of the Wallabag kind.
 - Remote access by an agent from another machine.
+
+**Amended : a collection may be shared.** This list ruled out social sharing and collaborative annotation, and both are now in scope for collections, through Apple's own sharing rather than through anything of ours. The rest of the line holds and is what makes it possible : there is still no server, no account of ours and no backend service, the data moves between iCloud accounts and none of it reaches us, and section 20 stays true because we still collect nothing. What travels is the excerpt the feed published and never the article. Section 7 says how, and `docs/technical/collaboration.md` says why.
 
 ---
 
@@ -217,6 +219,20 @@ The archives need the `com.apple.developer.ubiquity-container-identifiers` entit
 Private database storage counts against the user's iCloud quota, whose free tier is 5 GB. CloudKit returns `quotaExceeded`, which the application presents itself along with an offered purge.
 
 Rate limiting does not always come as `requestRateLimited` : `serviceUnavailable`, code 6, HTTP 503, is the frequent case in practice. Both are handled, honouring `CKErrorRetryAfterKey` and falling back to exponential backoff.
+
+### Sharing a collection
+
+A made collection may be shared with other iCloud users, who may file into it. Apple's own sharing carries it : a zone-wide `CKShare` on **one custom zone per shared collection**, never on the `Flong` zone, which holds everything and must never be handed over. The invitation goes through `ShareLink` and `CKShareTransferRepresentation` ; the participants are the system's to manage. A second `CKSyncEngine`, on the shared database, carries the collections the reader was invited to, and it sends as well as fetches.
+
+**What travels is the excerpt the feed published, and never the article.** The article is not the reader's to hand anybody, and what a publisher puts in a feed for syndication is the part they chose to make public. The excerpt is already plain text at three hundred characters, so no markup crosses between accounts and there is nothing for a renderer to interpret.
+
+**One list per participant**, chunked when it needs to be. Each person writes only their own and reads everybody else's, which is the shape the stream archives use and for the same reason : two people filing at once cannot collide, so there is no conflict to resolve. It follows that a participant takes back what they put in and nothing else. A shared collection therefore costs a handful of records rather than one per article.
+
+**An address is truncated of the parameters the reader designated as secret**, by the device doing the writing and against its own keychain, since nobody else can know which of them were theirs. Nothing is removed on a guess : a parameter is as likely to select the feed or a filter as to identify the subscriber, which is why a canonical address keeps its query string. A cookie session is never sent.
+
+**What arrives is not the reader's article.** It came from a feed they do not follow, it lives in a table of its own, and it is never counted unread, never purged, never indexed as theirs and never re-shared. Where they already hold the piece, their own copy is shown instead.
+
+`docs/technical/collaboration.md` carries the design and the reasoning.
 
 ---
 
