@@ -586,6 +586,16 @@
         }
       }
     },
+    "Address parameters" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Param\u00e8tres d\u2019adresse"
+          }
+        }
+      }
+    },
     "Additions to shared collections" : {
       "localizations" : {
         "fr" : {
@@ -1790,6 +1800,16 @@
         }
       }
     },
+    "Neither this feed's address nor its articles carry any." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ni l\u2019adresse de ce flux ni celles de ses articles n\u2019en portent."
+          }
+        }
+      }
+    },
     "New collection" : {
       "localizations" : {
         "fr" : {
@@ -1971,6 +1991,16 @@
         }
       }
     },
+    "No parameters" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun param\u00e8tre"
+          }
+        }
+      }
+    },
     "Notifications" : {
       "localizations" : {
         "fr" : {
@@ -2027,6 +2057,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvre l\u2019article sur son site"
+          }
+        }
+      }
+    },
+    "Parameters on this feed's addresses" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Param\u00e8tres des adresses de ce flux"
           }
         }
       }
@@ -3064,6 +3104,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qu'elle a signé a été purgé, ou n'est pas encore arrivé."
+          }
+        }
+      }
+    },
+    "What you mark here is taken off any address that leaves this device, and nothing else is. Nothing is removed on a guess : a parameter selects a feed or a filter as often as it names a subscriber." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que vous cochez ici est retir\u00e9 de toute adresse qui quitte cet appareil, et rien d\u2019autre ne l\u2019est. Rien n\u2019est retir\u00e9 au jug\u00e9 : un param\u00e8tre s\u00e9lectionne un flux ou un filtre aussi souvent qu\u2019il d\u00e9signe un abonn\u00e9."
           }
         }
       }

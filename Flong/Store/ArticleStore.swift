@@ -708,6 +708,31 @@ nonisolated struct ArticleStore: Sendable {
         }
     }
 
+    /// The addresses of one feed's recent articles.
+    ///
+    /// What the reader is shown when they are asked which parameters of a
+    /// feed's addresses are theirs : the question can only be answered against
+    /// real addresses, and the ones that matter are the articles', which are
+    /// written down exactly as the publisher spelled them.
+    ///
+    /// A sample rather than all of them. A parameter a feed uses is on every
+    /// link it serves, so a hundred answers the question as well as a hundred
+    /// thousand and costs nothing.
+    func addresses(ofFeed feedID: UUID, limit: Int = 100) async throws -> [URL] {
+        try await database.writer.read { db in
+            try String.fetchAll(
+                db,
+                sql: """
+                    SELECT url FROM entry
+                    WHERE feed_id = ? AND url IS NOT NULL
+                    ORDER BY received_at DESC LIMIT ?
+                    """,
+                arguments: [feedID, limit]
+            )
+            .compactMap(URL.init(string:))
+        }
+    }
+
     // MARK: - Writing
 
     /// Marks articles read or unread.
