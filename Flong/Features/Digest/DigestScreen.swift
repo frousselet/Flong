@@ -182,7 +182,6 @@ struct DigestScreen: View {
                 empty
             }
         }
-        .task { await model.loadLooseArticles() }
     }
 
     // MARK: - The page
@@ -237,12 +236,6 @@ struct DigestScreen: View {
             }
         }
 
-        if model.digest.looseCount > 0 {
-            header { Text("The rest") }
-            ForEach(model.looseArticles.prefix(40)) { article in
-                ArticleRow(article: article, zoom: zoom) { open(.article(article.id)) }
-            }
-        }
     }
 
     private func header(@ViewBuilder _ content: () -> some View) -> some View {

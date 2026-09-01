@@ -164,7 +164,6 @@ struct DigestTests {
 
         #expect(stories.count == 3)
         #expect(stories.map(\.articleCount).sorted() == [2, 2, 4])
-        #expect(digest.looseCount == Corpus.loose.count)
     }
 
     @Test("A story keeps its identity as it grows")
@@ -934,8 +933,6 @@ struct DigestTests {
         #expect(page.live.first?.topics == ["Éducation"])
         // The other subjects stay on the page, or there would be no way off it.
         #expect(page.topics == ["Logiciel", "Éducation"])
-        // The tail belongs to no story, so it belongs to no subject either.
-        #expect(page.looseCount == 0)
     }
 
     @Test("A story the model put under nothing is still on the front page")
@@ -948,7 +945,6 @@ struct DigestTests {
 
         #expect(front.live.count + front.stories.count == 3)
         #expect(education.live.count + education.stories.count == 1)
-        #expect(front.looseCount == Corpus.loose.count)
     }
 
     /// Writes subjects onto the stories whose title holds each word, which is
@@ -1040,13 +1036,24 @@ struct DigestTests {
         #expect(articles.first?.date ?? .distantPast > articles.last?.date ?? .distantFuture)
     }
 
-    @Test("What made no story is still reachable")
+    @Test("What made no story is still in the wire")
     func looseArticles() async throws {
         try await StoryBuilder(database).build(now: now)
 
-        let loose = try await service.looseArticles(now: now)
-        #expect(loose.count == Corpus.loose.count)
-        #expect(loose.contains { $0.title.contains("Cévennes") })
+        // The front page shows stories and nothing else. The tail that used to
+        // sit under it was the wire drawn a second time, and what grouped with
+        // nothing is still there, in the section whose whole job is everything
+        // as it arrived : that is what makes taking the tail away a tidying
+        // rather than a hiding, and it is worth an expectation of its own.
+        let wire = try await ArticleStore(database).summaries(.all, now: now)
+        #expect(wire.contains { $0.title.contains("Cévennes") })
+
+        // And the page itself is empty of them : a front page counting them as
+        // content would render blank while insisting it is not.
+        var bare = Digest()
+        #expect(bare.isEmpty)
+        bare.stories = try await service.digest(now: now).stories
+        #expect(!bare.isEmpty)
     }
 }
 

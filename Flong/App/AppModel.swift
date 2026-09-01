@@ -826,7 +826,6 @@ final class AppModel {
     private func reloadWhatIsShown() async {
         await loadSidebar()
         await loadDigest()
-        await loadLooseArticles()
         await loadCollections()
         if selectedArticle == nil { await loadArticles() }
     }
@@ -839,7 +838,6 @@ final class AppModel {
         // pass could fetch, group and announce a page of new stories and leave
         // the reader looking at yesterday's.
         await loadDigest()
-        await loadLooseArticles()
         await loadCredentials()
         // The search field completes tag names off them, so they are part of
         // what a window holds and not only of what the collections page shows.
@@ -867,7 +865,6 @@ final class AppModel {
     /// digest that loaded every article of every story would be the list it
     /// exists to replace.
     private(set) var storyArticles: [UUID: [ArticleSummary]] = [:]
-    private(set) var looseArticles: [ArticleSummary] = []
     var openStory: UUID?
 
     func loadDigest() async {
@@ -902,7 +899,6 @@ final class AppModel {
         moveWork(to: .grouping)
         await digestService.buildStories()
         await loadDigest()
-        await loadLooseArticles()
 
         // The headlines and the subjects, turn about and under a bound. They
         // ran one after the other and unbounded, which is how a page could
@@ -1052,11 +1048,6 @@ final class AppModel {
 
         guard storyArticles[story.id] == nil else { return }
         storyArticles[story.id] = (try? await digestService.articles(of: story.id)) ?? []
-    }
-
-    /// The articles of the window that made no story.
-    func loadLooseArticles() async {
-        looseArticles = (try? await digestService.looseArticles()) ?? []
     }
 
     // MARK: - The long work
@@ -1784,7 +1775,6 @@ final class AppModel {
         guard let id else { return }
 
         if let index = summaries.firstIndex(where: { $0.id == id }) { summaries[index].isRead = true }
-        if let index = looseArticles.firstIndex(where: { $0.id == id }) { looseArticles[index].isRead = true }
         for (story, articles) in storyArticles {
             guard let index = articles.firstIndex(where: { $0.id == id }) else { continue }
             storyArticles[story]?[index].isRead = true

@@ -2399,16 +2399,6 @@
         }
       }
     },
-    "The rest" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le reste"
-          }
-        }
-      }
-    },
     "The sections every reader has. The model files each story under one or two of these, or of yours, and can write none of its own." : {
       "localizations" : {
         "fr" : {

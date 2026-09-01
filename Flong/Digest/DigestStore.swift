@@ -101,8 +101,6 @@ nonisolated struct DigestStory: Identifiable, Hashable, Sendable {
 nonisolated struct Digest: Hashable, Sendable {
     var live: [DigestStory] = []
     var stories: [DigestStory] = []
-    /// Articles that made no story, which the tail shows as themselves.
-    var looseCount = 0
 
     /// The subjects on the page, whichever one is being shown : narrowing to
     /// one must not take the others off the page, or the only way back would
@@ -113,7 +111,12 @@ nonisolated struct Digest: Hashable, Sendable {
     /// about at all.
     var scores: [String: Int] = [:]
 
-    var isEmpty: Bool { live.isEmpty && stories.isEmpty && looseCount == 0 }
+    /// **Stories, and only stories.** The page used to count the articles that
+    /// grouped with nothing as content, since it showed them in a tail at the
+    /// bottom. It does not show them any more, so a page of nothing but those
+    /// is a page with nothing on it, and it has to say so rather than render
+    /// blank while insisting it is not empty.
+    var isEmpty: Bool { live.isEmpty && stories.isEmpty }
 }
 
 /// One article of a story, as the digest query returns it.
@@ -158,7 +161,7 @@ nonisolated struct DigestStore: Sendable {
         let scores = try await preferences.scores()
         let own = try await preferences.ownNames()
 
-        let (stories, topics, members, loose) = try await database.writer.read { db in
+        let (stories, topics, members) = try await database.writer.read { db in
             let stories =
                 try Story
                 .filter(Story.Columns.lastAt >= since)
@@ -197,19 +200,7 @@ nonisolated struct DigestStore: Sendable {
                 )
             }
 
-            let loose =
-                try Int.fetchOne(
-                    db,
-                    sql: """
-                        SELECT COUNT(*) FROM entry e
-                        LEFT JOIN story_member m ON m.entry_id = e.id
-                        WHERE m.entry_id IS NULL AND e.is_hidden = 0 AND e.duplicate_of IS NULL
-                          AND COALESCE(e.published_at, e.received_at) >= ?
-                        """,
-                    arguments: [since]
-                ) ?? 0
-
-            return (stories, topics, members, loose)
+            return (stories, topics, members)
         }
 
         let grouped = Dictionary(grouping: members, by: \.storyID)
@@ -256,10 +247,6 @@ nonisolated struct DigestStore: Sendable {
                 let right = ($1.score(scores), $1.lastAt, $1.articleCount)
                 return left > right
             }
-
-        // The tail is what fell under no story at all, so it belongs to no
-        // subject either, and it is shown on the front page only.
-        digest.looseCount = topic == .frontPage ? loose : 0
 
         return digest
     }
