@@ -628,7 +628,9 @@ A refusal leaves the reader in front of the search, which is the thing that work
 
 The mark is an ornate **F**, drawn once, black on nothing. It is kept as an Icon Composer document at `Flong/AppIcon.icon` rather than as a folder of exported squares : the system lays the glyph on the plate, cuts the shape each platform asks for, lights it and casts its shadow, and derives the light, dark and tinted appearances from that one layer. So iPhone, iPad and Mac wear the same icon, and changing it is changing one file rather than reconciling a dozen.
 
-In the dark appearance the glyph is filled white and in the tinted one it is filled with the accent, rather than either being redrawn : a mark drawn twice is two marks, and the second one is the one that goes stale. The source artwork is a transparent 1024 square carrying nothing but the letter, since every background the icon is ever seen on is the system's to draw.
+Each appearance is a fill over that one layer rather than a second drawing : black on the light plate, white on the dark one, white again where the system tints the plate itself. A mark drawn twice is two marks, and the second one is the one that goes stale. The source artwork is a transparent 1024 square carrying nothing but the letter, since every background the icon is ever seen on is the system's to draw.
+
+The letter is glass. It is a material the system gives the layer rather than anything drawn into the artwork : the glyph takes the light of the plate it sits on, lets a little of it through, and casts its own shadow, which is what makes one flat square read as a mark lying on a surface. The same file still carries every platform and every appearance.
 
 ---
 
