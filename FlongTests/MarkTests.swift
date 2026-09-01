@@ -198,6 +198,48 @@ struct MarkTests {
         #expect(try await articles.chosen().isEmpty)
     }
 
+    @Test("A favourite is worth its most recent articles and no more")
+    func favouritesAreCapped() async throws {
+        // Oldest first, so the two newest are the last two added.
+        let ordered = try await [
+            add("Le plus ancien", age: 4 * 3600),
+            add("Avant-dernier", age: 3 * 3600),
+            add("Avant-veille", age: 2 * 3600),
+            add("Le plus récent", age: 3600),
+        ]
+        try await database.writer.write { db in
+            for entry in ordered { try AuthorStore.index(entry.id, byline: "Claire Ancelin", in: db) }
+        }
+
+        try await subscriptions.setFavourite(feed.id, true)
+        try await AuthorStore(database).setFavourite("Claire Ancelin", true)
+
+        // The cap is per source and per writer, and these four are one of each,
+        // so both ways of choosing are cut at the same two articles.
+        let chosen = try await articles.chosen(perFavourite: 2)
+        #expect(Set(chosen.map(\.title)) == ["Le plus récent", "Avant-veille"])
+        #expect(try await articles.choices(perFavourite: 2).count == 2)
+
+        // **A star is not capped.** The oldest article of a prolific source is
+        // out of the index until the reader says otherwise, and saying so is
+        // what puts it back.
+        try await articles.setStarred([ordered[0].id], to: true)
+        let starred = try await articles.chosen(perFavourite: 2)
+        #expect(Set(starred.map(\.title)) == ["Le plus récent", "Avant-veille", "Le plus ancien"])
+    }
+
+    @Test("The cap is the system index's and never the collection's")
+    func theCollectionsAreNotCapped() async throws {
+        try await add("Premier", age: 2 * 3600)
+        try await add("Second", age: 3600)
+        try await subscriptions.setFavourite(feed.id, true)
+
+        // What the square opens on is everything the publisher served. Spotlight
+        // is the one place a favourite is rationed, because it is the one place
+        // with a budget that is not Flong's own.
+        #expect(try await articles.summaries(in: .builtIn(.favouriteSources)).count == 2)
+    }
+
     @Test("What the index should hold is answered without reading a single body")
     func choices() async throws {
         let starred = try await add("Étoilé")

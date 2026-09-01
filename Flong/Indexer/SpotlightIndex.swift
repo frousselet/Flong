@@ -59,8 +59,9 @@ nonisolated enum SpotlightResult: Hashable, Sendable {
 ///
 /// **The articles** are the ones the reader picked out. One at a time, by
 /// starring, writing on or filing them ; or once and for all that follows, by
-/// singling out a publisher or a writer. ``ArticleStore/wasChosen(_:)`` is the
-/// whole of the rule.
+/// singling out a publisher or a writer, which is worth that favourite's most
+/// recent ``ArticleStore/perFavourite`` articles and no more : a favourite
+/// daily would otherwise fill the whole budget by itself within the year.
 ///
 /// **The stories** are the ones on the front page, no more and no less. A story
 /// is where the digest starts and it is the thing a reader watching a subject

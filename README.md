@@ -20,7 +20,7 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **A truncated article is completed from its page.** Most feeds send a standfirst and a link. An article opens on what its feed sent ; ask for the whole one and Flong fetches the page behind it, once, and keeps what it finds beside the feed's version.
 
-**Search is genuinely indexed.** A full-text index over the whole local corpus, a query language with operators, and semantic search through Spotlight. What reaches the system search is what you chose : the articles you starred, wrote on or filed, everything a favourite source or a favourite author signed, and the stories on the front page while they are on it.
+**Search is genuinely indexed.** A full-text index over the whole local corpus, a query language with operators, and semantic search through Spotlight. What reaches the system search is what you chose : the articles you starred, wrote on or filed, the most recent two hundred and fifty from each favourite source and each favourite author, and the stories on the front page while they are on it. The cap is Spotlight's alone, and it is what stops one prolific publisher from filling an index the whole device shares ; the squares in your collections hold everything, and so does Flong's own search.
 
 **Enrichment happens on the device.** Classification, tagging and summaries come from the system model, in your own language whatever language the articles are in, and no article content is sent anywhere.
 

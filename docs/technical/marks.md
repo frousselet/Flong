@@ -60,9 +60,18 @@ Five ways of choosing one, written once as `ArticleStore.wasChosen(_:)` and used
 | a favourite source | once, for everything that follows | the publisher |
 | a favourite author | once, for everything that follows | the writer |
 
-The last two are deliberately wider than `Retention.marked`, which is what a purge may not take. A favourite is a judgement about a source or a writer rather than about an article, so it earns an article a place in the system search without earning it a place a purge has to work around. A reader who singles out a prolific publisher is the one case that can push the index past a few thousand items.
+The last two are deliberately wider than `Retention.marked`, which is what a purge may not take. A favourite is a judgement about a source or a writer rather than about an article, so it earns an article a place in the system search without earning it a place a purge has to work around.
 
 Everything outside those five is a cache nobody chose, and a system-wide index of a cache is an index of things nobody asked for.
+
+**A favourite is worth its `ArticleStore.perFavourite` most recent articles and no more**, two hundred and fifty of them, counted per source and per writer.
+
+- **Why only the favourites are capped.** A star is a decision about an article and the three deliberate ways bound themselves : a reader marks a few thousand articles in years, which is the size Core Spotlight is good at. A favourite is a decision about everything that follows from it, and a favourite daily serving forty articles a day is fifteen thousand items within the year, on its own, against a budget of a few thousand in total. Past it the system search degrades for everything the device holds and not only for Flong.
+- **What the cap buys.** The index is bounded by the number of favourites rather than by the size of the corpus, which is the only one of the two a reader controls. It bites hardest exactly where it was meant to : two hundred and fifty articles is five days of a firehose and five years of a weekly, and a favourite writer rarely has that many to their name at all.
+- **What it costs.** Nothing a reader cannot reach another way. Flong's own full-text index covers every article ever stored, and section 11 never made Spotlight the primary index.
+- **It is the system index's cap and nobody else's.** The favourites' own collections hold everything the source served and everything the writer signed, uncapped. Spotlight is the one place a favourite is rationed, because it is the one place with a budget that is not Flong's own.
+- **A star is never capped.** The oldest article of a prolific source is out of the index until the reader says otherwise, and starring it is what puts it back : the first of the five ways is asked without a rank.
+- **A table expression rather than a condition.** A cap asks where an article stands among its neighbours rather than anything about the article, and `ORDER BY date DESC LIMIT n` cannot answer it : that is one list, and this needs one per source and one per writer. So `ROW_NUMBER() OVER (PARTITION BY ...)`, with the rank broken by the identifier where two articles share a date, so that the cut falls in the same place at every reading and an index that has not changed is not written again.
 
 ### The stories
 
