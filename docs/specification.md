@@ -514,7 +514,7 @@ The first story on the page runs its picture across the column, above a larger h
 
 Each story carries its name, one line saying what happened, the marks of the rooms talking about it rather than a count of them, the number of articles, the shape of their arrival and how long ago the last one came. Opening a story lists its articles ; opening an article reads it. Not a card : a rule, a headline, a line and the facts underneath.
 
-The model names and summarizes ; without one, a story takes the title and standfirst of its most central article, and the page says which of the two it is, by a mark in front of the line rather than at the far end of the row it belongs to. `docs/technical/digest.md` records how stories are grouped, and why it is not by the vectors of section 11.
+The model names and summarizes ; without one, a story takes the title and standfirst of its most central article, and the page says which of the two it is, by a mark in front of the line and in no words : pressing that line says what was written and offers the article's own headline back. `docs/technical/digest.md` records how stories are grouped, and why it is not by the vectors of section 11.
 
 ### Common structure
 
