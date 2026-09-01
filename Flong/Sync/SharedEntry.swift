@@ -155,6 +155,41 @@ nonisolated extension SharedEntry {
         collectionNamed name: String,
         credentials: CredentialStoring
     ) async throws -> [SharedEntry] {
+        try await entries(
+            in: database,
+            where: """
+                e.id IN (
+                    SELECT b.target_id FROM tag_binding b JOIN tag t ON t.id = b.tag_id
+                    WHERE b.target_kind = 'entry' AND t.path = ?
+                )
+                """,
+            arguments: [CollectionStore.path(of: name)],
+            credentials: credentials
+        )
+    }
+
+    /// One article, ready to travel, for a reader filing it by hand.
+    static func entry(
+        in database: AppDatabase,
+        articleID: UUID,
+        credentials: CredentialStoring
+    ) async throws -> SharedEntry? {
+        try await entries(in: database, where: "e.id = ?", arguments: [articleID], credentials: credentials).first
+    }
+
+    /// The one query, so that what leaves is assembled in one place.
+    ///
+    /// **The truncation happens here, on the device that writes.** Each feed's
+    /// designated parameters come off its articles' addresses against this
+    /// device's own keychain, because nobody else can know which of them were
+    /// this reader's. A collection holding articles from twenty feeds asks the
+    /// keychain once rather than twenty times.
+    private static func entries(
+        in database: AppDatabase,
+        where condition: String,
+        arguments: StatementArguments,
+        credentials: CredentialStoring
+    ) async throws -> [SharedEntry] {
         let designations = (try? credentials.everySecretParameter()) ?? [:]
 
         return try await database.writer.read { db in
@@ -166,12 +201,10 @@ nonisolated extension SharedEntry {
                            f.id AS feed_id, f.url AS feed_url, f.title AS feed_title
                     FROM entry e
                     JOIN feed f ON f.id = e.feed_id
-                    JOIN tag_binding b ON b.target_id = e.id AND b.target_kind = 'entry'
-                    JOIN tag t ON t.id = b.tag_id
-                    WHERE t.path = ? AND e.is_hidden = 0
+                    WHERE \(condition) AND e.is_hidden = 0
                     ORDER BY COALESCE(e.published_at, e.received_at) DESC
                     """,
-                arguments: [CollectionStore.path(of: name)]
+                arguments: arguments
             )
 
             return rows.map { row in

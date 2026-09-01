@@ -180,6 +180,7 @@ final class AppModel {
     private let locator: Locating
     private let sharing: CollectionSharing
     private let sharedCollections: SharedCollectionStore
+    private let sharedEntries: SharedEntryStore
 
     /// The whole stream, as files in the reader's own iCloud.
     ///
@@ -204,6 +205,14 @@ final class AppModel {
     /// Held here rather than in the screen alone so that a row tapped in a
     /// collection is one the window can place when it opens it.
     private(set) var collectionArticles: [ArticleSummary] = []
+
+    /// What is in the shared collection the reader has opened.
+    ///
+    /// Separate from ``collectionArticles`` because it is a different thing :
+    /// an excerpt somebody else sent, from a feed this reader does not follow,
+    /// with no body to open and no read state of theirs. Putting the two in one
+    /// list would mean a row that has to keep asking which it is.
+    private(set) var sharedArticles: [SharedEntry] = []
 
     /// Everybody who has signed something, for the authors page.
     private(set) var authors: [Author] = []
@@ -759,6 +768,7 @@ final class AppModel {
         self.collectionStore = CollectionStore(database)
         self.sharing = CollectionSharing(database: database)
         self.sharedCollections = SharedCollectionStore(database)
+        self.sharedEntries = SharedEntryStore(database)
         self.authorStore = AuthorStore(database)
         self.marks = MarkStore(database)
         self.spotlight = SpotlightIndex(articles, subscriptions)
@@ -1752,7 +1762,12 @@ final class AppModel {
 
     func loadCollections() async {
         do {
-            collections = try await collectionStore.all()
+            // The ones somebody else shared are added here rather than inside
+            // `CollectionStore` : they are not in the tags, the columns or the
+            // saved queries that store answers from, they are in a table of
+            // their own, and a store that reached into it would be answering a
+            // question about somebody else's data.
+            collections = try await collectionStore.all() + sharedCollections.invited(from: sharedEntries)
             sharedCollectionNames = try await sharedCollections.ownedNames()
         } catch {
             Log.store.error("The collections could not be read : \(error, privacy: .public)")
@@ -1782,6 +1797,79 @@ final class AppModel {
     /// somebody, so a sheet opened and dismissed leaves nothing behind.
     nonisolated func invitation(toCollectionNamed name: String) -> SharedCollectionItem {
         SharedCollectionItem(name: name, sharing: sharing)
+    }
+
+    // MARK: - Filing into somebody else's collection
+
+    /// The collections the reader was invited to, for the article's own menu.
+    private(set) var invitedCollections: [SharedCollection] = []
+
+    /// Which of them the open article is already in, by this reader's own hand.
+    ///
+    /// Their own list alone : an article somebody else filed is in the
+    /// collection without being theirs, and a tick against it would offer to
+    /// remove something they cannot remove.
+    private(set) var articleSharedCollections: Set<String> = []
+
+    func loadInvitedCollections() async {
+        invitedCollections = (try? await sharedCollections.all().filter { !$0.isOwned }) ?? []
+    }
+
+    /// Puts the open article into a collection somebody shared, or takes it out.
+    ///
+    /// The excerpt only, and the addresses truncated of whatever this reader
+    /// designated as theirs : it is their device doing the writing, so it is
+    /// their keychain the truncation is against.
+    /// The open article as it would cross to somebody else, worked out once.
+    ///
+    /// Built by the store rather than from what the page holds : an ``Article``
+    /// is what a reader looks at and carries no feed identity, and the identity
+    /// is exactly what a recipient needs in order to recognize their own copy.
+    private var openSharedEntry: SharedEntry?
+
+    func fileArticle(inShared zone: String) async {
+        guard let entry = openSharedEntry,
+            let shared = invitedCollections.first(where: { $0.zoneName == zone })
+        else { return }
+
+        await sharedCloud?.file(entry, inZone: zone, ownedBy: shared.ownerName)
+        await loadArticleSharedCollections()
+        await loadCollections()
+    }
+
+    func unfileArticle(fromShared zone: String) async {
+        guard let entry = openSharedEntry,
+            let shared = invitedCollections.first(where: { $0.zoneName == zone })
+        else { return }
+
+        await sharedCloud?.file(nil, removing: entry.guid, inZone: zone, ownedBy: shared.ownerName)
+        await loadArticleSharedCollections()
+        await loadCollections()
+    }
+
+    func loadArticleSharedCollections() async {
+        guard let opened = article else {
+            openSharedEntry = nil
+            articleSharedCollections = []
+            return
+        }
+
+        openSharedEntry = try? await SharedEntry.entry(
+            in: database, articleID: opened.id, credentials: credentials
+        )
+
+        guard let guid = openSharedEntry?.guid, let sharedCloud else {
+            articleSharedCollections = []
+            return
+        }
+
+        var found: Set<String> = []
+        for shared in invitedCollections {
+            if await sharedCloud.filedGUIDs(inZone: shared.zoneName).contains(guid) {
+                found.insert(shared.zoneName)
+            }
+        }
+        articleSharedCollections = found
     }
 
     /// Makes a collection and shows it, empty, where the reader will look.
@@ -1817,6 +1905,10 @@ final class AppModel {
         case .dynamic(let name): try? await collectionStore.deleteDynamic(name)
         // Not a thing that was made, so there is nothing there to unmake.
         case .builtIn: return
+        // Somebody else's. Leaving a share is the system's own sheet to do,
+        // and deleting the rows here would only have them arrive again on the
+        // next fetch : the share is still there and this device is still in it.
+        case .shared: return
         }
         await loadCollections()
     }
@@ -1840,9 +1932,16 @@ final class AppModel {
         guard let id = article?.id else {
             articleCollections = []
             articleAuthorIsFavourite = false
+            await loadArticleSharedCollections()
             return
         }
         articleCollections = (try? await collectionStore.collections(of: id)) ?? []
+
+        // What somebody else shared, and which of them this article is already
+        // in by this reader's own hand. Asked here so that the menu has its
+        // answer before it is opened rather than after.
+        await loadInvitedCollections()
+        await loadArticleSharedCollections()
 
         guard let author = article?.author else {
             articleAuthorIsFavourite = false
@@ -1956,6 +2055,15 @@ final class AppModel {
 
     func loadCollection(_ kind: ArticleCollection.Kind) async {
         do {
+            // A shared one holds nothing of this device's : what is in it came
+            // from feeds the reader does not follow, and there is no article
+            // here to summarize.
+            if case .shared(let zone, _) = kind {
+                sharedArticles = try await sharedEntries.entries(inZone: zone)
+                collectionArticles = []
+                return
+            }
+
             // A dynamic one is a description, so it is answered by the same
             // query path any other search goes through. The other two are
             // memberships, which the articles carry themselves.

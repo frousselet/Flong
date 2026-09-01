@@ -32,6 +32,10 @@ actor CloudSync {
     private let database: AppDatabase
     private let payload: SyncPayload
     private let state: SyncState
+    /// What a record belonging to one of the reader's shared collections means.
+    /// Their own shared zones are in this database, so their participants'
+    /// records arrive here : see ``SharedInbox``.
+    private let inbox: SharedInbox
     private let container: CKContainer
     private let zoneID: CKRecordZone.ID
     private let report: @Sendable (SyncStatus) -> Void
@@ -51,6 +55,7 @@ actor CloudSync {
         self.zoneID = CKRecordZone.ID(zoneName: SyncRecords.zoneName, ownerName: CKCurrentUserDefaultName)
         self.payload = SyncPayload(database, zone: zoneID)
         self.state = SyncState(database)
+        self.inbox = SharedInbox(database)
         self.report = report
     }
 
@@ -275,6 +280,15 @@ extension CloudSync: CKSyncEngineDelegate {
         case .accountChange(let change):
             await handle(change)
 
+        case .fetchedDatabaseChanges(let changes):
+            // A zone gone from this database is one of the reader's own shared
+            // collections, stopped from another of their devices. The `Flong`
+            // zone going is the erasure of section 20 and is handled where the
+            // engine reports it, as `zoneNotFound` on the next save.
+            for deletion in changes.deletions where deletion.zoneID != zoneID {
+                await inbox.forget(zone: deletion.zoneID)
+            }
+
         case .fetchedRecordZoneChanges(let changes):
             await apply(changes)
 
@@ -323,9 +337,28 @@ extension CloudSync: CKSyncEngineDelegate {
         try? await state.remember(changes.modifications.map(\.record))
         try? await state.forget(changes.deletions.map(\.recordID.recordName))
 
+        // **The reader's own shared collections are in this database too.** A
+        // zone-wide share lives in the owner's private database, so what a
+        // participant files into one of the reader's collections arrives here
+        // rather than through the shared engine, and it means something this
+        // payload has never heard of. Sorted out first, and by zone : nothing
+        // but a shared collection is ever put in a zone that is not `Flong`.
+        let mine = changes.modifications.map(\.record).filter { !SharedInbox.belongsHere($0.recordID) }
+        let shared = changes.modifications.map(\.record).filter { SharedInbox.belongsHere($0.recordID) }
+        let removedElsewhere = changes.deletions.map(\.recordID).filter(SharedInbox.belongsHere)
+
+        if !shared.isEmpty || !removedElsewhere.isEmpty {
+            await inbox.apply(shared, isOwned: true)
+            await inbox.apply(deletions: removedElsewhere)
+            Log.sync.notice("A participant filed \(shared.count) records into a shared collection")
+        }
+
         do {
-            let applied = try await payload.apply(changes.modifications.map(\.record))
-            let removed = try await payload.apply(deletions: changes.deletions.map(\.recordID.recordName))
+            let applied = try await payload.apply(mine)
+            let removed = try await payload.apply(
+                deletions: changes.deletions.map(\.recordID).filter { !SharedInbox.belongsHere($0) }
+                    .map(\.recordName)
+            )
 
             if !applied.isEmpty || !removed.isEmpty {
                 Log.sync.notice(
@@ -361,6 +394,14 @@ extension CloudSync: CKSyncEngineDelegate {
                 }
 
             case .zoneNotFound:
+                // A shared collection's zone, taken down by its owner. Nothing
+                // to repair : it is not this device's zone and putting it back
+                // would recreate a share somebody ended.
+                guard failure.record.recordID.zoneID == zoneID else {
+                    await inbox.forget(zone: failure.record.recordID.zoneID)
+                    continue
+                }
+
                 // The zone was deleted from another device or from the settings.
                 // Nothing the server said about it holds any more.
                 try? await state.forgetEveryRecord()

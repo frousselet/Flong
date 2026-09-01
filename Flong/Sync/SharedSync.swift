@@ -34,7 +34,7 @@ actor SharedSync {
     private let database: AppDatabase
     private let container: CKContainer
     private let entries: SharedEntryStore
-    private let collections: SharedCollectionStore
+    private let inbox: SharedInbox
     private let state: SyncState
 
     private var engine: CKSyncEngine?
@@ -55,7 +55,7 @@ actor SharedSync {
         self.database = database
         self.container = container
         self.entries = SharedEntryStore(database)
-        self.collections = SharedCollectionStore(database)
+        self.inbox = SharedInbox(database)
         self.state = SyncState(database)
     }
 
@@ -97,14 +97,47 @@ actor SharedSync {
         try? await engine.sendChanges()
     }
 
-    /// Writes this reader's own list into a collection somebody shared.
+    /// Puts an article into a collection somebody shared, or takes it back out.
     ///
-    /// **Only their own list.** Every participant writes the record named after
-    /// them and reads everybody else's, so there is no record two people write
-    /// and no conflict to resolve. What another participant filed is not this
-    /// device's to rewrite, and a save that tried would be refused anyway.
-    func file(_ filed: [SharedEntry], inZone zoneName: String, ownedBy owner: String) async {
-        guard let engine, let me = await participant() else { return }
+    /// **Only ever this reader's own list.** Every participant writes the
+    /// record named after them and reads everybody else's, so there is no
+    /// record two people write and no conflict to resolve. What another
+    /// participant filed is not this device's to rewrite, and a save that tried
+    /// would be refused by the server anyway.
+    ///
+    /// It follows that **a reader takes back what they put in and nothing
+    /// else** : an article somebody else filed is not in this list and cannot
+    /// be removed from it.
+    ///
+    /// The store is written first and the record queued after. The list is what
+    /// the page shows, so a reader who files something sees it at once and
+    /// whether iCloud was reachable is a separate question.
+    func file(_ entry: SharedEntry?, removing guid: String? = nil, inZone zoneName: String, ownedBy owner: String)
+        async
+    {
+        guard let me = await participant() else { return }
+        let listKey = SyncRecords.namePrefix(forSharedListBy: me)
+
+        var filed = (try? await entries.entries(inList: listKey, inZone: zoneName)) ?? []
+        if let guid { filed.removeAll { $0.guid == guid } }
+        if let entry {
+            filed.removeAll { $0.guid == entry.guid }
+            filed.insert(entry, at: 0)
+        }
+
+        try? await entries.replace(filed, inList: listKey, by: me.recordName, inZone: zoneName)
+        await push(filed, inList: listKey, inZone: zoneName, ownedBy: owner, by: me)
+    }
+
+    /// Sends this reader's list as it now stands.
+    private func push(
+        _ filed: [SharedEntry],
+        inList listKey: String,
+        inZone zoneName: String,
+        ownedBy owner: String,
+        by me: CKRecord.ID
+    ) async {
+        guard let engine else { return }
 
         let zoneID = CKRecordZone.ID(zoneName: zoneName, ownerName: owner)
         let records = SharedList.records(for: filed, by: me, in: zoneID)
@@ -113,6 +146,19 @@ actor SharedSync {
         // and building a record needs the store.
         pending = records.reduce(into: pending) { $0[$1.recordID] = $1 }
         engine.state.add(pendingRecordZoneChanges: records.map { .saveRecord($0.recordID) })
+    }
+
+    /// Whether this reader put a given article in a given shared collection.
+    ///
+    /// What the menu draws its tick from, and it is about their own list alone :
+    /// an article somebody else filed is in the collection without being
+    /// theirs, and a tick against it would offer to remove something they
+    /// cannot remove.
+    func filedGUIDs(inZone zoneName: String) async -> Set<String> {
+        guard let me = await participant() else { return [] }
+        let listKey = SyncRecords.namePrefix(forSharedListBy: me)
+        let filed = (try? await entries.entries(inList: listKey, inZone: zoneName)) ?? []
+        return Set(filed.map(\.guid))
     }
 
     private func participant() async -> CKRecord.ID? {
@@ -169,84 +215,14 @@ extension SharedSync: CKSyncEngineDelegate {
 
     // MARK: - What arrived
 
-    /// A zone appearing or disappearing, which is a collection gained or lost.
-    ///
-    /// **A zone that goes is a share that ended**, whether the owner stopped
-    /// sharing, deleted the collection, or removed this reader from it. There
-    /// is nothing to keep : the articles were never this device's, and leaving
-    /// them would leave a collection nobody can reach the other end of.
     private func apply(_ changes: CKSyncEngine.Event.FetchedDatabaseChanges) async {
         for deletion in changes.deletions {
-            let zone = deletion.zoneID.zoneName
-            try? await entries.forget(zoneName: zone)
-            try? await collections.forget(zoneName: zone)
-            Log.sync.notice("A shared collection was withdrawn, and is gone from here")
+            await inbox.forget(zone: deletion.zoneID)
         }
     }
 
     private func apply(_ changes: CKSyncEngine.Event.FetchedRecordZoneChanges) async {
-        // One person's list arrives whole, so it is applied whole : what a list
-        // carries replaces everything that person had in that collection, which
-        // is what makes a removal travel. Chunks of one list are gathered first
-        // so that the second chunk does not delete what the first just wrote.
-        var lists: [Key: (author: String, entries: [SharedEntry])] = [:]
-
-        for record in changes.modifications.map(\.record) {
-            let zone = record.recordID.zoneID
-
-            switch record.recordType {
-            case SyncRecords.RecordType.sharedCollection:
-                await remember(record, in: zone)
-
-            case SyncRecords.RecordType.sharedList:
-                guard let listKey = SyncRecords.listKey(ofRecordNamed: record.recordID.recordName) else { continue }
-                let key = Key(zone: zone.zoneName, list: listKey)
-                let found = SharedList.entries(from: record)
-                lists[key, default: (SharedList.author(of: record), [])].entries += found
-
-            default:
-                break
-            }
-        }
-
-        for (key, list) in lists {
-            try? await entries.replace(list.entries, inList: key.list, by: list.author, inZone: key.zone)
-        }
-
-        for deletion in changes.deletions {
-            // A list deleted is that participant filing nothing, which is not
-            // the same as their never having been here. The record carries no
-            // author by then, which is why the store is keyed by the name.
-            guard let listKey = SyncRecords.listKey(ofRecordNamed: deletion.recordID.recordName) else { continue }
-            try? await entries.replace(
-                [], inList: listKey, by: "", inZone: deletion.recordID.zoneID.zoneName
-            )
-        }
-    }
-
-    /// One participant's list in one collection.
-    private struct Key: Hashable {
-        let zone: String
-        let list: String
-    }
-
-    /// Writes down a collection the reader has been invited to.
-    private func remember(_ record: CKRecord, in zone: CKRecordZone.ID) async {
-        let title = SharedEntry.bounded(record["title"] as? String, to: 200) ?? String(localized: "Shared collection")
-
-        try? await collections.remember(
-            SharedCollection(
-                id: UUID.v7(),
-                zoneName: zone.zoneName,
-                ownerName: zone.ownerName,
-                // None of the reader's own making : there is no tag of theirs
-                // behind a collection somebody else shared.
-                collectionName: nil,
-                title: title,
-                isOwned: false,
-                shareURL: nil,
-                createdAt: record["createdAt"] as? Date ?? Date()
-            )
-        )
+        await inbox.apply(changes.modifications.map(\.record), isOwned: false)
+        await inbox.apply(deletions: changes.deletions.map(\.recordID))
     }
 }
