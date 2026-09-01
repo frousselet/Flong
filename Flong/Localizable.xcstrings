@@ -2352,6 +2352,16 @@
         }
       }
     },
+    "Shared collection" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collection partagée"
+          }
+        }
+      }
+    },
     "Sources" : {
       "localizations" : {
         "fr" : {
