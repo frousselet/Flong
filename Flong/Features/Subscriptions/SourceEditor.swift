@@ -31,6 +31,14 @@ import SwiftUI
 /// their iCloud with the record it was in. Turning it off writes it back in the
 /// open, which the screen says before it is asked for.
 ///
+/// **A secret address is hidden here, not withheld.** It is read back from the
+/// keychain into the same field as any other, shown as dots, and revealed by a
+/// deliberate tap. Section 9 asks for it to be masked in the interface and this
+/// is masked ; what it cannot be is unreachable, since the masked form the
+/// database holds gives nothing back, and a reader whose platform reissued
+/// their token would have had nothing to edit and no way to see what they were
+/// editing.
+///
 /// **The parameters are here rather than behind a door.** They were a screen of
 /// their own, reached from a second line of the same menu, which is one place
 /// too many for something that is plainly a property of this source : the
@@ -72,6 +80,9 @@ struct SourceEditor: View {
     /// takes their typing with it.
     @State private var refusal: AppFailure?
     @State private var isWorking = false
+    /// Whether the reader has asked to read the secret address they are
+    /// editing. Off every time the screen opens, and never remembered.
+    @State private var isRevealed = false
 
     @Environment(\.dismiss) private var dismiss
 
@@ -89,8 +100,9 @@ struct SourceEditor: View {
         self.feed = feed
         let masked = MaskedURL.isMasked(feed.url)
         _name = State(initialValue: feed.title)
-        // A masked address holds a digest of the real one and nothing a reader
-        // would recognize, so the field starts empty rather than showing it.
+        // A masked address holds a digest and nothing a reader would
+        // recognize, so the field starts empty and is filled from the keychain
+        // once the screen is up : an initializer cannot wait on it.
         _address = State(initialValue: masked ? "" : feed.url.absoluteString)
         _isSecret = State(initialValue: masked)
         _site = State(initialValue: feed.siteURL?.absoluteString ?? "")
@@ -98,9 +110,9 @@ struct SourceEditor: View {
         _isFavourite = State(initialValue: feed.isFavourite)
     }
 
-    /// Whether the address stored for this source is the masked one, which is
-    /// what the screen may not print. It is not the switch : the switch is what
-    /// the reader is asking for, and this is what is.
+    /// Whether the address stored for this source is the masked one. It is not
+    /// the switch : the switch is what the reader is asking for, and this is
+    /// what the row says now.
     private var isKeptSecret: Bool { MaskedURL.isMasked(feed.url) }
 
     var body: some View {
@@ -136,6 +148,12 @@ struct SourceEditor: View {
                 }
             }
             .task {
+                // The field starts empty for a secret address, since the row
+                // holds only the masked form. What is edited is the real one,
+                // read back from the keychain and shown as dots.
+                if isKeptSecret, address.isEmpty {
+                    address = await model.secretAddress(ofFeed: feed.id) ?? ""
+                }
                 parameters = await model.addressParameters(of: feed.id, feedURL: feed.url)
                 designated = await model.secretParameters(of: feed.id)
             }
@@ -166,17 +184,31 @@ struct SourceEditor: View {
     private var addressing: some View {
         Section {
             // The address first, since it is what the switch under it is about.
-            // Empty and secret is the ordinary state of a source whose address
-            // is already one : there is nothing to show and nothing to type.
-            TextField(text: $address) {
-                if isKeptSecret {
-                    Text("New secret address")
-                } else {
-                    Text("Address of the feed")
+            // One field whether it is a secret or not : a secret is edited the
+            // same way as anything else, and hiding the characters is the whole
+            // of the difference.
+            HStack(spacing: 8) {
+                Group {
+                    if isSecret && !isRevealed {
+                        SecureField(text: $address) { Text("Address of the feed") }
+                    } else {
+                        TextField(text: $address) { Text("Address of the feed") }
+                    }
+                }
+                .disabled(isWorking)
+                .addressField()
+
+                if isSecret {
+                    Button {
+                        isRevealed.toggle()
+                    } label: {
+                        Image(systemName: isRevealed ? "eye.slash" : "eye")
+                    }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel(isRevealed ? Text("Hide the address") : Text("Show the address"))
                 }
             }
-            .disabled(isWorking)
-            .addressField()
 
             Toggle(isOn: $isSecret) {
                 Text("This address is a secret")
@@ -201,7 +233,7 @@ struct SourceEditor: View {
     private var addressExplanation: some View {
         if isSecret && isKeptSecret {
             Text(
-                "The address is the secret, so it is never shown. Type a new one to replace it in the keychain, and the source keeps everything already here."
+                "The address is kept in the keychain and never in the database. Tap the eye to read it, and edit it here like any other."
             )
         } else if isSecret {
             Text(
@@ -209,7 +241,7 @@ struct SourceEditor: View {
             )
         } else if isKeptSecret {
             Text(
-                "Turning this off writes the address back into the database and into your iCloud, in the open. Flong uses the one in the keychain unless you type another."
+                "Turning this off writes the address above back into the database and into your iCloud, in the open."
             )
         } else {
             Text(
@@ -249,7 +281,7 @@ struct SourceEditor: View {
                 ContentUnavailableView {
                     Label("No parameters", systemImage: "link")
                 } description: {
-                    Text("Neither this feed's address nor its articles carry any.")
+                    Text("Neither this feed's address nor the articles it has carried hold one.")
                 }
             } else {
                 ForEach(parameters) { parameter in
@@ -266,10 +298,10 @@ struct SourceEditor: View {
                 }
             }
         } header: {
-            Text("Parameters on this feed's addresses")
+            Text("What identifies you in these addresses")
         } footer: {
             Text(
-                "What you mark here is taken off any address that leaves this device, and nothing else is. Nothing is removed on a guess : a parameter selects a feed or a filter as often as it names a subscriber."
+                "Tick a parameter that carries your subscription : Flong takes exactly those off an address it hands to somebody else, in a shared collection or an export. Nothing here changes how the feed is fetched, and a parameter is added or removed in the address above."
             )
         }
     }

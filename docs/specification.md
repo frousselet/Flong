@@ -284,6 +284,8 @@ The cost is made legible rather than hidden : a session records when it was sign
 
 A secret URL is treated as a secret in its own right : masked in the interface, redacted from exports by default, absent from error messages. Whether an address is one is the reader's to change afterwards, from the editor of the source, which is what lets an address pasted in the open be taken out of the database and out of the reader's iCloud without losing anything under it.
 
+**Masked is not withheld.** In the editor of its own source, and nowhere else, a secret address is shown as dots in the field that edits it and is read out on a deliberate tap. The masked form the database holds gives nothing back, so a screen that refused to show the address was a screen where the address could not be corrected, could not be read to be checked against the platform's own page, and where the parameters it carries were reported as not existing. Hiding a secret from the person holding the device protects nobody ; hiding it from a glance over their shoulder does, and that is what dots are for.
+
 **Export** : two explicit modes, redacted by default with a marker forcing re-entry at import time, or complete on a deliberate action with a warning.
 
 **Failures** : a 401 or a 403 quarantines that one feed, with a notification and polling stopped after three consecutive failures, so dead credentials are not hammered at the publisher.

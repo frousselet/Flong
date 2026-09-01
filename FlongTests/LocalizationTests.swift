@@ -66,7 +66,11 @@ struct LocalizationTests {
         #expect(String(localized: "Edit the source", locale: french) == "Modifier la source")
         #expect(String(localized: "Address of the feed", locale: french) == "Adresse du flux")
         #expect(String(localized: "Address of the site", locale: french) == "Adresse du site")
-        #expect(String(localized: "New secret address", locale: french) == "Nouvelle adresse secrète")
+        #expect(String(localized: "Show the address", locale: french) == "Afficher l’adresse")
+        #expect(
+            String(localized: "What identifies you in these addresses", locale: french)
+                == "Ce qui vous identifie dans ces adresses"
+        )
         #expect(String(localized: "How often", locale: french) == "Fréquence")
         #expect(String(localized: "Automatic", locale: french) == "Automatique")
         #expect(String(localized: "Failures in a row", locale: french) == "Échecs consécutifs")
