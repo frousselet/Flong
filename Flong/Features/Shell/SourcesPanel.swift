@@ -62,24 +62,30 @@ struct SourcesPanel: View {
     /// next thing is picked up, not when the alert closes.
     @State private var deleting: Deletion?
     @State private var isDeleting = false
-    @State private var isAddingFeed = false
-    /// The feed whose address parameters are being looked at, if one is.
-    @State private var addressing: Addressing?
-    /// The source being edited, carried whole so the sheet opens on it rather
-    /// than on nothing while it reads it back.
-    @State private var edited: Feed?
+    /// What is standing over the panel, if anything is.
+    @State private var presented: Presentation?
     @State private var isChoosingFile = false
 
-    /// A feed whose address parameters are being looked at.
+    /// What the panel can put over itself.
     ///
-    /// The address is carried rather than fetched again by the sheet : it is
-    /// asked of the store before the sheet opens, and a sheet that opened on
-    /// nothing while it waited would be a sheet that flickered.
-    private struct Addressing: Identifiable, Hashable {
-        let feedID: UUID
-        let url: URL
+    /// **One state and one sheet, rather than one of each per screen.** Several
+    /// `sheet` modifiers on a single view is the shape SwiftUI is least
+    /// reliable about : which of them answers is not something to be found out
+    /// in the field, and a reader whose screen simply does not open has no way
+    /// to report anything but that.
+    ///
+    /// The source is carried whole rather than fetched by the sheet, so what
+    /// opens is the source rather than a blank that fills in a moment later.
+    private enum Presentation: Identifiable, Hashable {
+        case addingFeed
+        case editing(Feed)
 
-        var id: UUID { feedID }
+        var id: String {
+            switch self {
+            case .addingFeed: "adding"
+            case .editing(let feed): "editing-\(feed.id)"
+            }
+        }
     }
 
     /// A source or a publisher, on its way out.
@@ -118,7 +124,6 @@ struct SourcesPanel: View {
                                 .contextMenu {
                                     favouriting(source)
                                     editing(source)
-                                    addressing(source)
                                     deleting(source)
                                 }
                         }
@@ -138,7 +143,7 @@ struct SourcesPanel: View {
                     } description: {
                         Text("Add a feed, or import an OPML file to bring your subscriptions over.")
                     } actions: {
-                        Button("Add a feed") { isAddingFeed = true }
+                        Button("Add a feed") { presented = .addingFeed }
                         Button("Import an OPML file") { isChoosingFile = true }
                     }
                 }
@@ -193,20 +198,18 @@ struct SourcesPanel: View {
         // belong to what the reader is doing here, and a panel that had to be
         // dismissed before either could open would be asking them to put the
         // list away in order to add to it.
-        .sheet(isPresented: $isAddingFeed) {
-            AddFeedView(
-                add: { address in await model.addFeed(at: address) },
-                addPrivate: { address in await model.addPrivateFeed(at: address) }
-            )
-            .themed()
-        }
-        .sheet(item: $edited) { source in
-            SourceEditor(model: model, feed: source)
+        .sheet(item: $presented) { presentation in
+            switch presentation {
+            case .addingFeed:
+                AddFeedView(
+                    add: { address in await model.addFeed(at: address) },
+                    addPrivate: { address in await model.addPrivateFeed(at: address) }
+                )
                 .themed()
-        }
-        .sheet(item: $addressing) { addressing in
-            AddressParametersView(model: model, feedID: addressing.feedID, feedURL: addressing.url)
-                .themed()
+            case .editing(let source):
+                SourceEditor(model: model, feed: source)
+                    .themed()
+            }
         }
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: OPMLDocument.types) { result in
             guard case .success(let url) = result else { return }
@@ -226,7 +229,7 @@ struct SourcesPanel: View {
 
             Menu {
                 Button {
-                    isAddingFeed = true
+                    presented = .addingFeed
                 } label: {
                     Label("Add a feed", systemImage: "plus")
                 }
@@ -425,31 +428,12 @@ struct SourcesPanel: View {
     private func editing(_ source: SidebarItem) -> some View {
         if case .feed(let id) = source.kind {
             Button {
-                Task { edited = await model.source(id) }
-            } label: {
-                Label("Edit", systemImage: "pencil")
-            }
-        }
-    }
-
-    /// Saying which parameters of this feed's addresses are the reader's own.
-    ///
-    /// In the source's own menu, beside the favourite and the deletion, because
-    /// it is a thing about that source and not a setting of the application.
-    /// It is offered for every feed rather than only for the ones that look
-    /// authenticated : a paper may serve a plain feed and put a per-subscriber
-    /// token on every link inside it, which is exactly the case a reader would
-    /// never think to go looking for.
-    @ViewBuilder
-    private func addressing(_ source: SidebarItem) -> some View {
-        if case .feed(let id) = source.kind {
-            Button {
                 Task {
-                    guard let url = await model.address(ofFeed: id) else { return }
-                    addressing = Addressing(feedID: id, url: url)
+                    guard let feed = await model.source(id) else { return }
+                    presented = .editing(feed)
                 }
             } label: {
-                Label("Address parameters", systemImage: "link")
+                Label("Edit", systemImage: "pencil")
             }
         }
     }

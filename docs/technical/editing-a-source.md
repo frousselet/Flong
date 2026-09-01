@@ -12,9 +12,11 @@ It is worth the trouble because the alternative is worse. Until this existed, a 
 
 ## Where it lives
 
-In the sources panel, in the menu a source's own row opens, above the address parameters and the removal. It opens the editor, and the editor holds the name, the address, the site, how often the source is asked, whether it is one of the reader's favourites, and a way through to the address parameters.
+In the sources panel, in the menu a source's own row opens, between the favourite and the removal. It opens the editor, and the editor holds everything there is to say about one source : its name, its address and whether that address is a secret, the parameters on its addresses, the site it belongs to, how often it is asked, whether it is one of the reader's favourites, and its health.
 
 Every field is written on every save, so what the editor sends is the whole of what the reader was looking at. `SourceEdit` is that state and nothing else : text for what is typed, since text is what a reader types, and the canonicalization happens once, in the store, under the rules identity already follows.
+
+The parameters of its addresses are in it too, as toggles against what the feed's address and its recent articles actually carry. They were a screen of their own behind a second line of the same menu, which is one place too many for something that is plainly a property of this source. `docs/technical/credentials.md` covers what a designation means and where it is applied.
 
 The health of the source is shown and cannot be edited : when it last answered, the share of answers that were `304`, and how many failures stand in a row. Section 8 asks for the 304 rate to be surfaced in the feed settings, and this is where the feed settings are.
 
@@ -45,6 +47,15 @@ The entries are not touched at all, which is the whole point : they are keyed by
 
 **The keychain**, when the address that changed is itself a secret. What the database holds for a private feed is already the masked form of section 9, which gives nothing back, so the editor never shows the address and offers a new secret one instead. It goes to the keychain first, and the row is moved after : should the second half fail, a feed fetched with the secret it was given goes on working under an identity one move behind, where the other order would leave a source at an address whose secret nothing knows.
 
+## Secret, or not
+
+Whether an address is a secret is a fact about the address rather than a setting beside it, so it is a switch in the address section, and moving it moves the source through the same path as any other change of address.
+
+- **Making one secret** masks the row, writes the real address to the keychain, and deletes the records the plain address was in : it is the only way a reader who pasted a per-subscriber address without saying so can get it out of their own iCloud. The whole of what was under it stays.
+- **Making one open** writes the address back into the database and into iCloud, in the open, which the screen says before it is asked for. Flong uses the address the keychain holds unless the reader types another ; with neither, it is refused rather than leaving a source at an address nothing knows.
+- The keychain is written before the row and cleared after it. A secret stored for a source that did not move is a secret nothing will use ; a secret cleared from one that did is a source that is simply broken.
+- The masked form is never printed. A reader turning the switch off is not shown the address they are about to publish, because a screen that prints a secret to prove it is about to stop being one is still a screen that prints a secret.
+
 ## Carrying the move to the other devices
 
 The obvious implementation is a save under the new name and a deletion under the old one. On another device that pair reads as one subscription removed and another one added, and the removal takes the articles of a source that has not gone anywhere.
@@ -63,4 +74,4 @@ The upsert has always completed a feed and never overwritten it : a title they c
 
 ## What is tested
 
-That a rename leaves the source where it is ; that an empty name falls back to the host it now has ; that a move keeps the articles and reports the address it came from and the articles the reader had marked ; that a move onto an address already followed is refused and changes nothing ; that an address Flong cannot follow is refused ; that a move forgets the conditional state, the health record and the quarantine ; that the waiting marks follow and another source's stay ; that the name over an emptied publisher goes and the name over a publisher still served stays ; that the site is what a source is grouped under ; that a manual interval is held inside the bounds of section 8 ; that a move arriving from another device moves the row rather than adding one, twice over and onto a taken address ; and that what another device decided about a name, a site or a favourite is adopted, while a record that says nothing about one takes nothing back.
+That a source made secret is masked with its address in the keychain and its articles untouched ; that one made open again is written back in the open with the keychain emptied ; that one made open with no address anywhere is refused rather than broken ; that a new secret address replaces the one held and moves the source ; that changing anything else on a secret source leaves the secret alone ; that the parameters offered are the ones the feed and its articles carry, that a masked address is not among them and its articles' still are, and that a designation is folded. And, at the store : that a rename leaves the source where it is ; that an empty name falls back to the host it now has ; that a move keeps the articles and reports the address it came from and the articles the reader had marked ; that a move onto an address already followed is refused and changes nothing ; that an address Flong cannot follow is refused ; that a move forgets the conditional state, the health record and the quarantine ; that the waiting marks follow and another source's stay ; that the name over an emptied publisher goes and the name over a publisher still served stays ; that the site is what a source is grouped under ; that a manual interval is held inside the bounds of section 8 ; that a move arriving from another device moves the row rather than adding one, twice over and onto a taken address ; and that what another device decided about a name, a site or a favourite is adopted, while a record that says nothing about one takes nothing back.
