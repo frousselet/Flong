@@ -292,12 +292,23 @@ nonisolated struct SyncPayload: Sendable {
         return true
     }
 
+    /// Stops following what another device stopped following.
+    ///
+    /// Through the store's own removal rather than a delete of the row, so a
+    /// source that goes because another device said so goes exactly as one the
+    /// reader removed here does : the filings, the waiting marks, the emptied
+    /// stories and the name over a publisher whose last source this was. A
+    /// device that only deleted the row would keep every one of those, for ever
+    /// and invisibly, on the device that was not the one asked.
+    ///
+    /// Nothing is queued back to iCloud : the device that removed it has
+    /// already deleted every record, and this end has only to catch up.
     private func unsubscribe(named name: String) async throws -> Bool {
-        try await database.writer.write { db in
-            let feeds = try Feed.fetchAll(db)
-            guard let feed = feeds.first(where: { SyncRecords.name(forFeed: $0.url) == name }) else { return false }
-            return try Feed.deleteOne(db, key: feed.id)
-        }
+        let feeds = try await subscriptions.feeds()
+        guard let feed = feeds.first(where: { SyncRecords.name(forFeed: $0.url) == name }) else { return false }
+
+        try await subscriptions.unsubscribe(feed.id)
+        return true
     }
 
     /// Takes back the marks of an article another device unmarked entirely.

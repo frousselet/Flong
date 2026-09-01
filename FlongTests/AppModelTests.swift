@@ -344,6 +344,74 @@ struct AppModelTests {
         #expect(server.requests.isEmpty)
     }
 
+    // MARK: - Removing a source
+
+    @Test("Removing a source empties the window of it and puts the reader back on the stream")
+    func removingASource() async throws {
+        let une = try await subscriptions.subscribe(
+            to: Subscription(address: "https://www.lemonde.fr/rss/une.xml", title: "À la une")
+        ).feed
+        let blog = try await subscriptions.subscribe(
+            to: Subscription(address: "https://blog.example.com/feed", title: "Un blog")
+        ).feed
+        try await seed("une", feed: une)
+        try await seed("blog", feed: blog)
+
+        await model.load()
+        model.selection = .feed(une.id)
+
+        await model.unsubscribe(une.id)
+
+        #expect(model.failure == nil)
+        #expect(model.sourceGroups.map(\.kind) == [.group("blog.example.com")])
+        // Back where a first launch puts them, rather than on a heading with
+        // nothing under it.
+        #expect(model.selection == .all)
+        #expect(model.summaries.map(\.title) == ["blog"])
+    }
+
+    @Test("Removing a source takes its secret out of the keychain")
+    func removingASourceTakesItsSecret() async throws {
+        let credentials = MemoryCredentials()
+        let model = AppModel(database: database, credentials: credentials)
+        let feed = try await subscriptions.subscribe(
+            to: Subscription(address: "https://feeds.example.com/private.xml")
+        ).feed
+
+        await model.setCredential(.bearer("not-a-real-token"), for: feed.id)
+        #expect(model.hasCredential(feed.id))
+
+        await model.unsubscribe(feed.id)
+
+        // Keyed by a row that no longer exists : left behind, nothing in the
+        // application could ever name it again.
+        #expect(try credentials.identifiers().isEmpty)
+        #expect(!model.hasCredential(feed.id))
+    }
+
+    @Test("Removing a publisher removes every source under it")
+    func removingAPublisher() async throws {
+        let une = try await subscriptions.subscribe(
+            to: Subscription(address: "https://www.lemonde.fr/rss/une.xml", title: "À la une")
+        ).feed
+        try await subscriptions.subscribe(
+            to: Subscription(address: "https://lemonde.fr/rss/sport.xml", title: "Sport")
+        )
+        try await subscriptions.subscribe(
+            to: Subscription(address: "https://blog.example.com/feed", title: "Un blog")
+        )
+        try await seed("une", feed: une)
+        await model.renameGroup("lemonde.fr", to: "Le Monde")
+        model.selection = .group("lemonde.fr")
+
+        await model.unsubscribe(fromPublisher: "lemonde.fr")
+
+        #expect(model.failure == nil)
+        #expect(model.sourceGroups.map(\.kind) == [.group("blog.example.com")])
+        #expect(model.selection == .all)
+        #expect(model.summaries.isEmpty)
+    }
+
     @Test("An OPML file fills the sidebar and reports what it did")
     func importing() async throws {
         server.install { _ in StubResponse(statusCode: 404) }

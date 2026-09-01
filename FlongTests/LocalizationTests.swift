@@ -75,6 +75,34 @@ struct LocalizationTests {
         #expect(warning.contains("irréversible"))
     }
 
+    @Test("The other command that cannot be undone says so in French too")
+    func removingASource() {
+        let asked = String(localized: "Delete \("Le Monde")?", locale: french)
+        #expect(asked == "Supprimer Le Monde ?")
+
+        // The two sentences a reader reads before they confirm, and the half of
+        // each that matters : what goes beyond the source itself, and that it
+        // does not come back.
+        let source = String(
+            localized: """
+                Its articles go with it, including the ones you starred, wrote on or filed. This cannot be undone.
+                """,
+            locale: french
+        )
+        #expect(source.hasPrefix("Ses articles partent avec elle"))
+        #expect(source.hasSuffix("C'est sans retour."))
+
+        let publisher = String(
+            localized: """
+                Every source under it goes, and their articles with them, including the ones you starred, \
+                wrote on or filed. This cannot be undone.
+                """,
+            locale: french
+        )
+        #expect(publisher.hasPrefix("Toutes ses sources partent"))
+        #expect(publisher.hasSuffix("C'est sans retour."))
+    }
+
     @Test("Naming a publisher says which one it is putting back")
     func namingAPublisher() {
         let french = String(

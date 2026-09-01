@@ -136,7 +136,7 @@ nonisolated struct CollectionStore: Sendable {
                         INSERT OR IGNORE INTO tag_binding (tag_id, target_kind, target_id, created_at)
                         VALUES (?, ?, ?, ?)
                         """,
-                    arguments: [tag, Self.kind, id, date]
+                    arguments: [tag, Self.targetKind, id, date]
                 )
             }
         }
@@ -152,7 +152,7 @@ nonisolated struct CollectionStore: Sendable {
                     WHERE target_kind = ? AND target_id IN (\(databaseQuestionMarks(count: itemIDs.count)))
                       AND tag_id IN (SELECT id FROM tag WHERE path = ?)
                     """,
-                arguments: StatementArguments([Self.kind] + itemIDs.map { $0.databaseValue })
+                arguments: StatementArguments([Self.targetKind] + itemIDs.map { $0.databaseValue })
                     + StatementArguments([Self.path(of: name)])
             )
         }
@@ -168,7 +168,7 @@ nonisolated struct CollectionStore: Sendable {
                     JOIN tag_binding b ON b.tag_id = t.id
                     WHERE b.target_kind = ? AND b.target_id = ? AND t.path LIKE ?
                     """,
-                arguments: [Self.kind, itemID, Self.root + "/%"]
+                arguments: [Self.targetKind, itemID, Self.root + "/%"]
             )
             .compactMap(Self.name(ofPath:))
             .sorted(by: Self.before)
@@ -203,7 +203,7 @@ nonisolated struct CollectionStore: Sendable {
                     WHERE b.target_kind = ? AND t.path LIKE ?
                     ORDER BY t.path
                     """,
-                arguments: [Self.kind, Self.root + "/%"]
+                arguments: [Self.targetKind, Self.root + "/%"]
             )
             .compactMap { row in
                 (row["path"] as String?).flatMap(Self.name(ofPath:)).map {
@@ -239,7 +239,7 @@ nonisolated struct CollectionStore: Sendable {
                     WHERE t.path LIKE ?
                     GROUP BY t.path
                     """,
-                arguments: [Self.kind, Self.kind, Self.root + "/%"]
+                arguments: [Self.targetKind, Self.targetKind, Self.root + "/%"]
             )
             .compactMap { row in
                 (row["path"] as String?).map { Counted(name: $0, count: row["count"], cover: row["cover"]) }
@@ -372,5 +372,9 @@ nonisolated struct CollectionStore: Sendable {
     }
 
     /// What a binding points at, which is an article.
-    private static let kind = "entry"
+    ///
+    /// Not private : the kind is what tells a filing of an article from a
+    /// filing of anything else, so whoever removes articles has to name it too,
+    /// and two spellings of it would be a filing nothing ever clears.
+    static let targetKind = "entry"
 }

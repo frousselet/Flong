@@ -51,8 +51,31 @@ struct SourcesPanel: View {
     /// The publisher whose name is being written, and what is being written.
     @State private var renaming: String?
     @State private var renamed = ""
+    /// What the reader has asked to delete, and whether they are being asked
+    /// whether they meant it.
+    ///
+    /// **Two pieces of state rather than one optional**, and the reason is the
+    /// dismissal : the alert stays on screen for the length of its animation
+    /// after the binding that presented it has gone false, so an alert whose
+    /// words were read off that same optional would spend the animation saying
+    /// `Supprimer ?` about nothing. What is being deleted is put down when the
+    /// next thing is picked up, not when the alert closes.
+    @State private var deleting: Deletion?
+    @State private var isDeleting = false
     @State private var isAddingFeed = false
     @State private var isChoosingFile = false
+
+    /// A source or a publisher, on its way out.
+    ///
+    /// The name is carried rather than looked up again : by the time the alert
+    /// is answered the row it came from may already be gone.
+    private struct Deletion: Hashable {
+        let kind: SidebarItem.Kind
+        let title: String
+
+        /// Whether it is a whole publisher rather than one of its desks.
+        var isPublisher: Bool { if case .group = kind { true } else { false } }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -70,7 +93,15 @@ struct SourcesPanel: View {
                         ForEach(group.children) { source in
                             row(source)
                                 .swipeActions(edge: .leading) { favouriting(source) }
-                                .contextMenu { favouriting(source) }
+                                // The destructive one on the trailing edge, where
+                                // the system puts a deletion and where a reader
+                                // already expects to find one. It asks before it
+                                // acts, so the swipe cannot cost them a source.
+                                .swipeActions(edge: .trailing) { deleting(source) }
+                                .contextMenu {
+                                    favouriting(source)
+                                    deleting(source)
+                                }
                         }
                     } header: {
                         heading(of: group)
@@ -113,6 +144,31 @@ struct SourcesPanel: View {
                 "The sources stay where they are. Leave it empty to call it \(domain) again.",
                 comment: "The address of a publisher, such as lemonde.fr"
             )
+        }
+        // **It asks, and it names what goes.** Everything else this panel does
+        // is undoable by doing it again : a name comes back off a publisher, a
+        // favourite is unstarred. This does not, and the articles it takes
+        // include the ones the reader singled out, so the sentence says that
+        // before the button does it rather than warning in the abstract.
+        .alert(
+            Text("Delete \(deleting?.title ?? "")?", comment: "The name of a source or of a publisher"),
+            isPresented: $isDeleting,
+            presenting: deleting
+        ) { deletion in
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                Task { await delete(deletion) }
+            }
+        } message: { deletion in
+            if deletion.isPublisher {
+                Text(
+                    "Every source under it goes, and their articles with them, including the ones you starred, wrote on or filed. This cannot be undone."
+                )
+            } else {
+                Text(
+                    "Its articles go with it, including the ones you starred, wrote on or filed. This cannot be undone."
+                )
+            }
         }
         // The two ways in, presented over the panel rather than behind it. They
         // belong to what the reader is doing here, and a panel that had to be
@@ -282,6 +338,7 @@ struct SourcesPanel: View {
             } label: {
                 Label("All articles", systemImage: "tray.full")
             }
+            deleting(group)
         } label: {
             HStack(spacing: 4) {
                 // The mark stands here and nowhere else in the list. It belongs
@@ -325,6 +382,31 @@ struct SourcesPanel: View {
             )
         }
         .tint(.yellow)
+    }
+
+    /// Taking a source, or a whole publisher, away for good.
+    ///
+    /// The same button in the swipe, in the long press and in the heading's
+    /// menu, since they are one action reached three ways. None of them acts :
+    /// each one asks, and the alert is where it happens, so a swipe that went
+    /// further than the reader meant costs them a tap and not a publisher.
+    @ViewBuilder
+    private func deleting(_ item: SidebarItem) -> some View {
+        Button(role: .destructive) {
+            deleting = Deletion(kind: item.kind, title: item.title ?? "")
+            isDeleting = true
+        } label: {
+            Label("Delete", systemImage: "trash")
+        }
+    }
+
+    private func delete(_ deletion: Deletion) async {
+        switch deletion.kind {
+        case .feed(let id): await model.unsubscribe(id)
+        case .group(let domain): await model.unsubscribe(fromPublisher: domain)
+        // The fixed views are not sources and carry none of this.
+        default: break
+        }
     }
 
     private func domain(of group: SidebarItem) -> String? {

@@ -533,6 +533,8 @@ The mark of a publisher stands once, at the head of its group, and the rows unde
 
 A source can be made a **favourite**, which is the reader saying this publisher is one of theirs. It is not the star an article wears : it stars nothing, it reorders nothing, and it changes nothing the front page ranks. It marks the row, and it fills a square on the collections page beside the starred articles, where the two are plainly different things.
 
+A source can also be **removed**, from a swipe on its trailing edge or from its long press, and a whole publisher from its heading's menu, which is the second thing that menu does. It is the one thing in this panel that cannot be undone, so it asks first, and the sentence it asks with names what goes rather than warning in the abstract : the articles go with the source, the ones the reader starred, wrote on or filed included. What goes with them is everything that was only there because of that source, here and in the reader's iCloud, which is what carries the removal to their other devices. `docs/technical/removing-a-source.md` sets out what is reached, what is deliberately not, and why.
+
 The digest, a story and an article are set as a page rather than as a control panel : one column held to a readable measure, serif headlines, hairline rules, no cards and no boxes. Liquid Glass belongs to the navigation layer, which is the system's own bar. The application draws it of its own in two places and both are that same rule : the subject pills, which are controls floating over the page, and the credit in the corner of a picture, which has to stay legible over an image nobody chose. `docs/technical/interface.md` records the design and what was rejected.
 
 ### The wire

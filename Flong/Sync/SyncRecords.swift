@@ -60,7 +60,17 @@ nonisolated enum SyncRecords {
     /// whole goes past that : the day is cut into as many records as it needs,
     /// numbered from zero, and a day that fits is simply `-0`.
     static func name(forCatchUpFeed url: URL, day: String, chunk: Int = 0) -> String {
-        "catchup-" + digest(url.absoluteString) + "-" + day + "-" + String(chunk)
+        namePrefix(forCatchUpFeed: url) + day + "-" + String(chunk)
+    }
+
+    /// What every block of one feed's stream is named under.
+    ///
+    /// A name is a digest and cannot be read backwards, so this is the only way
+    /// back from a feed to the records carrying it : the days are not known
+    /// once the articles have gone, and the number of chunks a day was cut into
+    /// never was known anywhere but in the record names themselves.
+    static func namePrefix(forCatchUpFeed url: URL) -> String {
+        "catchup-" + digest(url.absoluteString) + "-"
     }
 
     /// The same record, carrying the tag the server expects.

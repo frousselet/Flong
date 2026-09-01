@@ -86,6 +86,23 @@ nonisolated struct SyncState: Sendable {
         }
     }
 
+    /// The records this device has saved whose names begin with a prefix.
+    ///
+    /// **The table is the ledger of what this device actually wrote**, which is
+    /// what makes the question answerable at all : record names are digests and
+    /// cannot be read backwards, so nothing else can say which blocks of the
+    /// stream exist for one feed. A prefix is built from a digest and carries
+    /// no `%` or `_` of its own, so it needs no escaping.
+    func names(startingWith prefix: String) async throws -> [String] {
+        try await database.writer.read { db in
+            try String.fetchAll(
+                db,
+                sql: "SELECT record_name FROM sync_record WHERE record_name LIKE ?",
+                arguments: [prefix + "%"]
+            )
+        }
+    }
+
     /// Forgets records the server no longer holds.
     func forget(_ names: [String]) async throws {
         guard !names.isEmpty else { return }

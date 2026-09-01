@@ -212,6 +212,153 @@ struct SubscriptionStoreTests {
         #expect(actual == 0)
     }
 
+    @Test("Unsubscribing takes the filings of its articles, which no key reaches")
+    func unsubscribingTakesTheFilings() async throws {
+        let collections = CollectionStore(database)
+        let feed = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml")).feed
+        let other = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/2.xml")).feed
+
+        let kept = Entry(feedID: feed.id, guid: "urn:example:1", title: "Filed")
+        let spared = Entry(feedID: other.id, guid: "urn:example:2", title: "Filed too")
+        try await database.writer.write { db in
+            try kept.insert(db)
+            try spared.insert(db)
+        }
+        _ = try await collections.create("À lire")
+        try await collections.add([kept.id, spared.id], to: "À lire")
+
+        try await store.unsubscribe(feed.id)
+
+        // The article of the other source keeps its place : a filing is removed
+        // because the article it names has gone, not because the collection was.
+        let bindings = try await database.writer.read { db in
+            try UUID.fetchAll(db, sql: "SELECT target_id FROM tag_binding WHERE target_kind = 'entry'")
+        }
+        #expect(bindings == [spared.id])
+        let made = try await collections.made()
+        #expect(made.first { $0.name == "À lire" }?.count == 1)
+    }
+
+    @Test("Unsubscribing says which of its articles the reader had marked")
+    func unsubscribingReportsWhatWasMarked() async throws {
+        let feed = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml")).feed
+
+        var starred = Entry(feedID: feed.id, guid: "urn:example:starred", title: "Starred")
+        starred.isStarred = true
+        var written = Entry(feedID: feed.id, guid: "urn:example:written", title: "Written on")
+        written.annotation = "A note"
+        let plain = Entry(feedID: feed.id, guid: "urn:example:plain", title: "Nothing said")
+        try await database.writer.write { db in
+            try starred.insert(db)
+            try written.insert(db)
+            try plain.insert(db)
+        }
+
+        let gone = try await store.unsubscribe(feed.id)
+
+        // What Spotlight held and what iCloud has a record of, which is the
+        // marked ones and never the whole stream of the feed.
+        #expect(Set(gone.marked.map(\.id)) == [starred.id, written.id])
+        #expect(Set(gone.marked.map(\.guid)) == ["urn:example:starred", "urn:example:written"])
+        #expect(gone.feed.url == feed.url)
+    }
+
+    @Test("Unsubscribing drops the marks that were waiting for its articles")
+    func unsubscribingDropsWaitingMarks() async throws {
+        let feed = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml")).feed
+        let other = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/2.xml")).feed
+
+        for url in [feed.url, other.url] {
+            try await database.writer.write { db in
+                try db.execute(
+                    sql: """
+                        INSERT INTO pending_mark (feed_url, guid, payload, received_at)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                    arguments: [url.absoluteString, "urn:example:1", Data(), Date()]
+                )
+            }
+        }
+
+        try await store.unsubscribe(feed.id)
+
+        let waiting = try await database.writer.read { db in
+            try String.fetchAll(db, sql: "SELECT feed_url FROM pending_mark")
+        }
+        #expect(waiting == [other.url.absoluteString])
+    }
+
+    @Test("Unsubscribing leaves no story standing over nothing")
+    func unsubscribingEmptiesStories() async throws {
+        let feed = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml")).feed
+        let other = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/2.xml")).feed
+
+        let covered = Entry(feedID: feed.id, guid: "urn:example:1", title: "One room")
+        let alsoCovered = Entry(feedID: other.id, guid: "urn:example:2", title: "The other")
+        let now = Date()
+        let story = Story(title: "Something happened", articleCount: 2, feedCount: 2, firstAt: now, lastAt: now)
+        try await database.writer.write { db in
+            try covered.insert(db)
+            try alsoCovered.insert(db)
+            try story.insert(db)
+            try StoryMember(storyID: story.id, entryID: covered.id, similarity: 1).insert(db)
+            try StoryMember(storyID: story.id, entryID: alsoCovered.id, similarity: 1).insert(db)
+        }
+
+        try await store.unsubscribe(feed.id)
+
+        // One room left covering it is not a story, so the headline goes rather
+        // than standing over a single article.
+        let stories = try await database.writer.read { db in try Story.fetchCount(db) }
+        #expect(stories == 0)
+    }
+
+    @Test("The name over a publisher goes with the last of its sources")
+    func unsubscribingForgetsTheName() async throws {
+        let une = try await store.subscribe(to: Subscription(address: "https://www.lemonde.fr/rss/une.xml")).feed
+        let sport = try await store.subscribe(to: Subscription(address: "https://lemonde.fr/rss/sport.xml")).feed
+        try await store.rename(domain: "lemonde.fr", to: "Le Monde")
+
+        let first = try await store.unsubscribe(une.id)
+        #expect(!first.forgotName)
+        let stillNamed = try await store.names()
+        #expect(stillNamed.map(\.name) == ["Le Monde"])
+
+        let last = try await store.unsubscribe(sport.id)
+        #expect(last.forgotName)
+        let forgotten = try await store.names()
+        #expect(forgotten.isEmpty)
+    }
+
+    @Test("Removing a publisher removes every source under it and nothing else")
+    func unsubscribingFromAPublisher() async throws {
+        try await store.subscribe(to: Subscription(address: "https://www.lemonde.fr/rss/une.xml"))
+        try await store.subscribe(to: Subscription(address: "https://lemonde.fr/rss/sport.xml"))
+        let blog = try await store.subscribe(to: Subscription(address: "https://blog.example.com/feed")).feed
+        try await store.rename(domain: "lemonde.fr", to: "Le Monde")
+
+        let gone = try await store.unsubscribe(fromPublisher: "lemonde.fr")
+
+        #expect(gone.count == 2)
+        // The name is forgotten once, by whichever of them turned out to be last.
+        #expect(gone.filter(\.forgotName).count == 1)
+        let names = try await store.names()
+        #expect(names.isEmpty)
+        let left = try await store.feeds()
+        #expect(left.map(\.id) == [blog.id])
+    }
+
+    @Test("Removing a publisher nobody follows removes nothing")
+    func unsubscribingFromAnUnknownPublisher() async throws {
+        try await store.subscribe(to: Subscription(address: "https://blog.example.com/feed"))
+
+        let gone = try await store.unsubscribe(fromPublisher: "lemonde.fr")
+
+        #expect(gone.isEmpty)
+        let left = try await store.count()
+        #expect(left == 1)
+    }
+
     // MARK: - Groups and favourites
 
     @Test("Naming a publisher writes a row, and only the ones named have one")

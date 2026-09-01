@@ -24,6 +24,33 @@ nonisolated struct SubscriptionResult: Hashable, Sendable {
     let isNew: Bool
 }
 
+/// What went with a source, and what is left to take away elsewhere.
+///
+/// The store empties itself : the articles, their bodies, their rows of the
+/// index, their place in a story and their filings all go with the feed. Three
+/// things it cannot reach go with them, and this is what the window needs in
+/// order to reach them : the secret in the keychain, the marked articles
+/// Spotlight is holding, and the records the reader's iCloud has for the
+/// subscription and for what they marked under it.
+nonisolated struct Unsubscription: Hashable, Sendable {
+    /// One article the reader had said something about.
+    ///
+    /// Its identifier is what Spotlight files it under, and its GUID is half of
+    /// what names its record, the other half being the address of the feed.
+    nonisolated struct Marked: Hashable, Sendable {
+        let id: UUID
+        let guid: String
+    }
+
+    /// The source as it was, which nothing can be read back from now.
+    let feed: Feed
+    /// The articles of it the reader had starred, written on or filed.
+    let marked: [Marked]
+    /// Whether the name the reader had written over the publisher went too,
+    /// which happens when this was the last of its sources.
+    let forgotName: Bool
+}
+
 /// The subscriptions : which feeds Flong follows, how they are called and which
 /// publisher they belong to.
 ///
@@ -179,12 +206,91 @@ nonisolated struct SubscriptionStore: Sendable {
         try await update(id) { feed in feed.isFavourite = isFavourite }
     }
 
-    /// Stops following a feed, which takes its articles and their bodies with it.
-    func unsubscribe(_ id: UUID) async throws {
-        let deleted = try await database.writer.write { db in
-            try Feed.deleteOne(db, key: id)
+    /// Stops following a source and takes everything it brought with it.
+    ///
+    /// **One transaction, so a source never half goes.** Most of what a feed
+    /// owns leaves on the foreign keys : the articles, their bodies, their
+    /// place in a story and, through the triggers of the schema, their rows of
+    /// the full-text index. What is done by hand here is the four things no key
+    /// reaches, and every one of them would otherwise be a row pointing at
+    /// something that no longer exists.
+    @discardableResult
+    func unsubscribe(_ id: UUID) async throws -> Unsubscription {
+        try await database.writer.write { db in
+            guard let feed = try Feed.fetchOne(db, key: id) else { throw SubscriptionError.unknownFeed(id) }
+            return try Self.remove(feed, in: db)
         }
-        guard deleted else { throw SubscriptionError.unknownFeed(id) }
+    }
+
+    /// Stops following every source of one publisher.
+    ///
+    /// A group is the address its sources share and is not a row, so removing
+    /// one is removing its sources : there is nothing else of it to delete, and
+    /// the heading goes because the last thing under it did. In one
+    /// transaction, since a publisher half removed is a heading over the desks
+    /// that happened to fail.
+    @discardableResult
+    func unsubscribe(fromPublisher domain: String) async throws -> [Unsubscription] {
+        try await database.writer.write { db in
+            try Feed.all().orderedByTitle().fetchAll(db)
+                .filter { $0.domain == domain }
+                .map { try Self.remove($0, in: db) }
+        }
+    }
+
+    /// Takes one source away, and everything that was only there because of it.
+    private static func remove(_ feed: Feed, in db: Database) throws -> Unsubscription {
+        // Read before anything is deleted : this is what the window has to take
+        // out of Spotlight and out of the reader's iCloud, and in a moment
+        // there will be nothing left to read it from.
+        let marked = try Row.fetchAll(
+            db,
+            sql: "SELECT id, guid FROM entry WHERE feed_id = ? AND \(Retention.marked)",
+            arguments: [feed.id]
+        )
+        .map { Unsubscription.Marked(id: $0["id"], guid: $0["guid"]) }
+
+        // A filing carries no foreign key, since it points at one of three
+        // tables, so nothing takes it away with the article it names. Left
+        // behind it is a row of a collection standing for an article that has
+        // gone, which every count of that collection then has to step over.
+        try db.execute(
+            sql: """
+                DELETE FROM tag_binding
+                WHERE target_kind = ? AND target_id IN (SELECT id FROM entry WHERE feed_id = ?)
+                """,
+            arguments: [CollectionStore.targetKind, feed.id]
+        )
+
+        // A mark waiting for an article that is never going to arrive now. It
+        // is keyed by the address of the feed rather than by a row of it, which
+        // is the whole point of it, and so no key reaches it either.
+        try db.execute(
+            sql: "DELETE FROM pending_mark WHERE feed_url = ?",
+            arguments: [feed.url.absoluteString]
+        )
+
+        // The source itself, and with it the articles and everything keyed on
+        // them.
+        try feed.delete(db)
+
+        // A story is several rooms covering one event. Take a room away and
+        // some of them are one article, or none, and a front page would go on
+        // showing a headline over nothing.
+        try StoryBuilder.removeEmptyStories(in: db)
+
+        // The name the reader wrote over the publisher, when this was the last
+        // source under it. A group is worked out from the addresses of the
+        // feeds and never survives them, so a name left here would be a row
+        // nothing can reach : not shown anywhere, not editable anywhere, and
+        // silently reappearing over the group if the reader ever subscribes to
+        // that publisher again.
+        let stillFollowed = try Feed.fetchAll(db).contains { $0.domain == feed.domain }
+        let forgotName =
+            try !stillFollowed
+            && SourceName.filter(SourceName.Columns.domain == feed.domain).deleteAll(db) > 0
+
+        return Unsubscription(feed: feed, marked: marked, forgotName: forgotName)
     }
 
     private func update(_ id: UUID, _ change: @escaping @Sendable (inout Feed) -> Void) async throws {

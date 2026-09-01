@@ -842,6 +842,17 @@
         }
       }
     },
+    "Delete %@?" : {
+      "comment" : "The name of a source or of a publisher",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer %@ ?"
+          }
+        }
+      }
+    },
     "Delete everything" : {
       "localizations" : {
         "fr" : {
@@ -996,6 +1007,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Union européenne"
+          }
+        }
+      }
+    },
+    "Every source under it goes, and their articles with them, including the ones you starred, wrote on or filed. This cannot be undone." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toutes ses sources partent, et leurs articles avec elles, y compris ceux que vous avez mis en favori, annotés ou classés. C'est sans retour."
           }
         }
       }
@@ -1419,6 +1440,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Elle se remplit de tout ce qui correspond, et continue de se remplir. Essayez `title:Swift` ou `is:unread`."
+          }
+        }
+      }
+    },
+    "Its articles go with it, including the ones you starred, wrote on or filed. This cannot be undone." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ses articles partent avec elle, y compris ceux que vous avez mis en favori, annotés ou classés. C'est sans retour."
           }
         }
       }
@@ -2507,6 +2538,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce site n'a laissé aucune session. Connectez-vous sur sa page, puis dites-le."
+          }
+        }
+      }
+    },
+    "This source could not be removed. Try again in a moment." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette source n'a pas pu être supprimée. Réessayez dans un instant."
           }
         }
       }

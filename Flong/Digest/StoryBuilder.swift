@@ -273,16 +273,25 @@ nonisolated struct StoryBuilder: Sendable {
 
     /// Drops the stories a purge left with fewer than two articles.
     private func removeEmptyStories() async throws {
-        try await database.writer.write { db in
-            try db.execute(
-                sql: """
-                    DELETE FROM story WHERE id IN (
-                        SELECT s.id FROM story s
-                        LEFT JOIN story_member m ON m.story_id = s.id
-                        GROUP BY s.id HAVING COUNT(m.entry_id) < 2
-                    )
-                    """
-            )
-        }
+        try await database.writer.write { db in try Self.removeEmptyStories(in: db) }
+    }
+
+    /// The same, inside a transaction somebody else opened.
+    ///
+    /// Removing a source empties stories exactly as a purge does, and what a
+    /// story needs in order to still be a story is written here and nowhere
+    /// else : two rooms covering one event. A second copy of that rule would be
+    /// a front page that disagreed with itself depending on which path had last
+    /// touched it.
+    static func removeEmptyStories(in db: Database) throws {
+        try db.execute(
+            sql: """
+                DELETE FROM story WHERE id IN (
+                    SELECT s.id FROM story s
+                    LEFT JOIN story_member m ON m.story_id = s.id
+                    GROUP BY s.id HAVING COUNT(m.entry_id) < 2
+                )
+                """
+        )
     }
 }

@@ -70,6 +70,7 @@ nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
     case noFeedFound
     case notSignedIn
     case notDeleted
+    case notRemoved
 
     var id: Self { self }
 
@@ -83,6 +84,7 @@ nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
         case .noFeedFound: "No feed was found at this address."
         case .notSignedIn: "This site left no session. Sign in on its page, then say so."
         case .notDeleted: "Not everything could be deleted. Try again in a moment."
+        case .notRemoved: "This source could not be removed. Try again in a moment."
         }
     }
 }
@@ -2110,9 +2112,14 @@ final class AppModel {
     }
 
     /// Keeps what a feed needs to prove the reader is entitled to it.
+    ///
+    /// Which feeds are authenticated is read back rather than assumed : it is
+    /// what says a source has a secret without holding one, and a window that
+    /// did not read it back would go on saying no until something else reloaded.
     func setCredential(_ credential: FeedCredential?, for feedID: UUID) async {
         do {
             try credentials.setCredential(credential, for: feedID)
+            await loadCredentials()
             await loadSidebar()
         } catch {
             failure = .notSaved
@@ -2195,15 +2202,91 @@ final class AppModel {
         }
     }
 
+    /// Stops following a source, and takes everything it brought with it.
+    ///
+    /// **It is the one thing in the sources panel that cannot be undone**, and
+    /// the panel says so before it is asked for. What goes is everything that
+    /// was only here because of this source : its articles whatever the reader
+    /// did to them, the collections they were filed into losing those rows, the
+    /// secret it was fetched with, what Spotlight held of it, and its records in
+    /// the reader's iCloud, which is what carries the removal to their other
+    /// devices.
     func unsubscribe(_ id: UUID) async {
         do {
-            let url = try await subscriptions.feed(id: id)?.url
-            try await subscriptions.unsubscribe(id)
-            if let url { await cloud?.enqueue(deletions: [SyncRecords.name(forFeed: url)]) }
-            if case .feed(let selected) = selection, selected == id { selection = .unread }
-            await load()
+            let gone = try await subscriptions.unsubscribe(id)
+            await forget([gone])
         } catch {
-            Log.store.error("The feed could not be removed : \(error, privacy: .public)")
+            failure = .notRemoved
+            Log.store.error("The source could not be removed : \(error, privacy: .public)")
+        }
+    }
+
+    /// Stops following every source of one publisher.
+    ///
+    /// The heading is the only place a group is acted on, and this is the
+    /// second thing it does. A group is the address its sources share rather
+    /// than a row, so there is nothing of it left over : it goes because the
+    /// last thing under it did.
+    func unsubscribe(fromPublisher domain: String) async {
+        do {
+            let gone = try await subscriptions.unsubscribe(fromPublisher: domain)
+            await forget(gone)
+        } catch {
+            failure = .notRemoved
+            Log.store.error("The publisher could not be removed : \(error, privacy: .public)")
+        }
+    }
+
+    /// Takes away what sources that have gone left outside the store, and puts
+    /// the window back where it can stand.
+    ///
+    /// **The secret first.** A credential is keyed by a row that no longer
+    /// exists, so a moment from now nothing in the application would be able to
+    /// name it : it would sit in the keychain, unreachable, until the reader
+    /// deleted everything. Section 20 of the specification is careful about
+    /// exactly this.
+    private func forget(_ gone: [Unsubscription]) async {
+        for one in gone {
+            do {
+                try credentials.setCredential(nil, for: one.feed.id)
+            } catch {
+                // Never the address, and never the credential : an error
+                // message is one of the places section 9 says a secret may not
+                // appear.
+                Log.store.error("A secret of a source that has gone stayed in the keychain")
+            }
+
+            do {
+                try await spotlight.remove(one.marked.map(\.id))
+            } catch {
+                Log.index.error("Spotlight kept articles of a removed source : \(error, privacy: .public)")
+            }
+
+            await cloud?.enqueueRemoval(
+                ofFeed: one.feed.url,
+                marks: one.marked.map { SyncRecords.name(forMarkWithGUID: $0.guid, feedURL: one.feed.url) },
+                sourceName: one.forgotName ? SyncRecords.name(forSourceNamedDomain: one.feed.domain) : nil
+            )
+        }
+
+        // What the window was pointed at may have been one of them. The whole
+        // stream is where a reader lands then, which is where a first launch
+        // puts them, rather than on a heading with nothing under it.
+        let removed = Set(gone.map(\.feed.id))
+        let domains = Set(gone.map(\.feed.domain))
+        switch selection {
+        case .feed(let selected) where removed.contains(selected): selection = .all
+        case .group(let selected) where domains.contains(selected): selection = .all
+        default: break
+        }
+
+        await load()
+
+        // An article of a source that has gone is not an article any more, and
+        // a page still holding it would be a page reading from nothing.
+        if let open = article, ((try? await articles.article(id: open.id)) ?? nil) == nil {
+            selectedArticle = nil
+            article = nil
         }
     }
 

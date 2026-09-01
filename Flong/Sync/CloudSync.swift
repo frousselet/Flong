@@ -209,6 +209,28 @@ actor CloudSync {
         engine.state.add(pendingRecordZoneChanges: names.map { .deleteRecord(recordID(for: $0)) })
     }
 
+    /// Deletes from iCloud everything one source ever put there.
+    ///
+    /// **Four kinds of record, and the reader's iCloud holds all four.** The
+    /// subscription, so the reader's other devices stop following it too ; one
+    /// record for each article they had marked under it, since a mark is the
+    /// one thing here that is theirs rather than the publisher's ; every block
+    /// of that feed's stream this device wrote, which is the bulk of them ; and
+    /// the name they had written over the publisher, when the source that went
+    /// was its last.
+    ///
+    /// The blocks are found by name rather than worked out : the days are gone
+    /// with the articles, and a day cut into three records is three names only
+    /// the ledger of what was saved still knows.
+    func enqueueRemoval(ofFeed url: URL, marks: [String], sourceName: String?) async {
+        var names = [SyncRecords.name(forFeed: url)] + marks
+        if let sourceName { names.append(sourceName) }
+        names += (try? await state.names(startingWith: SyncRecords.namePrefix(forCatchUpFeed: url))) ?? []
+
+        enqueue(deletions: names)
+        Log.sync.notice("Queued \(names.count) records for deletion with a source")
+    }
+
     /// Queues what this device saw lately, so a device that was switched off
     /// learns what it missed, and drops what has fallen out of the window.
     func enqueueCatchUp(now: Date = Date()) async {
