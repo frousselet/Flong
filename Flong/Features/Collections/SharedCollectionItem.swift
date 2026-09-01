@@ -31,6 +31,8 @@ nonisolated struct SharedCollectionItem: Transferable, Sendable {
     /// The made collection being shared, by the name the reader gave it.
     let name: String
     let sharing: CollectionSharing
+    /// Sends what is already in it, once there is a zone to send it to.
+    let push: @Sendable () async -> Void
 
     static var transferRepresentation: some TransferRepresentation {
         CKShareTransferRepresentation { item in
@@ -40,6 +42,11 @@ nonisolated struct SharedCollectionItem: Transferable, Sendable {
                 // making a second zone the first participant would never see.
                 let share = try await item.sharing.share(ofCollectionNamed: item.name)
                 await item.sharing.rememberURL(of: share)
+                // What is already in it goes with the invitation. A collection
+                // that arrived empty and filled itself on the owner's next
+                // filing would look, to whoever was invited, like nothing was
+                // shared at all.
+                await item.push()
                 return share
             }
         }

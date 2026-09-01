@@ -33,6 +33,7 @@ actor CollectionSharing {
     nonisolated let container: CKContainer
 
     private let store: SharedCollectionStore
+    private let entries: SharedEntryStore
 
     init(
         database: AppDatabase,
@@ -40,6 +41,37 @@ actor CollectionSharing {
     ) {
         self.container = container
         self.store = SharedCollectionStore(database)
+        self.entries = SharedEntryStore(database)
+    }
+
+    // MARK: - Who put what in
+
+    /// Who filed each article in one shared collection, by its identity.
+    ///
+    /// **Two questions joined here so that neither leaves this layer.** The
+    /// store says which identifier filed which article, and the share says what
+    /// that identifier is called ; the identifier itself is a CloudKit user
+    /// record name, which is opaque and has no business anywhere near a view.
+    ///
+    /// `owner` is `nil` for one of the reader's own collections, whose share is
+    /// in their private database. A collection they were invited to has its
+    /// share in the shared one, under the owner named here.
+    ///
+    /// **Nothing comes back for the reader's own filings.** A collection saying
+    /// who put a thing in it should not keep telling them it was them.
+    func attribution(inZone zone: String, ownedBy owner: String?) async -> [String: String] {
+        guard let authors = try? await entries.authors(inZone: zone) else { return [:] }
+
+        let database = owner == nil ? container.privateCloudDatabase : container.sharedCloudDatabase
+        let zoneID = CKRecordZone.ID(zoneName: zone, ownerName: owner ?? CKCurrentUserDefaultName)
+
+        let names = await ShareParticipants.names(inZone: zoneID, from: database)
+        let me = try? await container.userRecordID().recordName
+
+        return authors.reduce(into: [:]) { found, pair in
+            guard pair.value != me, let name = names[pair.value] else { return }
+            found[pair.key] = name
+        }
     }
 
     // MARK: - Inviting
@@ -119,6 +151,43 @@ actor CollectionSharing {
         guard let existing = try await store.owned(named: name) else { return nil }
         let zoneID = CKRecordZone.ID(zoneName: existing.zoneName, ownerName: CKCurrentUserDefaultName)
         return try await share(in: zoneID)
+    }
+
+    /// Sends what the reader has in one of their own shared collections.
+    ///
+    /// **Through `CKDatabase` and not through an engine**, for the same reason
+    /// the share itself is : the owner's shared zones are in their private
+    /// database, and ``CloudSync`` addresses one zone by construction. Teaching
+    /// it several is a change worth making one day and not one to make in
+    /// passing ; what a save loses meanwhile is the engine's retrying, and this
+    /// is called again on every change to the collection, so a push that fails
+    /// is a push the next filing makes good.
+    ///
+    /// **The whole list, every time.** A list is the whole truth about what one
+    /// person filed, so an article taken out of the collection has to leave the
+    /// record for the removal to reach anybody.
+    ///
+    /// A collection nobody was invited to does nothing here.
+    func push(collectionNamed name: String, from database: AppDatabase, credentials: CredentialStoring) async {
+        guard let existing = try? await store.owned(named: name),
+            let me = try? await container.userRecordID()
+        else { return }
+
+        let zoneID = CKRecordZone.ID(zoneName: existing.zoneName, ownerName: CKCurrentUserDefaultName)
+
+        do {
+            let filed = try await SharedEntry.entries(in: database, collectionNamed: name, credentials: credentials)
+            let records = SharedList.records(for: filed, by: me, in: zoneID)
+            _ = try await container.privateCloudDatabase.modifyRecords(saving: records, deleting: [])
+            Log.sync.notice("Sent \(filed.count) excerpts to a shared collection")
+        } catch let error as CKError where error.code == .zoneNotFound {
+            // The zone is gone, from another device or from the system's sheet.
+            // The collection is not shared any more, and the row saying it is
+            // would have every later filing try again against nothing.
+            try? await store.forget(zoneName: existing.zoneName)
+        } catch {
+            Log.sync.error("A shared collection could not be sent : \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// Stops sharing a collection, and takes the zone down with it.

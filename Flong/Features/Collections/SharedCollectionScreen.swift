@@ -33,7 +33,7 @@ struct SharedCollectionScreen: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(model.sharedArticles, id: \.guid) { entry in
-                    SharedArticleRow(entry: entry) {
+                    SharedArticleRow(entry: entry, by: model.filedBy[entry.guid]) {
                         guard let address = entry.url.flatMap(URL.init(string:)) else { return }
                         openURL(address)
                     }
@@ -66,6 +66,12 @@ struct SharedCollectionScreen: View {
 /// excerpt is a promise of an article rather than the article.
 struct SharedArticleRow: View {
     let entry: SharedEntry
+    /// Whoever put it here, where they can be named.
+    ///
+    /// Nothing for the reader's own filings, and nothing for a participant
+    /// CloudKit will not name : an opaque identifier is worse than silence,
+    /// because it looks like information.
+    var by: String?
     let open: () -> Void
 
     @Environment(\.theme) private var theme
@@ -93,11 +99,24 @@ struct SharedArticleRow: View {
                             .multilineTextAlignment(.leading)
                     }
 
-                    if let author = entry.author {
-                        Text(verbatim: author)
-                            .font(theme.metadata)
-                            .foregroundStyle(.tertiary)
+                    // The byline and whoever filed it are two different people
+                    // and the row says so : one wrote the piece, the other
+                    // thought it was worth passing on.
+                    HStack(spacing: 6) {
+                        if let author = entry.author {
+                            Text(verbatim: author)
+                        }
+                        if let by {
+                            if entry.author != nil { Text(verbatim: "·") }
+                            Label {
+                                Text("Filed by \(by)")
+                            } icon: {
+                                Image(systemName: "person.crop.circle")
+                            }
+                        }
                     }
+                    .font(theme.metadata)
+                    .foregroundStyle(.tertiary)
                 }
 
                 Spacer(minLength: 0)

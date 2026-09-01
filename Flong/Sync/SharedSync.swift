@@ -148,6 +148,16 @@ actor SharedSync {
         engine.state.add(pendingRecordZoneChanges: records.map { .saveRecord($0.recordID) })
     }
 
+    /// What this reader's own list is named, wherever they file.
+    ///
+    /// The same on every device of theirs, since it is worked out from their
+    /// own record in the container : filing from an iPad rewrites the list
+    /// filed from an iPhone rather than opening a second one.
+    func myListKey() async -> String? {
+        guard let me = await participant() else { return nil }
+        return SyncRecords.namePrefix(forSharedListBy: me)
+    }
+
     /// Whether this reader put a given article in a given shared collection.
     ///
     /// What the menu draws its tick from, and it is about their own list alone :
