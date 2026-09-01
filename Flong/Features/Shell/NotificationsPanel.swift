@@ -71,7 +71,7 @@ struct NotificationsPanel: View {
                     set: { wanted in Task { await model.setWantsNewStoryNotices(wanted) } }
                 )
             ) {
-                Label("New stories", systemImage: "sparkles.rectangle.stack")
+                Label("New stories", systemImage: "newspaper.fill")
             }
             .disabled(isRefused)
             .padding(.horizontal, 14)
