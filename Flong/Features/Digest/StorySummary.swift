@@ -27,10 +27,14 @@ import SwiftUI
 /// glyph is a summary rather than a spark, since what it marks is a summary and
 /// not a piece of magic.
 ///
-/// **Beside the words and not inside them.** Set into the text it would flow
-/// with it and end up in the middle of a wrapped line on a narrow phone. In its
-/// own column the sentence keeps its own measure and the mark keeps the margin,
-/// which is where a mark about a paragraph has always gone.
+/// **Set into the line, and not stood beside it.** It was in a column of its
+/// own first, the sentence indented past it. That is a label pinned next to a
+/// paragraph : it holds a gutter open down the whole page, it takes the width
+/// away from the words at the one size where they have least to spare, and a
+/// summary of three lines reads as a quotation. Inline, the glyph is the first
+/// thing in the sentence and the wrapped lines come back to the margin under
+/// it, which is how Mail sets the same mark on the same kind of line, and it is
+/// the treatment the reader has already met there.
 struct StorySummary: View {
     let summary: String
     /// Whether a model wrote the headline or this line. See `Story`.
@@ -45,26 +49,42 @@ struct StorySummary: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            if isGenerated {
-                Image(systemName: "text.line.3.summary")
-                    // The line's own size, so the mark grows with Dynamic Type
-                    // and sits on the same baseline whatever the reader has
-                    // asked for, and a step quieter in colour than the words :
-                    // it says who wrote them and is not one of them.
-                    .font(.system(style))
-                    .foregroundStyle(.tertiary)
-                    .accessibilityLabel(Text("Written by the model"))
-                    .help(Text("Written by the model"))
-            }
+        line
+            .font(theme.standfirst(style))
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.leading)
+            .lineLimit(lines)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // The glyph inside the words is not a word, and VoiceOver reads
+            // nothing where the eye reads a mark. Said here instead, in front
+            // of the sentence, in the order the page says it.
+            .accessibilityLabel(
+                isGenerated ? Text("Written by the model. \(summary)") : Text(verbatim: summary)
+            )
+            .help(isGenerated ? Text("Written by the model") : Text(verbatim: ""))
+    }
 
-            Text(verbatim: summary)
-                .font(theme.standfirst(style))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.leading)
-                .lineLimit(lines)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    /// The sentence, with the mark of who wrote it at the head of it.
+    ///
+    /// **One `Text` and not two views.** A glyph that is part of a sentence has
+    /// to break with the sentence : the second line of a summary starts at the
+    /// margin, under the mark, rather than in a column the mark opened. Only a
+    /// single run of text does that.
+    ///
+    /// The concatenation is deprecated and its replacement is not usable here :
+    /// interpolating into a `Text` means interpolating into a localized key, and
+    /// a story's summary is written by a model on this device and translated by
+    /// nobody, so the key would be `%@ %@` in the catalogue. The tick at the end
+    /// of a read headline is built exactly this way, a screen away in
+    /// ``ArticleRow``.
+    private var line: Text {
+        let sentence = Text(verbatim: summary)
+        guard isGenerated else { return sentence }
+
+        // A step quieter than the words it stands in front of : it says who
+        // wrote them and is not one of them.
+        return Text(Image(systemName: "text.line.3.summary")).foregroundStyle(.tertiary)
+            + Text(verbatim: " ") + sentence
     }
 }
