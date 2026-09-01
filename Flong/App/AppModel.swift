@@ -214,6 +214,13 @@ final class AppModel {
     /// list would mean a row that has to keep asking which it is.
     private(set) var sharedArticles: [SharedEntry] = []
 
+    /// Who filed each of them, by the article's identity, where there is a name.
+    ///
+    /// Empty for the reader's own filings, deliberately : a collection several
+    /// people fill has to say who put a thing in it, and saying so against the
+    /// reader's own is telling them what they already know.
+    private(set) var filedBy: [String: String] = [:]
+
     /// Everybody who has signed something, for the authors page.
     private(set) var authors: [Author] = []
     /// The writer whose page is open, and what they signed.
@@ -1796,7 +1803,9 @@ final class AppModel {
     /// sheet's own preparation handler, once the reader has actually picked
     /// somebody, so a sheet opened and dismissed leaves nothing behind.
     nonisolated func invitation(toCollectionNamed name: String) -> SharedCollectionItem {
-        SharedCollectionItem(name: name, sharing: sharing)
+        SharedCollectionItem(name: name, sharing: sharing) { [database, sharing, credentials] in
+            await sharing.push(collectionNamed: name, from: database, credentials: credentials)
+        }
     }
 
     // MARK: - Filing into somebody else's collection
@@ -1820,6 +1829,37 @@ final class AppModel {
     /// The excerpt only, and the addresses truncated of whatever this reader
     /// designated as theirs : it is their device doing the writing, so it is
     /// their keychain the truncation is against.
+    /// What other people put into one of the reader's own shared collections.
+    ///
+    /// Nothing at all for a collection that is not shared, which is most of
+    /// them, and nothing for the reader's own list either : they read their own
+    /// filings from their own articles, and showing them twice would be showing
+    /// them twice.
+    private func contributions(to kind: ArticleCollection.Kind) async throws -> [SharedEntry] {
+        guard case .made(let name) = kind,
+            let shared = try await sharedCollections.owned(named: name),
+            let mine = await sharedCloud?.myListKey()
+        else { return [] }
+
+        return try await sharedEntries.entries(inZone: shared.zoneName, excluding: mine)
+    }
+
+    /// Who filed what in one shared collection, by the article's identity.
+    ///
+    /// Two questions joined : the store says which identifier filed which
+    /// article, and the share says what that identifier is called. The share is
+    /// in the owner's private database when it is the reader's own collection
+    /// and in their shared database when it is not, which is the only thing
+    /// `isOwned` decides here.
+    private func namesFiling(inZone zone: String, isOwned: Bool) async -> [String: String] {
+        let owner =
+            isOwned
+            ? nil : (try? await sharedCollections.all())?.first { $0.zoneName == zone }?.ownerName
+        guard isOwned || owner != nil else { return [:] }
+
+        return await sharing.attribution(inZone: zone, ownedBy: owner)
+    }
+
     /// The open article as it would cross to somebody else, worked out once.
     ///
     /// Built by the store rather than from what the page holds : an ``Article``
@@ -1973,9 +2013,20 @@ final class AppModel {
             await loadArticleCollections()
             await loadCollections()
             await apply(marks: [opened.id])
+            await pushIfShared(name)
         } catch {
             Log.store.error("The article could not be filed : \(error, privacy: .public)")
         }
+    }
+
+    /// Sends a collection the reader shared, after it has changed.
+    ///
+    /// A collection nobody was invited to does nothing, which is most of them.
+    /// The whole list goes each time, so a filing and an unfiling travel the
+    /// same way and a push that failed is made good by the next one.
+    private func pushIfShared(_ name: String) async {
+        guard sharedCollectionNames.contains(name) else { return }
+        await sharing.push(collectionNamed: name, from: database, credentials: credentials)
     }
 
     func unfileArticle(from name: String) async {
@@ -1985,6 +2036,7 @@ final class AppModel {
         await loadArticleCollections()
         await loadCollections()
         await apply(marks: [opened.id])
+        await pushIfShared(name)
     }
 
     // MARK: - Authors
@@ -2060,6 +2112,7 @@ final class AppModel {
             // here to summarize.
             if case .shared(let zone, _) = kind {
                 sharedArticles = try await sharedEntries.entries(inZone: zone)
+                filedBy = await namesFiling(inZone: zone, isOwned: false)
                 collectionArticles = []
                 return
             }
@@ -2072,6 +2125,18 @@ final class AppModel {
                 collectionArticles = try await articles.summaries(.all, matching: QueryParser.parse(query))
             } else {
                 collectionArticles = try await articles.summaries(in: kind)
+            }
+
+            // **A collection the reader shared shows what the others put in
+            // it.** Their own filings are the articles above, read from their
+            // own store ; what a participant filed is an excerpt of a piece
+            // this device does not hold, and it arrives here. Without this the
+            // owner is the one person in a collaboration who cannot see it.
+            sharedArticles = try await contributions(to: kind)
+            if case .made(let name) = kind, let shared = try await sharedCollections.owned(named: name) {
+                filedBy = await namesFiling(inZone: shared.zoneName, isOwned: true)
+            } else {
+                filedBy = [:]
             }
         } catch {
             Log.store.error("A collection could not be read : \(error, privacy: .public)")

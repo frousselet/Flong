@@ -536,6 +536,16 @@
         }
       }
     },
+    "Added by others" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajout\u00e9s par d\u2019autres"
+          }
+        }
+      }
+    },
     "All articles" : {
       "localizations" : {
         "fr" : {
@@ -1174,6 +1184,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les flux qui indiquent qui a écrit un article y placent son auteur, et vous pouvez garder ceux que vous suivez."
+          }
+        }
+      }
+    },
+    "Filed by %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Class\u00e9 par %@"
           }
         }
       }

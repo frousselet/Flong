@@ -146,17 +146,37 @@ nonisolated struct SharedEntryStore: Sendable {
     }
 
     /// Everything in one shared collection, most recently published first.
-    func entries(inZone zoneName: String) async throws -> [SharedEntry] {
+    ///
+    /// `excluding` leaves out one participant's list, which is what the owner
+    /// of a collection wants : they read their own filings from their own
+    /// articles, and what they need from here is what everybody else added.
+    func entries(inZone zoneName: String, excluding listKey: String? = nil) async throws -> [SharedEntry] {
         try await database.writer.read { db in
             try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT * FROM shared_entry WHERE zone_name = ?
+                    SELECT * FROM shared_entry WHERE zone_name = ? AND (? IS NULL OR list_key <> ?)
                     ORDER BY COALESCE(published_at, received_at) DESC
                     """,
-                arguments: [zoneName]
+                arguments: [zoneName, listKey, listKey]
             )
             .map(Self.entry(from:))
+        }
+    }
+
+    /// Who filed each thing in one shared collection, by the article's identity.
+    ///
+    /// Kept apart from the entries themselves because it is about the filing
+    /// and not about the article : the same piece filed by two people is one
+    /// row, and the name on it is whoever got there first.
+    func authors(inZone zoneName: String) async throws -> [String: String] {
+        try await database.writer.read { db in
+            try Row.fetchAll(
+                db,
+                sql: "SELECT guid, author_name FROM shared_entry WHERE zone_name = ?",
+                arguments: [zoneName]
+            )
+            .reduce(into: [:]) { found, row in found[row["guid"] as String] = row["author_name"] as String }
         }
     }
 
