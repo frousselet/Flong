@@ -209,7 +209,11 @@ struct ReaderPanel: View {
                 isChoosingPlace = true
             } label: {
                 HStack(spacing: 12) {
+                    // The name of the row is what has to stay whole : a long
+                    // town truncates, and a label that gave up half of itself
+                    // to one would leave the row saying nothing at all.
                     Text("City and country")
+                        .layoutPriority(1)
                     Spacer(minLength: 0)
                     Group {
                         if let place = model.place {
@@ -221,6 +225,8 @@ struct ReaderPanel: View {
                             Text("Not set")
                         }
                     }
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                     .foregroundStyle(.secondary)
                     Image(systemName: "chevron.forward")
                         .font(.footnote)
