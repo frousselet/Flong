@@ -100,6 +100,18 @@ The first is the only square on the collections page that opens on people. Every
 
 Neither square is drawn when it holds nothing, which is how every built-in square behaves. A reader whose feeds sign nothing is not shown an empty shelf of authors.
 
+## Where they write, on the row
+
+A byline on its own is a name in a list of a thousand names. The same byline with `Le Monde` and `Libération` after it is somebody the reader can place before they have opened anything, and it is the thing this page is for : a writer moving between papers is what no subscription can express, and two marks say it without a word.
+
+The marks follow the name rather than the number, since they are an attribution and not a property of the row. They are **the publisher and never the desk**, exactly as an article row's stamp is : two feeds of one paper are one mark. They come from the same `publishers` map every other mark in the application is looked up in, so a publisher the reader renames is renamed here at the same moment, and nothing about a picture is stored beside a name.
+
+**Four of them, and no `+3` after.** They are a hint of where somebody writes, not an inventory : the row already carries a number, and a second one counting papers would be two numbers doing different jobs side by side. A reader who wants the whole answer opens the writer. Where there are none - a favourite whose articles have not arrived - the row draws nothing rather than a run of aerials, this being a byline and not a column of marks that has to be kept.
+
+They are ordered by how much of the writer each publisher has, so the paper somebody mostly writes for is the mark that survives the cap, and alphabetically where two are equal so a row does not reshuffle itself between two readings.
+
+Both of those are one walk of the same rows : the count is grouped over the people and the marks over the publishers, which are two groupings of one query rather than two queries.
+
 ## The two ways in
 
 The star on a row of the authors page, and the article's own overflow menu. The second is where the opinion is actually formed - the reader has just finished the piece - and it is inside that menu rather than beside the star in the bar : the bar holds three items, a fourth would earn an overflow of its own, and `docs/technical/interface.md` records why that is a place nothing may go.
