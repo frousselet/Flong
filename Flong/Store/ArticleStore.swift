@@ -170,9 +170,10 @@ nonisolated enum ArticleFilter: Hashable, Sendable {
     /// shows. The members are passed rather than the address : the grouping is
     /// worked out from the feeds themselves and never stored on a row.
     case feeds([UUID])
-    /// Everything one writer signed, matched on the byline exactly : an author
-    /// is a name and Flong never guesses that two spellings are one person.
-    /// See ``Author``.
+    /// Everything one writer signed, matched on the name exactly : an author is
+    /// a name and Flong never guesses that two spellings are one person. Asked
+    /// of the people beside an article rather than of its byline, since one
+    /// byline names two of them as often as not. See ``Author``.
     case author(String)
 
     /// The condition and its arguments, as SQL.
@@ -189,7 +190,7 @@ nonisolated enum ArticleFilter: Hashable, Sendable {
             ids.isEmpty
                 ? ("0", [])
                 : ("e.feed_id IN (\(databaseQuestionMarks(count: ids.count)))", StatementArguments(ids))
-        case .author(let name): ("e.author = ?", [name])
+        case .author(let name): (AuthorStore.signedBy("e"), [name])
         }
     }
 }

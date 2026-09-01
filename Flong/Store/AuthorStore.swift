@@ -15,10 +15,17 @@ import GRDB
 /// Who has signed what, and which of them the reader singled out.
 ///
 /// **The list of authors is not stored anywhere.** It is a question the
-/// articles answer about themselves, asked of the `author` column and grouped,
-/// exactly as the starred articles are a question and not a list. Nothing has
-/// to be kept in step, nothing goes stale when a source is removed, and a
-/// writer whose last article was purged simply stops being one.
+/// articles answer about themselves, asked of the row per person v26 puts
+/// beside each article and grouped, exactly as the starred articles are a
+/// question and not a list. Nothing has to be kept in step by hand, nothing
+/// goes stale when a source is removed, and a writer whose last article was
+/// purged simply stops being one.
+///
+/// **The row per person exists because a byline names more than one.** The
+/// `author` column holds what the publisher wrote, `Claire Ancelin et Paul
+/// Rey` included, and grouping on it would make those two into a third person.
+/// ``index(_:byline:in:)`` writes the people out beside the article as it is
+/// stored, which is the one place the two are ever put in step.
 ///
 /// **What is stored is the favourite**, one row per writer the reader singled
 /// out, and only for those. A table of every byline there is would be a second
@@ -29,6 +36,30 @@ nonisolated struct AuthorStore: Sendable {
 
     init(_ database: AppDatabase) {
         self.database = database
+    }
+
+    // MARK: - Writing the people out beside the article
+
+    /// Says who signed one article, and only them.
+    ///
+    /// **Called wherever an article's byline is written**, which is the two
+    /// paths in ``FeedRefresh`` and the one in ``StreamBlock``. A path that
+    /// forgot this would leave an article out of its own authors' pages, which
+    /// is why `AuthorIndexTests` walks an ingestion end to end rather than
+    /// trusting the call sites.
+    ///
+    /// The old rows go first, so an article whose byline a publisher rewrote
+    /// keeps no writer it no longer names, and so that saying it twice says it
+    /// once.
+    static func index(_ entryID: UUID, byline: String?, in db: Database) throws {
+        try db.execute(sql: "DELETE FROM entry_author WHERE entry_id = ?", arguments: [entryID])
+
+        for (position, person) in Author.people(in: byline).enumerated() {
+            try db.execute(
+                sql: "INSERT OR IGNORE INTO entry_author (entry_id, name, position) VALUES (?, ?, ?)",
+                arguments: [entryID, person, position]
+            )
+        }
     }
 
     // MARK: - Who there is
@@ -62,8 +93,9 @@ nonisolated struct AuthorStore: Sendable {
             let row = try Row.fetchOne(
                 db,
                 sql: """
-                    SELECT (SELECT COUNT(*) FROM entry e WHERE e.author = ? AND \(Self.shown("e"))) AS count,
-                           EXISTS(SELECT 1 FROM favourite_author a WHERE a.name = ?) AS favourite
+                    SELECT (SELECT COUNT(*) FROM entry_author a JOIN entry e ON e.id = a.entry_id
+                            WHERE a.name = ? AND \(Self.shown("e"))) AS count,
+                           EXISTS(SELECT 1 FROM favourite_author f WHERE f.name = ?) AS favourite
                     """,
                 arguments: [name, name]
             )
@@ -140,12 +172,13 @@ nonisolated struct AuthorStore: Sendable {
             let writers = try Row.fetchOne(
                 db,
                 sql: """
-                    SELECT (SELECT COUNT(*) FROM (SELECT 1 FROM entry e
-                                                  WHERE \(Self.signed("e")) AND \(Self.shown("e"))
-                                                  GROUP BY e.author)) AS signing,
-                           (SELECT COUNT(*) FROM favourite_author a
-                            WHERE NOT EXISTS (SELECT 1 FROM entry e
-                                              WHERE e.author = a.name AND \(Self.shown("e")))) AS forgotten,
+                    SELECT (SELECT COUNT(DISTINCT a.name) FROM entry_author a
+                            JOIN entry e ON e.id = a.entry_id
+                            WHERE \(Self.shown("e"))) AS signing,
+                           (SELECT COUNT(*) FROM favourite_author f
+                            WHERE NOT EXISTS (SELECT 1 FROM entry_author a
+                                              JOIN entry e ON e.id = a.entry_id
+                                              WHERE a.name = f.name AND \(Self.shown("e")))) AS forgotten,
                            \(Self.cover(where: Self.signed("i"))) AS cover
                     """
             )
@@ -182,18 +215,29 @@ nonisolated struct AuthorStore: Sendable {
 
     /// An article somebody put their name to.
     ///
-    /// Empty is not a byline. The column is normalized on the way in, so this
-    /// is the whole of what has to be excluded.
+    /// Asked of the people beside it rather than of the column : a byline that
+    /// named nobody this could name leaves no rows, which is the same answer
+    /// and the only one that stays true for `A and B`.
     static func signed(_ table: String) -> String {
-        "\(table).author IS NOT NULL AND \(table).author <> ''"
+        "EXISTS (SELECT 1 FROM entry_author a WHERE a.entry_id = \(table).id)"
     }
 
-    /// An article by somebody the reader singled out.
+    /// An article one named writer signed. See ``Author`` for why the name is
+    /// matched exactly.
+    static func signedBy(_ table: String) -> String {
+        "\(table).id IN (SELECT a.entry_id FROM entry_author a WHERE a.name = ?)"
+    }
+
+    /// An article somebody the reader singled out signed.
     ///
     /// A subquery rather than a join, so it drops into a count over `entry`
-    /// alone exactly as the favourite sources one does.
+    /// alone exactly as the favourite sources one does, and so an article two
+    /// favourites wrote together is counted once rather than twice.
     static func byAFavouriteAuthor(_ table: String) -> String {
-        "\(table).author IN (SELECT name FROM favourite_author)"
+        """
+        \(table).id IN (SELECT a.entry_id FROM entry_author a
+                        WHERE a.name IN (SELECT name FROM favourite_author))
+        """
     }
 
     /// What is not a duplicate and was not hidden by a rule.
@@ -214,12 +258,14 @@ nonisolated struct AuthorStore: Sendable {
         Author(name: row["name"], count: row["count"], isFavourite: (row["favourite"] as Int) == 1)
     }
 
-    /// Every byline, with what it signed and whether it is one of the reader's.
+    /// Every writer, with what they signed and whether they are one of the
+    /// reader's.
     private static let grouped = """
-        SELECT e.author AS name, COUNT(*) AS count,
-               EXISTS(SELECT 1 FROM favourite_author a WHERE a.name = e.author) AS favourite
-        FROM entry e
-        WHERE \(signed("e")) AND \(shown("e"))
-        GROUP BY e.author
+        SELECT a.name AS name, COUNT(*) AS count,
+               EXISTS(SELECT 1 FROM favourite_author f WHERE f.name = a.name) AS favourite
+        FROM entry_author a
+        JOIN entry e ON e.id = a.entry_id
+        WHERE \(shown("e"))
+        GROUP BY a.name
         """
 }

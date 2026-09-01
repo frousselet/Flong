@@ -354,6 +354,9 @@ nonisolated struct FeedRefresh: Sendable {
             entry.imageURL = cover ?? entry.imageURL
             entry.canonicalKey = key ?? entry.canonicalKey
             try entry.update(db)
+            // A publisher who rewrites a byline changes who wrote the piece,
+            // so the people beside it are written again rather than added to.
+            try AuthorStore.index(entry.id, byline: entry.author, in: db)
 
             if let sanitized {
                 try EntryBody(
@@ -389,6 +392,9 @@ nonisolated struct FeedRefresh: Sendable {
         // follow, and points at the copy that arrived first.
         entry.duplicateOf = key.flatMap { try? Self.original(of: $0, in: db) }
         try entry.insert(db)
+        // One field holds a whole newsroom, so the people it names are written
+        // out beside the article : see ``AuthorStore/index(_:byline:in:)``.
+        try AuthorStore.index(entry.id, byline: entry.author, in: db)
 
         if let sanitized {
             try EntryBody(entryID: entry.id, sanitizedHTML: sanitized, plainText: plainText).insert(db)
