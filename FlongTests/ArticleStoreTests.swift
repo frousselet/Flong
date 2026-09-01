@@ -238,26 +238,22 @@ struct ArticleStoreTests {
         #expect(!bare.contains("class=\"mark\""))
     }
 
-    @Test("Two people are two pills, and one written backwards is still one person")
-    func aBylineIsUnpicked() {
-        #expect(ArticleDocument.people(in: "Claire Ancelin") == ["Claire Ancelin"])
+    @Test("Two people are two pills, and the pills come from where the list comes from")
+    func aBylineIsUnpicked() async throws {
+        let feed = try await feed("https://feeds.example.com/rss.xml", title: "Example")
+        var entry = Entry(feedID: feed.id, guid: "urn:1", title: "Un titre", author: "Claire Ancelin et Paul Rey")
+        entry.hasMedia = false
+        try await database.writer.write { db in try entry.insert(db) }
 
-        // The separators publishers actually use, in one field none of them
-        // was designed for.
-        #expect(ArticleDocument.people(in: "Claire Ancelin, Paul Rey") == ["Claire Ancelin", "Paul Rey"])
-        #expect(ArticleDocument.people(in: "Claire Ancelin & Paul Rey") == ["Claire Ancelin", "Paul Rey"])
-        #expect(ArticleDocument.people(in: "Claire Ancelin and Paul Rey") == ["Claire Ancelin", "Paul Rey"])
-        #expect(ArticleDocument.people(in: "Claire Ancelin et Paul Rey") == ["Claire Ancelin", "Paul Rey"])
-        #expect(
-            ArticleDocument.people(in: "Claire Ancelin, Paul Rey et Yann Sobral")
-                == ["Claire Ancelin", "Paul Rey", "Yann Sobral"]
-        )
+        let article = try #require(try await articles.article(id: entry.id))
+        let html = ArticleDocument.html(for: article, publisher: "Le Monde")
 
-        // One person written backwards, which splitting would tear in half.
-        #expect(ArticleDocument.people(in: "Dupont, Jean") == ["Dupont, Jean"])
-
-        #expect(ArticleDocument.people(in: "").isEmpty)
-        #expect(ArticleDocument.people(in: " , ").isEmpty)
+        // The page and the authors list ask the same function, so they cannot
+        // disagree about how many people wrote a piece. The rules themselves
+        // are `AuthorStoreTests`.
+        #expect(html.contains(">Claire Ancelin</span>"))
+        #expect(html.contains(">Paul Rey</span>"))
+        #expect(!html.contains("Claire Ancelin et Paul Rey"))
     }
 
     @Test("Each person's pill has a place for a picture, and none is kept empty")

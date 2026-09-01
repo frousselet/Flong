@@ -197,7 +197,7 @@ nonisolated enum ArticleDocument {
         // Then who wrote it. The names alone : a pill under the paper that ran
         // it, holding a person's name, is a byline, and a word in front of it
         // would be the page explaining a shape that explains itself.
-        let people = self.people(in: article.author ?? "")
+        let people = Author.people(in: article.author)
         if !people.isEmpty {
             let pills = people.map { pill($0, wearing: portraits[$0]) }.joined()
             lines.append("<div class=\"line\">\(pills)</div>")
@@ -305,41 +305,6 @@ nonisolated enum ArticleDocument {
             }
             .joined(separator: "\n")
     }()
-
-    /// The people named in one credit line, one by one.
-    ///
-    /// A feed has one field for this and publishers put whole newsrooms in it,
-    /// separated by whichever punctuation the template happened to use. The
-    /// separators here are the ones that actually turn up : a comma, a
-    /// semicolon, an ampersand, and the word for *and* in the two languages
-    /// this application speaks.
-    ///
-    /// **Two bare words divided by a comma are left alone.** `Dupont, Jean` is
-    /// one person written backwards, and splitting it produces two pills naming
-    /// halves of somebody. It is a guess, and it is the guess that fails
-    /// quietly : a pair of one-word stage names kept together reads as an
-    /// oddity, where a surname and a forename torn apart reads as a bug.
-    static func people(in line: String) -> [String] {
-        let flattened =
-            line
-            .replacingOccurrences(of: ";", with: ",")
-            .replacingOccurrences(of: " & ", with: ",")
-            .replacingOccurrences(of: " and ", with: ",", options: .caseInsensitive)
-            .replacingOccurrences(of: " et ", with: ",", options: .caseInsensitive)
-
-        let parts =
-            flattened
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        if parts.count == 2, parts.allSatisfy({ !$0.contains(" ") }) {
-            let whole = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            return whole.isEmpty ? [] : [whole]
-        }
-
-        return parts
-    }
 
     /// An address, safe to write into the `url()` of a rule.
     ///

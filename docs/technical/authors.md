@@ -8,7 +8,27 @@ There is no row for a writer and there could not be one. What arrives is `Jean D
 
 That is the rule the import already follows : what cannot be understood is not invented. A grouping that decided `J. Dupont` was `Jean Dupont` would be right often and wrong quietly, and the reader would have no way of seeing which. Two spellings are two authors, and a reader who wants them as one has the search field on the authors page.
 
-**A byline is not split, either.** A field carrying `Smith, John` and one carrying `Jean Dupont, Marie Curie` are the same string as far as any rule could tell, and cutting on the comma would file half the writers of the world under their own surnames.
+## A byline names more than one person
+
+No feed format gives a publisher a second author element they actually use, so they write the whole newsroom into the one field : `Claire Ancelin et Paul Rey`, `Smith; Doe`, `A & B`. Kept whole, those two people are a third person who has written one article, and neither of the two is ever findable.
+
+`Author.people(in:)` cuts on the separators that are never anything else - a semicolon, an ampersand, and `and` or `et` standing alone between two names, whatever their case. The line is cleaned **before** it is cut, since the wrappings go round the whole of it : `desk@example.com (Claire Ancelin and Paul Rey)` names two people inside one address, and cutting first would leave half an address on one of them. Each name is then put through the cleaner again, which is what takes a masthead off the last of them and a credit off the first.
+
+**A comma is not a separator on its own.** `Dupont, Jean` is one person written the way a directory writes them and `Claire Ancelin, Paul Rey` is two ; what tells them apart is that neither half of the first holds a space. The rule is applied to each piece rather than to the line, so `Dupont, Jean; Curie, Marie` is two people written backwards and not four written wrong.
+
+Everything the comma cannot answer is left alone. `Claire Ancelin, Reporter` is a name and a job, and no rule can tell that from a name and a name.
+
+**The article's own page and the authors list ask the same function.** They did not, and the page had been unpicking bylines into one pill per person since before the authors page existed : two pills over an article that counted as one writer in the list. There is one splitter now, in `Author`, and `ArticleDocument` calls it.
+
+## An article has authors, and the schema said it had one
+
+The `author` column is what the publisher wrote, and it stays : it is what the article is headed with, what the full-text index holds, and what travels between devices in a stream block. Beside it, v26 puts `entry_author` - one row per person per article, with their place in the byline.
+
+That row is what every question about a writer is asked of : the list is `GROUP BY name` over it, one writer's page is `entry_id IN (SELECT ... WHERE name = ?)`, and the favourites square is the same with the name in `favourite_author`. An article two favourites wrote together is one article in that square and not two, which the byline column could not have expressed.
+
+The foreign key is what keeps it honest : an article that goes takes its authors with it, unlike `tag_binding`, which points at one of three tables and can carry no key at all.
+
+**It is written by hand at each path that stores an article**, through `AuthorStore.index(_:byline:in:)` : the two in `FeedRefresh`, one for a new article and one for a byline a publisher rewrote, and the one in `StreamBlock` for an article arriving from another device. A path that forgot would leave its articles out of their own writers' pages and nothing else would notice, so the test for it walks an ingestion end to end rather than trusting the call sites.
 
 ## What is cleaned is the spelling, never the person
 
@@ -43,7 +63,9 @@ RSS 2.0's `author` is an address ; Dublin Core's `dc:creator` and Atom's `<autho
 
 ## The column is clean, so the questions are exact
 
-Because the column is clean, every later question is an exact comparison : `GROUP BY author` for the list, `author = ?` for one writer's page, `author IN (SELECT name FROM favourite_author)` for the favourites. The v24 index on `entry.author` is what keeps the first of those cheap over a corpus of a hundred thousand articles.
+Because the names are clean and stored one per row, every question about a writer is an exact comparison against an indexed column, over a corpus of a hundred thousand articles.
+
+The index over `entry.author` itself survives, under the name `entry_on_author` since the table took the other one. It answers nothing the interface asks any more ; what it is for is the pass that re-spells every byline when a rule changes, which has happened twice already, and which without it would be a full scan per distinct name.
 
 ## The list is not stored
 

@@ -228,6 +228,49 @@ struct FeedRefreshTests {
         #expect(stored.lastSuccessAt != nil)
     }
 
+    @Test("Ingesting an article writes out everybody its byline names")
+    func theWritersAreIndexed() async throws {
+        let feed = try await subscribe()
+        let authors = AuthorStore(database)
+
+        func serve(byline: String) {
+            server.install { _ in
+                StubResponse(
+                    statusCode: 200,
+                    headers: ["Content-Type": "application/rss+xml"],
+                    body: Data(
+                        """
+                        <?xml version="1.0" encoding="UTF-8"?>
+                        <rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+                          <channel><title>P</title><link>https://example.com/</link>
+                            <item>
+                              <title>Un titre</title><guid isPermaLink="false">urn:1</guid>
+                              <dc:creator>\(byline)</dc:creator>
+                            </item>
+                          </channel>
+                        </rss>
+                        """.utf8
+                    )
+                )
+            }
+        }
+        defer { server.reset() }
+
+        // **End to end on purpose.** The people beside an article are written
+        // by hand at each path that stores one, so a path that forgot would
+        // leave its articles out of their own writers' pages and nothing else
+        // would notice.
+        serve(byline: "Claire Ancelin et Paul Rey")
+        _ = await refresh.refresh(feed)
+        #expect(try await authors.all().map(\.name) == ["Claire Ancelin", "Paul Rey"])
+
+        // And again when the publisher rewrites it : the update path is the
+        // second of the two, and a writer taken off a byline goes with it.
+        serve(byline: "Claire Ancelin")
+        _ = await refresh.refresh(try await self.feed(feed.id))
+        #expect(try await authors.all().map(\.name) == ["Claire Ancelin"])
+    }
+
     @Test("The same feed served twice adds nothing the second time")
     func identityHolds() async throws {
         let feed = try await subscribe()

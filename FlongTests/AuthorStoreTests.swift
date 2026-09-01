@@ -48,7 +48,12 @@ struct AuthorStoreTests {
             imageURL: image
         )
         entry.hasMedia = false
-        try await database.writer.write { db in try entry.insert(db) }
+        try await database.writer.write { db in
+            try entry.insert(db)
+            // What every path that stores an article does : see
+            // ``AuthorStore/index(_:byline:in:)``.
+            try AuthorStore.index(entry.id, byline: entry.author, in: db)
+        }
         return entry
     }
 
@@ -150,6 +155,88 @@ struct AuthorStoreTests {
         let found = try await authors.all()
         #expect(found.map(\.name) == ["Marie Curie"])
         #expect(found.first?.count == 5)
+    }
+
+    // MARK: - Everybody a byline names
+
+    @Test("One field holds a whole newsroom, and every separator publishers use is one")
+    func severalPeople() {
+        #expect(Author.people(in: "Claire Ancelin") == ["Claire Ancelin"])
+        #expect(Author.people(in: "Claire Ancelin, Paul Rey") == ["Claire Ancelin", "Paul Rey"])
+        #expect(Author.people(in: "Claire Ancelin & Paul Rey") == ["Claire Ancelin", "Paul Rey"])
+        #expect(Author.people(in: "Claire Ancelin and Paul Rey") == ["Claire Ancelin", "Paul Rey"])
+        #expect(Author.people(in: "Claire Ancelin AND Paul Rey") == ["Claire Ancelin", "Paul Rey"])
+        #expect(Author.people(in: "Claire Ancelin et Paul Rey") == ["Claire Ancelin", "Paul Rey"])
+        #expect(Author.people(in: "Ancelin; Rey; Sobral") == ["Ancelin", "Rey", "Sobral"])
+        #expect(
+            Author.people(in: "Claire Ancelin, Paul Rey et Yann Sobral")
+                == ["Claire Ancelin", "Paul Rey", "Yann Sobral"]
+        )
+    }
+
+    @Test("A comma is not a separator on its own, and the rule is applied piece by piece")
+    func namesWrittenBackwards() {
+        // One person written the way a directory writes them : neither half
+        // holds a space, and splitting would make two halves of somebody.
+        #expect(Author.people(in: "Dupont, Jean") == ["Dupont, Jean"])
+        // The same rule, applied to each piece rather than to the line. Cut on
+        // the semicolon first, this is two people written backwards ; cut on
+        // the commas, it is four written wrong.
+        #expect(Author.people(in: "Dupont, Jean; Curie, Marie") == ["Dupont, Jean", "Curie, Marie"])
+    }
+
+    @Test("The line is cleaned before it is cut, and each name after")
+    func cleanedThenCut() {
+        #expect(Author.people(in: "By Claire Ancelin and Paul Rey") == ["Claire Ancelin", "Paul Rey"])
+        #expect(Author.people(in: "Claire Ancelin and Paul Rey | Le Monde") == ["Claire Ancelin", "Paul Rey"])
+        // Two people inside one address : cutting first would leave half an
+        // address on one of them.
+        #expect(
+            Author.people(in: "desk@example.com (Claire Ancelin and Paul Rey)")
+                == ["Claire Ancelin", "Paul Rey"]
+        )
+        // A byline that names somebody twice names them once.
+        #expect(Author.people(in: "Paul Rey et Paul Rey") == ["Paul Rey"])
+        #expect(Author.people(in: " , ").isEmpty)
+        #expect(Author.people(in: nil).isEmpty)
+    }
+
+    @Test("Two people who signed together are two rows, and each keeps the article")
+    func twoPeopleAreTwoWriters() async throws {
+        try await article("Un", by: "Claire Ancelin et Paul Rey")
+        try await article("Deux", by: "Claire Ancelin")
+
+        let found = try await authors.all()
+        #expect(found.map(\.name) == ["Claire Ancelin", "Paul Rey"])
+        #expect(found.first?.count == 2)
+        #expect(found.last?.count == 1)
+
+        // The byline itself is untouched : it is what the article is headed
+        // with, what the index holds and what travels between devices.
+        #expect(try await articles.summaries(.author("Paul Rey")).map(\.author) == ["Claire Ancelin et Paul Rey"])
+    }
+
+    @Test("A piece two favourites wrote together is one article, not two")
+    func countedOnce() async throws {
+        try await article("Un", by: "Claire Ancelin et Paul Rey")
+        try await authors.setFavourite("Claire Ancelin", true)
+        try await authors.setFavourite("Paul Rey", true)
+
+        #expect(try await articles.summaries(in: .builtIn(.favouriteAuthors)).map(\.title) == ["Un"])
+
+        let squares = try await authors.collections()
+        #expect(squares.first { $0.kind == .builtIn(.authors) }?.count == 2)
+        #expect(squares.first { $0.kind == .builtIn(.favouriteAuthors) }?.count == 1)
+    }
+
+    @Test("A byline a publisher rewrote leaves nobody behind")
+    func rewrittenByline() async throws {
+        let entry = try await article("Un", by: "Claire Ancelin et Paul Rey")
+
+        try await database.writer.write { db in
+            try AuthorStore.index(entry.id, byline: "Claire Ancelin", in: db)
+        }
+        #expect(try await authors.all().map(\.name) == ["Claire Ancelin"])
     }
 
     @Test("Two spellings are two writers, since nothing here guesses at a person")

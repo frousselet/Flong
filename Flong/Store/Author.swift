@@ -104,6 +104,44 @@ nonisolated struct Author: Identifiable, Hashable, Sendable {
         return isAName(name) ? name : nil
     }
 
+    /// Everybody a byline names, which is very often more than one.
+    ///
+    /// **One field for a whole newsroom.** No feed format has a place for a
+    /// second author that publishers actually use, so they write both into the
+    /// one field and leave the reader to unpick them : `Claire Ancelin et Paul
+    /// Rey`, `Smith; Doe`, `A & B`. Kept whole, two people are a third person
+    /// who has written one article, and neither of the two is ever findable.
+    ///
+    /// **The line is cleaned before it is cut**, since the wrappings go round
+    /// the whole of it : `lawyer@boyer.net (Claire Ancelin and Paul Rey)` names
+    /// two people inside one address, and cutting first would leave half an
+    /// address on one of them. Each name is then put through ``name(from:)``
+    /// again, which is what takes a masthead off the last of them and a credit
+    /// off the first.
+    ///
+    /// **A comma is not a separator on its own.** `Dupont, Jean` is one person
+    /// written the way a directory writes them, and `Claire Ancelin, Paul Rey`
+    /// is two : what tells them apart is that neither half of the first holds a
+    /// space. The rule is applied to each piece rather than to the line, so
+    /// `Dupont, Jean; Curie, Marie` is two people written backwards and not
+    /// four written wrong.
+    ///
+    /// Everything the comma cannot answer is left alone. `Claire Ancelin,
+    /// Reporter` is a name and a job, and no rule can tell that from a name and
+    /// a name.
+    static func people(in raw: String?) -> [String] {
+        guard let line = name(from: raw) else { return [] }
+
+        return
+            chunks(of: line)
+            .flatMap(names(inChunk:))
+            .compactMap { name(from: $0) }
+            // A byline that names somebody twice names them once.
+            .reduce(into: []) { found, person in
+                if !found.contains(person) { found.append(person) }
+            }
+    }
+
     /// The order a reader expects names in.
     ///
     /// Not the order SQLite puts them in : `ORDER BY` is byte order, where
@@ -179,6 +217,51 @@ nonisolated struct Author: Identifiable, Hashable, Sendable {
     private static func withoutPublication(_ line: String) -> String {
         guard let bar = line.firstIndex(of: "|") else { return line }
         return String(line[..<bar])
+    }
+
+    /// The separators that are never anything but separators.
+    ///
+    /// A semicolon and an ampersand cannot be part of a name. `and` and `et`
+    /// can only be read as one where they stand alone between two names, which
+    /// is what the spaces round them say.
+    private static let separators = [";", " & ", " and ", " et "]
+
+    private static func chunks(of line: String) -> [String] {
+        separators.reduce([line]) { found, separator in
+            found.flatMap { split($0, on: separator) }
+        }
+    }
+
+    /// One line cut on every occurrence of a separator, whatever its case.
+    ///
+    /// By hand rather than through `components(separatedBy:)`, which is case
+    /// sensitive : `Ancelin AND Rey` is the same byline as `Ancelin and Rey`.
+    private static func split(_ line: String, on separator: String) -> [String] {
+        var parts: [String] = []
+        var rest = Substring(line)
+
+        while let found = rest.range(of: separator, options: .caseInsensitive) {
+            parts.append(String(rest[..<found.lowerBound]))
+            rest = rest[found.upperBound...]
+        }
+        parts.append(String(rest))
+        return parts
+    }
+
+    /// The names in one piece of a byline, cut on its commas or not at all.
+    private static func names(inChunk chunk: String) -> [String] {
+        let parts =
+            chunk
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+
+        // `Dupont, Jean` : two halves, neither of them holding a space, which
+        // is one person written the way a directory writes them.
+        if parts.count == 2, parts.allSatisfy({ !$0.contains(" ") }) {
+            return [chunk.trimmingCharacters(in: .whitespaces)]
+        }
+        return parts
     }
 
     /// Whether what is left names somebody at all.

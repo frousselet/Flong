@@ -439,6 +439,66 @@ nonisolated extension AppDatabase {
             try normalizeBylines(db)
         }
 
+        // **An article has authors, and the schema has said it has one since
+        // v1.** No feed format gives a publisher a second author element they
+        // actually use, so they write the whole newsroom into the one field :
+        // `Claire Ancelin et Paul Rey`, `Smith; Doe`. Grouped on the column,
+        // two people are a third person who has written one article, and
+        // neither of the two is findable. The article's own page has been
+        // unpicking that field into one pill per person all along, so the page
+        // and the list disagreed about how many people wrote a piece.
+        //
+        // **The column stays and holds the byline.** It is what the article is
+        // headed with, what the full-text index holds and what travels between
+        // devices ; nothing about it changes. What is new is the row per person
+        // beside it, which is what every question about a writer is asked of
+        // from here on.
+        //
+        // The foreign key is what keeps it honest : an article that goes takes
+        // its authors with it, unlike `tag_binding`, which points at one of
+        // three tables and can carry no key at all.
+        migrator.registerMigration("v26.everybodyWhoSigned") { db in
+            // SQLite keeps tables and indexes in one namespace, and v24 spent
+            // this name on the index over the byline. The index is still worth
+            // having : it is what makes a pass that re-spells every byline an
+            // indexed range rather than a scan per name, and there have been
+            // two of those already. So it moves rather than goes, under the
+            // name GRDB would have given it.
+            try db.execute(sql: "DROP INDEX IF EXISTS entry_author")
+
+            try db.create(table: "entry_author") { table in
+                table.column("entry_id", .blob).notNull().references("entry", onDelete: .cascade)
+                table.column("name", .text).notNull().indexed()
+                // Where they stood in the byline, so a page credits them in the
+                // order the publisher wrote them rather than in the order
+                // SQLite happens to hold them.
+                table.column("position", .integer).notNull()
+                table.primaryKey(["entry_id", "name"])
+            }
+
+            try db.create(index: "entry_on_author", on: "entry", columns: ["author"], ifNotExists: true)
+
+            // One statement per person per distinct byline rather than one per
+            // article : a corpus of a hundred thousand pieces carries a few
+            // thousand bylines, and the index just re-made over the column is
+            // what makes each of those an indexed range rather than a scan.
+            let bylines = try String.fetchAll(
+                db,
+                sql: "SELECT DISTINCT author FROM entry WHERE author IS NOT NULL AND author <> ''"
+            )
+            for byline in bylines {
+                for (position, person) in Author.people(in: byline).enumerated() {
+                    try db.execute(
+                        sql: """
+                            INSERT OR IGNORE INTO entry_author (entry_id, name, position)
+                            SELECT id, ?, ? FROM entry WHERE author = ?
+                            """,
+                        arguments: [person, position, byline]
+                    )
+                }
+            }
+        }
+
         return migrator
     }
 

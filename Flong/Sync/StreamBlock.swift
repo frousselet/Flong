@@ -175,6 +175,9 @@ nonisolated enum StreamBlock {
                 entry.hasMedia = header.hasMedia ?? false
                 entry.imageURL = header.imageURL.flatMap(URL.init(string:))
                 try entry.insert(db)
+                // An article arriving from another device names its writers
+                // exactly as one arriving from a feed does.
+                try AuthorStore.index(entry.id, byline: entry.author, in: db)
 
                 if let html = SyncRecords.expanded(header.body) {
                     try EntryBody(
