@@ -49,13 +49,17 @@ nonisolated final class Preferences: @unchecked Sendable {
         static let firstName = "reader.first-name"
         static let lastName = "reader.last-name"
         static let picture = "reader.picture"
+        static let city = "reader.city"
+        static let country = "reader.country"
+        static let countryCode = "reader.country-code"
         static let device = "device.identifier"
         static let newStoryNotices = "notify.new-stories"
         static let storiesAnnouncedAt = "notify.stories-announced-at"
 
         /// Every key, for the one operation that has to name all of them.
         static let all = [
-            articleBody, theme, firstName, lastName, picture, device, newStoryNotices, storiesAnnouncedAt,
+            articleBody, theme, firstName, lastName, picture, city, country, countryCode, device,
+            newStoryNotices, storiesAnnouncedAt,
         ]
     }
 
@@ -144,6 +148,42 @@ nonisolated final class Preferences: @unchecked Sendable {
         }
     }
 
+    /// Where the reader reads from, when they have said.
+    ///
+    /// **Three keys and not one encoded blob.** A town, a country and a country
+    /// code are three strings, the store holds strings, and a JSON payload in a
+    /// preference is a thing that has to be versioned the first time a field is
+    /// added to it. Written and removed together, so a half-written place is
+    /// never read back.
+    ///
+    /// It travels with the name and the face, for the same reason and to the
+    /// same place : it is a fact about the reader rather than about a device,
+    /// and a reader who said Paris on the phone did not mean only on the phone.
+    /// Nothing else is ever told : section 20 says no data leaves the device,
+    /// and where somebody lives is not an exception to that.
+    var place: Place? {
+        get {
+            Place(
+                city: value(for: Key.city),
+                country: value(for: Key.country),
+                countryCode: value(for: Key.countryCode)
+            )
+        }
+        set {
+            guard let newValue else {
+                for key in [Key.city, Key.country, Key.countryCode] { remove(key) }
+                return
+            }
+            set(newValue.city, for: Key.city)
+            set(newValue.country, for: Key.country)
+            if let code = newValue.countryCode {
+                set(code, for: Key.countryCode)
+            } else {
+                remove(Key.countryCode)
+            }
+        }
+    }
+
     // MARK: - What the reader wants to be told
 
     /// Whether the reader wants to hear about a story that has just opened.
@@ -224,6 +264,12 @@ nonisolated final class Preferences: @unchecked Sendable {
     private func set(_ value: String, for key: String) {
         local.set(value, forKey: key)
         cloud?.set(value, forKey: key)
+        cloud?.synchronize()
+    }
+
+    private func remove(_ key: String) {
+        local.removeObject(forKey: key)
+        cloud?.removeObject(forKey: key)
         cloud?.synchronize()
     }
 

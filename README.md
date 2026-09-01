@@ -22,6 +22,8 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **Enrichment happens on the device.** Classification, tagging and summaries come from the system model, in your own language whatever language the articles are in, and no article content is sent anywhere.
 
+**You can say where you read from, and it stays a name.** A town and a country under your own face, completed by MapKit as you type or taken once from the device, optional and empty until you answer. What is kept is the name of a town and the code of its country, never a coordinate, and it travels between your devices with the rest of what you chose and goes nowhere else.
+
 **It is set like a page, not like a control panel.** One column at a time, held to a readable measure, hairline rules, no cards and no boxes. Liquid Glass stays in the navigation layer, where Apple puts it, apart from the subject pills and the credit in the corner of a picture.
 
 **Three themes, and they reach everything.** `Défaut` is the system's own colours ; `Papier` puts the same page on warm paper with the contrast pulled back ; `Solarized` is Ethan Schoonover's palette, and the one that changes the headline face too, to monospace. A theme speaks in the headline and gets out of the way underneath it, the way a newspaper does : serif headlines over a sans body. Each states both appearances and follows the device, the rendered article included. The choice is made under your own face in the reader's panel, and it follows you to your other devices.
@@ -91,6 +93,8 @@ Everything else comes from the system frameworks.
 
 No data leaves the device, apart from the private CloudKit database, the requests to the feeds themselves, and the pictures those feeds point at, which are asked for from the publisher when a screen shows one. No telemetry, no tracker, no third-party service active by default. Feed credentials and secret feed URLs live in the keychain only, and never appear in the database, in an export, or in a log.
 
+Location is asked for only at the moment you press the button that uses it, and what is kept is a town and a country rather than a coordinate. While you are choosing, what you type and the fix itself go to Apple's own geocoder, which is what a completer and a geocoder are ; nothing comes back out of the device afterwards.
+
 There is no account to close, so the reader's panel holds a danger zone that deletes everything instead : the database, the keychain, the preferences, the Spotlight index, the CloudKit record zone and the archive in iCloud Drive. Another device that still holds the subscriptions will put its own copy back, which the confirmation says before the reader confirms.
 
 ## Other services
@@ -124,6 +128,7 @@ The interface is authored in English and translated to French. All strings live 
 | [`docs/technical/background.md`](docs/technical/background.md) | How long work survives being interrupted, and how the marked articles are searched by meaning |
 | [`docs/technical/digest.md`](docs/technical/digest.md) | How articles become stories, and why not with the vectors |
 | [`docs/technical/interface.md`](docs/technical/interface.md) | How the interface is set, where Liquid Glass is allowed, and what was rejected |
+| [`docs/technical/place.md`](docs/technical/place.md) | Where you say you read from, what is kept of it, and what is not |
 | [`docs/technical/freshrss-api.md`](docs/technical/freshrss-api.md) | The Google Reader API surface, kept for the FreshRSS import |
 
 ## License

@@ -174,6 +174,7 @@ final class AppModel {
     private let sessions: SessionStoring
     private let preferences: Preferences
     private let announcer: Announcing
+    private let locator: Locating
 
     /// The whole stream, as files in the reader's own iCloud.
     ///
@@ -318,11 +319,62 @@ final class AppModel {
         return true
     }
 
+    /// Where the reader reads from, when they have chosen to say.
+    ///
+    /// A town and a country, and nothing finer : ``Place`` says why. It is
+    /// nothing at all until the reader answers, which is the honest state and
+    /// is never nagged at, exactly as an empty name is.
+    ///
+    /// Set through ``setPlace(_:)`` rather than written to, since choosing one
+    /// and taking one back are the same operation on three keys in the store.
+    private(set) var place: Place?
+
+    /// Whether the device is being asked where it is.
+    ///
+    /// A fix from cold takes seconds, and a button that sat there saying
+    /// nothing would be pressed again.
+    private(set) var isLocating = false
+
+    /// Keeps where the reader says they are, or takes it back.
+    func setPlace(_ place: Place?) {
+        self.place = place
+        preferences.place = place
+    }
+
+    /// Asks the device where it is, and keeps the town it stands in.
+    ///
+    /// **What went wrong is handed back rather than posted to ``failure``.**
+    /// The shell's alert is attached behind two sheets by the time this is
+    /// called, and an alert presented from under a sheet is an alert nobody
+    /// sees. The screen that asked is the screen that says so, and the reader
+    /// stays where they were, in front of a search that needs no permission.
+    ///
+    /// **A refusal changes nothing else.** Whatever the reader had chosen
+    /// before stays chosen : an answer they gave by hand is not undone by the
+    /// system declining to give another one.
+    func locate() async -> PlaceFailure? {
+        guard !isLocating else { return nil }
+        isLocating = true
+        defer { isLocating = false }
+
+        do {
+            setPlace(try await locator.here())
+            return nil
+        } catch let refusal as PlaceFailure {
+            Log.place.notice("The device did not say where it is : \(String(describing: refusal), privacy: .public)")
+            return refusal
+        } catch {
+            Log.place.error("The device could not say where it is : \(error, privacy: .public)")
+            return .unavailable
+        }
+    }
+
     /// Reads the name and the face back from what has been kept.
     private func loadProfile() {
         firstName = preferences.firstName
         lastName = preferences.lastName
         picture = preferences.picture.flatMap(ProfilePicture.image)
+        place = preferences.place
     }
 
     private(set) var isRefreshing = false
@@ -668,19 +720,22 @@ final class AppModel {
         credentials: CredentialStoring = KeychainCredentials(),
         sessions: SessionStoring = KeychainSessions(),
         preferences: Preferences = Preferences(),
-        announcer: Announcing = Notifier()
+        announcer: Announcing = Notifier(),
+        locator: Locating = DeviceLocator()
     ) {
         self.database = database
         self.credentials = credentials
         self.sessions = sessions
         self.preferences = preferences
         self.announcer = announcer
+        self.locator = locator
         self.articleBody = preferences.articleBody
         self.theme = preferences.theme
         self.wantsNewStoryNotices = preferences.wantsNewStoryNotices
         self.firstName = preferences.firstName
         self.lastName = preferences.lastName
         self.picture = preferences.picture.flatMap(ProfilePicture.image)
+        self.place = preferences.place
         let subscriptions = SubscriptionStore(database)
         self.subscriptions = subscriptions
         let articles = ArticleStore(database)
@@ -1422,6 +1477,7 @@ final class AppModel {
         firstName = ""
         lastName = ""
         setPicture(nil)
+        setPlace(nil)
         articleBody = .feed
         theme = .standard
         wantsNewStoryNotices = false

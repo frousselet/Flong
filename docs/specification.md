@@ -108,6 +108,7 @@ A single application, shared code, distinct interface layers per platform.
 | `Enricher` | vectors, classification, rule execution |
 | `Sync` | `CKSyncEngine` on the private database |
 | `Notify` | Local notifications : what is worth saying, and the rules for saying it |
+| `Place` | Where the reader says they read from : suggestions from MapKit, one fix from the device. `docs/technical/place.md` |
 | `Automation` | App Intents, widgets, local MCP server on macOS |
 | `Import` | OPML and service imports, exports |
 
@@ -573,6 +574,16 @@ Unread, collection and saved-query widgets. A Share extension for subscribing an
 
 An OPML import or an import from an existing service offered right away, an optional starter set of feeds, a one-sentence explanation of what a mark is and why it never disappears, and no account creation.
 
+### Where the reader is
+
+Under the reader's own face, beside their name : **a town and a country**, optional, empty until they answer, and never asked for twice. It is kept because the region somebody reads from is a fact about them, like their name and like the theme they read in, and it travels between their devices through the key-value store with the rest of what they chose.
+
+Two ways to answer it. **Typing is the road** : the town is completed by MapKit as the reader types, the list is held to towns and countries by an address filter, and the one suggestion they choose is resolved into fields rather than read off its own display text. It needs no permission, and it works on a Mac with no receiver in it. **The device is the shortcut** : one fix, asked for at the moment the button is pressed and never before, turned into a town and forgotten.
+
+**What is kept is a name and never a coordinate.** A latitude is the reader's street, it would travel to their iCloud with everything else here, and nothing that will read this wants more than a region. The country's ISO code is kept beside its name, since a name arrives translated and a code does not, and matching on a translated string is how a preference set on one device stops working on the next.
+
+A refusal leaves the reader in front of the search, which is the thing that works in every case, and leaves whatever they had chosen by hand alone. `docs/technical/place.md` records the two paths, what is sent to Apple while they choose, and what is not.
+
 ---
 
 ## 17. Accessibility and internationalization
@@ -622,6 +633,7 @@ The initial import runs in a resumable task with system progress.
 - Lazy and disableable image loading, tracking pixels neutralized.
 - Optional application lock by Face ID, Touch ID or password.
 - No logging of article content or of a secret URL, including on a crash.
+- Location asked for only at the moment the reader presses the button that uses it, kept as a town and a country and never as a coordinate, and never sent anywhere but Apple's own geocoder while they are choosing.
 - A privacy policy and an App Store privacy nutrition label consistent with the above : no collection.
 
 ### Deleting everything

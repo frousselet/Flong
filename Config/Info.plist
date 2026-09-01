@@ -8,6 +8,8 @@
 		<string>com.rslt.Flong.processing</string>
 		<string>com.rslt.Flong.continued</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Flong fills in the city and country of your profile from where you are. The town is kept, never the coordinate, and it goes nowhere but your own iCloud.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

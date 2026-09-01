@@ -618,6 +618,16 @@
         }
       }
     },
+    "Asked once, when you press it. What comes back is a town : the coordinate itself is never kept." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demandée une seule fois, quand vous appuyez. Ce qui revient est une ville : la coordonnée elle-même n'est jamais conservée."
+          }
+        }
+      }
+    },
     "Bearer token" : {
       "localizations" : {
         "fr" : {
@@ -706,6 +716,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cinéma"
+          }
+        }
+      }
+    },
+    "City" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ville"
+          }
+        }
+      }
+    },
+    "City and country" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ville et pays"
           }
         }
       }
@@ -1183,6 +1213,16 @@
         }
       }
     },
+    "Flong may not use your location. The system settings are where that is changed." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flong n'a pas le droit d'utiliser votre position. Cela se change dans les réglages du système."
+          }
+        }
+      }
+    },
     "Flong reads the page to find its feed when the address is not one already." : {
       "localizations" : {
         "fr" : {
@@ -1464,6 +1504,16 @@
         }
       }
     },
+    "Kept beside your name, in your own iCloud. Flong has nowhere to send it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conservé à côté de votre nom, dans votre propre iCloud. Flong n'a nulle part où l'envoyer."
+          }
+        }
+      }
+    },
     "Kept on your own devices, through your iCloud. Flong has no account and nowhere to send them." : {
       "localizations" : {
         "fr" : {
@@ -1661,6 +1711,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tout n'a pas pu être supprimé. Réessayez dans un instant."
+          }
+        }
+      }
+    },
+    "Not set" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non renseigné"
           }
         }
       }
@@ -1883,6 +1943,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirer la photo"
+          }
+        }
+      }
+    },
+    "Remove where you are" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer votre localisation"
           }
         }
       }
@@ -2330,6 +2400,16 @@
         }
       }
     },
+    "Suggestions" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suggestions"
+          }
+        }
+      }
+    },
     "Synchronized %@" : {
       "localizations" : {
         "fr" : {
@@ -2386,6 +2466,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce fichier n'est pas une image"
+          }
+        }
+      }
+    },
+    "That town could not be read. Try another one." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette ville n'a pas pu être lue. Essayez-en une autre."
           }
         }
       }
@@ -2652,6 +2742,16 @@
         }
       }
     },
+    "Use my location" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser ma position"
+          }
+        }
+      }
+    },
     "Use the article's own headline" : {
       "localizations" : {
         "fr" : {
@@ -2699,6 +2799,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qu'elle cherche"
+          }
+        }
+      }
+    },
+    "Where you are" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Où vous êtes"
+          }
+        }
+      }
+    },
+    "Where you are could not be worked out. Search for your city instead." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de déterminer où vous êtes. Cherchez plutôt votre ville."
           }
         }
       }
