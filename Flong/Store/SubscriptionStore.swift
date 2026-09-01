@@ -15,6 +15,9 @@ import GRDB
 /// Why a subscription operation could not be carried out.
 nonisolated enum SubscriptionError: Error, Hashable, Sendable {
     case unknownFeed(UUID)
+    /// The address asked for is the one another source is already served at,
+    /// and a feed is identified by its address, so the two cannot both have it.
+    case addressAlreadyFollowed(UUID)
 }
 
 /// What became of one subscription request.
@@ -49,6 +52,52 @@ nonisolated struct Unsubscription: Hashable, Sendable {
     /// Whether the name the reader had written over the publisher went too,
     /// which happens when this was the last of its sources.
     let forgotName: Bool
+}
+
+/// What a reader wrote in the editor of one source.
+///
+/// **Text rather than a `URL` and a `TimeInterval`**, because text is what a
+/// reader types. Canonicalizing it is the store's business and happens in one
+/// place, under the rules of `docs/technical/feed-identity.md`, so that the
+/// editor cannot become a second way of spelling an address.
+nonisolated struct SourceEdit: Hashable, Sendable {
+    /// What to call it. Empty falls back to the host, as it does everywhere.
+    var title: String = ""
+    /// Where it is served.
+    ///
+    /// Empty leaves it exactly where it is, which is what a source whose
+    /// address is itself a secret sends : the editor never shows that address,
+    /// so it has none to send back.
+    var address: String = ""
+    /// The site it belongs to, which decides which publisher it files under and
+    /// where its icon is looked for. Empty takes it off.
+    var siteAddress: String = ""
+    /// A manual interval in seconds, or `nil` for the rhythm the feed itself
+    /// shows. Bounded by ``RefreshSchedule`` either way.
+    var refreshInterval: TimeInterval?
+    var isFavourite: Bool = false
+}
+
+/// What editing one source came to, and what has to follow it outside the store.
+///
+/// The address is the whole of the difficulty. Everything iCloud holds about a
+/// source is named after the address it is served at, so a source that moves is
+/// a set of records under names nothing has ever written, and another set under
+/// names nothing will ever write again.
+nonisolated struct SourceChange: Hashable, Sendable {
+    /// The source as it now stands.
+    let feed: Feed
+    /// Where it was served before, and `nil` when the address did not move.
+    let previousURL: URL?
+    /// The articles the reader had marked under it, whose records are named
+    /// after the address they arrived at and have to be written again under the
+    /// new one.
+    let marked: [Unsubscription.Marked]
+    /// The publisher whose name went, when the move was the last source leaving
+    /// it.
+    let forgottenName: String?
+
+    var movedAddress: Bool { previousURL != nil }
 }
 
 /// The subscriptions : which feeds Flong follows, how they are called and which
@@ -206,6 +255,131 @@ nonisolated struct SubscriptionStore: Sendable {
         try await update(id) { feed in feed.isFavourite = isFavourite }
     }
 
+    /// Edits one source : its name, its address, the site it belongs to, how
+    /// often it is asked and whether it is one of the reader's own.
+    ///
+    /// **One transaction, because the address drags the rest along.** A source
+    /// that moves takes with it the marks still waiting under the old address,
+    /// the conditional state that belonged to the old server and, when it was
+    /// the last source of its publisher, the name the reader had written over
+    /// that publisher. A half-applied edit would leave a row pointing at an
+    /// address nothing else in the store agrees with.
+    ///
+    /// **Every field is written**, so a caller sends the whole of what the
+    /// reader was looking at rather than the part they touched. An editor is a
+    /// screen showing a state, and a partial edit would be a screen that half
+    /// remembers.
+    ///
+    /// What comes back is what the window has to carry outside the store :
+    /// iCloud names every record after the address, and Spotlight holds the
+    /// name of the publisher on every article of it.
+    @discardableResult
+    func edit(_ id: UUID, to edited: SourceEdit) async throws -> SourceChange {
+        let address = edited.address.trimmingCharacters(in: .whitespacesAndNewlines)
+        let asked = address.isEmpty ? nil : try FeedURL.canonical(address)
+
+        let site = edited.siteAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        let siteURL = site.isEmpty ? nil : try FeedURL.canonical(site)
+
+        return try await database.writer.write { db in
+            guard var feed = try Feed.fetchOne(db, key: id) else { throw SubscriptionError.unknownFeed(id) }
+            let publisher = feed.domain
+
+            var moved: URL?
+            if let asked { moved = try Self.move(&feed, to: asked, in: db) }
+
+            let title = edited.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            feed.title = title.isEmpty ? Subscription.fallbackTitle(for: feed.url) : title
+            feed.siteURL = siteURL
+            feed.refreshInterval = edited.refreshInterval.map(Self.bounded)
+            feed.isFavourite = edited.isFavourite
+            try feed.update(db)
+
+            return SourceChange(
+                feed: feed,
+                previousURL: moved,
+                // Only when the address moved. They are here to be named again
+                // in the reader's iCloud, and nothing else about a source
+                // changes what its marks are called.
+                marked: moved == nil ? [] : try Self.marked(ofFeed: feed.id, in: db),
+                forgottenName: publisher == feed.domain ? nil : try Self.forgetName(ofEmptied: publisher, in: db)
+            )
+        }
+    }
+
+    /// Moves a source to the address another device says it is served at now.
+    ///
+    /// **The whole point is that the row is moved rather than replaced.** A
+    /// source that moved arrives as a record under a name this device has never
+    /// seen and a deletion of the one it knows, and taking those at face value
+    /// would delete the articles, the stars, the notes and the filings of a
+    /// source that has not gone anywhere.
+    ///
+    /// `nil`, and nothing done, when there is nothing here at the old address,
+    /// or when something is already at the new one. Both mean this device has
+    /// already followed the move or never knew the source, and neither is an
+    /// error : records are replayed, and a second application has to change
+    /// nothing.
+    @discardableResult
+    func readdress(from previous: URL, to url: URL) async throws -> SourceChange? {
+        try await database.writer.write { db in
+            guard var feed = try Feed.filter(Feed.Columns.url == previous).fetchOne(db),
+                try Feed.filter(Feed.Columns.url == url).fetchOne(db) == nil
+            else { return nil }
+
+            let publisher = feed.domain
+            guard let moved = try Self.move(&feed, to: url, in: db) else { return nil }
+            try feed.update(db)
+
+            return SourceChange(
+                feed: feed,
+                previousURL: moved,
+                marked: try Self.marked(ofFeed: feed.id, in: db),
+                forgottenName: publisher == feed.domain ? nil : try Self.forgetName(ofEmptied: publisher, in: db)
+            )
+        }
+    }
+
+    /// Takes on what another device decided about a source already followed.
+    ///
+    /// **The upsert completes a feed and never overwrites it, which is right
+    /// for an import and wrong for what arrives from iCloud.** A name the
+    /// reader wrote on their iPad, a site they corrected and a source they
+    /// singled out are decisions, and a decision that did not travel is one
+    /// they made and then watched disappear on the next device they picked up.
+    ///
+    /// A field the record does not state is not a decision to unset it. An
+    /// older record carries no favourite and may carry no site, and nothing
+    /// said is not the same as `no`.
+    @discardableResult
+    func adopt(_ subscription: Subscription, isFavourite: Bool?, at id: UUID) async throws -> Bool {
+        try await database.writer.write { db in
+            guard var feed = try Feed.fetchOne(db, key: id) else { throw SubscriptionError.unknownFeed(id) }
+            var changed = false
+
+            if feed.title != subscription.title {
+                feed.title = subscription.title
+                changed = true
+            }
+            if let site = subscription.siteURL, feed.siteURL != site {
+                feed.siteURL = site
+                changed = true
+            }
+            if let icon = subscription.iconURL, feed.iconURL != icon {
+                feed.iconURL = icon
+                changed = true
+            }
+            if let isFavourite, feed.isFavourite != isFavourite {
+                feed.isFavourite = isFavourite
+                changed = true
+            }
+
+            guard changed else { return false }
+            try feed.update(db)
+            return true
+        }
+    }
+
     /// Stops following a source and takes everything it brought with it.
     ///
     /// **One transaction, so a source never half goes.** Most of what a feed
@@ -243,12 +417,7 @@ nonisolated struct SubscriptionStore: Sendable {
         // Read before anything is deleted : this is what the window has to take
         // out of Spotlight and out of the reader's iCloud, and in a moment
         // there will be nothing left to read it from.
-        let marked = try Row.fetchAll(
-            db,
-            sql: "SELECT id, guid FROM entry WHERE feed_id = ? AND \(Retention.marked)",
-            arguments: [feed.id]
-        )
-        .map { Unsubscription.Marked(id: $0["id"], guid: $0["guid"]) }
+        let marked = try Self.marked(ofFeed: feed.id, in: db)
 
         // A filing carries no foreign key, since it points at one of three
         // tables, so nothing takes it away with the article it names. Left
@@ -285,12 +454,93 @@ nonisolated struct SubscriptionStore: Sendable {
         // nothing can reach : not shown anywhere, not editable anywhere, and
         // silently reappearing over the group if the reader ever subscribes to
         // that publisher again.
-        let stillFollowed = try Feed.fetchAll(db).contains { $0.domain == feed.domain }
-        let forgotName =
-            try !stillFollowed
-            && SourceName.filter(SourceName.Columns.domain == feed.domain).deleteAll(db) > 0
+        let forgotName = try Self.forgetName(ofEmptied: feed.domain, in: db) != nil
 
         return Unsubscription(feed: feed, marked: marked, forgotName: forgotName)
+    }
+
+    /// Puts a source at another address, with everything that was named after
+    /// the old one.
+    ///
+    /// Answers with the address it came from, or `nil` when it was already
+    /// there, so that a caller can tell an edit that moved a source from one
+    /// that only renamed it.
+    private static func move(_ feed: inout Feed, to url: URL, in db: Database) throws -> URL? {
+        guard url != feed.url else { return nil }
+
+        if let other = try Feed.filter(Feed.Columns.url == url).fetchOne(db), other.id != feed.id {
+            throw SubscriptionError.addressAlreadyFollowed(other.id)
+        }
+
+        let previous = feed.url
+
+        // A mark that arrived before its article is keyed by the address it
+        // arrived under, which is the only thing it has to find its article by.
+        // Left where it was, it would wait for ever on an address nothing is
+        // going to ask for again. `OR REPLACE` because one may already be
+        // waiting under the new address, and two marks for one article is one
+        // mark : the one that has been waiting is the one that named the
+        // article correctly at the time.
+        try db.execute(
+            sql: "UPDATE OR REPLACE pending_mark SET feed_url = ? WHERE feed_url = ?",
+            arguments: [url.absoluteString, previous.absoluteString]
+        )
+
+        feed.previousURL = previous
+        feed.url = url
+
+        // **The conditional state belongs to the address and not to the
+        // source.** An `ETag` replayed at a server that never issued it is a
+        // question about somebody else's file, and the `304` it may well answer
+        // with would keep the new address empty for as long as the reader
+        // waited. The health record goes with it, since a 304 rate mixing two
+        // servers' answers measures neither, and so do the failures : a reader
+        // who edits an address is usually repairing a source that had stopped
+        // answering, and the quarantine is exactly what they are undoing.
+        feed.etag = nil
+        feed.lastModified = nil
+        feed.fetchCount = 0
+        feed.notModifiedCount = 0
+        feed.failureCount = 0
+        feed.lastFailureReason = nil
+        feed.lastFetchAt = nil
+        feed.lastSuccessAt = nil
+        feed.quarantinedAt = nil
+
+        return previous
+    }
+
+    /// The articles of one source the reader had said something about.
+    private static func marked(ofFeed id: UUID, in db: Database) throws -> [Unsubscription.Marked] {
+        try Row.fetchAll(
+            db,
+            sql: "SELECT id, guid FROM entry WHERE feed_id = ? AND \(Retention.marked)",
+            arguments: [id]
+        )
+        .map { Unsubscription.Marked(id: $0["id"], guid: $0["guid"]) }
+    }
+
+    /// Takes the name off a publisher nothing is followed from any more.
+    ///
+    /// A group is worked out from the addresses of its feeds and never survives
+    /// them, so a name left behind would be a row nothing can reach : not shown
+    /// anywhere, not editable anywhere, and silently reappearing over the group
+    /// if the reader ever came back to that publisher.
+    ///
+    /// Answers with the domain whose name went, so that the caller knows there
+    /// is a record of it to delete.
+    private static func forgetName(ofEmptied domain: String, in db: Database) throws -> String? {
+        guard try !Feed.fetchAll(db).contains(where: { $0.domain == domain }) else { return nil }
+        guard try SourceName.filter(SourceName.Columns.domain == domain).deleteAll(db) > 0 else { return nil }
+        return domain
+    }
+
+    /// A manual interval, held inside the bounds section 8 sets for every feed.
+    ///
+    /// The editor offers a handful of intervals that are all inside them, so
+    /// this is for what arrives from anywhere else.
+    private static func bounded(_ interval: TimeInterval) -> TimeInterval {
+        min(max(interval, RefreshSchedule.minimumInterval), RefreshSchedule.maximumInterval)
     }
 
     private func update(_ id: UUID, _ change: @escaping @Sendable (inout Feed) -> Void) async throws {

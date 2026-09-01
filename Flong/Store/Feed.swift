@@ -19,6 +19,7 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
     enum CodingKeys: String, CodingKey {
         case id
         case url
+        case previousURL = "previous_url"
         case siteURL = "site_url"
         case iconURL = "icon_url"
         case title
@@ -42,6 +43,20 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
 
     var id: UUID
     var url: URL
+
+    /// Where this source was served before the reader moved it, when they have.
+    ///
+    /// **It is kept so that the move can travel.** Every record about a source
+    /// is named after its address, so a source that moves is a new record and a
+    /// deletion of the old one, and a device reading those two as a removal
+    /// followed by a subscription would take the articles of the old row with
+    /// it. The record carries this, and a device that has the source at this
+    /// address moves it rather than building a second one.
+    ///
+    /// Never cleared, since the device that needs it is the one that has been
+    /// switched off, and never a secret : the address stored for a private feed
+    /// is already the masked one.
+    var previousURL: URL?
     var siteURL: URL?
     var iconURL: URL?
     var title: String
@@ -80,6 +95,7 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
     init(
         id: UUID = .v7(),
         url: URL,
+        previousURL: URL? = nil,
         siteURL: URL? = nil,
         iconURL: URL? = nil,
         title: String,
@@ -102,6 +118,7 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
     ) {
         self.id = id
         self.url = url
+        self.previousURL = previousURL
         self.siteURL = siteURL
         self.iconURL = iconURL
         self.title = title

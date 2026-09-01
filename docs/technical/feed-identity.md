@@ -73,11 +73,23 @@ Subscribing to an address already followed is not an error : it returns the feed
 
 **What the reader did outranks what an import carries.** A title they changed, a source they made a favourite and a name they wrote over a publisher are never overwritten. Only a field still empty is filled in, which lets a second import complete a feed with the site URL or the icon the first one lacked.
 
-That rule is right for an import and wrong for what arrives from iCloud, and `SyncPayload` is the one place that says so : a favourite set on another device is the later word on the matter, so it is applied over the upsert rather than through it. A record written before favourites existed carries no such field, and nothing said is not the same as `no`.
+That rule is right for an import and wrong for what arrives from iCloud, and `SyncPayload` is the one place that says so : a name written, a site corrected or a favourite set on another device is the later word on the matter, so `SubscriptionStore.adopt` applies it over the upsert rather than through it. A field the record does not state is not a decision to unset it : a record written before favourites existed carries no such field, and nothing said is not the same as `no`.
 
 A feed with no title of its own is called after its host, `www.` stripped, until the feed states one.
 
 That is the only moment a refresh may rename a feed : while the stored title is still that host fallback. A title carried by an OPML file is already somebody's choice, and a rename certainly is, so neither is ever overwritten by what a publisher decides to call themselves next month.
+
+## A source that moves
+
+An address is not a field like the others : it is what identifies the feed, and it is what every record in the reader's iCloud is named after. A reader may still change it, from the editor of the source, and the row is moved rather than replaced : the articles, the marks on them and the collections they are filed into are keyed by the feed and stay exactly where they are.
+
+- The address is canonicalized here like any other, so the editor cannot become a second way of spelling one.
+- An address another source is already served at is **refused**. The column is unique, and merging two subscriptions is not something a reader asked for by typing an address.
+- What the old server said is forgotten : the `ETag`, the `Last-Modified`, the fetch counts and the quarantine all belonged to the address that was left.
+- The name over the publisher goes if the move was the last source leaving it, exactly as a removal would take it.
+- The `Feed` record carries `previousURL`, which is what lets another device move the row it already holds instead of reading a new name and a deleted one as a subscription gained and a subscription lost.
+
+`docs/technical/editing-a-source.md` is the whole of it.
 
 ## Ordering
 

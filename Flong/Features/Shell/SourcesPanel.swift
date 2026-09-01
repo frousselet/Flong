@@ -65,6 +65,9 @@ struct SourcesPanel: View {
     @State private var isAddingFeed = false
     /// The feed whose address parameters are being looked at, if one is.
     @State private var addressing: Addressing?
+    /// The source being edited, carried whole so the sheet opens on it rather
+    /// than on nothing while it reads it back.
+    @State private var edited: Feed?
     @State private var isChoosingFile = false
 
     /// A feed whose address parameters are being looked at.
@@ -114,6 +117,7 @@ struct SourcesPanel: View {
                                 .swipeActions(edge: .trailing) { deleting(source) }
                                 .contextMenu {
                                     favouriting(source)
+                                    editing(source)
                                     addressing(source)
                                     deleting(source)
                                 }
@@ -195,6 +199,10 @@ struct SourcesPanel: View {
                 addPrivate: { address in await model.addPrivateFeed(at: address) }
             )
             .themed()
+        }
+        .sheet(item: $edited) { source in
+            SourceEditor(model: model, feed: source)
+                .themed()
         }
         .sheet(item: $addressing) { addressing in
             AddressParametersView(model: model, feedID: addressing.feedID, feedURL: addressing.url)
@@ -401,6 +409,27 @@ struct SourcesPanel: View {
             )
         }
         .tint(.yellow)
+    }
+
+    /// Changing what a source is, which is the one thing in this panel that
+    /// used to be impossible.
+    ///
+    /// **In the source's own menu, above the two things that are about its
+    /// address and its removal**, since a reader who wants to correct anything
+    /// at all about a source looks here first. What it opens holds the name,
+    /// the address, the site, how often it is asked and whether it is one of
+    /// the reader's own, and it is where the address parameters are reached
+    /// from too : a menu is a list of what can be done, and a screen is where
+    /// it is done.
+    @ViewBuilder
+    private func editing(_ source: SidebarItem) -> some View {
+        if case .feed(let id) = source.kind {
+            Button {
+                Task { edited = await model.source(id) }
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+        }
     }
 
     /// Saying which parameters of this feed's addresses are the reader's own.

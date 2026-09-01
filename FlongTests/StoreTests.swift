@@ -56,7 +56,7 @@ struct StoreTests {
                 "v19.marksThatArriveFirst", "v20.secureThePictures", "v21.threeKindsOfSubject",
                 "v22.twoKindsOfSubject", "v23.publishersRatherThanFolders", "v24.theWriters",
                 "v25.theWholeByline", "v26.everybodyWhoSigned", "v27.aCollectionShared",
-                "v28.whatSomebodyElseFiled",
+                "v28.whatSomebodyElseFiled", "v29.aSourceThatMoved",
             ]
         )
     }

@@ -7,7 +7,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ a ajout\u00e9 dans %2$@"
+            "value" : "%1$@ a ajouté dans %2$@"
           }
         }
       }
@@ -17,7 +17,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld ajout\u00e9s dans %2$@"
+            "value" : "%1$lld ajoutés dans %2$@"
           }
         }
       }
@@ -27,7 +27,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%lld ajout\u00e9s dans vos collections partag\u00e9es"
+            "value" : "%lld ajoutés dans vos collections partagées"
           }
         }
       }
@@ -452,6 +452,16 @@
         }
       }
     },
+    "A source that moves keeps its articles, everything you marked on them and the collections they are filed into. It is asked again at once, and your other devices follow." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une source qui déménage garde ses articles, tout ce que vous y avez marqué et les collections où ils sont classés. Elle est interrogée aussitôt, et vos autres appareils suivent."
+          }
+        }
+      }
+    },
     "A subscription platform gives each subscriber an address nobody else has. Kept in the keychain, never in the database, and never in an export." : {
       "localizations" : {
         "fr" : {
@@ -546,12 +556,42 @@
         }
       }
     },
+    "Address" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adresse"
+          }
+        }
+      }
+    },
     "Address of a feed or of a site" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Adresse d'un flux ou d'un site"
+          }
+        }
+      }
+    },
+    "Address of the feed" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adresse du flux"
+          }
+        }
+      }
+    },
+    "Address of the site" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adresse du site"
           }
         }
       }
@@ -571,7 +611,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajout\u00e9 dans %@"
+            "value" : "Ajouté dans %@"
           }
         }
       }
@@ -581,7 +621,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajout\u00e9s par d\u2019autres"
+            "value" : "Ajoutés par d’autres"
           }
         }
       }
@@ -591,7 +631,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Param\u00e8tres d\u2019adresse"
+            "value" : "Paramètres d’adresse"
           }
         }
       }
@@ -601,7 +641,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajouts aux collections partag\u00e9es"
+            "value" : "Ajouts aux collections partagées"
           }
         }
       }
@@ -611,7 +651,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les ajouts s\u2019annoncent depuis Notifications"
+            "value" : "Les ajouts s’annoncent depuis Notifications"
           }
         }
       }
@@ -636,6 +676,16 @@
         }
       }
     },
+    "Another source is already followed at this address." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une autre source est déjà suivie à cette adresse."
+          }
+        }
+      }
+    },
     "Answer in English. Write every word of your answer in English." : {
       "comment" : "Sent to the on-device model, in the reader's own language, to make it answer in that language",
       "localizations" : {
@@ -643,6 +693,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réponds en français. Écris chaque mot de ta réponse en français."
+          }
+        }
+      }
+    },
+    "Answered not modified" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réponses sans changement"
           }
         }
       }
@@ -775,6 +835,37 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Auteurs"
+          }
+        }
+      }
+    },
+    "Automatic" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatique"
+          }
+        }
+      }
+    },
+    "Automatic follows the rhythm the feed shows, between a quarter of an hour and a day." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En automatique, Flong suit le rythme du flux, entre un quart d’heure et un jour."
+          }
+        }
+      }
+    },
+    "Automatic follows the rhythm the feed shows, which is about %@ between articles." : {
+      "comment" : "A length of time, such as 3 hours",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En automatique, Flong suit le rythme du flux : environ %@ entre deux articles."
           }
         }
       }
@@ -1115,6 +1206,26 @@
         }
       }
     },
+    "Edit" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier"
+          }
+        }
+      }
+    },
+    "Edit the source" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modifier la source"
+          }
+        }
+      }
+    },
     "Education" : {
       "localizations" : {
         "fr" : {
@@ -1205,6 +1316,16 @@
         }
       }
     },
+    "Failures in a row" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échecs consécutifs"
+          }
+        }
+      }
+    },
     "Fashion" : {
       "localizations" : {
         "fr" : {
@@ -1263,7 +1384,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Class\u00e9 par %@"
+            "value" : "Classé par %@"
           }
         }
       }
@@ -1398,6 +1519,16 @@
         }
       }
     },
+    "Flong stopped asking after repeated failures. Saving an address puts it back in service." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flong a cessé d’interroger cette source après des échecs répétés. Enregistrer une adresse la remet en service."
+          }
+        }
+      }
+    },
     "Food" : {
       "localizations" : {
         "fr" : {
@@ -1525,6 +1656,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Logement"
+          }
+        }
+      }
+    },
+    "How often" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fréquence"
           }
         }
       }
@@ -1679,6 +1820,16 @@
         }
       }
     },
+    "Last answered" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière réponse"
+          }
+        }
+      }
+    },
     "Last name" : {
       "localizations" : {
         "fr" : {
@@ -1695,6 +1846,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "A fonctionné %@"
+          }
+        }
+      }
+    },
+    "Leave it empty to call it %@ again." : {
+      "comment" : "The host a feed is served from, such as feeds.example.com",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laissez le champ vide pour l’appeler de nouveau %@."
           }
         }
       }
@@ -1805,7 +1967,17 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ni l\u2019adresse de ce flux ni celles de ses articles n\u2019en portent."
+            "value" : "Ni l’adresse de ce flux ni celles de ses articles n’en portent."
+          }
+        }
+      }
+    },
+    "Never" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jamais"
           }
         }
       }
@@ -1826,6 +1998,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouvelle collection dynamique"
+          }
+        }
+      }
+    },
+    "New secret address" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle adresse secrète"
           }
         }
       }
@@ -1966,7 +2148,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rien dedans pour l\u2019instant"
+            "value" : "Rien dedans pour l’instant"
           }
         }
       }
@@ -1996,7 +2178,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aucun param\u00e8tre"
+            "value" : "Aucun paramètre"
           }
         }
       }
@@ -2056,7 +2238,17 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ouvre l\u2019article sur son site"
+            "value" : "Ouvre l’article sur son site"
+          }
+        }
+      }
+    },
+    "Parameters" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paramètres"
           }
         }
       }
@@ -2066,7 +2258,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Param\u00e8tres des adresses de ce flux"
+            "value" : "Paramètres des adresses de ce flux"
           }
         }
       }
@@ -2208,6 +2400,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Renommer"
+          }
+        }
+      }
+    },
+    "Save" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrer"
           }
         }
       }
@@ -2507,7 +2709,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Partag\u00e9es avec moi"
+            "value" : "Partagées avec moi"
           }
         }
       }
@@ -2725,6 +2927,16 @@
         }
       }
     },
+    "The address is the secret, so it is never shown. A new one goes to the keychain and takes the source with it, keeping everything already here." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’adresse est le secret : elle n’est jamais affichée. Une nouvelle adresse va dans le trousseau et emmène la source avec elle, en conservant tout ce qui est déjà là."
+          }
+        }
+      }
+    },
     "TV series" : {
       "localizations" : {
         "fr" : {
@@ -2760,7 +2972,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "M\u2019annoncer les ajouts"
+            "value" : "M’annoncer les ajouts"
           }
         }
       }
@@ -3093,7 +3305,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce que chacun classe dans cette collection appara\u00eet ici."
+            "value" : "Ce que chacun classe dans cette collection apparaît ici."
           }
         }
       }
@@ -3113,7 +3325,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce que vous cochez ici est retir\u00e9 de toute adresse qui quitte cet appareil, et rien d\u2019autre ne l\u2019est. Rien n\u2019est retir\u00e9 au jug\u00e9 : un param\u00e8tre s\u00e9lectionne un flux ou un filtre aussi souvent qu\u2019il d\u00e9signe un abonn\u00e9."
+            "value" : "Ce que vous cochez ici est retiré de toute adresse qui quitte cet appareil, et rien d’autre ne l’est. Rien n’est retiré au jugé : un paramètre sélectionne un flux ou un filtre aussi souvent qu’il désigne un abonné."
           }
         }
       }
@@ -3134,6 +3346,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Impossible de déterminer où vous êtes. Cherchez plutôt votre ville."
+          }
+        }
+      }
+    },
+    "Which publisher it is grouped under, and where its icon is looked for. Leave it empty and it is grouped under the address of the feed itself." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’éditeur sous lequel elle est regroupée, et l’endroit où son icône est cherchée. Laissez le champ vide et elle est regroupée sous l’adresse du flux lui-même."
           }
         }
       }
