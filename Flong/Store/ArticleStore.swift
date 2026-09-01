@@ -476,26 +476,82 @@ nonisolated struct ArticleStore: Sendable {
         "\(table).feed_id IN (SELECT id FROM feed WHERE is_favourite = 1)"
     }
 
-    /// An article the reader chose, which is what the system index holds.
+    /// How many articles one favourite is worth to the system index.
     ///
-    /// **Five ways of choosing, one condition, written once.** Three of them
-    /// are about the article itself and are made one article at a time : a
-    /// star, a note, a filing. Two are made once and stand for everything that
-    /// follows : a publisher singled out, a writer singled out. All five are
-    /// the reader saying this one, and none of them is the stream saying it.
+    /// **A star is a decision about an article ; a favourite is a decision
+    /// about everything that follows from it.** The first bounds itself : a
+    /// reader stars, annotates and files a few thousand articles in years,
+    /// which is exactly the size Core Spotlight is good at. The second does
+    /// not. A favourite daily serving forty articles a day is fifteen thousand
+    /// items within the year, on its own, and section 11 of the specification
+    /// budgets a few thousand in total, beyond which the system search
+    /// degrades for everything the device holds and not only for Flong.
+    ///
+    /// So a favourite is worth its most recent articles and no more. The index
+    /// is then bounded by the number of favourites rather than by the size of
+    /// the corpus, which is the only bound a reader controls. It costs them
+    /// nothing they cannot reach another way : Flong's own search covers every
+    /// article ever stored, and Spotlight was never the primary index.
+    ///
+    /// It bites hardest exactly where it was meant to. Two hundred and fifty
+    /// articles is five days of a firehose and five years of a weekly, and a
+    /// favourite writer almost never has that many to their name at all.
+    static let perFavourite = 250
+
+    /// The identifier of every article the reader chose.
+    ///
+    /// **Five ways of choosing, written once.** Three are about the article
+    /// itself and are made one article at a time : a star, a note, a filing.
+    /// Two are made once and stand for everything that follows : a publisher
+    /// singled out, a writer singled out. All five are the reader saying this
+    /// one, and none of them is the stream saying it.
     ///
     /// It is deliberately wider than ``Retention/marked``, which is what a
     /// purge may not take. A favourite is a judgement about a source or a
     /// writer rather than about an article, so it earns an article a place in
     /// the system search without earning it a place a purge has to work
-    /// around.
-    static func wasChosen(_ table: String) -> String {
+    /// around. It is deliberately narrower than the favourites' own
+    /// collections, which hold everything : the cap is what the system index
+    /// can carry, not what the reader chose.
+    ///
+    /// **A table expression rather than a condition**, because the two capped
+    /// ways ask where an article stands among its neighbours rather than
+    /// anything about the article. `ORDER BY date DESC LIMIT n` cannot answer
+    /// that : it is one list, and this needs one per source and one per writer.
+    /// The rank is broken by the identifier where two articles share a date, so
+    /// that the cut falls in the same place at every reading and an index that
+    /// has not changed is not written again.
+    private static func choice(perFavourite: Int) -> String {
         """
-        (\(table).is_starred = 1 OR COALESCE(\(table).annotation, '') <> ''
-         OR \(table).id IN (SELECT target_id FROM tag_binding WHERE target_kind = 'entry')
-         OR \(fromAFavouriteSource(table))
-         OR \(AuthorStore.byAFavouriteAuthor(table)))
+        chosen(id) AS (
+            SELECT e.id FROM entry e
+            WHERE \(shown("e"))
+              AND (e.is_starred = 1 OR COALESCE(e.annotation, '') <> ''
+                   OR e.id IN (SELECT target_id FROM tag_binding WHERE target_kind = 'entry'))
+            UNION
+            SELECT id FROM (
+                SELECT e.id AS id, ROW_NUMBER() OVER (
+                    PARTITION BY e.feed_id
+                    ORDER BY COALESCE(e.published_at, e.received_at) DESC, e.id DESC
+                ) AS place
+                FROM entry e WHERE \(shown("e")) AND \(fromAFavouriteSource("e"))
+            ) WHERE place <= \(perFavourite)
+            UNION
+            SELECT id FROM (
+                SELECT a.entry_id AS id, ROW_NUMBER() OVER (
+                    PARTITION BY a.name
+                    ORDER BY COALESCE(e.published_at, e.received_at) DESC, e.id DESC
+                ) AS place
+                FROM entry_author a JOIN entry e ON e.id = a.entry_id
+                WHERE \(shown("e")) AND a.name IN (SELECT name FROM favourite_author)
+            ) WHERE place <= \(perFavourite)
+        )
         """
+    }
+
+    /// What is not a duplicate and was not hidden by a rule.
+    private static func shown(_ table: String) -> String {
+        "\(table).is_hidden = 0 AND \(table).duplicate_of IS NULL"
     }
 
     /// What is in one collection of the first two natures, newest first.
@@ -556,13 +612,14 @@ nonisolated struct ArticleStore: Sendable {
     ///
     /// In the store's own order, which is the identifier, so that two readings
     /// of one unchanged store are two identical answers.
-    func choices() async throws -> [Choice] {
+    func choices(perFavourite: Int = ArticleStore.perFavourite) async throws -> [Choice] {
         try await database.writer.read { db in
             try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT e.id AS id, e.received_at AS received_at FROM entry e
-                    WHERE e.is_hidden = 0 AND e.duplicate_of IS NULL AND \(Self.wasChosen("e"))
+                    WITH \(Self.choice(perFavourite: perFavourite))
+                    SELECT e.id AS id, e.received_at AS received_at
+                    FROM entry e JOIN chosen c ON c.id = e.id
                     ORDER BY e.id
                     """
             )
@@ -574,22 +631,23 @@ nonisolated struct ArticleStore: Sendable {
     ///
     /// Narrowed to a few of them when only a few changed, so that starring one
     /// article does not read every mark there is back out of the database.
-    func chosen(_ ids: [UUID]? = nil) async throws -> [Chosen] {
-        let narrowing = ids.map { " AND e.id IN (\(databaseQuestionMarks(count: $0.count)))" } ?? ""
+    func chosen(_ ids: [UUID]? = nil, perFavourite: Int = ArticleStore.perFavourite) async throws -> [Chosen] {
+        let narrowing = ids.map { " WHERE e.id IN (\(databaseQuestionMarks(count: $0.count)))" } ?? ""
         let arguments = StatementArguments(ids ?? [])
 
         return try await database.writer.read { db in
             try Row.fetchAll(
                 db,
                 sql: """
+                    WITH \(Self.choice(perFavourite: perFavourite))
                     SELECT e.id AS id, e.title AS title, b.plain_text AS plain_text, e.url AS url,
                            e.author AS author, f.title AS feed_title, f.site_url AS site_url,
                            f.url AS feed_url, e.published_at AS published_at,
                            e.received_at AS received_at
                     FROM entry e
+                    JOIN chosen c ON c.id = e.id
                     JOIN feed f ON f.id = e.feed_id
                     LEFT JOIN entry_body b ON b.entry_id = e.id
-                    WHERE e.is_hidden = 0 AND e.duplicate_of IS NULL AND \(Self.wasChosen("e"))
                     \(narrowing)
                     """,
                 arguments: arguments
