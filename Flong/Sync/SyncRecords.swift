@@ -35,6 +35,8 @@ nonisolated enum SyncRecords {
         static let favouriteAuthor = "FavouriteAuthor"
         /// What a shared collection is called, in the zone standing for it.
         static let sharedCollection = "SharedCollection"
+        /// What one participant filed into a shared collection.
+        static let sharedList = "SharedList"
     }
 
     // MARK: - A collection that is shared
@@ -60,6 +62,39 @@ nonisolated enum SyncRecords {
     /// One per zone, so a fixed name rather than a derived one : there is
     /// nothing to tell apart.
     static let sharedCollectionName = "collection"
+
+    /// One participant's list in a shared collection, and one chunk of it.
+    ///
+    /// **Named after the person, so that each of them writes only their own.**
+    /// Two participants filing at the same moment then touch two records and
+    /// cannot collide, which is what removes conflict resolution from this
+    /// entirely. Two devices of one participant work the same name out and
+    /// rewrite one list between them rather than opening a second.
+    static func name(forSharedListBy participant: CKRecord.ID, chunk: Int = 0) -> String {
+        "list-" + digest(participant.recordName) + "-" + String(chunk)
+    }
+
+    /// What every chunk of one participant's list is named under.
+    static func namePrefix(forSharedListBy participant: CKRecord.ID) -> String {
+        "list-" + digest(participant.recordName) + "-"
+    }
+
+    /// Which participant's list a record belongs to, from its name alone.
+    ///
+    /// **The one thing a modification and a deletion have in common.** A record
+    /// that arrives says who wrote it ; a record that is deleted arrives as an
+    /// identifier and nothing else, and one participant taking everything out
+    /// of a collection has to reach exactly their own rows and no one else's.
+    /// The name is what answers that in both cases, so the name is what the
+    /// store is keyed by.
+    ///
+    /// `nil` for a name that is not one of these, which is how a record of some
+    /// other kind is left alone rather than read as an empty list.
+    static func listKey(ofRecordNamed name: String) -> String? {
+        guard name.hasPrefix("list-"), let last = name.lastIndex(of: "-"), last > name.startIndex else { return nil }
+        let key = String(name[..<last]) + "-"
+        return key == "list-" ? nil : key
+    }
 
     // MARK: - Names
 

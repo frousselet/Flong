@@ -540,6 +540,64 @@ nonisolated extension AppDatabase {
             )
         }
 
+        // An article somebody else filed into a collection they shared.
+        //
+        // **A table of its own, and that is not tidiness.** What is here came
+        // from a feed the reader does not follow, and every guarantee about
+        // their own articles has to go on being true : it is not counted
+        // unread, not purged, not indexed as theirs, not swept up by a rule or
+        // a replay, and never re-shared. Putting it in `entry` would break all
+        // of those at once, and each of them silently.
+        //
+        // It holds an excerpt and never a body, because a body never crossed.
+        migrator.registerMigration("v28.whatSomebodyElseFiled") { db in
+            try db.create(table: "shared_entry") { table in
+                table.primaryKey("id", .blob)
+                table.column("zone_name", .text).notNull()
+                // Which participant's list it came in, as the record that
+                // carried it is named.
+                //
+                // **Not the person, because a deletion does not carry one.**
+                // A record that arrives says who wrote it ; a record that is
+                // deleted arrives as an identifier and nothing else, and the
+                // whole point of a list per participant is that one person's
+                // removal touches only their own rows. The name is what both
+                // events have in common, so the name is what this is keyed by.
+                table.column("list_key", .text).notNull()
+                // Whoever put it there, as CloudKit names them, which is for
+                // saying so on the page and never for finding a row.
+                table.column("author_name", .text).notNull()
+                // The article's identity as the sender's device knows it, which
+                // is what lets a recipient who follows the same source
+                // recognize their own copy.
+                table.column("guid", .text).notNull()
+                table.column("title", .text).notNull()
+                table.column("url", .text)
+                table.column("excerpt", .text)
+                table.column("author", .text)
+                table.column("published_at", .datetime)
+                table.column("image_url", .text)
+                table.column("feed_url", .text)
+                table.column("source_title", .text)
+                table.column("received_at", .datetime).notNull()
+            }
+
+            // One person's list is written whole every time it changes, so what
+            // this answers is : everything in this zone, and everything in it
+            // from that person.
+            try db.create(
+                index: "shared_entry_on_zone_list",
+                on: "shared_entry",
+                columns: ["zone_name", "list_key"]
+            )
+            try db.create(
+                index: "shared_entry_on_zone_guid",
+                on: "shared_entry",
+                columns: ["zone_name", "guid"],
+                options: .unique
+            )
+        }
+
         return migrator
     }
 
