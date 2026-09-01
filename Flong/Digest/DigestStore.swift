@@ -118,6 +118,15 @@ nonisolated struct Digest: Hashable, Sendable {
     /// blank while insisting it is not empty.
     var isEmpty: Bool { live.isEmpty && stories.isEmpty }
 
+    /// Every story on the page, what is happening now first.
+    ///
+    /// The page in one list, for whatever wants the page rather than its two
+    /// halves. The system index is the one that matters : what Spotlight holds
+    /// is what the reader would find on the front page, no more and no less,
+    /// and a split into live and the rest is a decision about where a headline
+    /// goes on a page rather than about what is on it.
+    var all: [DigestStory] { live + stories }
+
     /// The story the page leads on : the first of the live ones, or the first
     /// of the rest where nothing is live.
     ///

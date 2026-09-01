@@ -954,8 +954,39 @@ final class AppModel {
             // header rebuilt mid-gesture is a page that does not settle back
             // where it was.
             if fetched != digest { digest = fetched }
+
+            // **The front page, and only the front page.** What Spotlight holds
+            // is what a reader would find on the digest, no more and no less,
+            // and narrowing to one subject is a question about the window they
+            // are looking at rather than about what the system search should be
+            // able to find.
+            if digestTopic == .frontPage { await handToSpotlight(fetched.all) }
         } catch {
             Log.enrich.error("The digest could not be read : \(error, privacy: .public)")
+        }
+    }
+
+    /// What Spotlight was last told the front page holds.
+    ///
+    /// `nil` is `nobody has told it anything yet`, which is not the same as an
+    /// empty page : a launch that finds no stories still has to empty out the
+    /// ones the last one left behind.
+    private var indexedStories: [DigestStory]?
+
+    /// Hands the front page to Spotlight, unless it is already holding it.
+    ///
+    /// The digest is read back on every change the store notices, and almost
+    /// none of those changes are the page : an article marked read is a reason
+    /// to read the digest again and no reason at all to write sixty items to
+    /// the system index.
+    private func handToSpotlight(_ stories: [DigestStory]) async {
+        guard stories != indexedStories else { return }
+
+        do {
+            try await spotlight.index(stories: stories)
+            indexedStories = stories
+        } catch {
+            Log.index.error("The stories could not be handed to Spotlight : \(error, privacy: .public)")
         }
     }
 
@@ -1550,30 +1581,31 @@ final class AppModel {
         openedAuthor = nil
         authorArticles = []
         digestTopic = .frontPage
+        indexedStories = nil
         searchText = ""
         report = nil
         failure = nil
     }
 
-    /// Writes the marked articles to Spotlight when the two have drifted apart.
+    /// Writes the chosen articles to Spotlight when the two have drifted apart.
     ///
     /// Spotlight keeps the record of what it holds, so an index it has lost is
     /// an index Flong writes again, without being told.
+    ///
+    /// A rebuild empties the whole index, the stories with it, so the page is
+    /// handed straight back. Read afresh rather than taken from the window :
+    /// the reader may have narrowed the digest to one subject, and the system
+    /// index is about neither this window nor that subject.
     func synchronizeSpotlight() async {
         do {
-            try await spotlight.rebuildIfNeeded()
+            guard try await spotlight.rebuildIfNeeded() else { return }
+
+            let page = try await digestService.digest(.frontPage)
+            indexedStories = nil
+            await handToSpotlight(page.all)
         } catch {
-            Log.index.error("The marks could not be handed to Spotlight : \(error, privacy: .public)")
+            Log.index.error("What the reader chose could not reach Spotlight : \(error, privacy: .public)")
         }
-    }
-
-    /// Follows what a Spotlight result stands for.
-    func open(spotlightIdentifier: String) async {
-        guard let id = UUID(uuidString: spotlightIdentifier) else { return }
-
-        selection = .all
-        await loadArticles()
-        selectedArticle = id
     }
 
     /// Tells Spotlight and the other devices that the reader marked something.
@@ -1586,11 +1618,11 @@ final class AppModel {
         guard !ids.isEmpty else { return }
 
         do {
-            let marked = try await articles.marked(ids)
-            try await spotlight.index(marked)
+            let chosen = try await articles.chosen(ids)
+            try await spotlight.index(chosen)
 
-            let stillMarked = Set(marked.map(\.id))
-            try await spotlight.remove(ids.filter { !stillMarked.contains($0) })
+            let stillChosen = Set(chosen.map(\.id))
+            try await spotlight.remove(ids.filter { !stillChosen.contains($0) })
         } catch {
             Log.index.error("Spotlight could not be told about a mark : \(error, privacy: .public)")
         }
@@ -1847,6 +1879,9 @@ final class AppModel {
             if !authors.isEmpty { await loadAuthors() }
             if openedAuthor?.name == name { openedAuthor?.isFavourite = isFavourite }
             await loadCollections()
+            // Everything this writer signed, as a favourite source does for
+            // everything a publisher served.
+            await synchronizeSpotlight()
         } catch {
             failure = .notSaved
             Log.store.error("The author could not be marked : \(error, privacy: .public)")
@@ -2080,6 +2115,13 @@ final class AppModel {
         moveWork(to: .grouping)
         await digestService.buildStories()
         if reason.readsBackAtOnce { await load() }
+
+        // An article from a favourite source or a favourite writer is chosen
+        // the moment it lands, without the reader touching it, so a pass that
+        // brought something is where the system index hears about it. Nothing
+        // arrived means nothing to tell it, and the check costs a pass over the
+        // identifiers rather than over the texts.
+        if summary.newArticles > 0 { await synchronizeSpotlight() }
 
         guard reason.mayRunTheModel else {
             endWork()
@@ -2333,6 +2375,11 @@ final class AppModel {
             }
             await loadSidebar()
             await loadCollections()
+            // Everything this publisher has served has just become something
+            // the reader chose, or stopped being it. The system index is where
+            // one decision about a source turns into thousands of articles
+            // found or no longer found.
+            await synchronizeSpotlight()
         } catch {
             failure = .notSaved
             Log.store.error("The source could not be marked : \(error, privacy: .public)")
@@ -2440,6 +2487,13 @@ final class AppModel {
         }
 
         await load()
+
+        // The marks were taken out of Spotlight one by one above, since they
+        // are known by identifier. What a favourite source or a favourite
+        // writer had chosen is not : it was never a mark, and it left with the
+        // rows rather than through a decision anybody made. The index and the
+        // store disagree now, which is exactly the question this asks.
+        await synchronizeSpotlight()
 
         // An article of a source that has gone is not an article any more, and
         // a page still holding it would be a page reading from nothing.

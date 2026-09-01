@@ -10,19 +10,63 @@
 //
 
 import CoreSpotlight
+import CryptoKit
 import Foundation
 import OSLog
 import UniformTypeIdentifiers
 
-/// Hands what the reader marked to Spotlight.
+/// What a Spotlight result stands for.
 ///
-/// Section 11 of the specification gives Spotlight the marked articles and only
-/// those : a few thousand items, which is what it is good at, against the
-/// hundreds of thousands of the whole stream, which it is not. An article is
-/// marked when the reader did something to it - starred it, wrote on it, filed
-/// it - and everything else is a cache nobody chose. Two things come of it at
-/// once : what the reader kept turns up in the system search, and the semantic
-/// matching Spotlight does is had for nothing.
+/// Two things are indexed and they are not the same kind of thing, so the
+/// identifier has to say which : an article is read, a story is a page of
+/// several articles about one subject.
+///
+/// **An article keeps the bare identifier it has always had.** The prefix is on
+/// the stories alone. A rename would leave every article already in the index
+/// standing under a name nothing answers to, and nothing would notice : the
+/// index is rebuilt when its contents disagree with the store, and renaming
+/// what they are called changes neither side of that comparison.
+nonisolated enum SpotlightResult: Hashable, Sendable {
+    case article(UUID)
+    case story(UUID)
+
+    private static let storyPrefix = "story/"
+
+    var identifier: String {
+        switch self {
+        case .article(let id): id.uuidString
+        case .story(let id): Self.storyPrefix + id.uuidString
+        }
+    }
+
+    init?(_ identifier: String) {
+        if identifier.hasPrefix(Self.storyPrefix) {
+            guard let id = UUID(uuidString: String(identifier.dropFirst(Self.storyPrefix.count))) else { return nil }
+            self = .story(id)
+        } else {
+            guard let id = UUID(uuidString: identifier) else { return nil }
+            self = .article(id)
+        }
+    }
+}
+
+/// Hands what the reader chose to Spotlight.
+///
+/// Section 11 of the specification gives Spotlight what the reader chose and
+/// only that : a few thousand items, which is what it is good at, against the
+/// hundreds of thousands of the whole stream, which it is not. Two things go
+/// in, and each is chosen rather than collected.
+///
+/// **The articles** are the ones the reader picked out. One at a time, by
+/// starring, writing on or filing them ; or once and for all that follows, by
+/// singling out a publisher or a writer. ``ArticleStore/wasChosen(_:)`` is the
+/// whole of the rule.
+///
+/// **The stories** are the ones on the front page, no more and no less. A story
+/// is where the digest starts and it is the thing a reader watching a subject
+/// is actually looking for, so the system search has to be able to find one.
+/// They are not marks and they are not kept : they age off the page, and they
+/// age out of the index with it.
 ///
 /// The index is local to the device and never shared between the devices of one
 /// account. Each of them indexes for itself.
@@ -31,13 +75,20 @@ import UniformTypeIdentifiers
 /// any thread, which its headers have never said in a way the compiler can read.
 /// The unchecked conformance says exactly that and nothing more.
 nonisolated struct SpotlightIndex: @unchecked Sendable {
-    /// Everything Flong writes goes under one domain, so it can all be taken
-    /// back in one call.
+    /// Where the articles go, so they can all be taken back in one call.
     ///
     /// The name is what it was called when only the library was indexed. It is
     /// an opaque identifier the system keys its own records on, and renaming it
     /// would abandon what is already indexed rather than replace it.
     static let domain = "library"
+
+    /// Where the stories go.
+    ///
+    /// A domain of their own, and that is what makes `no more and no less`
+    /// cheap : the page is written by emptying this one and writing it again,
+    /// which needs no record of what was there before and cannot leave a story
+    /// behind that has left the page.
+    static let storyDomain = "stories"
 
     /// The index is a named one rather than the shared one.
     ///
@@ -67,29 +118,92 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
 
     // MARK: - Keeping Spotlight in step
 
-    /// Adds or replaces items in the index.
-    func index(_ items: [ArticleStore.Marked]) async throws {
+    /// Adds or replaces articles in the index.
+    func index(_ items: [ArticleStore.Chosen]) async throws {
         guard Self.isAvailable, !items.isEmpty else { return }
         let publishers = try await subscriptions.identities()
         try await index.indexSearchableItems(items.map { Self.searchableItem(for: $0, publishedBy: publishers) })
     }
 
-    /// Takes items out of it.
+    /// Takes articles out of it.
     func remove(_ ids: [UUID]) async throws {
         guard Self.isAvailable, !ids.isEmpty else { return }
-        try await index.deleteSearchableItems(withIdentifiers: ids.map(\.uuidString))
+        try await index.deleteSearchableItems(withIdentifiers: ids.map { SpotlightResult.article($0).identifier })
     }
 
-    /// Writes everything the reader has marked, and tells Spotlight what it holds.
+    /// Writes the stories the front page is showing, and takes out the ones
+    /// that have left it.
+    ///
+    /// **The whole page, every time, rather than a difference.** There are at
+    /// most sixty of them and they carry no body, so writing the lot costs less
+    /// than keeping a record of what was written last time would, and it is the
+    /// only way the index cannot drift : whatever it held before, it holds the
+    /// page afterwards.
+    ///
+    /// The caller decides when the page has changed. This is called with the
+    /// front page and never with a narrowed one : narrowing is a question about
+    /// the window the reader is looking at, not about what the system search
+    /// should be able to find.
+    func index(stories: [DigestStory]) async throws {
+        guard Self.isAvailable else { return }
+
+        try await index.deleteSearchableItems(withDomainIdentifiers: [Self.storyDomain])
+        guard !stories.isEmpty else { return }
+
+        let publishers = try await subscriptions.identities()
+        try await index.indexSearchableItems(stories.map { Self.searchableItem(for: $0, publishedBy: publishers) })
+
+        Log.index.notice("Wrote \(stories.count) stories to Spotlight")
+    }
+
+    /// Writes everything the reader has chosen, and tells Spotlight what it
+    /// holds.
     ///
     /// The client state is kept **by Spotlight**, not by Flong. That is what
     /// makes this self healing : if Spotlight loses its index, it loses the
     /// state with it, and the next check sees a mismatch and writes everything
     /// again. An application that remembered the state itself would confidently
     /// skip the rebuild it most needed.
+    ///
+    /// It empties the whole index, the stories with it, which is why
+    /// ``rebuildIfNeeded()`` says whether it ran : the page has to be handed
+    /// back afterwards by whoever is holding it.
     func rebuild() async throws {
         guard Self.isAvailable else { return }
-        let items = try await articles.marked()
+        try await rebuild(against: articles.choices())
+    }
+
+    /// Rebuilds only when Spotlight and the store disagree about what it holds.
+    ///
+    /// **The question is asked of the identifiers alone.** Deciding costs one
+    /// pass over the chosen articles' keys and dates ; deciding yes costs their
+    /// full texts as well. The first happens on every catch-up that brought
+    /// something, the second almost never, and only the second is allowed to be
+    /// expensive.
+    ///
+    /// - Returns: whether the index was written again, which also means the
+    ///   stories were emptied out of it.
+    @discardableResult
+    func rebuildIfNeeded() async throws -> Bool {
+        guard Self.isAvailable else { return false }
+
+        let choices = try await articles.choices()
+        guard try await lastState() != Self.state(of: choices) else { return false }
+
+        try await rebuild(against: choices)
+        return true
+    }
+
+    /// Empties the index and writes the chosen articles back into it.
+    ///
+    /// - Parameter choices: what the store held when the decision to write was
+    ///   taken, which is what Spotlight is told it now holds. Taken before the
+    ///   articles are read rather than from them : a mark that lands between the
+    ///   two readings then leaves a state that is older than the index, and the
+    ///   next check writes again. The other way round it would be newer, and the
+    ///   next check would agree with itself about an index missing an article.
+    private func rebuild(against choices: [ArticleStore.Choice]) async throws {
+        let items = try await articles.chosen()
         let publishers = try await subscriptions.identities()
 
         index.beginBatch()
@@ -97,31 +211,20 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
         if !items.isEmpty {
             try await index.indexSearchableItems(items.map { Self.searchableItem(for: $0, publishedBy: publishers) })
         }
-        try await endBatch(state: Self.state(of: items))
+        try await endBatch(state: Self.state(of: choices))
 
-        Log.index.notice("Wrote \(items.count) marked articles to Spotlight")
-    }
-
-    /// Rebuilds only when Spotlight and the store disagree about what it holds.
-    func rebuildIfNeeded() async throws {
-        guard Self.isAvailable else { return }
-
-        let items = try await articles.marked()
-        let expected = Self.state(of: items)
-        guard try await lastState() != expected else { return }
-
-        try await rebuild()
+        Log.index.notice("Wrote \(items.count) chosen articles to Spotlight")
     }
 
     // MARK: - Shapes
 
-    /// What Spotlight is told about a marked article.
+    /// What Spotlight is told about an article the reader chose.
     ///
     /// - Parameter publishedBy: what each publisher is called, so the system
     ///   search names an article's source the way the application does. The
     ///   feed's own title stands in where the publisher is not known.
     static func searchableItem(
-        for item: ArticleStore.Marked,
+        for item: ArticleStore.Chosen,
         publishedBy publishers: [String: SourceIdentity] = [:]
     ) -> CSSearchableItem {
         let attributes = CSSearchableItemAttributeSet(contentType: .text)
@@ -145,7 +248,7 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
         if let source, !source.isEmpty { attributes.contentSources = [source] }
 
         let searchable = CSSearchableItem(
-            uniqueIdentifier: item.id.uuidString,
+            uniqueIdentifier: SpotlightResult.article(item.id).identifier,
             domainIdentifier: domain,
             attributeSet: attributes
         )
@@ -154,15 +257,65 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
         return searchable
     }
 
-    /// A short summary of what is marked, for Spotlight to hand back.
-    private static func state(of items: [ArticleStore.Marked]) -> Data {
-        var hasher = Hasher()
-        hasher.combine(items.count)
-        for item in items.sorted(by: { $0.id.uuidString < $1.id.uuidString }) {
-            hasher.combine(item.id)
-            hasher.combine(item.markedAt)
+    /// What Spotlight is told about a story on the front page.
+    ///
+    /// A story has no address of its own : it is several articles from several
+    /// rooms, and the one thing it is not is a page on somebody's site. So no
+    /// `contentURL`, and the result opens the story in Flong, where it exists.
+    ///
+    /// **It expires when it would leave the page.** A story is on the front page
+    /// while its last article is inside the digest's window, so the item is
+    /// given exactly that moment as its expiry. The page is written again
+    /// whenever it changes and that is what normally keeps the two in step ; the
+    /// expiry is what holds `no more and no less` true on a device that was put
+    /// down for a week.
+    static func searchableItem(
+        for story: DigestStory,
+        publishedBy publishers: [String: SourceIdentity] = [:]
+    ) -> CSSearchableItem {
+        let attributes = CSSearchableItemAttributeSet(contentType: .text)
+        attributes.title = story.title
+        attributes.displayName = story.title
+        attributes.contentDescription = story.summary.map { String($0.prefix(300)) }
+        attributes.textContent = story.summary
+        attributes.contentCreationDate = story.firstAt
+        attributes.contentModificationDate = story.lastAt
+        attributes.identifier = story.id.uuidString
+
+        // The subjects the model filed it under. A reader searching for one of
+        // their own subjects is searching for the stories under it.
+        if !story.topics.isEmpty { attributes.keywords = story.topics }
+
+        // Every room covering it, named the way the application names it. A
+        // story is who is talking about it as much as it is what happened.
+        let rooms = story.feedMarks.map { publishers[$0.room]?.name ?? $0.room }.filter { !$0.isEmpty }
+        if !rooms.isEmpty { attributes.contentSources = rooms }
+
+        let searchable = CSSearchableItem(
+            uniqueIdentifier: SpotlightResult.story(story.id).identifier,
+            domainIdentifier: storyDomain,
+            attributeSet: attributes
+        )
+        searchable.expirationDate = story.lastAt.addingTimeInterval(DigestStore.window)
+        return searchable
+    }
+
+    /// A short summary of what is chosen, for Spotlight to hand back.
+    ///
+    /// **A digest and not a hash.** `Hasher` is seeded afresh in every process,
+    /// so the same articles hashed at two launches gave two different answers
+    /// and the check they were for never once said `nothing has changed` : the
+    /// whole index was written again at every launch, which is precisely the
+    /// work the client state exists to avoid.
+    private static func state(of choices: [ArticleStore.Choice]) -> Data {
+        var digest = SHA256()
+        for choice in choices {
+            withUnsafeBytes(of: choice.id.uuid) { digest.update(bufferPointer: $0) }
+            withUnsafeBytes(of: choice.chosenAt.timeIntervalSinceReferenceDate.bitPattern) {
+                digest.update(bufferPointer: $0)
+            }
         }
-        return withUnsafeBytes(of: hasher.finalize()) { Data($0) }
+        return Data(digest.finalize())
     }
 
     private func lastState() async throws -> Data? {
