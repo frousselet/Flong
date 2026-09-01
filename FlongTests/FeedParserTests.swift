@@ -49,6 +49,44 @@ struct FeedParserTests {
         #expect(first.publishedAt == Date(timeIntervalSince1970: 1_787_639_400))
     }
 
+    @Test("A name beats the address RSS puts in its author element, whichever came first")
+    func bylinesPreferAName() throws {
+        // RSS 2.0 defines `author` as the author's e-mail address and Dublin
+        // Core's creator as a name, and feeds routinely carry both. Which of
+        // them the parser met last is no reason to prefer it.
+        func item(_ inner: String) throws -> ParsedItem {
+            let feed = try FeedParser.parse(
+                Data(
+                    """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+                      <channel><title>P</title><link>https://example.com/</link>
+                        <item><title>T</title><guid>urn:1</guid>\(inner)</item>
+                      </channel>
+                    </rss>
+                    """.utf8
+                ),
+                url: source
+            )
+            return try #require(feed.items.first)
+        }
+
+        let creatorLast = try item(
+            "<author>lawyer@boyer.net</author><dc:creator>Lawyer Boyer</dc:creator>"
+        )
+        #expect(creatorLast.author == "Lawyer Boyer")
+
+        let creatorFirst = try item(
+            "<dc:creator>Lawyer Boyer</dc:creator><author>lawyer@boyer.net</author>"
+        )
+        #expect(creatorFirst.author == "Lawyer Boyer")
+
+        // On its own the address is all there is, and what survives of it is
+        // the person in the brackets. See `Author`.
+        let alone = try item("<author>lawyer@boyer.net (Lawyer Boyer)</author>")
+        #expect(Author.name(from: alone.author) == "Lawyer Boyer")
+    }
+
     @Test("Atom, including the xhtml body")
     func atom() throws {
         let feed = try parse("atom.xml")

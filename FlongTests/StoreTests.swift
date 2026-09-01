@@ -54,6 +54,7 @@ struct StoreTests {
                 "v15.askedOnce", "v16.whyItWasKept", "v17.archiveLedger", "v18.oneArticle",
                 "v19.marksThatArriveFirst", "v20.secureThePictures", "v21.threeKindsOfSubject",
                 "v22.twoKindsOfSubject", "v23.publishersRatherThanFolders", "v24.theWriters",
+                "v25.theWholeByline",
             ]
         )
     }
@@ -102,7 +103,18 @@ struct StoreTests {
                 sql: "INSERT INTO feed (id, url, title, created_at) VALUES (?, ?, ?, ?)",
                 arguments: [feed, "https://feeds.example.com/paper.xml", "Le Papier", Date()]
             )
-            for (id, guid, author) in [(untidy, "urn:1", "\n  Marie\n  Curie\n"), (tidy, "urn:2", "Marie Curie")] {
+            let rows = [
+                (untidy, "urn:1", "\n  Marie\n  Curie\n"),
+                (tidy, "urn:2", "Marie Curie"),
+                // The address RSS 2.0 says its own `author` element holds, the
+                // word a publisher writes in front of every credit, and a
+                // masthead stapled to a name : every one of them was a whole
+                // writer of its own before v25.
+                (UUID.v7(), "urn:3", "curie@example.com (Marie Curie)"),
+                (UUID.v7(), "urn:4", "By Marie Curie"),
+                (UUID.v7(), "urn:5", "Marie Curie | Le Papier"),
+            ]
+            for (id, guid, author) in rows {
                 try db.execute(
                     sql: """
                         INSERT INTO entry (id, feed_id, guid, title, author, received_at, is_read, is_starred,
@@ -116,9 +128,10 @@ struct StoreTests {
 
         try AppDatabase.migrator.migrate(queue)
 
-        // One writer, not two : the two rows were the same person badly
-        // typeset, and a list that answered `Marie Curie` twice is a list the
-        // reader cannot trust.
+        // One writer, not five : every row was the same person, wearing what
+        // the format, the publisher or the typesetter put round her name. A
+        // list that answered `Marie Curie` five times is a list the reader
+        // cannot trust.
         let bylines = try queue.read { db in
             try String.fetchAll(db, sql: "SELECT DISTINCT author FROM entry WHERE author IS NOT NULL")
         }

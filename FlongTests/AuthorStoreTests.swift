@@ -60,19 +60,96 @@ struct AuthorStoreTests {
         // What a pretty-printed feed hands over when the name sits on its own
         // line inside an `author` element.
         #expect(Author.name(from: "\n      Jean\n      Dupont\n   ") == "Jean Dupont")
+        #expect(Author.name(from: "Jean&nbsp;Dupont") == "Jean Dupont")
         #expect(Author.name(from: "   ") == nil)
         #expect(Author.name(from: "") == nil)
         #expect(Author.name(from: nil) == nil)
     }
 
-    @Test("The spelling is normalized on the way in, so one writer is one row")
-    func normalizedOnTheWayIn() async throws {
+    @Test("The person is taken out of the address RSS says the field holds")
+    func addresses() {
+        // The spelling of RSS 2.0's own example.
+        #expect(Author.name(from: "lawyer@boyer.net (Lawyer Boyer)") == "Lawyer Boyer")
+        #expect(Author.name(from: "\"Lawyer Boyer\" <lawyer@boyer.net>") == "Lawyer Boyer")
+        #expect(Author.name(from: "Lawyer Boyer <lawyer@boyer.net>") == "Lawyer Boyer")
+
+        // An inbox with nobody's name on it names nobody, which is the truth
+        // about that article rather than a writer called `noreply`.
+        #expect(Author.name(from: "noreply@example.com") == nil)
+        #expect(Author.name(from: "<lawyer@boyer.net>") == nil)
+
+        // Brackets are not stripped in general : there is no address here, and
+        // what is in them may well be the thing the reader recognizes.
+        #expect(Author.name(from: "Jean Dupont (Le Monde)") == "Jean Dupont (Le Monde)")
+    }
+
+    @Test("The word a publisher writes in front of every credit is not part of a name")
+    func credits() {
+        #expect(Author.name(from: "By Jean Dupont") == "Jean Dupont")
+        #expect(Author.name(from: "by Jean Dupont") == "Jean Dupont")
+        #expect(Author.name(from: "Par Marie Curie") == "Marie Curie")
+        #expect(Author.name(from: "Written by Marie Curie") == "Marie Curie")
+        #expect(Author.name(from: "Posted by Marie Curie") == "Marie Curie")
+        #expect(Author.name(from: "Auteur : Marie Curie") == "Marie Curie")
+        #expect(Author.name(from: "Author: Marie Curie") == "Marie Curie")
+
+        // The word has to be the word, and not the first letters of a name.
+        #expect(Author.name(from: "Byron Smith") == "Byron Smith")
+        #expect(Author.name(from: "Parker Lewis") == "Parker Lewis")
+        // Nothing follows it, so there is nobody to uncover.
+        #expect(Author.name(from: "By") == "By")
+    }
+
+    @Test("A masthead stapled to a byline is not part of the byline")
+    func mastheads() {
+        #expect(Author.name(from: "Jean Dupont | Le Monde") == "Jean Dupont")
+        #expect(Author.name(from: "By Jean Dupont | Le Monde") == "Jean Dupont")
+
+        // A dash is left alone : it can be part of a name, and a bar cannot.
+        #expect(Author.name(from: "Jean Dupont - BBC News") == "Jean Dupont - BBC News")
+        #expect(Author.name(from: "Jean-Pierre Dupont") == "Jean-Pierre Dupont")
+    }
+
+    @Test("What is not somebody is nobody, and what is somebody is left alone")
+    func nobodyAndEverybody() {
+        #expect(Author.name(from: "-") == nil)
+        #expect(Author.name(from: "--") == nil)
+        #expect(Author.name(from: "https://example.com/author/jean") == nil)
+
+        // A newsroom is what the publisher said, and deciding it is not a
+        // person is a judgement rather than a fact about the spelling. The
+        // capitals are left alone for the same reason : `JEAN DUPONT` and
+        // `Jean Dupont` are two spellings of one person, which is a merge.
+        #expect(Author.name(from: "Rédaction") == "Rédaction")
+        #expect(Author.name(from: "admin") == "admin")
+        #expect(Author.name(from: "JEAN DUPONT") == "JEAN DUPONT")
+        #expect(Author.name(from: "J. R. R. Tolkien") == "J. R. R. Tolkien")
+    }
+
+    /// The migrations lean on this : v24 and v25 both ask the column to be
+    /// whatever the current rule says, and they are only interchangeable
+    /// because asking twice is asking once.
+    @Test("Cleaning a byline twice cleans it once")
+    func idempotentCleaning() throws {
+        for raw in ["By Jean Dupont | Le Monde", "lawyer@boyer.net (Lawyer Boyer)", "  Marie  Curie "] {
+            let once = try #require(Author.name(from: raw))
+            #expect(Author.name(from: once) == once)
+        }
+    }
+
+    @Test("The spelling is cleaned on the way in, so one writer is one row")
+    func cleanedOnTheWayIn() async throws {
         try await article("Un", by: "  Marie Curie ")
         try await article("Deux", by: "Marie\n  Curie")
+        try await article("Trois", by: "By Marie Curie")
+        try await article("Quatre", by: "curie@example.com (Marie Curie)")
+        try await article("Cinq", by: "Marie Curie | Le Papier")
+        // Not a name at all : the article is signed by nobody this can name.
+        try await article("Six", by: "noreply@example.com")
 
         let found = try await authors.all()
         #expect(found.map(\.name) == ["Marie Curie"])
-        #expect(found.first?.count == 2)
+        #expect(found.first?.count == 5)
     }
 
     @Test("Two spellings are two writers, since nothing here guesses at a person")

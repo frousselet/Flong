@@ -86,7 +86,7 @@ The group is also **who an article is shown to be from**, everywhere it is shown
 
 **Favourite source** : a publisher the reader singled out. It is not a starred article and it makes none : the star stays a judgement about an article, this is a judgement about who wrote it, and the two fill different squares on the collections page.
 
-**Author** : whoever a feed says signed an article, which is a byline and never a person : there is no row for a writer and there could not be one. The name, trimmed and with its inner whitespace collapsed, is the whole of the identity, and two spellings are two authors. See `docs/technical/authors.md`.
+**Author** : whoever a feed says signed an article, which is a byline and never a person : there is no row for a writer and there could not be one. The name is the whole of the identity, and two spellings are two authors. What is cleaned on the way in is the spelling and never the person : entities, whitespace, the address RSS 2.0 says its own `author` element holds, the word a publisher writes in front of every credit, and a masthead stapled to a name. Capitalization is not, a merge being a judgement rather than a cleaning. The rules are mechanical and deterministic, since the stored byline is what a favourite is named after between devices. See `docs/technical/authors.md`.
 
 **Favourite author** : a writer the reader singled out. The third of the three judgements, and the only one that crosses publishers : a reader follows a byline through whatever paper it appears in, which no subscription can express. It stars nothing and it changes nothing about the articles.
 
