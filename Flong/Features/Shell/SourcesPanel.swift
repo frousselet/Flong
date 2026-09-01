@@ -474,7 +474,7 @@ struct SourcesPanel: View {
 
     private static func icon(of kind: SidebarItem.Kind) -> String {
         switch kind {
-        case .digest: "sparkles.rectangle.stack"
+        case .digest: "newspaper.fill"
         case .unread: "circle.inset.filled"
         case .today: "sun.max"
         case .starred: "star"
