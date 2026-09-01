@@ -508,6 +508,20 @@ struct StoryRow: View {
         .accessibilityElement(children: .combine)
     }
 
+    /// The story the page leads on : its picture across the column, and its
+    /// type a step up from everything under it.
+    ///
+    /// **A lead that is two points larger is not a lead.** It ran at `title2`
+    /// over a page set in `title3`, which is twenty-two points against twenty :
+    /// a difference a reader cannot see is a difference that is not there, and
+    /// a page where every story is the same size is a list, which makes the
+    /// reader do the ranking the digest exists to do.
+    ///
+    /// So it takes the next step of the scale in both, `title` over the rest's
+    /// `title3` and `body` over their `subheadline`, which is what a front page
+    /// has always done and what makes the picture above it read as belonging to
+    /// something rather than as the top of a list. Steps of the scale rather
+    /// than sizes in points, so the whole of it still follows Dynamic Type.
     private var lead: some View {
         VStack(alignment: .leading, spacing: 10) {
             if story.imageURL != nil {
@@ -515,8 +529,8 @@ struct StoryRow: View {
                     .padding(.bottom, 2)
             }
             VStack(alignment: .leading, spacing: 7) {
-                masthead(headline: .title2)
-                whatHappened
+                masthead(headline: .title)
+                whatHappened(standfirst: .body)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -536,7 +550,7 @@ struct StoryRow: View {
             masthead(headline: .title3)
 
             HStack(alignment: .top, spacing: 14) {
-                whatHappened
+                whatHappened()
 
                 if story.imageURL != nil {
                     RemoteImage(url: story.imageURL, credit: story.imageCredit, width: Self.thumbnailWidth)
@@ -585,11 +599,14 @@ struct StoryRow: View {
     }
 
     /// What happened and who is saying it, which is what a picture sits beside.
-    private var whatHappened: some View {
+    ///
+    /// It is set larger on the lead, for the reason the headline above it is :
+    /// see ``lead``.
+    private func whatHappened(standfirst: Font.TextStyle = .subheadline) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             if let summary = story.summary, !summary.isEmpty {
                 Text(verbatim: summary)
-                    .font(theme.standfirst())
+                    .font(theme.standfirst(standfirst))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.leading)
                     .lineLimit(3)
