@@ -60,6 +60,11 @@ struct CollectionsScreen: View {
                 section(nil, of: builtIn)
                 section("My collections", of: mine)
                 section("Dynamic collections", of: dynamic)
+                // Last, and under a heading that says whose they are. A
+                // collection somebody else shared holds excerpts rather than
+                // the reader's own articles, and mixing it in with the shelf
+                // above would say the two are the same thing.
+                section("Shared with me", of: shared)
             }
             .editorialColumn()
             .padding(.horizontal, 22)
@@ -189,6 +194,11 @@ struct CollectionsScreen: View {
     private var dynamic: [ArticleCollection] {
         model.collections.filter { if case .dynamic = $0.kind { true } else { false } }
     }
+
+    /// The ones somebody else made and invited the reader into.
+    private var shared: [ArticleCollection] {
+        model.collections.filter { if case .shared = $0.kind { true } else { false } }
+    }
 }
 
 /// One square : a picture of what is inside, and what it is called under it.
@@ -252,6 +262,8 @@ struct CollectionSquare: View {
         case .builtIn(.annotated): Text("Notes")
         case .builtIn(.authors): Text("Authors")
         case .made(let name), .dynamic(let name): Text(verbatim: name)
+        // Named by whoever shared it, so it is their words and not ours.
+        case .shared(_, let title): Text(verbatim: title)
         }
     }
 
@@ -285,6 +297,10 @@ struct CollectionSquare: View {
         // Described rather than filled, and the mark says which : a reader who
         // wonders why articles appear in one they never touched has been told.
         case .dynamic: "line.3.horizontal.decrease.circle"
+        // Somebody else's, which the mark says before the band above it does :
+        // a square that opens on excerpts rather than on the reader's own
+        // articles should not look like the squares that do.
+        case .shared: "folder.badge.person.crop"
         }
     }
 }

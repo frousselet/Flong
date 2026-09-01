@@ -1861,6 +1861,16 @@
         }
       }
     },
+    "Nothing in it yet" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien dedans pour l\u2019instant"
+          }
+        }
+      }
+    },
     "Nothing kept yet" : {
       "localizations" : {
         "fr" : {
@@ -1927,6 +1937,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ouvrir les réglages système"
+          }
+        }
+      }
+    },
+    "Opens the article on its own site" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre l\u2019article sur son site"
           }
         }
       }
@@ -2348,6 +2368,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quelque chose n'a pas fonctionné"
+          }
+        }
+      }
+    },
+    "Shared with me" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partag\u00e9es avec moi"
           }
         }
       }
@@ -2914,6 +2944,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qu'elle cherche"
+          }
+        }
+      }
+    },
+    "What anyone files into this collection shows up here." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que chacun classe dans cette collection appara\u00eet ici."
           }
         }
       }

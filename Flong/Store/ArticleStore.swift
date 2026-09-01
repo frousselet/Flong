@@ -700,6 +700,11 @@ nonisolated struct ArticleStore: Sendable {
             )
         // A dynamic one is a description, answered by the ordinary query path.
         case .dynamic: ("0", [])
+        // One somebody else shared holds nothing of this store's : what is in
+        // it came from feeds the reader does not follow and lives in
+        // `shared_entry`. Answering the whole stream here would show them their
+        // own articles under another person's name.
+        case .shared: ("0", [])
         }
     }
 

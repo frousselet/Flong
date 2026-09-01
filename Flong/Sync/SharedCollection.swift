@@ -88,6 +88,29 @@ nonisolated struct SharedCollectionStore: Sendable {
         }
     }
 
+    /// The squares for the collections somebody else shared.
+    ///
+    /// Only those : a collection the reader shared themselves is still the made
+    /// one it always was, and showing it twice would say sharing had turned it
+    /// into something else.
+    func invited(from entries: SharedEntryStore) async throws -> [ArticleCollection] {
+        let mine = try await all().filter { !$0.isOwned }
+        guard !mine.isEmpty else { return [] }
+
+        var found: [ArticleCollection] = []
+        for shared in mine {
+            let held = try await entries.entries(inZone: shared.zoneName)
+            found.append(
+                ArticleCollection(
+                    kind: .shared(zone: shared.zoneName, title: shared.title),
+                    count: held.count,
+                    cover: held.compactMap(\.imageURL).first.flatMap(URL.init(string:))
+                )
+            )
+        }
+        return found.sorted { CollectionStore.before($0.name ?? "", $1.name ?? "") }
+    }
+
     func remember(_ shared: SharedCollection) async throws {
         try await database.writer.write { db in
             try db.execute(

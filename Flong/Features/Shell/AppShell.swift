@@ -359,6 +359,12 @@ struct AppShell: View {
         case .collection(.builtIn(.authors)):
             AuthorsScreen(model: model) { path.wrappedValue.append(.author($0)) }
 
+        // One somebody else shared holds excerpts and not this device's
+        // articles, so it is a different page and not the same page with a
+        // condition in every row.
+        case .collection(.shared(let zone, let title)):
+            SharedCollectionScreen(model: model, zone: zone, title: title)
+
         case .collection(let kind):
             CollectionScreen(model: model, kind: kind, zoom: zoom) { reading = Reading(id: $0) }
 

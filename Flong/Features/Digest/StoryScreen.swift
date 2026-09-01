@@ -528,6 +528,33 @@ struct ArticleScreen: View {
                 }
             }
 
+            // The collections somebody else shared, under a heading of their
+            // own. Filing into one sends the excerpt this feed published to
+            // everybody in it, which is a different act from filing into a
+            // shelf of the reader's own, and the menu should not pretend the
+            // two are one row apart by accident.
+            if !model.invitedCollections.isEmpty {
+                Section("Shared with me") {
+                    ForEach(model.invitedCollections) { shared in
+                        let isIn = model.articleSharedCollections.contains(shared.zoneName)
+                        Button {
+                            Task {
+                                if isIn {
+                                    await model.unfileArticle(fromShared: shared.zoneName)
+                                } else {
+                                    await model.fileArticle(inShared: shared.zoneName)
+                                }
+                            }
+                        } label: {
+                            Label(
+                                shared.title,
+                                systemImage: isIn ? "checkmark" : "folder.badge.person.crop"
+                            )
+                        }
+                    }
+                }
+            }
+
             if !model.collectionNames.isEmpty { Divider() }
 
             Button {

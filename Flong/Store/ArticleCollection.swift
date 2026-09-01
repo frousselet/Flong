@@ -40,6 +40,18 @@ nonisolated struct ArticleCollection: Identifiable, Hashable, Sendable {
         case made(String)
         /// One the reader described, filled by whatever matches, by its name.
         case dynamic(String)
+        /// One somebody else shared with them, by the zone standing for it.
+        ///
+        /// **Keyed by the zone and not by the name**, unlike the two above.
+        /// Those are the reader's own and their names are unique because one
+        /// person made them ; this one was named by somebody else, and two
+        /// people may perfectly well call a collection the same thing. The zone
+        /// is the only thing about it that cannot collide.
+        ///
+        /// A collection the reader shared themselves is not one of these. It is
+        /// still the ``made`` one it always was : sharing does not change what
+        /// it is, only who else can see it.
+        case shared(zone: String, title: String)
     }
 
     /// The ones that are not made and cannot be unmade.
@@ -96,6 +108,7 @@ nonisolated struct ArticleCollection: Identifiable, Hashable, Sendable {
         switch kind {
         case .builtIn: nil
         case .made(let name), .dynamic(let name): name
+        case .shared(_, let title): title
         }
     }
 
@@ -108,9 +121,15 @@ nonisolated struct ArticleCollection: Identifiable, Hashable, Sendable {
 
 nonisolated extension ArticleCollection.Kind {
     /// Whether the reader may rename it or take it away.
+    ///
+    /// **A shared one is not theirs either**, and for a different reason from a
+    /// built-in one : it is a thing that was made, but somebody else made it.
+    /// Renaming it here would rename it for nobody, and deleting it would be
+    /// the reader leaving a share, which is the system's own sheet to do and
+    /// not a menu item that looks like throwing something away.
     var isTheReaders: Bool {
         switch self {
-        case .builtIn: false
+        case .builtIn, .shared: false
         case .made, .dynamic: true
         }
     }

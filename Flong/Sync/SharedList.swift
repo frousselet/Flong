@@ -127,6 +127,24 @@ nonisolated struct SharedEntryStore: Sendable {
         self.database = database
     }
 
+    /// What one participant put in one shared collection.
+    ///
+    /// The reader's own list is what they may add to and take from : an article
+    /// somebody else filed is in the collection without being theirs.
+    func entries(inList listKey: String, inZone zoneName: String) async throws -> [SharedEntry] {
+        try await database.writer.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT * FROM shared_entry WHERE zone_name = ? AND list_key = ?
+                    ORDER BY COALESCE(published_at, received_at) DESC
+                    """,
+                arguments: [zoneName, listKey]
+            )
+            .map(Self.entry(from:))
+        }
+    }
+
     /// Everything in one shared collection, most recently published first.
     func entries(inZone zoneName: String) async throws -> [SharedEntry] {
         try await database.writer.read { db in
