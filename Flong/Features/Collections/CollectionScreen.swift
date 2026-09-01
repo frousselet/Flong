@@ -47,7 +47,23 @@ struct CollectionScreen: View {
             if kind.isTheReaders {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
+                        // Only a made collection can be shared. A dynamic one
+                        // is a description rather than a set of articles, so
+                        // sharing it would hand somebody a question answered
+                        // against their own reading and not the reader's : a
+                        // different thing, and not this one.
                         if case .made(let name) = kind {
+                            ShareLink(
+                                item: model.invitation(toCollectionNamed: name),
+                                preview: SharePreview(name, image: Image(systemName: "folder"))
+                            ) {
+                                Label(
+                                    model.sharedCollectionNames.contains(name)
+                                        ? "Manage the collaboration" : "Invite to collaborate",
+                                    systemImage: "person.crop.circle.badge.plus"
+                                )
+                            }
+
                             Button {
                                 renamed = name
                                 isRenaming = true
@@ -86,6 +102,9 @@ struct CollectionScreen: View {
             // stranger than coming back to the grid.
             Text("The articles stay where they are.")
         }
-        .task { await model.loadCollection(kind) }
+        .task {
+            await model.loadCollection(kind)
+            await model.loadSharedCollections()
+        }
     }
 }

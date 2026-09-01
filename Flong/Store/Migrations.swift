@@ -499,6 +499,47 @@ nonisolated extension AppDatabase {
             }
         }
 
+        // A collection the reader shared, or was invited to.
+        //
+        // **The zone is the row's reason to exist.** A `CKShare` reaches one
+        // zone and a zone holds one zone-wide share, so a shared collection is
+        // a zone of its own and this is the only thing that remembers which.
+        // The name cannot stand in for it : a reader may rename a collection,
+        // and two readers may perfectly well name theirs the same thing.
+        //
+        // **Nothing here is synchronized between the reader's own devices.**
+        // The zone and the share are in their private database already, so a
+        // second device learns of both from CloudKit rather than from a record
+        // this table would have to write. What this holds is the local index
+        // back to them.
+        migrator.registerMigration("v27.aCollectionShared") { db in
+            try db.create(table: "shared_collection") { table in
+                table.primaryKey("id", .blob)
+                // The zone, which is the identity of the thing. Unique because
+                // a zone carries exactly one shared collection.
+                table.column("zone_name", .text).notNull().unique()
+                // Whose zone it is : the reader's own, or the participant who
+                // invited them. `CKCurrentUserDefaultName` for a collection of
+                // the reader's making.
+                table.column("owner_name", .text).notNull()
+                // The made collection this stands for, when it is one of the
+                // reader's own. A collection they were invited to has no tag
+                // of theirs behind it and carries its name instead.
+                table.column("collection_name", .text)
+                table.column("title", .text).notNull()
+                table.column("is_owned", .boolean).notNull()
+                table.column("share_url", .text)
+                table.column("created_at", .datetime).notNull()
+            }
+
+            // What the collections page asks : is this one shared, and by whom.
+            try db.create(
+                index: "shared_collection_on_collection",
+                on: "shared_collection",
+                columns: ["collection_name", "is_owned"]
+            )
+        }
+
         return migrator
     }
 

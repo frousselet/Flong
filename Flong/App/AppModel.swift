@@ -176,6 +176,8 @@ final class AppModel {
     private let preferences: Preferences
     private let announcer: Announcing
     private let locator: Locating
+    private let sharing: CollectionSharing
+    private let sharedCollections: SharedCollectionStore
 
     /// The whole stream, as files in the reader's own iCloud.
     ///
@@ -753,6 +755,8 @@ final class AppModel {
         let articles = ArticleStore(database)
         self.articles = articles
         self.collectionStore = CollectionStore(database)
+        self.sharing = CollectionSharing(database: database)
+        self.sharedCollections = SharedCollectionStore(database)
         self.authorStore = AuthorStore(database)
         self.marks = MarkStore(database)
         self.spotlight = SpotlightIndex(articles, subscriptions)
@@ -1733,9 +1737,35 @@ final class AppModel {
     func loadCollections() async {
         do {
             collections = try await collectionStore.all()
+            sharedCollectionNames = try await sharedCollections.ownedNames()
         } catch {
             Log.store.error("The collections could not be read : \(error, privacy: .public)")
         }
+    }
+
+    /// Which of the reader's own collections they have shared.
+    ///
+    /// Local to this device and read from the store rather than from CloudKit :
+    /// the page says it against a square, and a square should not wait on the
+    /// network to know what to draw.
+    private(set) var sharedCollectionNames: Set<String> = []
+
+    /// Reads back which collections are shared, without the rest of the page.
+    ///
+    /// An open collection asks for this on its own : the share is made inside
+    /// the system's sheet, so this device only learns that one exists after the
+    /// reader has come back from it.
+    func loadSharedCollections() async {
+        sharedCollectionNames = (try? await sharedCollections.ownedNames()) ?? []
+    }
+
+    /// What the share sheet is handed when the reader invites somebody.
+    ///
+    /// Nothing is created here : the zone and the share are made inside the
+    /// sheet's own preparation handler, once the reader has actually picked
+    /// somebody, so a sheet opened and dismissed leaves nothing behind.
+    nonisolated func invitation(toCollectionNamed name: String) -> SharedCollectionItem {
+        SharedCollectionItem(name: name, sharing: sharing)
     }
 
     /// Makes a collection and shows it, empty, where the reader will look.
@@ -1751,13 +1781,23 @@ final class AppModel {
     }
 
     func renameCollection(_ name: String, to renamed: String) async {
-        _ = try? await collectionStore.rename(name, to: renamed)
+        guard let renamed = try? await collectionStore.rename(name, to: renamed) else { return }
+        // The local index follows, so a collection that was shared is still
+        // known to be. The share's own title does not : what the participants
+        // were invited to is what they were invited to, and a name changing
+        // under them would read as a different collection.
+        try? await sharedCollections.rename(name, to: renamed)
         await loadCollections()
     }
 
     func deleteCollection(_ collection: ArticleCollection.Kind) async {
         switch collection {
-        case .made(let name): try? await collectionStore.delete(name)
+        case .made(let name):
+            // The share goes with it. A zone left behind would go on showing
+            // the participants a collection its owner believes is gone, and
+            // nothing would ever take it down.
+            await sharing.stopSharing(collectionNamed: name)
+            try? await collectionStore.delete(name)
         case .dynamic(let name): try? await collectionStore.deleteDynamic(name)
         // Not a thing that was made, so there is nothing there to unmake.
         case .builtIn: return
