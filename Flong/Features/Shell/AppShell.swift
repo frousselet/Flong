@@ -75,7 +75,7 @@ struct AppShell: View {
 
     var body: some View {
         TabView(selection: $section) {
-            Tab("Digest", systemImage: "sparkles.rectangle.stack", value: AppSection.digest) {
+            Tab("Digest", systemImage: "newspaper.fill", value: AppSection.digest) {
                 stack($digestPath) {
                     let open: (Route) -> Void = opening($digestPath)
 
