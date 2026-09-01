@@ -24,7 +24,7 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **You can say where you read from, and it stays a name.** A town and a country under your own face, completed by MapKit as you type or taken once from the device, optional and empty until you answer. What is kept is the name of a town and the code of its country, never a coordinate, and it travels between your devices with the rest of what you chose and goes nowhere else.
 
-**It is set like a page, not like a control panel.** One column at a time, held to a readable measure, hairline rules, no cards and no boxes. Liquid Glass stays in the navigation layer, where Apple puts it, apart from the subject pills and the credit in the corner of a picture.
+**It is set like a page, not like a control panel.** One column at a time, held to a readable measure, hairline rules, no cards and no boxes. Under the default theme the top of the front page takes the colours of the photograph the page leads on, and the colour is spent by the time that photograph comes into view. Liquid Glass stays in the navigation layer, where Apple puts it, apart from the subject pills and the credit in the corner of a picture.
 
 **Three themes, and they reach everything.** `Défaut` is the system's own colours ; `Papier` puts the same page on warm paper with the contrast pulled back ; `Solarized` is Ethan Schoonover's palette, and the one that changes the headline face too, to monospace. A theme speaks in the headline and gets out of the way underneath it, the way a newspaper does : serif headlines over a sans body. Each states both appearances and follows the device, the rendered article included. The choice is made under your own face in the reader's panel, and it follows you to your other devices.
 

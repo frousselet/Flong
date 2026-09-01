@@ -46,6 +46,22 @@ nonisolated struct Tint: Hashable, Sendable {
     }
 }
 
+/// The colours a picture lends the page above it.
+///
+/// The picture read in three bands, from its own top to its own bottom, rather
+/// than the one colour it averages to : an average is a grey, since a
+/// photograph averages its sky into its ground and comes out the colour of
+/// neither. Read in bands, a sky stays a sky and what is under it stays under
+/// it, and a page washed with them is lit the way the picture is lit.
+nonisolated struct Wash: Hashable, Sendable {
+    /// The top of the picture, which is usually the light in it.
+    let top: Tint
+    /// Its middle, which is usually what it is a picture of.
+    let middle: Tint
+    /// Its foot.
+    let bottom: Tint
+}
+
 /// identifying user agent, a body cap, and a disk cache so a picture already
 /// seen is never asked for twice.
 nonisolated final class ImageStore: Sendable {
@@ -75,6 +91,18 @@ nonisolated final class ImageStore: Sendable {
     private final class TintBox: @unchecked Sendable {
         let tint: Tint
         init(_ tint: Tint) { self.tint = tint }
+    }
+
+    /// The bands of each photograph, by the address it came from.
+    ///
+    /// Keyed by address alone, like the tints and for the same reason : what is
+    /// wanted is the colour of the picture rather than of one thumbnail of it.
+    private let washes = NSCache<NSString, WashBox>()
+
+    /// A wash in a cache, which takes objects and not values.
+    private final class WashBox: @unchecked Sendable {
+        let wash: Wash
+        init(_ wash: Wash) { self.wash = wash }
     }
 
     /// Addresses that answered with something that is not a picture.
@@ -115,6 +143,7 @@ nonisolated final class ImageStore: Sendable {
         memory.countLimit = 400
         refused.countLimit = 500
         tints.countLimit = 400
+        washes.countLimit = 60
     }
 
     /// The picture at that address, decoded no larger than it will be drawn.
@@ -189,6 +218,7 @@ nonisolated final class ImageStore: Sendable {
     func forgetEverything() {
         memory.removeAllObjects()
         tints.removeAllObjects()
+        washes.removeAllObjects()
         refused.removeAllObjects()
         session.configuration.urlCache?.removeAllCachedResponses()
     }
@@ -210,28 +240,83 @@ nonisolated final class ImageStore: Sendable {
         return tints.object(forKey: HTTPURL.secured(url).absoluteString as NSString)?.tint
     }
 
+    /// How large a picture is decoded to be read for its colours.
+    ///
+    /// Small, since it is about to become three pixels : the bands of a
+    /// photograph at sixty four pixels are the bands of the same photograph at
+    /// two thousand. Wherever the picture has already been shown the bytes are
+    /// the ones in the cache, so this is a decode rather than a fetch.
+    static let washPixels = 64
+
+    /// The colours the picture at that address lends the page above it.
+    ///
+    /// **Unlike ``tint(at:)`` this one fetches**, because it has to. The colour
+    /// is wanted at the very top of the page, above the row that carries the
+    /// picture and usually before that row has been built at all, so there is
+    /// nothing already decoded to answer from. A pill is drawn the instant an
+    /// article opens and cannot wait ; a wash is the page settling into its
+    /// colour and can.
+    @concurrent
+    func wash(at url: URL) async throws -> Wash? {
+        guard HTTPURL.isFetchable(url) else { return nil }
+
+        let key = HTTPURL.secured(url).absoluteString as NSString
+        if let held = washes.object(forKey: key) { return held.wash }
+
+        guard
+            let image = try await image(at: url, maximumPixels: Self.washPixels),
+            let wash = Self.wash(of: image)
+        else { return nil }
+
+        washes.setObject(WashBox(wash), forKey: key)
+        return wash
+    }
+
     /// The one colour a picture averages to.
     ///
-    /// Drawn into a single pixel, which is the whole of it : Core Graphics
-    /// resamples on the way down and the result is the mean of the picture.
+    /// One band of it, the band being the whole : see ``rows(of:count:)`` for
+    /// the drawing, and for what is done about transparency.
+    static func average(of image: CGImage) -> Tint? {
+        guard let only = rows(of: image, count: 1).first else { return nil }
+        return only
+    }
+
+    /// The colours a picture lends the page above it.
+    ///
+    /// Three bands rather than one average, for the reason ``Wash`` gives, and
+    /// all three or none : a picture with a transparent band has no colour to
+    /// lend there, and a wash with a hole in it is worse than no wash at all.
+    static func wash(of image: CGImage) -> Wash? {
+        let bands = rows(of: image, count: 3)
+        guard let top = bands[0], let middle = bands[1], let bottom = bands[2] else { return nil }
+        return Wash(top: top, middle: middle, bottom: bottom)
+    }
+
+    /// A picture resampled to a column of pixels, from its top to its bottom.
+    ///
+    /// Drawn into a bitmap one pixel wide and `count` tall, which is the whole
+    /// of it : Core Graphics resamples on the way down, so each pixel is the
+    /// mean of the band of the picture it stands for. The first row of the
+    /// bitmap is the top of the picture, the raster beginning at the highest
+    /// point of the context's own coordinates.
     ///
     /// **Transparency is divided back out.** A favicon is a logo on nothing as
     /// often as not, and a pixel that has been composited over a transparent
     /// ground comes back premultiplied : a red logo covering a fifth of its
     /// square averages to a fifth of red, which is a very pale pink rather than
     /// red. Dividing by the alpha gives the colour of what was actually drawn,
-    /// which is the logo. A square with nothing in it at all has no colour, and
+    /// which is the logo. A band with nothing in it at all has no colour, and
     /// says so.
-    static func average(of image: CGImage) -> Tint? {
-        var pixel: [UInt8] = [0, 0, 0, 0]
+    private static func rows(of image: CGImage, count: Int) -> [Tint?] {
+        var pixels = [UInt8](repeating: 0, count: count * 4)
         let bitmap = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
 
-        let drawn = pixel.withUnsafeMutableBytes { bytes -> Bool in
+        let drawn = pixels.withUnsafeMutableBytes { bytes -> Bool in
             guard
                 let context = CGContext(
                     data: bytes.baseAddress,
                     width: 1,
-                    height: 1,
+                    height: count,
                     bitsPerComponent: 8,
                     bytesPerRow: 4,
                     space: CGColorSpaceCreateDeviceRGB(),
@@ -240,19 +325,22 @@ nonisolated final class ImageStore: Sendable {
             else { return false }
 
             context.interpolationQuality = .medium
-            context.draw(image, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            context.draw(image, in: CGRect(x: 0, y: 0, width: 1, height: count))
             return true
         }
-        guard drawn else { return nil }
+        guard drawn else { return Array(repeating: nil, count: count) }
 
-        let alpha = Double(pixel[3]) / 255
-        guard alpha > 0.05 else { return nil }
+        return (0..<count).map { band in
+            let start = band * 4
+            let alpha = Double(pixels[start + 3]) / 255
+            guard alpha > 0.05 else { return nil }
 
-        return Tint(
-            red: min(Double(pixel[0]) / 255 / alpha, 1),
-            green: min(Double(pixel[1]) / 255 / alpha, 1),
-            blue: min(Double(pixel[2]) / 255 / alpha, 1)
-        )
+            return Tint(
+                red: min(Double(pixels[start]) / 255 / alpha, 1),
+                green: min(Double(pixels[start + 1]) / 255 / alpha, 1),
+                blue: min(Double(pixels[start + 2]) / 255 / alpha, 1)
+            )
+        }
     }
 
     /// What a set of bytes turned out to be.

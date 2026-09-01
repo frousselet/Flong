@@ -74,6 +74,13 @@ struct DigestScreen: View {
             .editorialColumn()
             .padding(.horizontal, 22)
             .padding(.bottom, 90)
+            // Behind the page and rising above it, so the colour is under the
+            // bar as well as under the subjects. In the content rather than
+            // behind the scroll view, so it scrolls away with the head of the
+            // page it belongs to instead of staying on as chrome.
+            .background(alignment: .top) {
+                DigestWash(url: model.digest.lead?.imageURL)
+            }
         }
         .scrollPosition($position)
         .onScrollGeometryChange(for: Bool.self) { geometry in

@@ -130,6 +130,22 @@ Beside a picture on a phone the facts line runs out of room, and a line that wra
 
 A picture occupies nothing until it has something to show, and nothing again if the address turns out to be dead : a grey rectangle where a photograph failed is worse than no photograph, and a page of them looks broken. It is decorative and hidden from VoiceOver, since feeds almost never carry alternative text and reading a headline out twice helps nobody.
 
+## The colour of the lead, at the top of the page
+
+A front page is one photograph and everything else set around it, and the picture gives the page its temperature before a word of it is read. `DigestWash` is that, on a screen : the top of the digest, the bar over it and the dateline in it are washed in the colours of the story the page leads on, and the colour is spent by the time the picture that gave it comes into view. A wash still going at the photograph would be a tinted photograph rather than a lit page.
+
+**Three bands and not one average.** A photograph averages its sky into its ground and comes out the colour of neither, which is why `ImageStore.average(of:)` is used for a favicon and would be useless here. The picture is resampled to a column of three pixels, top, middle and foot, and the page takes them in that order : the light in the picture at the top of the screen, what the picture is of where the page begins, and its foot fading into the paper.
+
+**A photograph's own colours are not a background.** A night shot is nearly black and a snowfield nearly white, and either laid behind the dateline is a grey page or no colour at all. What is kept is the hue and the fact that there is one. How light it is stays the page's decision, pale on white and deep on black, moving within a narrow window so a dark picture still gives a slightly deeper page than a bright one. The saturation is lifted rather than floored, since a band is already a mean and means are duller than what they average : lifting leaves a genuinely grey picture grey, which most photographs of a press conference are, where a floor would invent a hue out of the noise in the last digit of a mean.
+
+**It is laid in the content and rises above it.** The colour is wanted under the bar most of all, and the page's own content begins below the bar : a wash starting at the content would draw a hard edge across the screen at exactly the height a fade exists to make invisible. So it is drawn taller than the tallest bar the three platforms draw, held at full strength over all of that, and offset up into it. In the content rather than behind the scroll view, so it scrolls away with the head of the page it belongs to instead of staying on as chrome, and at the width of the window rather than of the column, since the page holds its type to a measure and light is not held to anything.
+
+**Under the standard theme and no other.** `Papier` and `Solarized` state what the page is printed on, and a wash over either is a second opinion about the paper. The standard theme states nothing, which is the whole of what it means, so it is the one page with room for a picture to say something. It is also the only way the page reaches the bar at all : *What a theme does not reach*, above, records that a section's large title is drawn by the system in the system's own colour and that nothing short of an appearance proxy changes it. The type stays the system's ; the ground under it does not have to.
+
+**And nothing whatever at increased contrast.** It is gentle enough to leave the largest type on the page legible over it, and it is still something between that type and the paper, which is the thing increased contrast is a request to stop doing.
+
+**Unlike a mark's tint, the wash fetches.** `ImageStore.tint(at:)` answers from what is already decoded and never waits, because a pill is drawn the instant an article opens. The wash is wanted above the row that carries the picture and usually before that row has been built at all, so there is nothing to answer from ; it decodes the picture at sixty four pixels, which is ample for something about to become three, and from the bytes already in the cache wherever the picture has been shown.
+
 ## The mark of a publisher
 
 A list of articles is a list of names, and names take reading. A mark is recognized before it is read, which is the whole of what a favicon is for. It stands beside the publisher's name on every article row, at the head of an article, and once at the head of each group in the sources list.

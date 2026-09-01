@@ -117,6 +117,15 @@ nonisolated struct Digest: Hashable, Sendable {
     /// is a page with nothing on it, and it has to say so rather than render
     /// blank while insisting it is not empty.
     var isEmpty: Bool { live.isEmpty && stories.isEmpty }
+
+    /// The story the page leads on : the first of the live ones, or the first
+    /// of the rest where nothing is live.
+    ///
+    /// **For what reads the page once**, which is the page itself and the
+    /// colour it is washed in. A row does not ask this : it is handed the lead
+    /// from the same read of the same page it came from, for the reason
+    /// `DigestScreen.stories` sets out at length.
+    var lead: DigestStory? { live.first ?? stories.first }
 }
 
 /// One article of a story, as the digest query returns it.
