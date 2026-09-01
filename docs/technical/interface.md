@@ -18,8 +18,8 @@ So the digest is set as an editor would set a page :
 | ----- | ----- | --- |
 | `measure` | 680 pt | The column stops there whatever the window does. A line of text past about 80 characters is a line the eye loses. |
 | `rhythm` / `tightRhythm` | 28 / 10 pt | Two spacings, used everywhere, so the page has a pulse rather than forty arbitrary gaps. |
-| `headline` | the theme's own face, semibold | One voice for what was written, another for what the application says about it. The two stay apart without a single line of chrome. |
-| `metadata` | caption, sans, tertiary | The facts under a story are for the reader who asks, not for the one who scans. Sans in every theme, so the application's voice never wears the headline's face. |
+| `headline` | the theme's own face, semibold | The one line a theme is allowed to speak in. It stays apart from everything under it without a single line of chrome. |
+| `standfirst` / `metadata` | sans, in every theme | A theme gets out of the way under the headline : prose reads best in a column face, and the facts under a story are for the reader who asks rather than the one who scans. |
 
 The measures live in `Flong/Support/Editorial.swift` and the faces in `Flong/Support/Theme.swift`. A screen that needs a fifth spacing value is a screen that has gone wrong.
 
@@ -32,7 +32,7 @@ The headline face used to be serif and nothing else, which was a decision about 
 | Theme | Faces | Paper |
 | ----- | ----- | ----- |
 | `Défaut` | Sans throughout | The system's own |
-| `Papier` | Serif headlines and standfirsts | Warm cream, warm near-black at night, every colour in it warm and pulled back from the contrast a screen defaults to |
+| `Papier` | Serif headlines over a sans body | Warm cream, warm near-black at night, every colour in it warm and pulled back from the contrast a screen defaults to |
 | `Solarized` | Monospace headlines over a sans body | base3 and base03, base01 and base1 for the ink, violet for a control |
 
 **Three, and three is the number.** Past three they stop being opinions. Each says something the other two do not, and each says it in the two halves a theme has : what it is set in, and what it is printed on.
@@ -45,7 +45,9 @@ The instinct is to cool the hue, and it is wrong : a blue accent was tried and i
 
 At night it goes the other way, since ink on a dark ground is the light thing : the same warmth lifted to `#B98D70`, and left a little more of its colour than the light one keeps, since a desaturated tone on a dark ground reads as dust. Kept well clear of the cream the page is set in, so that a control is still a control and not a slightly different word. The live dot stays brick red in both, being the one thing in the application that is meant to be the loudest.
 
-**The metadata is sans in all three.** It is the application's own voice, and a theme that set it in the headline's face would have thrown away the one distinction the typography exists to make. A monospace caption under every story would also be the loudest quiet thing on the page.
+**A theme speaks in the headline and gets out of the way underneath it.** The standfirst, the body of an article, and everything the application says about one are sans in all three. A newspaper sets its headline in the display face it paid for and its columns in whatever reads best down a column, and it has never set both in the same : what is left to a theme is the one line that is glanced at, which is the line a face is for. `Papier` set its standfirsts and its article bodies in serif to begin with, and a page of prose in a display face is a page that is looked at rather than read.
+
+The metadata is part of that, and doubly so : it is the application's own voice, and a theme that set it in the headline's face would have thrown away the one distinction the typography exists to make. A monospace caption under every story would also be the loudest quiet thing on the page.
 
 **`Défaut` states no colours at all, and that is what it means.** It is the system's appearance, so it is left to the system : a theme that restated the system's colours as literals is a theme that stops following them the first time the system changes one, or the reader turns the contrast up. `Theme.paints` is what says so, and the painting modifier does nothing under it. The one place `Défaut` does state its six colours is the rendered article, which is a web page and has no system colours to inherit ; they are the values the stylesheet has always carried.
 
