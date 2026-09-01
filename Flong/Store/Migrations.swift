@@ -392,6 +392,40 @@ nonisolated extension AppDatabase {
             }
         }
 
+        // **The writers, who were in the schema all along and had nowhere to
+        // be.** An article has carried its byline since v1 ; nothing ever asked
+        // the column a question, so nothing ever needed it grouped or indexed.
+        // The authors page asks both.
+        //
+        // **A byline is normalized once, on the way in**, and the spellings
+        // already stored are put through the same rule here. A name wrapped in
+        // the whitespace of a pretty-printed feed is not a second writer, and
+        // one grouping that answered `Jean Dupont` twice would be a list the
+        // reader cannot trust. See ``Author``.
+        //
+        // **A favourite author is one row, and only for the writers the reader
+        // singled out.** A table of every byline there is would be a second
+        // copy of what the articles already say, and it would go stale the
+        // first time a publisher changed a spelling.
+        migrator.registerMigration("v24.theWriters") { db in
+            for spelling in try String.fetchAll(db, sql: "SELECT DISTINCT author FROM entry WHERE author IS NOT NULL") {
+                let name = Author.name(from: spelling)
+                guard name != spelling else { continue }
+                try db.execute(
+                    sql: "UPDATE entry SET author = ? WHERE author = ?",
+                    arguments: [name, spelling]
+                )
+            }
+
+            try db.create(index: "entry_author", on: "entry", columns: ["author"])
+
+            try db.create(table: "favourite_author") { table in
+                table.primaryKey("id", .blob)
+                table.column("name", .text).notNull().unique()
+                table.column("created_at", .datetime).notNull()
+            }
+        }
+
         return migrator
     }
 

@@ -18,6 +18,9 @@ nonisolated enum Route: Hashable {
     case article(UUID)
     case view(SidebarItem.Kind)
     case collection(ArticleCollection.Kind)
+    /// One writer, by their byline : see ``Author`` for why the name is the
+    /// whole of the identity.
+    case author(String)
 }
 
 /// The article being read, when one is.
@@ -333,8 +336,17 @@ struct AppShell: View {
         case .view(let kind):
             ArticleFeedScreen(model: model, kind: kind, zoom: zoom) { reading = Reading(id: $0) }
 
+        // The one square that opens on people rather than on articles. It is
+        // matched before the general collection so that the page the reader
+        // lands on is a list of names and not an empty list of pieces.
+        case .collection(.builtIn(.authors)):
+            AuthorsScreen(model: model) { path.wrappedValue.append(.author($0)) }
+
         case .collection(let kind):
             CollectionScreen(model: model, kind: kind, zoom: zoom) { reading = Reading(id: $0) }
+
+        case .author(let name):
+            AuthorScreen(model: model, name: name, zoom: zoom) { reading = Reading(id: $0) }
 
         }
     }

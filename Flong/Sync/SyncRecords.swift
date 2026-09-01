@@ -32,6 +32,7 @@ nonisolated enum SyncRecords {
         static let sourceName = "SourceName"
         static let catchUp = "CatchUp"
         static let collections = "Collections"
+        static let favouriteAuthor = "FavouriteAuthor"
     }
 
     // MARK: - Names
@@ -40,6 +41,12 @@ nonisolated enum SyncRecords {
 
     /// The name the reader gave one publisher.
     static func name(forSourceNamedDomain domain: String) -> String { "source-" + digest(domain) }
+
+    /// One writer the reader singled out, named after the writer.
+    ///
+    /// Two devices that single out the same person compute the same name and
+    /// write one record between them, and nothing has to be reconciled.
+    static func name(forFavouriteAuthor author: String) -> String { "author-" + digest(author) }
 
     /// One marked article, named after the article and not after the device.
     ///
@@ -215,6 +222,38 @@ nonisolated enum SyncRecords {
         else { return nil }
 
         return SourceName(domain: domain, name: name, createdAt: record["createdAt"] as? Date ?? Date())
+    }
+
+    // MARK: - The writers the reader singled out
+
+    /// One favourite author.
+    ///
+    /// **A record apiece, and only for the ones the reader singled out.** The
+    /// writers themselves are worked out from the articles, so there is nothing
+    /// to send about the thousands nobody has an opinion on. A reader who
+    /// follows a few dozen bylines spends a few dozen records of the budget of
+    /// section 7.
+    ///
+    /// **The record is the favourite, and its deletion is the `no`.** A field
+    /// saying yes or no would need a record per writer ever considered ; here
+    /// the presence of the record is the whole of the answer, which is why
+    /// un-favouriting deletes it rather than rewriting it.
+    static func record(forFavouriteAuthor author: String, in zone: CKRecordZone.ID) -> CKRecord {
+        let record = CKRecord(
+            recordType: RecordType.favouriteAuthor,
+            recordID: CKRecord.ID(recordName: name(forFavouriteAuthor: author), zoneID: zone)
+        )
+        record["name"] = author
+        return record
+    }
+
+    static func favouriteAuthor(from record: CKRecord) -> String? {
+        guard record.recordType == RecordType.favouriteAuthor,
+            let name = record["name"] as? String,
+            !name.isEmpty
+        else { return nil }
+
+        return name
     }
 
     // MARK: - The reader's marks

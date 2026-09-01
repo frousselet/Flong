@@ -51,6 +51,14 @@ struct LocalizationTests {
         #expect(String(localized: "Add to favourite sources", locale: french) == "Ajouter aux sources favorites")
         #expect(String(localized: "Remove from favourite sources", locale: french) == "Retirer des sources favorites")
         #expect(String(localized: "Favourite source", locale: french) == "Source favorite")
+
+        // The third of them. `Auteurs favoris` is the square ; the two commands
+        // are the way in and the way out, and neither may be called `Favoris`
+        // either.
+        #expect(String(localized: "Favourite authors", locale: french) == "Auteurs favoris")
+        #expect(String(localized: "Add to favourite authors", locale: french) == "Ajouter aux auteurs favoris")
+        #expect(String(localized: "Remove from favourite authors", locale: french) == "Retirer des auteurs favoris")
+        #expect(String(localized: "Authors", locale: french) == "Auteurs")
     }
 
     @Test("The one command that cannot be undone says so in French")

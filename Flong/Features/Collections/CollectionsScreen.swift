@@ -27,11 +27,16 @@ import SwiftUI
 /// Then the months, which fall out of when a copy was kept and cost the reader
 /// nothing to maintain.
 ///
-/// **The two favourites stand next to each other on purpose.** A star on an
-/// article and a favourite source are different judgements, and a reader who
-/// found them at opposite ends of the page would have to work out that they
-/// are not the same thing. Side by side, one holding a morning's arrivals and
-/// the other holding four pieces, they say it themselves.
+/// **The three favourites stand next to each other on purpose.** A star on an
+/// article, a favourite source and a favourite author are three different
+/// judgements - about the piece, about who printed it, about who wrote it - and
+/// a reader who found them at opposite ends of the page would have to work out
+/// that they are not the same thing. Side by side, one holding a morning's
+/// arrivals and the others holding four pieces each, they say it themselves.
+///
+/// **The authors square is the odd one and is last for that reason.** Every
+/// other square opens on a list of articles ; that one opens on a list of
+/// people, and the number under it counts names rather than pieces.
 ///
 /// **A band with nothing in it is not drawn at all**, its heading included. A
 /// reader who has made no collections is not shown an empty shelf with a label
@@ -106,7 +111,9 @@ struct CollectionsScreen: View {
                 ContentUnavailableView {
                     Label("Nothing kept yet", systemImage: "folder")
                 } description: {
-                    Text("Star an article, write a note on one, or choose a favourite source, and it shows up here.")
+                    Text(
+                        "Star an article, write a note on one, or choose a favourite source or author, and it shows up here."
+                    )
                 }
             }
         }
@@ -202,7 +209,7 @@ struct CollectionSquare: View {
                 Self.name(of: collection.kind)
                     .font(.system(.subheadline, weight: .medium))
                     .lineLimit(1)
-                Text("\(collection.count) articles")
+                Self.count(of: collection)
                     .font(theme.metadata)
                     .foregroundStyle(.secondary)
             }
@@ -241,8 +248,23 @@ struct CollectionSquare: View {
         switch kind {
         case .builtIn(.starred): Text("Starred articles")
         case .builtIn(.favouriteSources): Text("Favourite sources")
+        case .builtIn(.favouriteAuthors): Text("Favourite authors")
         case .builtIn(.annotated): Text("Notes")
+        case .builtIn(.authors): Text("Authors")
         case .made(let name), .dynamic(let name): Text(verbatim: name)
+        }
+    }
+
+    /// What the number under the name counts.
+    ///
+    /// Articles, for every square but one. The authors square opens on a list
+    /// of people, so the number under it has to be the number of rows the
+    /// reader will find there : a square saying `1 240 articles` that opens on
+    /// eighty names has told them the wrong thing before they touched it.
+    private static func count(of collection: ArticleCollection) -> Text {
+        switch collection.kind {
+        case .builtIn(.authors): Text("\(collection.count) authors")
+        default: Text("\(collection.count) articles")
         }
     }
 
@@ -252,7 +274,13 @@ struct CollectionSquare: View {
         // The mark a source wears everywhere else in the application, so the
         // square beside the star is plainly about publishers and not articles.
         case .builtIn(.favouriteSources): "dot.radiowaves.up.forward"
+        // A pen, because a favourite author is about who wrote the piece and
+        // not about who printed it : the mark beside the aerial says the two
+        // are different judgements before the name under it does.
+        case .builtIn(.favouriteAuthors): "signature"
         case .builtIn(.annotated): "text.quote"
+        // People rather than articles, which is what this one square holds.
+        case .builtIn(.authors): "person.2"
         case .made: "folder"
         // Described rather than filled, and the mark says which : a reader who
         // wonders why articles appear in one they never touched has been told.

@@ -102,6 +102,46 @@
         }
       }
     },
+    "%lld authors" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld author"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld authors"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld auteur"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld auteurs"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld feeds added" : {
       "localizations" : {
         "en" : {
@@ -446,6 +486,16 @@
         }
       }
     },
+    "Add to favourite authors" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter aux auteurs favoris"
+          }
+        }
+      }
+    },
     "Add to favourite sources" : {
       "localizations" : {
         "fr" : {
@@ -492,6 +542,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tous les articles"
+          }
+        }
+      }
+    },
+    "All authors" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tous les auteurs"
           }
         }
       }
@@ -624,6 +684,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Demandée une seule fois, quand vous appuyez. Ce qui revient est une ville : la coordonnée elle-même n'est jamais conservée."
+          }
+        }
+      }
+    },
+    "Authors" : {
+      "comment" : "The collection that lists everybody who signed an article",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auteurs"
           }
         }
       }
@@ -954,23 +1025,6 @@
         }
       }
     },
-    "Écologie" : {
-      "comment" : "The former name of the Environment section, kept so a rename can find it",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Climate"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Écologie"
-          }
-        }
-      }
-    },
     "Economy" : {
       "localizations" : {
         "fr" : {
@@ -1081,6 +1135,17 @@
         }
       }
     },
+    "Favourite authors" : {
+      "comment" : "The collection of the articles signed by a writer the reader singled out",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auteurs favoris"
+          }
+        }
+      }
+    },
     "Favourite source" : {
       "comment" : "Said of a source the reader singled out, beside its name",
       "localizations" : {
@@ -1099,6 +1164,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Sources favorites"
+          }
+        }
+      }
+    },
+    "Feeds that name who wrote an article put them here, and you can keep the ones you follow." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les flux qui indiquent qui a écrit un article y placent son auteur, et vous pouvez garder ceux que vous suivez."
           }
         }
       }
@@ -1380,26 +1455,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Je suis connecté"
-          }
-        }
-      }
-    },
-    "iCloud is not answering" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud ne répond pas"
-          }
-        }
-      }
-    },
-    "iCloud storage is full" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le stockage iCloud est plein"
           }
         }
       }
@@ -1705,6 +1760,16 @@
         }
       }
     },
+    "Nobody signed yet" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personne n'a encore signé"
+          }
+        }
+      }
+    },
     "Not everything could be deleted. Try again in a moment." : {
       "localizations" : {
         "fr" : {
@@ -1732,6 +1797,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Notes"
+          }
+        }
+      }
+    },
+    "Nothing by them here" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien de cette personne ici"
           }
         }
       }
@@ -1877,22 +1952,22 @@
         }
       }
     },
-    "Published on %@" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Publié le %@"
-          }
-        }
-      }
-    },
     "Published on" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Publié le"
+          }
+        }
+      }
+    },
+    "Published on %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publié le %@"
           }
         }
       }
@@ -1913,6 +1988,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Religion"
+          }
+        }
+      }
+    },
+    "Remove from favourite authors" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer des auteurs favoris"
           }
         }
       }
@@ -1983,6 +2068,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rechercher"
+          }
+        }
+      }
+    },
+    "Search authors" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher un auteur"
           }
         }
       }
@@ -2277,12 +2372,12 @@
         }
       }
     },
-    "Star an article, write a note on one, or choose a favourite source, and it shows up here." : {
+    "Star an article, write a note on one, or choose a favourite source or author, and it shows up here." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mettez un article en favori, écrivez une note dessus ou choisissez une source favorite, et cela apparaît ici."
+            "value" : "Mettez un article en favori, annotez-en un, ou choisissez une source ou un auteur favori, et cela apparaît ici."
           }
         }
       }
@@ -2436,6 +2531,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Synchronisation avec iCloud"
+          }
+        }
+      }
+    },
+    "TV series" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Séries"
           }
         }
       }
@@ -2682,32 +2787,12 @@
         }
       }
     },
-    "TV series" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Séries"
-          }
-        }
-      }
-    },
     "Unread" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Non lus"
-          }
-        }
-      }
-    },
-    "Updated %@" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Mis à jour %@"
           }
         }
       }
@@ -2722,22 +2807,12 @@
         }
       }
     },
-    "updated" : {
+    "Updated %@" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "modifié"
-          }
-        }
-      }
-    },
-    "updated on %@" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "modifié le %@"
+            "value" : "Mis à jour %@"
           }
         }
       }
@@ -2809,6 +2884,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qu'elle cherche"
+          }
+        }
+      }
+    },
+    "What they signed has been purged, or has not arrived yet." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qu'elle a signé a été purgé, ou n'est pas encore arrivé."
           }
         }
       }
@@ -2910,6 +2995,63 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les vôtres, à ajouter et à retirer. Le modèle y recourt aussi volontiers qu'aux rubriques."
+          }
+        }
+      }
+    },
+    "iCloud is not answering" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud ne répond pas"
+          }
+        }
+      }
+    },
+    "iCloud storage is full" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le stockage iCloud est plein"
+          }
+        }
+      }
+    },
+    "updated" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "modifié"
+          }
+        }
+      }
+    },
+    "updated on %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "modifié le %@"
+          }
+        }
+      }
+    },
+    "Écologie" : {
+      "comment" : "The former name of the Environment section, kept so a rename can find it",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Climate"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écologie"
           }
         }
       }
