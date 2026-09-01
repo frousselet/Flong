@@ -118,6 +118,8 @@ On macOS the same four sections become a sidebar, through `tabViewStyle(.sidebar
 
 An editorial page without pictures is a page of grey, and a page where every picture is the same size is a list. So there is a hierarchy of exactly one : **the first story runs its picture across the column**, in a band rather than a square, above a larger headline ; everything below it keeps its picture to a square at the side. That is how a front page has said what matters for two centuries, and it costs one line of code to say it.
 
+**The type is a step up as well, and it had to be a real one.** The lead ran at `title2` over a page set in `title3`, which is twenty-two points against twenty : a difference a reader cannot see is a difference that is not there, and a lead announced by its picture alone is a picture with an ordinary story under it. It takes the next step of the scale in both, `title` over `title3` and `body` over `subheadline`. Steps of the scale rather than sizes in points, so the whole of it still follows Dynamic Type.
+
 Every picture is shown at three by two, lead and thumbnail alike. That is what a camera takes and therefore what a publisher's picture already is : any other ratio is a crop, and a crop is a decision about somebody else's photograph. One ratio for the whole page rather than a band above and squares beside, since a column whose pictures are all the same shape has a rhythm and one whose pictures each have their own does not.
 
 It is `Editorial.pictureAspect`, named once. Across a column of six hundred and eighty points a lead runs to four hundred and fifty, which is most of an iPad screen : the trade is fewer stories at a glance in exchange for pictures nobody has cropped.
