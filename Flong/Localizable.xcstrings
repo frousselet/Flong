@@ -1529,6 +1529,16 @@
         }
       }
     },
+    "Invite to collaborate" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inviter à collaborer"
+          }
+        }
+      }
+    },
     "It fills itself with whatever matches, and goes on filling itself. Try `title:Swift` or `is:unread`." : {
       "localizations" : {
         "fr" : {
@@ -1615,6 +1625,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Régions"
+          }
+        }
+      }
+    },
+    "Manage the collaboration" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gérer la collaboration"
           }
         }
       }

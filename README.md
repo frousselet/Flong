@@ -16,7 +16,9 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **Your sources are grouped by publisher, and there is nothing to file.** A paper with a feed per desk is one heading, worked out from the address it serves them at, so the list is organized the moment you subscribe and never goes stale. Every article says the publisher it came from and wears the one mark that publisher drew, rather than naming whichever desk it happened to arrive through. Call a publisher what you call it rather than what its address says, and make one a favourite when it is one of yours : a favourite source is not a starred article, and the two sit as separate squares in your collections. Stop following a source, or a whole publisher, and everything that was only there because of it goes with it, on this device and in your iCloud, after Flong has said so and you have said yes.
 
-**Sources you pay for stay readable.** A per-subscriber feed address, HTTP Basic or a token, kept in the keychain. For a site whose articles sit behind a wall, sign in on its own page and Flong fetches the rest as you : it never holds your password.
+**A collection can be shared with somebody else.** Invite them from the collection itself, through the system's own share sheet and the collaboration pill in Messages, and they can file into it too. What travels is the excerpt the feed published and never the article, because the article is not yours to hand anybody. Nothing you were not asked about leaves : an address is stripped of the parameters you marked as yours and of the tracking, and a session cookie is never sent.
+
+**Sources you pay for stay readable.** A per-subscriber feed address, HTTP Basic or a token, kept in the keychain. Say which parameters of a feed's addresses carry your subscription and Flong takes exactly those off any link that leaves the device, and nothing else : a parameter selects a feed or a filter as often as it names a subscriber, so it is never guessed at. For a site whose articles sit behind a wall, sign in on its own page and Flong fetches the rest as you : it never holds your password.
 
 **A truncated article is completed from its page.** Most feeds send a standfirst and a link. An article opens on what its feed sent ; ask for the whole one and Flong fetches the page behind it, once, and keeps what it finds beside the feed's version.
 
@@ -125,6 +127,7 @@ The interface is authored in English and translated to French. All strings live 
 | [`docs/technical/search.md`](docs/technical/search.md) | The index, the query language, and why nothing typed into it is ever run |
 | [`docs/technical/marks.md`](docs/technical/marks.md) | What a mark is, why the library went, and what Spotlight is told |
 | [`docs/technical/sync.md`](docs/technical/sync.md) | What travels between devices, what never does, and why the record budget shapes it |
+| [`docs/technical/collaboration.md`](docs/technical/collaboration.md) | What a shared collection holds, why it is the excerpt and never the article, and what must not leave with it |
 | [`docs/technical/erasure.md`](docs/technical/erasure.md) | What deleting everything reaches, in which order, and what it cannot promise |
 | [`docs/technical/notifications.md`](docs/technical/notifications.md) | What Flong may interrupt you for, and the rules it interrupts you under |
 | [`docs/technical/background.md`](docs/technical/background.md) | How long work survives being interrupted, and how the marked articles are searched by meaning |

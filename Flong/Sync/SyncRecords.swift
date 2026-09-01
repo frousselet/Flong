@@ -33,7 +33,33 @@ nonisolated enum SyncRecords {
         static let catchUp = "CatchUp"
         static let collections = "Collections"
         static let favouriteAuthor = "FavouriteAuthor"
+        /// What a shared collection is called, in the zone standing for it.
+        static let sharedCollection = "SharedCollection"
     }
+
+    // MARK: - A collection that is shared
+
+    /// The zone one shared collection lives in.
+    ///
+    /// **A zone of its own, and never the one everything else is in.** A
+    /// `CKShare` reaches a single zone, and a zone holds a single zone-wide
+    /// share, so a second shared collection is a second zone. Sharing
+    /// ``zoneName`` instead would hand a participant every feed, every mark,
+    /// every read state and the whole stream in one gesture.
+    ///
+    /// Named after an identifier of this device's making rather than after the
+    /// collection : a reader renames a collection, and two readers may name
+    /// theirs the same thing, while a zone name is fixed for the life of the
+    /// zone and has to be unique in the database.
+    static func zoneName(forSharedCollection id: UUID) -> String {
+        "shared-" + id.uuidString.lowercased()
+    }
+
+    /// What the record naming a shared collection is called.
+    ///
+    /// One per zone, so a fixed name rather than a derived one : there is
+    /// nothing to tell apart.
+    static let sharedCollectionName = "collection"
 
     // MARK: - Names
 
