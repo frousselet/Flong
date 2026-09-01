@@ -1218,22 +1218,62 @@
         }
       }
     },
-    "The address is the secret, so it is never shown. Type a new one to replace it in the keychain, and the source keeps everything already here." : {
+    "Hide the address" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’adresse est le secret : elle n’est jamais affichée. Saisissez-en une nouvelle pour la remplacer dans le trousseau, et la source conserve tout ce qui est déjà là."
+            "value" : "Masquer l’adresse"
           }
         }
       }
     },
-    "Turning this off writes the address back into the database and into your iCloud, in the open. Flong uses the one in the keychain unless you type another." : {
+    "Neither this feed's address nor the articles it has carried hold one." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Désactiver cette option réécrit l’adresse en clair dans la base et dans votre iCloud. Flong utilise celle du trousseau à moins que vous n’en saisissiez une autre."
+            "value" : "Ni l’adresse de ce flux ni les articles qu’il a portés n’en comportent."
+          }
+        }
+      }
+    },
+    "Show the address" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher l’adresse"
+          }
+        }
+      }
+    },
+    "The address is kept in the keychain and never in the database. Tap the eye to read it, and edit it here like any other." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’adresse est conservée dans le trousseau et jamais dans la base. Touchez l’œil pour la lire, et modifiez-la ici comme n’importe quelle autre."
+          }
+        }
+      }
+    },
+    "Tick a parameter that carries your subscription : Flong takes exactly those off an address it hands to somebody else, in a shared collection or an export. Nothing here changes how the feed is fetched, and a parameter is added or removed in the address above." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cochez un paramètre qui porte votre abonnement : Flong retire exactement ceux-là d’une adresse qu’il transmet à quelqu’un d’autre, dans une collection partagée ou un export. Rien ici ne change la façon dont le flux est récupéré, et un paramètre s’ajoute ou se retire dans l’adresse ci-dessus."
+          }
+        }
+      }
+    },
+    "Turning this off writes the address above back into the database and into your iCloud, in the open." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désactiver cette option réécrit l’adresse ci-dessus en clair dans la base et dans votre iCloud."
           }
         }
       }
@@ -1244,6 +1284,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Saisissez l’adresse à laquelle cette source est servie."
+          }
+        }
+      }
+    },
+    "What identifies you in these addresses" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui vous identifie dans ces adresses"
           }
         }
       }
@@ -2051,16 +2101,6 @@
         }
       }
     },
-    "Neither this feed's address nor its articles carry any." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ni l’adresse de ce flux ni celles de ses articles n’en portent."
-          }
-        }
-      }
-    },
     "Never" : {
       "localizations" : {
         "fr" : {
@@ -2087,16 +2127,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouvelle collection dynamique"
-          }
-        }
-      }
-    },
-    "New secret address" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nouvelle adresse secrète"
           }
         }
       }
@@ -2338,16 +2368,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Papier"
-          }
-        }
-      }
-    },
-    "Parameters on this feed's addresses" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Paramètres des adresses de ce flux"
           }
         }
       }
@@ -3405,16 +3425,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qu'elle a signé a été purgé, ou n'est pas encore arrivé."
-          }
-        }
-      }
-    },
-    "What you mark here is taken off any address that leaves this device, and nothing else is. Nothing is removed on a guess : a parameter selects a feed or a filter as often as it names a subscriber." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce que vous cochez ici est retiré de toute adresse qui quitte cet appareil, et rien d’autre ne l’est. Rien n’est retiré au jugé : un paramètre sélectionne un flux ou un filtre aussi souvent qu’il désigne un abonné."
           }
         }
       }

@@ -2703,9 +2703,21 @@ final class AppModel {
             }
         }
 
-        // A masked address holds a digest of the real one and nothing a reader
-        // could recognize, so it is not offered.
-        if !MaskedURL.isMasked(feedURL) { take(feedURL) }
+        // **A masked address is looked up rather than skipped.** What the
+        // database holds for a secret feed is a digest and nothing a reader
+        // could recognize, so it used to be left out ; but the address behind
+        // it is in the keychain, it is the one carrying the subscription, and
+        // it is the case this screen exists for. Refusing to look at it left
+        // the screen saying that neither the feed nor its articles carried a
+        // parameter, to a reader looking straight at one.
+        //
+        // Only the names are shown. The values are masked here as everywhere
+        // else on this screen.
+        if MaskedURL.isMasked(feedURL) {
+            take(Self.secretAddress(of: keptCredential(of: feedID)).flatMap(URL.init(string:)))
+        } else {
+            take(feedURL)
+        }
 
         let addresses = (try? await articles.addresses(ofFeed: feedID)) ?? []
         for address in addresses { take(address) }
@@ -2719,6 +2731,19 @@ final class AppModel {
     /// A feed's own address, for the screen that asks about its parameters.
     func address(ofFeed feedID: UUID) async -> URL? {
         try? await subscriptions.feed(id: feedID)?.url
+    }
+
+    /// The address behind a masked one, for the screen that edits it.
+    ///
+    /// **Section 9 says a secret address is masked in the interface, and a
+    /// field that hides it is masked.** What it may not be is unreachable :
+    /// the masked form gives nothing back, so a reader whose platform reissues
+    /// their token, or who has to add a parameter to their own subscription,
+    /// had nothing to edit and no way to see what they were editing. It is
+    /// handed to the editor of that source and nowhere else, shown hidden, and
+    /// revealed only by a deliberate tap by whoever is holding the device.
+    func secretAddress(ofFeed feedID: UUID) async -> String? {
+        Self.secretAddress(of: keptCredential(of: feedID))
     }
 
     /// Which of them the reader has already said are theirs.

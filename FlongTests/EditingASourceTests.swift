@@ -196,7 +196,7 @@ struct EditingASourceTests {
         #expect(found.first(where: { $0.name == "format" })?.masked == "••••")
     }
 
-    @Test("A masked address is not offered, and its articles' parameters still are")
+    @Test("The parameters of a secret address are read back from the keychain")
     func addressParametersOfASecretSource() async throws {
         let address = "https://feeds.example.com/rss?token=abcdefghijkl"
         let feed = try await follow(address)
@@ -213,11 +213,13 @@ struct EditingASourceTests {
         let masked = try await stored(feed.id)
         let found = await model.addressParameters(of: feed.id, feedURL: masked.url)
 
-        // The masked address holds a digest and nothing a reader would
-        // recognize, so there is nothing to ask about it. The articles are
-        // written down exactly as the feed published them, and they are the
-        // case this screen exists for.
-        #expect(found.map(\.name) == ["key"])
+        // The row holds a digest and nothing a reader would recognize, so the
+        // address behind it is read from the keychain : refusing to look told a
+        // reader staring at their own token that the feed carried no parameter.
+        #expect(found.map(\.name) == ["token", "key"])
+
+        let real = await model.secretAddress(ofFeed: feed.id)
+        #expect(real == address)
     }
 
     @Test("What the reader designated is kept per source, folded")
