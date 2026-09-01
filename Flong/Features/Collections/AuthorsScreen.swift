@@ -123,12 +123,33 @@ struct AuthorsScreen: View {
 /// The count is what they signed on this device and not what they ever wrote,
 /// so it is set in the metadata face beside the name rather than announced :
 /// it says how much of them is here, which is a different claim.
+///
+/// **The marks say where, and they follow the name rather than the number.** A
+/// byline on its own is a name in a list of a thousand names ; the same byline
+/// with `Le Monde` and `Libération` after it is somebody the reader can place
+/// before they have opened anything. It is also the thing the page is for : a
+/// writer moving between papers is what no subscription can express, and a row
+/// showing two marks says it without a word.
+///
+/// A publisher's mark is looked up rather than stored beside the name, so a
+/// publisher the reader renames is renamed here at the same moment as
+/// everywhere else.
 struct AuthorRow: View {
     let author: Author
     let open: () -> Void
     let favourite: () -> Void
 
     @Environment(\.theme) private var theme
+    @Environment(\.publishers) private var publishers
+
+    /// How many marks a row has room for.
+    ///
+    /// **Four, and no `+3` after them.** The marks are a hint of where somebody
+    /// writes and not an inventory of it : the number the row already carries
+    /// is a number of articles, and a second one counting papers would be two
+    /// numbers doing different jobs side by side. A reader who wants the whole
+    /// answer opens the writer.
+    private static let marks = 4
 
     var body: some View {
         HStack(spacing: 10) {
@@ -139,6 +160,8 @@ struct AuthorRow: View {
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
+
+                    marks
 
                     Spacer(minLength: 8)
 
@@ -165,6 +188,9 @@ struct AuthorRow: View {
             // has and the name stays a name in every language.
             .accessibilityLabel(
                 Text(verbatim: author.name) + Text(verbatim: ", ") + Text("\(author.count) articles")
+                    // The marks say where in a shape, and say nothing at all to
+                    // a reader who is listening to the page.
+                    + Text(verbatim: named.isEmpty ? "" : ", " + named.joined(separator: ", "))
             )
 
             Button(action: favourite) {
@@ -187,5 +213,28 @@ struct AuthorRow: View {
             }
         }
         .overlay(alignment: .top) { Divider() }
+    }
+
+    /// The marks of the publishers they write for, the ones the row has room
+    /// for.
+    ///
+    /// Nothing at all where there are none, rather than a run of aerials : a
+    /// mark stands for a publisher the reader recognizes, and a placeholder in
+    /// its place stands for nothing. This is not a column, so there is no
+    /// column to keep.
+    @ViewBuilder
+    private var marks: some View {
+        if !author.publishers.isEmpty {
+            HStack(spacing: 4) {
+                ForEach(author.publishers.prefix(Self.marks), id: \.self) { domain in
+                    SourceIconView(identity: publishers[domain], side: 14)
+                }
+            }
+        }
+    }
+
+    /// What those publishers are called, for a reader who is listening.
+    private var named: [String] {
+        author.publishers.prefix(Self.marks).map { publishers[$0]?.name ?? $0 }
     }
 }

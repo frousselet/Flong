@@ -42,6 +42,15 @@ nonisolated struct Author: Identifiable, Hashable, Sendable {
     /// Whether the reader singled them out.
     var isFavourite: Bool
 
+    /// Where they write, by publisher, most published in first.
+    ///
+    /// **The domains and not the marks.** A publisher's mark is drawn from
+    /// what the reader is subscribed to now, by the one map the whole
+    /// application looks it up in, so a page renaming a publisher renames it
+    /// here too and a store that carried pictures would be carrying a second
+    /// copy of something already answered. See `SourceIdentity`.
+    var publishers: [String] = []
+
     var id: String { name }
 
     /// The spelling to keep, out of whatever the feed sent.

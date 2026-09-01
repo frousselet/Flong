@@ -72,11 +72,27 @@ nonisolated struct AuthorStore: Sendable {
     /// about, or because it reached this device before the articles did.
     func all() async throws -> [Author] {
         try await database.writer.read { db in
-            var found = try Row.fetchAll(db, sql: Self.grouped).map(Self.author(from:))
+            let favourites = Set(try String.fetchAll(db, sql: "SELECT name FROM favourite_author"))
 
-            let known = Set(found.map(\.name))
-            found += try String.fetchAll(db, sql: "SELECT name FROM favourite_author")
-                .filter { !known.contains($0) }
+            // One row per writer and per source, added up here rather than in
+            // SQL : the count is over the people and the marks are over the
+            // publishers, which are two different groupings of the same rows,
+            // and asking twice would walk the corpus twice.
+            var tallies: [String: Tally] = [:]
+            for row in try Row.fetchAll(db, sql: Self.grouped) {
+                let count = row["count"] as Int
+                tallies[row["name"], default: Tally()].add(count, of: Self.publisher(of: row))
+            }
+
+            var found = tallies.map { name, tally in
+                Author(
+                    name: name,
+                    count: tally.count,
+                    isFavourite: favourites.contains(name),
+                    publishers: tally.ranked
+                )
+            }
+            found += favourites.subtracting(tallies.keys)
                 .map { Author(name: $0, count: 0, isFavourite: true) }
 
             return found.sorted(by: Author.before)
@@ -101,7 +117,17 @@ nonisolated struct AuthorStore: Sendable {
             )
             guard let row else { return nil }
 
-            let author = Author(name: name, count: row["count"], isFavourite: (row["favourite"] as Int) == 1)
+            var tally = Tally()
+            for source in try Row.fetchAll(db, sql: Self.sources, arguments: [name]) {
+                tally.add(source["count"] as Int, of: Self.publisher(of: source))
+            }
+
+            let author = Author(
+                name: name,
+                count: row["count"],
+                isFavourite: (row["favourite"] as Int) == 1,
+                publishers: tally.ranked
+            )
             // Nobody : no article and no decision carries this name, so there
             // is no page to draw.
             return author.count == 0 && !author.isFavourite ? nil : author
@@ -254,18 +280,62 @@ nonisolated struct AuthorStore: Sendable {
         """
     }
 
-    private static func author(from row: Row) -> Author {
-        Author(name: row["name"], count: row["count"], isFavourite: (row["favourite"] as Int) == 1)
+    /// What one writer has signed, and where.
+    ///
+    /// The publishers are counted rather than collected, so the one a writer
+    /// mostly writes for is the mark a row shows first when there is only room
+    /// for a few of them.
+    private struct Tally {
+        var count = 0
+        private var publishers: [String: Int] = [:]
+
+        mutating func add(_ articles: Int, of publisher: String?) {
+            count += articles
+            guard let publisher else { return }
+            publishers[publisher, default: 0] += articles
+        }
+
+        /// Most published in first, and alphabetically where two are equal so
+        /// that a row does not reshuffle itself between two readings.
+        var ranked: [String] {
+            publishers
+                .sorted { first, second in
+                    first.value == second.value ? first.key < second.key : first.value > second.value
+                }
+                .map(\.key)
+        }
     }
 
-    /// Every writer, with what they signed and whether they are one of the
-    /// reader's.
+    /// Who published a row's feed, named the way the whole application names a
+    /// publisher : the group and never the desk it arrived through.
+    private static func publisher(of row: Row) -> String? {
+        FeedURL.publisher(
+            site: (row["site_url"] as String?).flatMap(URL.init(string:)),
+            feed: (row["feed_url"] as String?).flatMap(URL.init(string:))
+        )
+    }
+
+    /// Every writer, by the source they signed in.
+    ///
+    /// One row per pair rather than one per writer : a byline is what a page
+    /// shows and where it appeared is what the marks beside it say, and both
+    /// fall out of the same walk.
     private static let grouped = """
-        SELECT a.name AS name, COUNT(*) AS count,
-               EXISTS(SELECT 1 FROM favourite_author f WHERE f.name = a.name) AS favourite
+        SELECT a.name AS name, COUNT(*) AS count, f.site_url AS site_url, f.url AS feed_url
         FROM entry_author a
         JOIN entry e ON e.id = a.entry_id
+        JOIN feed f ON f.id = e.feed_id
         WHERE \(shown("e"))
-        GROUP BY a.name
+        GROUP BY a.name, f.id
+        """
+
+    /// The same, for one writer.
+    private static let sources = """
+        SELECT COUNT(*) AS count, f.site_url AS site_url, f.url AS feed_url
+        FROM entry_author a
+        JOIN entry e ON e.id = a.entry_id
+        JOIN feed f ON f.id = e.feed_id
+        WHERE a.name = ? AND \(shown("e"))
+        GROUP BY f.id
         """
 }

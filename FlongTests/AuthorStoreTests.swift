@@ -34,9 +34,14 @@ struct AuthorStoreTests {
     }
 
     @discardableResult
-    private func article(_ title: String, by author: String?, image: URL? = nil) async throws -> Entry {
+    private func article(
+        _ title: String,
+        by author: String?,
+        image: URL? = nil,
+        from source: String = "https://feeds.papier.example.com/une.xml"
+    ) async throws -> Entry {
         let feed = try await subscriptions.subscribe(
-            to: Subscription(address: "https://feeds.example.com/paper.xml", title: "Le Papier")
+            to: Subscription(address: source, title: "Le Papier")
         ).feed
 
         var entry = Entry(
@@ -237,6 +242,34 @@ struct AuthorStoreTests {
             try AuthorStore.index(entry.id, byline: "Claire Ancelin", in: db)
         }
         #expect(try await authors.all().map(\.name) == ["Claire Ancelin"])
+    }
+
+    // MARK: - Where they write
+
+    @Test("A row names the publishers a writer appears in, the ones they write most for first")
+    func whereTheyWrite() async throws {
+        try await article("Un", by: "Paul Rey", from: "https://feeds.papier.example.com/une.xml")
+        try await article("Deux", by: "Paul Rey", from: "https://feeds.papier.example.com/monde.xml")
+        try await article("Trois", by: "Paul Rey", from: "https://feeds.revue.example.com/rss.xml")
+
+        let rey = try #require(try await authors.all().first)
+        #expect(rey.count == 3)
+        // The publisher and never the desk : two feeds served from one address
+        // are one mark, exactly as they are one heading in the sources list.
+        // The host is taken as it stands, `feeds.` included : folding a
+        // subdomain into its parent would need the public suffix list, and the
+        // sources list has always refused that for the same reason.
+        #expect(rey.publishers == ["feeds.papier.example.com", "feeds.revue.example.com"])
+
+        // The page about them answers the same thing, since it is asked from
+        // somewhere the list has not been loaded.
+        #expect(try await authors.author(named: "Paul Rey")?.publishers == rey.publishers)
+    }
+
+    @Test("A favourite with nothing to their name writes nowhere, and says so")
+    func nowhereToWrite() async throws {
+        try await authors.setFavourite("Paul Rey", true)
+        #expect(try await authors.all().first?.publishers.isEmpty == true)
     }
 
     @Test("Two spellings are two writers, since nothing here guesses at a person")
