@@ -605,12 +605,12 @@ struct StoryRow: View {
     private func whatHappened(standfirst: Font.TextStyle = .subheadline) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             if let summary = story.summary, !summary.isEmpty {
-                Text(verbatim: summary)
-                    .font(theme.standfirst(standfirst))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
+                StorySummary(
+                    summary: summary,
+                    isGenerated: story.isGenerated,
+                    style: standfirst,
+                    lines: 3
+                )
             }
 
             facts
@@ -678,11 +678,9 @@ struct StoryRow: View {
 
             Spacer(minLength: 4)
 
-            if story.isGenerated {
-                Image(systemName: "sparkles")
-                    .accessibilityLabel(Text("Written by the model"))
-                    .help(Text("Written by the model"))
-            }
+            // What a model wrote is said in front of the line it wrote, by
+            // ``StorySummary``, and not at the far end of the facts : the mark
+            // used to be a screen's width from the sentence it was about.
             Text(story.lastAt, format: .relative(presentation: .numeric))
                 .lineLimit(1)
         }

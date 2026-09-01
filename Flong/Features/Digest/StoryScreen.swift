@@ -90,12 +90,9 @@ struct StoryScreen: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if let summary = story.summary, !summary.isEmpty {
-                Text(verbatim: summary)
-                    // The standfirst at the size a whole page gives it, rather
-                    // than at the size a row on the front page can spare.
-                    .font(theme.standfirst(.body))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                // The standfirst at the size a whole page gives it, rather than
+                // at the size a row on the front page can spare.
+                StorySummary(summary: summary, isGenerated: story.isGenerated, style: .body)
             }
 
             if story.isGenerated {
@@ -119,7 +116,7 @@ struct StoryScreen: View {
         Button {
             isExplaining = true
         } label: {
-            Label("Written by the model", systemImage: "sparkles")
+            Label("Written by the model", systemImage: "text.line.3.summary")
                 .font(theme.metadata)
                 .foregroundStyle(.secondary)
         }
