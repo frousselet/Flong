@@ -2,6 +2,12 @@
   "fill" : "automatic",
   "groups" : [
     {
+      "blend-mode-specializations" : [
+        {
+          "appearance" : "tinted",
+          "value" : "normal"
+        }
+      ],
       "blur-material" : null,
       "hidden" : false,
       "layers" : [
@@ -17,7 +23,9 @@
           ],
           "fill-specializations" : [
             {
-              "value" : "automatic"
+              "value" : {
+                "solid" : "srgb:0.00000,0.00000,0.00000,1.00000"
+              }
             },
             {
               "appearance" : "dark",
@@ -28,10 +36,11 @@
             {
               "appearance" : "tinted",
               "value" : {
-                "solid" : "extended-srgb:0.00000,0.53333,1.00000,1.00000"
+                "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
               }
             }
           ],
+          "glass" : true,
           "hidden" : false,
           "image-name" : "flong-mark.png",
           "name" : "flong-mark"
@@ -44,7 +53,7 @@
       },
       "specular" : true,
       "translucency" : {
-        "enabled" : false,
+        "enabled" : true,
         "value" : 0.5
       }
     }
