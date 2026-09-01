@@ -55,16 +55,17 @@ struct PageWash: View {
         Group {
             if !theme.paints, contrast != .increased, let wash {
                 LinearGradient(stops: stops(of: wash), startPoint: .top, endPoint: .bottom)
-                    .frame(height: Self.hold + Self.fade)
+                    .frame(height: Self.height)
                     // The width of the window rather than of the column : the
                     // page holds its type to a measure, and light is not held
                     // to anything.
                     .containerRelativeFrame(.horizontal)
-                    // Up under the bar. The wash is laid at the top of the
-                    // page's own content, which begins below the bar : left
-                    // there, it would draw a hard edge across the screen at
-                    // exactly the height a fade exists to make invisible.
-                    .offset(y: -Self.hold)
+                    // Up under the bar and further. The wash is laid at the
+                    // top of the page's own content, which begins below the
+                    // bar : left there, it would draw a hard edge across the
+                    // screen at exactly the height a fade exists to make
+                    // invisible. See ``rise`` for how far above that, and why.
+                    .offset(y: -(Self.rise + Self.hold))
                     // One lead giving way to another is a dissolve and not a
                     // cut : the colour of the page is not news.
                     .transition(.opacity)
@@ -76,7 +77,7 @@ struct PageWash: View {
         .task(id: url) { await read() }
     }
 
-    /// How far above the page's own top the colour reaches, at full strength.
+    /// How far above the page's own top the colour is held at full strength.
     ///
     /// The page begins under the bar, and the bar is where the colour is most
     /// wanted : a date, a large title and four glass buttons over the system's
@@ -85,7 +86,23 @@ struct PageWash: View {
     /// any of the three platforms draws, so what is above the content is at
     /// full strength whatever the window is doing and the fade begins where the
     /// reader's own page begins.
-    private static let hold: CGFloat = 260
+    private static let hold: CGFloat = 200
+
+    /// How far the colour fades in above all that.
+    ///
+    /// **A gradient has two ends and both of them have to be nothing.** The
+    /// wash used to begin at full strength, which is a hard edge, and it was
+    /// hidden above the bar where nothing could reach it. A pull to refresh
+    /// reaches it : the gesture pushes the whole page down by a couple of
+    /// hundred points, the wash goes with it, and the edge it had been keeping
+    /// out of sight came out under the bar with a slab of flat colour under it.
+    ///
+    /// So the colour comes up out of nothing over this distance before it
+    /// reaches full strength. At rest all of it is off screen and the page
+    /// looks exactly as it did ; under a pull, what appears is the fade rather
+    /// than the edge, and a pull long enough to reach the top of it finds
+    /// nothing there, which is what was wanted in the first place.
+    private static let rise: CGFloat = 300
 
     /// How far into the page the colour lasts.
     ///
@@ -116,16 +133,25 @@ struct PageWash: View {
     private static let floor: Double = 0.10
     private static let colourless: Double = 0.03
 
-    /// The bands laid down the page : the picture's top at the top of it, its
-    /// middle where the page begins, and its foot fading out into the paper.
+    /// The whole of it, from the nothing above the bar to the nothing in the
+    /// page.
+    private static let height = rise + hold + fade
+
+    /// The bands laid down the page : the picture's top from nothing up to full
+    /// strength and across the bar, its middle where the page begins, and its
+    /// foot fading out into the paper.
     private func stops(of wash: Wash) -> [Gradient.Stop] {
-        let total = Self.hold + Self.fade
         let full = Self.strength(in: scheme)
+        func at(_ distance: CGFloat) -> CGFloat { distance / Self.height }
 
         return [
-            Gradient.Stop(color: paint(wash.top, full), location: 0),
-            Gradient.Stop(color: paint(wash.top, full), location: Self.hold / total),
-            Gradient.Stop(color: paint(wash.middle, full * 0.5), location: (Self.hold + Self.fade * 0.45) / total),
+            Gradient.Stop(color: paint(wash.top, 0), location: 0),
+            Gradient.Stop(color: paint(wash.top, full), location: at(Self.rise)),
+            Gradient.Stop(color: paint(wash.top, full), location: at(Self.rise + Self.hold)),
+            Gradient.Stop(
+                color: paint(wash.middle, full * 0.5),
+                location: at(Self.rise + Self.hold + Self.fade * 0.45)
+            ),
             Gradient.Stop(color: paint(wash.bottom, 0), location: 1),
         ]
     }
