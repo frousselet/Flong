@@ -59,10 +59,15 @@ struct StorySummary: View {
             // The glyph inside the words is not a word, and VoiceOver reads
             // nothing where the eye reads a mark. Said here instead, in front
             // of the sentence, in the order the page says it.
+            //
+            // **Here and nowhere else.** The page says it in a mark and not in
+            // words : a line under every written summary reading `written by
+            // the model` is the application talking about itself over the top
+            // of the news. What a reader hears is the one place the mark cannot
+            // be seen, and it is not a caption, it is the mark read out.
             .accessibilityLabel(
                 isGenerated ? Text("Written by the model. \(summary)") : Text(verbatim: summary)
             )
-            .help(isGenerated ? Text("Written by the model") : Text(verbatim: ""))
     }
 
     /// The sentence, with the mark of who wrote it at the head of it.

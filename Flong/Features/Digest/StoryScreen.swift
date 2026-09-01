@@ -90,13 +90,7 @@ struct StoryScreen: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if let summary = story.summary, !summary.isEmpty {
-                // The standfirst at the size a whole page gives it, rather than
-                // at the size a row on the front page can spare.
-                StorySummary(summary: summary, isGenerated: story.isGenerated, style: .body)
-            }
-
-            if story.isGenerated {
-                explanation
+                standfirst(summary, isGenerated: story.isGenerated)
             }
 
             facts(story)
@@ -106,37 +100,56 @@ struct StoryScreen: View {
         .padding(.bottom, Editorial.rhythm)
     }
 
+    /// What happened, at the size a whole page gives it rather than the size
+    /// a row on the front page can spare, and the way back where a model
+    /// wrote it.
+    ///
+    /// **The line is the control.** There was a row under it reading `written
+    /// by the model`, which was the application talking about itself over the
+    /// top of the news : a caption on every written summary, saying in words
+    /// what the mark in front of the line already says. The words are gone and
+    /// the mark stays, so what is left to press is the line the mark is about.
+    /// A reader asking who wrote this presses this, which is where they were
+    /// already looking.
+    @ViewBuilder
+    private func standfirst(_ summary: String, isGenerated: Bool) -> some View {
+        let line = StorySummary(summary: summary, isGenerated: isGenerated, style: .body)
+
+        if isGenerated {
+            Button {
+                isExplaining = true
+            } label: {
+                line.contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .popover(isPresented: $isExplaining, arrowEdge: .bottom) { explanation }
+        } else {
+            line
+        }
+    }
+
     /// What the model did, said plainly, with the way back.
     ///
     /// The trend the research names is an assistant that is present, optional
     /// and explainable rather than an oracle. A reader who does not want a
     /// written headline gets the article's own, in one tap, and the application
-    /// does not argue.
+    /// does not argue. It is said here, where it was asked for, rather than
+    /// printed on the page whether anybody wondered or not.
     private var explanation: some View {
-        Button {
-            isExplaining = true
-        } label: {
-            Label("Written by the model", systemImage: "text.line.3.summary")
-                .font(theme.metadata)
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $isExplaining, arrowEdge: .bottom) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(
-                    "The headline and the line above were written on this device, from the articles below. Nothing was sent anywhere."
-                )
-                .font(.callout)
+        VStack(alignment: .leading, spacing: 12) {
+            Text(
+                "The headline and the line above were written on this device, from the articles below. Nothing was sent anywhere."
+            )
+            .font(.callout)
 
-                Button("Use the article's own headline") {
-                    isExplaining = false
-                    Task { await model.dropGeneratedBrief(of: storyID) }
-                }
+            Button("Use the article's own headline") {
+                isExplaining = false
+                Task { await model.dropGeneratedBrief(of: storyID) }
             }
-            .padding(16)
-            .frame(maxWidth: 320)
-            .presentationCompactAdaptation(.popover)
         }
+        .padding(16)
+        .frame(maxWidth: 320)
+        .presentationCompactAdaptation(.popover)
     }
 
     private func facts(_ story: DigestStory) -> some View {

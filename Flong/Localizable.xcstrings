@@ -2843,16 +2843,6 @@
         }
       }
     },
-    "Written by the model" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Écrit par le modèle"
-          }
-        }
-      }
-    },
     "Written by the model. %@" : {
       "localizations" : {
         "fr" : {
