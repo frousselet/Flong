@@ -35,7 +35,7 @@ struct StoreTests {
             "feed", "entry", "entry_body", "tag", "tag_binding",
             "rule", "saved_query", "read_state_block", "sync_state", "sync_record", "entry_fts", "story",
             "story_member", "story_topic", "topic_preference", "topic", "source_name", "favourite_author",
-            "entry_author", "shared_collection",
+            "entry_author", "shared_collection", "shared_entry",
         ]
         #expect(expected.isSubset(of: tables))
     }
@@ -56,6 +56,7 @@ struct StoreTests {
                 "v19.marksThatArriveFirst", "v20.secureThePictures", "v21.threeKindsOfSubject",
                 "v22.twoKindsOfSubject", "v23.publishersRatherThanFolders", "v24.theWriters",
                 "v25.theWholeByline", "v26.everybodyWhoSigned", "v27.aCollectionShared",
+                "v28.whatSomebodyElseFiled",
             ]
         )
     }
