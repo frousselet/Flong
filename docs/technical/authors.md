@@ -1,25 +1,47 @@
 # Authors
 
-A feed that names who wrote an article hands over a byline : a piece of text in a field. Flong shows those bylines as a page of their own, lets the reader single out the ones they follow, and does nothing else with them. This page is about what an author is taken to be, and about the two things that follow from that.
+A feed that names who wrote an article hands over a byline : a piece of text in a field. Flong shows those bylines as a page of their own, lets the reader single out the ones they follow, and does nothing else with them. This page is about what an author is taken to be, what is cleaned off a byline before it becomes one, and what follows from both.
 
 ## An author is a name, not a person
 
-There is no row for a writer and there could not be one. What arrives is `Jean Dupont`, or `J. Dupont`, or `Jean Dupont et Marie Curie`, or `By Jean Dupont`, and only a human eye can tell which of those are the same person. So **the name is the identity, matched exactly**, and Flong never guesses.
+There is no row for a writer and there could not be one. What arrives is `Jean Dupont`, or `J. Dupont`, or `JP Dupont`, or `Jean Dupont et Marie Curie`, and only a human eye can tell which of those are the same person. So **the name is the identity, matched exactly**, and Flong never guesses.
 
 That is the rule the import already follows : what cannot be understood is not invented. A grouping that decided `J. Dupont` was `Jean Dupont` would be right often and wrong quietly, and the reader would have no way of seeing which. Two spellings are two authors, and a reader who wants them as one has the search field on the authors page.
 
 **A byline is not split, either.** A field carrying `Smith, John` and one carrying `Jean Dupont, Marie Curie` are the same string as far as any rule could tell, and cutting on the comma would file half the writers of the world under their own surnames.
 
-**What is normalized is the spelling, not the person.** A pretty-printed feed hands over
+## What is cleaned is the spelling, never the person
 
-```xml
-<author>
-  Jean
-  Dupont
-</author>
-```
+A byline does not arrive as a name. It arrives wrapped in whatever the format, the publisher and the typesetter put round it, and every one of those wrappings would otherwise be part of the writer's identity : `lawyer@boyer.net (Lawyer Boyer)` would be one person, `By Lawyer Boyer` a second and `Lawyer Boyer | Le Monde` a third, and none of the three would ever meet.
 
-and that is not a second writer, it is one badly typeset. The name is trimmed and its inner runs of whitespace collapsed, once, in `Author.name(from:)`, which every path into the store goes through : `Entry.init` for a new article and the update in `FeedRefresh` for one that changed. The v24 migration puts the bylines already stored through the same rule, so the corpus is normalized before anything ever groups it.
+`Author.name(from:)` applies four rules, in order, and every one of them is mechanical :
+
+| Rule | Why it is safe |
+| ---- | -------------- |
+| Decode entities, collapse whitespace | `Jean&nbsp;Dupont` and a name on its own line inside a pretty-printed element are one writer badly typeset |
+| Take the person out of an address : `lawyer@boyer.net (Lawyer Boyer)`, `Lawyer Boyer <lawyer@boyer.net>` | **RSS 2.0 defines its `author` element as the author's e-mail address**, and naming them in brackets after it is the convention its own example uses |
+| Drop the leading `By`, `Par`, `Written by`, `Posted by`, `Author:`, `Auteur :` | The publisher's furniture, never part of anybody's name. The word has to be the whole word : `Byron` and `Parker` are left alone |
+| Drop what follows a vertical bar | `Jean Dupont \| Le Monde` is a byline with a masthead stapled to it, and keeping it gives one writer a row per paper they write for |
+
+**A dash is left alone**, though `Jean Dupont - BBC News` is the same shape. A bar cannot be part of a name and a dash can, so cutting on it would be guessing where a name ends. The bar is the only separator here that is never anything else.
+
+**Capitalization is left alone.** `JEAN DUPONT` and `Jean Dupont` are two spellings of one person, which is a merge and not a cleaning : deciding they are the same is a judgement, and the initials, the acronyms and the names that really are set in capitals are what a rule would get wrong.
+
+**A newsroom is left alone.** `Rédaction`, `Editor` and `admin` are what the publisher said. Deciding they are not people is a judgement about the byline rather than a fact about its spelling.
+
+**Nobody is nobody.** An empty field, a lone piece of punctuation, an inbox with no name on it and a link are all things a feed puts in that field, and none of them is somebody. They yield no author at all, which is the truth about that article : it is signed by nobody this can name.
+
+### Where the cleaning happens
+
+Once, on the way in, through the single entry point every path goes through : `Entry.init` for a new article and the update in `FeedRefresh` for one that changed, which covers ingestion from a feed and from another device's stream blocks alike. The v24 and v25 migrations put the bylines already stored through the same rule, so the corpus is clean before anything ever groups it.
+
+**It is deliberately deterministic, and that is not a stylistic preference.** The stored byline is the identity a favourite is named after between devices (`author-<digest>`), and articles travel carrying their `author` field. A rule that answered differently on two devices - because one of them can run a model and the other cannot, or because a model changed with an OS update - would give one writer two rows and a favourite that only half travels. Nothing in this pipeline asks the system model, and nothing in it depends on what a device can do.
+
+### The parser prefers a name to an address
+
+RSS 2.0's `author` is an address ; Dublin Core's `dc:creator` and Atom's `<author><name>` are names. Feeds routinely carry both, and which one the parser met last is no reason to prefer it, so `XMLFeedParser` lets the address answer only where nothing has named anybody. All three now go through `HTMLSanitizer.plainText`, which the Atom name used not to.
+
+## The column is clean, so the questions are exact
 
 Because the column is clean, every later question is an exact comparison : `GROUP BY author` for the list, `author = ?` for one writer's page, `author IN (SELECT name FROM favourite_author)` for the favourites. The v24 index on `entry.author` is what keeps the first of those cheap over a corpus of a hundred thousand articles.
 

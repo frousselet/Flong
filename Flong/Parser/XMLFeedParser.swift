@@ -255,12 +255,23 @@ nonisolated final class XMLFeedParser: NSObject, XMLParserDelegate {
         case ("updated", _), ("modified", _):
             item?.updatedAt = FeedDates.date(from: value)
 
-        case ("creator", Namespace.dublinCore),
-            ("author", _) where parent != "author":
+        case ("creator", Namespace.dublinCore):
             item?.author = HTMLSanitizer.plainText(value)
 
+        // **RSS 2.0 defines this one as an address**, and its own example is
+        // `lawyer@boyer.net (Lawyer Boyer)`, where Dublin Core's creator and
+        // Atom's name are names. A feed carrying both is ordinary, and which
+        // of the two the parser met last is no reason to prefer it : the
+        // address answers only where nothing has named anybody. What is left of
+        // it once ``Author`` has had it is the person in the brackets, or
+        // nobody at all.
+        case ("author", _) where parent != "author" && item?.author == nil:
+            item?.author = HTMLSanitizer.plainText(value)
+
+        // Through the same door as the other two : an Atom name is a name, and
+        // it used to be the one byline no publisher's markup was taken out of.
         case ("name", _) where parent == "author":
-            item?.author = value
+            item?.author = HTMLSanitizer.plainText(value)
 
         case ("lang", _):
             item?.language = value

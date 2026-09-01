@@ -408,14 +408,7 @@ nonisolated extension AppDatabase {
         // copy of what the articles already say, and it would go stale the
         // first time a publisher changed a spelling.
         migrator.registerMigration("v24.theWriters") { db in
-            for spelling in try String.fetchAll(db, sql: "SELECT DISTINCT author FROM entry WHERE author IS NOT NULL") {
-                let name = Author.name(from: spelling)
-                guard name != spelling else { continue }
-                try db.execute(
-                    sql: "UPDATE entry SET author = ? WHERE author = ?",
-                    arguments: [name, spelling]
-                )
-            }
+            try normalizeBylines(db)
 
             try db.create(index: "entry_author", on: "entry", columns: ["author"])
 
@@ -426,7 +419,40 @@ nonisolated extension AppDatabase {
             }
         }
 
+        // **The rule for a byline grew, so the column is put through it again.**
+        // v24 trimmed a name and collapsed its whitespace, which was the whole
+        // of what it did. It left `lawyer@boyer.net (Lawyer Boyer)` standing as
+        // a writer, because RSS 2.0 defines its `author` element as an address ;
+        // it left `By Jean Dupont` beside `Jean Dupont` as two people ; and it
+        // left a masthead stapled to a name, which gives one writer a row per
+        // paper they write for. ``Author/name(from:)`` now takes all of that
+        // out, and a database that has already run v24 would keep the old
+        // spellings for ever without this.
+        //
+        // **A migration calling into live code is a thing to be careful of**,
+        // since what it does then changes under it. It is right here and only
+        // because the rule is idempotent : both of these ask the column to be
+        // whatever the current rule says, so a fresh database running v24 with
+        // today's rule and an old one running v24 then v25 land in the same
+        // place, which is the only property that matters.
+        migrator.registerMigration("v25.theWholeByline") { db in
+            try normalizeBylines(db)
+        }
+
         return migrator
+    }
+
+    /// Writes every stored byline the way ``Author/name(from:)`` spells it.
+    ///
+    /// A pass over the distinct spellings rather than over the articles : a
+    /// corpus of a hundred thousand pieces carries a few thousand bylines, and
+    /// the ones already clean are the great majority and are not written at all.
+    private static func normalizeBylines(_ db: Database) throws {
+        for spelling in try String.fetchAll(db, sql: "SELECT DISTINCT author FROM entry WHERE author IS NOT NULL") {
+            let name = Author.name(from: spelling)
+            guard name != spelling else { continue }
+            try db.execute(sql: "UPDATE entry SET author = ? WHERE author = ?", arguments: [name, spelling])
+        }
     }
 
     /// The same article, arriving twice.
