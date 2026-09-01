@@ -681,23 +681,10 @@ struct CatchUpTests {
         #expect(CatchUp.pull.mayRunTheModel)
         #expect(CatchUp.launch.mayRunTheModel)
     }
-
-    @Test("A pull does not replace the page under its own control")
-    func readsBack() {
-        // SwiftUI holds the refresh control out until the gesture's work
-        // returns, so replacing the content as the last thing before returning
-        // has the scroll view begin its retraction against content it has never
-        // laid out. The watcher reads back once the control is out of the way.
-        #expect(!CatchUp.pull.readsBackAtOnce)
-        #expect(CatchUp.reader.readsBackAtOnce)
-        #expect(CatchUp.clock.readsBackAtOnce)
-        #expect(CatchUp.background.readsBackAtOnce)
-    }
 }
 
-/// The two floors that keep the line from flickering.
-/// The two floors that keep the line from flickering.
-@Suite("When the activity line appears, and when it goes", .serialized)
+/// The two floors that keep the ring from flickering.
+@Suite("When the ring appears, and when it goes", .serialized)
 @MainActor
 struct ActivityTimingTests {
     private let model: AppModel

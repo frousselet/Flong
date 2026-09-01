@@ -42,10 +42,8 @@ struct SearchScreen: View {
             .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
-            if let menu {
-                ToolbarItem(placement: .primaryAction) {
-                    ReaderButton(model: model)
-                }
+            if menu != nil {
+                ReaderCorner(model: model, work: model.currentWork)
             }
         }
         .searchable(
