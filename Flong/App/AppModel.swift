@@ -72,6 +72,7 @@ nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
     case notDeleted
     case notRemoved
     case addressAlreadyFollowed
+    case noAddress
 
     var id: Self { self }
 
@@ -87,8 +88,27 @@ nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
         case .notDeleted: "Not everything could be deleted. Try again in a moment."
         case .notRemoved: "This source could not be removed. Try again in a moment."
         case .addressAlreadyFollowed: "Another source is already followed at this address."
+        case .noAddress: "Type the address this source is served at."
         }
     }
+}
+
+/// Where a source is served, as the editor of one states it.
+///
+/// **The address is the one field whose answer cannot be a plain string**,
+/// because whether it is a secret is a fact about the address rather than a
+/// setting beside it. A secret one is masked in the database and lives in the
+/// keychain ; an open one is the row itself. Moving between the two is moving
+/// the source, and it is the same move either way.
+nonisolated enum SourceAddress: Hashable, Sendable {
+    /// Served in the open, at this address. Empty leaves it where it is, and
+    /// takes a source that was a secret back into the open at the address the
+    /// keychain holds.
+    case open(String)
+    /// Served at an address that is itself the secret. Empty keeps the secret
+    /// already in the keychain, which is what a reader who changed something
+    /// else on the screen sends.
+    case secret(String)
 }
 
 /// What set a catch-up going.
@@ -2774,36 +2794,77 @@ final class AppModel {
     /// the notes and the filings with it, on every device. Editing the address
     /// moves the row and leaves all of that where it is.
     ///
-    /// A new secret address is written to the keychain first. Should the edit
-    /// then fail, a feed fetched with the secret it was given goes on working
-    /// under an identity that is one move behind ; the other order would leave
-    /// a source at an address whose secret nothing knows, which is a source
-    /// that is simply broken.
-    func editSource(_ id: UUID, to edit: SourceEdit, secretAddress: String? = nil) async {
-        var edit = edit
+    /// **Whether the address is a secret is part of the address**, and moving
+    /// between the two is moving the source. A source made secret has the
+    /// masked form of section 9 written in its place and the real address put
+    /// in the keychain, which also takes that address out of the reader's
+    /// iCloud, where the plain one had been sitting in the subscription record.
+    /// One made open again is written back in the open, which is what the
+    /// reader asked for and what the screen says before they ask.
+    ///
+    /// The keychain is written before the row and cleared after it. A secret
+    /// stored for a source that did not move is a secret nothing will use ; a
+    /// secret cleared from one that did is a source at an address whose secret
+    /// nothing knows, and that source is simply broken.
+    func editSource(_ id: UUID, to edit: SourceEdit, address: SourceAddress) async {
+        guard let feed = try? await subscriptions.feed(id: id) else {
+            failure = .notSaved
+            return
+        }
 
-        if let secretAddress, !secretAddress.trimmingCharacters(in: .whitespaces).isEmpty {
-            do {
-                let url = try FeedURL.canonical(secretAddress)
-                guard let masked = MaskedURL.mask(url) else {
-                    failure = .invalidAddress
+        var edit = edit
+        let wasSecret = MaskedURL.isMasked(feed.url)
+        var clearsTheSecret = false
+
+        switch address {
+        case .open(let typed):
+            let typed = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+            if wasSecret {
+                // Back into the open : the address the keychain holds is the
+                // one to write, unless the reader typed another.
+                guard let real = typed.isEmpty ? Self.secretAddress(of: keptCredential(of: id)) : typed else {
+                    failure = .noAddress
                     return
                 }
-                try credentials.setCredential(.secretURL(url), for: id)
-                edit.address = masked.absoluteString
-            } catch is FeedURLError {
+                edit.address = real
+                clearsTheSecret = true
+            } else {
+                edit.address = typed
+            }
+
+        case .secret(let typed):
+            let typed = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+            let real: URL?
+            if typed.isEmpty {
+                real = (Self.secretAddress(of: keptCredential(of: id))).flatMap { try? FeedURL.canonical($0) }
+            } else {
+                real = try? FeedURL.canonical(typed)
+            }
+
+            guard let real else {
+                failure = typed.isEmpty ? .noAddress : .invalidAddress
+                return
+            }
+            guard let masked = MaskedURL.mask(real) else {
                 failure = .invalidAddress
                 return
+            }
+
+            do {
+                try credentials.setCredential(.secretURL(real), for: id)
             } catch {
                 // Never the address : an error message is one of the places
                 // section 9 says a secret must not appear.
                 failure = .notSaved
                 return
             }
+            edit.address = masked.absoluteString
         }
 
         do {
             let change = try await subscriptions.edit(id, to: edit)
+            if clearsTheSecret { try? credentials.setCredential(nil, for: id) }
+            await loadCredentials()
             await carry(change)
         } catch is FeedURLError {
             failure = .invalidAddress
@@ -2813,6 +2874,17 @@ final class AppModel {
             failure = .notSaved
             Log.store.error("The source could not be edited : \(error, privacy: .public)")
         }
+    }
+
+    /// The credential of a source, or nothing, and never a reason why.
+    private func keptCredential(of id: UUID) -> FeedCredential? {
+        try? credentials.credential(for: id)
+    }
+
+    /// The address a credential is, when the credential is an address.
+    private static func secretAddress(of credential: FeedCredential?) -> String? {
+        guard case .secretURL(let url) = credential else { return nil }
+        return url.absoluteString
     }
 
     /// Carries an edited source everywhere the store cannot reach.

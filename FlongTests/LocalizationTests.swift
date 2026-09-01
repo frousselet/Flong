@@ -70,6 +70,7 @@ struct LocalizationTests {
         #expect(String(localized: "How often", locale: french) == "Fréquence")
         #expect(String(localized: "Automatic", locale: french) == "Automatique")
         #expect(String(localized: "Failures in a row", locale: french) == "Échecs consécutifs")
+        #expect(String(localized: "This address is a secret", locale: french) == "Cette adresse est un secret")
 
         // The one refusal this screen has of its own, read by somebody who has
         // just typed an address a second source is already served at.
