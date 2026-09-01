@@ -139,6 +139,23 @@ struct SecretParameterTests {
         #expect(stripped.absoluteString == "https://example.com:8443/a/b/c?id=7#part-2")
     }
 
+    // MARK: - What the reader is shown before they answer
+
+    /// The screen exists because some of these are secrets, so it is a strange
+    /// place to print one where it can be read over a shoulder.
+    @Test("A value is shown with enough of it to recognize and not enough to use")
+    func masksAValue() {
+        #expect(AddressParameter.mask("rss") == "•••")
+        #expect(AddressParameter.mask("s3cr3ttoken") == "s3•••••••••")
+        // A long one says only that it is long.
+        #expect(AddressParameter.mask(String(repeating: "x", count: 64)) == "xx" + String(repeating: "•", count: 12))
+    }
+
+    @Test("A parameter with nothing in it still shows as a parameter")
+    func masksAnEmptyValue() {
+        #expect(AddressParameter.mask("") == "•")
+    }
+
     // MARK: - Where they are kept
 
     @Test("A designation is kept per feed, and given back per feed")

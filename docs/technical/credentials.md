@@ -32,7 +32,21 @@ database https://rss.example.com/private/a3f9c2b1e4d7a8f0
 
 It is a URL like any other, so `FeedURL.canonical` and everything built on it work unchanged. It is unique per secret address, so two subscriptions to one platform stay two subscriptions. It is stable, so a feed does not become a second feed on the next launch. And it is one way : the digest gives nothing back.
 
-Every refresh asks the keychain for the real address. A keychain that will not answer means the feed is fetched without its credential, the server answers 401, and section 9 quarantines it — which is a better outcome than refusing to try, and one the reader can see and act on.
+Every refresh asks the keychain for the real address. A keychain that will not answer means the feed is fetched without its credential, the server answers 401, and section 9 quarantines it, which is a better outcome than refusing to try, and one the reader can see and act on.
+
+## The parameters on an address, which the reader designates
+
+A secret does not always take one of the four shapes above. A platform may serve a feed at an ordinary address and put a per-subscriber token in the query string of it, or of every article link inside it. `entry.url` holds an article's address exactly as the publisher spelled it, so such a token is in the database and would go out on any address that leaves the device.
+
+**Flong does not guess which parameter that is, and `SecretParameters` is why it does not have to.** `?token=` and `?format=rss` look exactly alike from here, and `docs/technical/feed-identity.md` already settled the consequence for identity : a canonical address keeps its query string because it *selects the feed on plenty of sites*. A heuristic that stripped it to be safe would collapse two subscriptions into one and hand somebody a link to the wrong page.
+
+So the reader says, per feed and by parameter name, and nothing else is ever taken off. The designation joins the credential in the keychain, under a service of its own since the account is already the feed, which carries it to their other devices through iCloud Keychain and keeps it out of a default export. A feed may have the designation without a credential, and a reset takes both.
+
+**Nothing is taken off at ingestion.** The reader has to be able to open the article, and the parameters that are not secret are frequently what makes the address work at all. `PublicURL` is what an address goes through where it leaves : it takes the designated parameters, the tracking of `ArticleKey.tracking`, which only ever said who sent them, and anything written in front of the host, since a `user:password@host` is a credential in an address without being a parameter at all.
+
+**The question is asked against real addresses.** `AddressParametersView` is reached from the source's own menu and lists what the feed's address and its recent articles' addresses actually carry, each with its value masked : a list of parameter names in the abstract is a list of things nobody recognizes, and printing the values would make the screen a strange place to keep a secret. It is offered for every feed and not only for the ones that look authenticated, since a plain feed with a token on every link inside it is exactly the case a reader would never think to look for.
+
+**Each device applies its own designations to its own writes.** When somebody files an article into a shared collection, it is their device that truncates the address, against their keychain, because nobody else can know which of those parameters were theirs.
 
 ## What is never shown
 
@@ -56,4 +70,4 @@ The web view runs scripts, which is the one place in the application that does. 
 
 The cookies are set on the request rather than left to a shared cookie store, which is what makes that scoping something the code does rather than something it hopes for.
 
-**When it breaks, it says so.** A session records when it was signed in and, separately, when a page last came back whole — which is the only honest proof it still works. A fresh sign-in has proved nothing yet and does not claim to. A site that has started refusing shows as signed out rather than as articles that mysteriously went back to being teasers.
+**When it breaks, it says so.** A session records when it was signed in and, separately, when a page last came back whole, which is the only honest proof it still works. A fresh sign-in has proved nothing yet and does not claim to. A site that has started refusing shows as signed out rather than as articles that mysteriously went back to being teasers.

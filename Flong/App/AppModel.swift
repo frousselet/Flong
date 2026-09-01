@@ -2653,6 +2653,66 @@ final class AppModel {
     /// Which feeds are authenticated is read back rather than assumed : it is
     /// what says a source has a secret without holding one, and a window that
     /// did not read it back would go on saying no until something else reloaded.
+    // MARK: - The parameters on a feed's addresses
+
+    /// Every parameter this feed's addresses carry, with what each one holds.
+    ///
+    /// **Both the feed's own address and its articles'**, because the two are
+    /// frequently different. A paper may serve its feed at a plain address and
+    /// put a per-subscriber token on every link inside it, which is the case
+    /// this exists for : the feed's address is masked already when it is itself
+    /// the secret, and the articles' are written down exactly as published.
+    ///
+    /// Masked before it leaves the store. The whole reason a reader is looking
+    /// at this screen is that some of these are secrets.
+    func addressParameters(of feedID: UUID, feedURL: URL) async -> [AddressParameter] {
+        var seen: [String: String] = [:]
+        var order: [String] = []
+
+        func take(_ url: URL?) {
+            guard let url, let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
+            for item in components.queryItems ?? [] {
+                guard let folded = SecretParameters.folded(item.name) else { continue }
+                if seen[folded] == nil { order.append(item.name) }
+                // The longest value seen, which is the one that shows best what
+                // the parameter is for : a token is long and a page number is
+                // not, and the reader is being asked to tell them apart.
+                if (item.value?.count ?? 0) >= (seen[folded]?.count ?? -1) { seen[folded] = item.value ?? "" }
+            }
+        }
+
+        // A masked address holds a digest of the real one and nothing a reader
+        // could recognize, so it is not offered.
+        if !MaskedURL.isMasked(feedURL) { take(feedURL) }
+
+        let addresses = (try? await articles.addresses(ofFeed: feedID)) ?? []
+        for address in addresses { take(address) }
+
+        return order.compactMap { name in
+            guard let folded = SecretParameters.folded(name), let value = seen[folded] else { return nil }
+            return AddressParameter(name: name, masked: AddressParameter.mask(value))
+        }
+    }
+
+    /// A feed's own address, for the screen that asks about its parameters.
+    func address(ofFeed feedID: UUID) async -> URL? {
+        try? await subscriptions.feed(id: feedID)?.url
+    }
+
+    /// Which of them the reader has already said are theirs.
+    func secretParameters(of feedID: UUID) async -> Set<String> {
+        Set(((try? credentials.secretParameters(for: feedID))?.names ?? []))
+    }
+
+    /// Records what the reader designated, and nothing they did not.
+    func setSecretParameters(_ names: Set<String>, for feedID: UUID) async {
+        do {
+            try credentials.setSecretParameters(names.isEmpty ? nil : SecretParameters(names), for: feedID)
+        } catch {
+            Log.store.error("The address parameters could not be kept : \(error, privacy: .public)")
+        }
+    }
+
     func setCredential(_ credential: FeedCredential?, for feedID: UUID) async {
         do {
             try credentials.setCredential(credential, for: feedID)

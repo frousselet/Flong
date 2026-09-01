@@ -63,7 +63,21 @@ struct SourcesPanel: View {
     @State private var deleting: Deletion?
     @State private var isDeleting = false
     @State private var isAddingFeed = false
+    /// The feed whose address parameters are being looked at, if one is.
+    @State private var addressing: Addressing?
     @State private var isChoosingFile = false
+
+    /// A feed whose address parameters are being looked at.
+    ///
+    /// The address is carried rather than fetched again by the sheet : it is
+    /// asked of the store before the sheet opens, and a sheet that opened on
+    /// nothing while it waited would be a sheet that flickered.
+    private struct Addressing: Identifiable, Hashable {
+        let feedID: UUID
+        let url: URL
+
+        var id: UUID { feedID }
+    }
 
     /// A source or a publisher, on its way out.
     ///
@@ -100,6 +114,7 @@ struct SourcesPanel: View {
                                 .swipeActions(edge: .trailing) { deleting(source) }
                                 .contextMenu {
                                     favouriting(source)
+                                    addressing(source)
                                     deleting(source)
                                 }
                         }
@@ -180,6 +195,10 @@ struct SourcesPanel: View {
                 addPrivate: { address in await model.addPrivateFeed(at: address) }
             )
             .themed()
+        }
+        .sheet(item: $addressing) { addressing in
+            AddressParametersView(model: model, feedID: addressing.feedID, feedURL: addressing.url)
+                .themed()
         }
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: OPMLDocument.types) { result in
             guard case .success(let url) = result else { return }
@@ -382,6 +401,28 @@ struct SourcesPanel: View {
             )
         }
         .tint(.yellow)
+    }
+
+    /// Saying which parameters of this feed's addresses are the reader's own.
+    ///
+    /// In the source's own menu, beside the favourite and the deletion, because
+    /// it is a thing about that source and not a setting of the application.
+    /// It is offered for every feed rather than only for the ones that look
+    /// authenticated : a paper may serve a plain feed and put a per-subscriber
+    /// token on every link inside it, which is exactly the case a reader would
+    /// never think to go looking for.
+    @ViewBuilder
+    private func addressing(_ source: SidebarItem) -> some View {
+        if case .feed(let id) = source.kind {
+            Button {
+                Task {
+                    guard let url = await model.address(ofFeed: id) else { return }
+                    addressing = Addressing(feedID: id, url: url)
+                }
+            } label: {
+                Label("Address parameters", systemImage: "link")
+            }
+        }
     }
 
     /// Taking a source, or a whole publisher, away for good.
