@@ -167,6 +167,8 @@ final class AppModel {
     private let spotlight: SpotlightIndex
     private let digestService: DigestService
     private var cloud: CloudSync?
+    /// The second engine, on the shared database : see ``SharedSync``.
+    private var sharedCloud: SharedSync?
     private let refresher: FeedRefresh
     private let retention: Retention
     private let finder: FeedFinder
@@ -1319,6 +1321,20 @@ final class AppModel {
         }
         self.cloud = cloud
         await cloud.start()
+
+        // The collections other people shared, which are in a different
+        // database and therefore a different engine. Its failures are its own
+        // and do not colour the status the sidebar shows : a reader with no
+        // shared collections has nothing here that could go wrong.
+        let sharedCloud = SharedSync(database: database)
+        self.sharedCloud = sharedCloud
+        await sharedCloud.start()
+
+        // An invitation accepted before there was a window says so now.
+        await ShareAcceptance.pending.onArrival { [weak self] _ in
+            await self?.sharedCloud?.synchronize()
+            await self?.loadCollections()
+        }
     }
 
     /// Queues everything and exchanges it, whatever iCloud already has.

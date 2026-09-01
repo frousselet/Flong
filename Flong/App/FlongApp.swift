@@ -20,6 +20,17 @@ struct FlongApp: App {
     /// the work belongs to it.
     static let work = BackgroundWorkBox()
 
+    /// The one delegate this application has, and the one thing it is for.
+    ///
+    /// An invitation to a shared collection is handed over by the system to a
+    /// delegate and to nothing else : there is no modifier and no scene phase
+    /// that hears it. See ``ShareAcceptance``.
+    #if os(iOS)
+        @UIApplicationDelegateAdaptor(ShareAppDelegate.self) private var delegate
+    #elseif os(macOS)
+        @NSApplicationDelegateAdaptor(ShareAppDelegate.self) private var delegate
+    #endif
+
     /// The store, opened once for the lifetime of the process.
     ///
     /// Opening it at launch is what runs the migrations and creates the file
