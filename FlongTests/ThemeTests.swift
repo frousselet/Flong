@@ -35,17 +35,19 @@ struct ThemeTests {
         #expect(Theme.solarized.headline(.title) == .system(.title, design: .monospaced, weight: .semibold))
     }
 
-    @Test("What the application says about an article is sans in all three")
+    @Test("A theme speaks in the headline and nowhere else")
     func voice() {
-        // The metadata is the application's own voice. A theme that set it in
-        // the headline's face would have lost the distinction the typography
-        // exists to make, and a monospace caption under every story would be
-        // the loudest quiet thing on the page.
+        // Everything under a headline is sans in all three. A newspaper sets
+        // its headline in the display face it paid for and its columns in
+        // whatever reads best down a column, and it has never set both in the
+        // same ; a monospace caption under every story would also be the
+        // loudest quiet thing on the page.
         for theme in Theme.allCases {
             #expect(theme.metadata == .system(.caption, design: .default))
+            #expect(theme.standfirst() == .system(.subheadline, design: .default))
+            #expect(theme.standfirst(.body) == .system(.body, design: .default))
+            #expect(theme.pageBody == Theme.sansStack)
         }
-        #expect(Theme.solarized.standfirst() == .system(.subheadline, design: .default))
-        #expect(Theme.paper.standfirst() == .system(.subheadline, design: .serif))
     }
 
     @Test("The standard theme is the system's own and paints nothing")
@@ -149,17 +151,15 @@ struct ThemedDocumentTests {
 
         let printed = ArticleDocument.html(for: article(), theme: .paper)
         #expect(printed.contains("--headline: \(Theme.serifStack);"))
-        #expect(printed.contains("--body: \(Theme.serifStack);"))
 
-        // Monospace headlines over a sans body : the one theme whose two faces
-        // are different from each other.
         let solarized = ArticleDocument.html(for: article(), theme: .solarized)
         #expect(solarized.contains("--headline: \(Theme.monoStack);"))
-        #expect(solarized.contains("--body: \(Theme.sansStack);"))
 
-        // And the application's own voice stays sans in all three, so a byline
-        // never wears the headline's face.
+        // A theme speaks in the headline and gets out of the way underneath
+        // it : the article's own text, and the application's voice in the
+        // byline and the captions, are sans whichever theme is on.
         for page in [plain, printed, solarized] {
+            #expect(page.contains("--body: \(Theme.sansStack);"))
             #expect(page.contains("--voice: \(Theme.sansStack);"))
         }
     }

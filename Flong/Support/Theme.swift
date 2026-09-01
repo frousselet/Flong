@@ -96,9 +96,15 @@ nonisolated struct Palette: Hashable, Sendable {
 /// **The face is the loud half.** A reader can name the colours of a theme
 /// after a while ; they can tell the face apart in the first second, and it is
 /// what says whether this is a place where things are read or a place where
-/// things are managed. So each theme states its own answer for headlines, for
-/// the line under one, and for what the application says about an article, and
+/// things are managed. So each theme states its own answer for headlines, and
 /// no screen sets a face of its own.
+///
+/// **A theme speaks in the headline and gets out of the way underneath it.**
+/// The standfirst, the body of an article and everything the application says
+/// about one are sans in all three : a newspaper sets its headline in the
+/// display face it paid for and its columns in whatever reads best down a
+/// column, and it has never set both in the same. What is left to a theme is
+/// the one line that is glanced at, which is the line a face is for.
 nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
     case standard
     case paper
@@ -144,16 +150,15 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
     /// It takes a size because the front page and a story's own page set it at
     /// different ones, and a token that answered only for the smaller of the
     /// two left the larger writing a face of its own at a call site.
+    ///
+    /// **Sans in all three, whatever the headline is set in.** A theme's
+    /// distinctive face is for the line that is glanced at, and prose is not
+    /// glanced at : a newspaper sets its headline in the display face it paid
+    /// for and its body in the one that is easiest to read down a column, and
+    /// it has never set both in the same. So the headline is where a theme
+    /// speaks and everything below it is where it gets out of the way.
     func standfirst(_ style: Font.TextStyle = .subheadline) -> Font {
-        switch self {
-        // Serif under a serif headline, and sans under the other two : the
-        // standfirst belongs to the headline above it rather than to the
-        // application, so it is set in the voice the headline is set in. Never
-        // in monospace, which is a face for a title of twelve words and not for
-        // two sentences of prose.
-        case .paper: .system(style, design: .serif)
-        case .standard, .solarized: .system(style, design: .default)
-        }
+        .system(style, design: .default)
     }
 
     /// Everything the application says about an article rather than in it :
@@ -345,12 +350,10 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
     ///
     /// The stacks are written out rather than left to `font-family: system-ui`,
     /// which resolves to one face and cannot be asked for the other two.
-    var pageBody: String {
-        switch self {
-        case .standard, .solarized: Self.sansStack
-        case .paper: Self.serifStack
-        }
-    }
+    /// Sans in all three, for the reason ``standfirst(_:)`` is : a theme's face
+    /// is for the headline, and a page of prose set in it is a page that is
+    /// looked at rather than read.
+    var pageBody: String { Self.sansStack }
 
     /// The face a rendered article's headline is set in.
     var pageHeadline: String {
