@@ -377,7 +377,9 @@ Half a point wide, at half the separator's opacity. A point was tried and read a
 
 **The headline crosses the whole measure ; the picture comes in beside what follows it.** A headline is the widest thing a story says and the thing a reader scans for, and one squeezed into the column a thumbnail leaves over breaks across three lines where it would have taken two.
 
-So a picture is not beside the story, it is beside the summary. The rubric and the headline run the full width above it, and what explains them shares the line with it. The row is a stack of two rather than a column and a picture : the masthead, then the summary and the marks with the picture at their side.
+So a picture is not beside the story, it is beside the summary. The rubric and the headline run the full width above it, and what explains them shares the line with it. The row is a stack of three : the masthead, then the summary with the picture at its side, then the facts across the whole measure.
+
+**The facts are under the picture and not beside it, because the moment has to land in one place.** The line ends in when the story was last added to, pushed to the far end of it. Beside a thumbnail that end is the thumbnail's edge ; on a story with no picture it is the measure, and on the lead it is the measure again. So the times marched down the page in two columns, alternating with whichever stories happened to carry a picture, and a column that moves is a column a reader stops reading. Across the measure there is one edge for every row.
 
 An alignment guide was tried first, holding the whole text block to the left and pinning the picture to the summary's own top. It put the picture in the right place and left the headline in the wrong one, which was the fault being fixed.
 
@@ -520,6 +522,14 @@ The offset is what is asked, not the rows : a row is a landmark and this is a qu
 **It counts hours over a day, and not days over a month.** A month of thirty-odd bars says which weeks were busy, which is a fact about the press rather than about the reading : somebody looking at a wire wants to know what has come in since they last looked, and that is a question about this morning and last night. Exactly the hours the day has, which is twenty-three, twenty-four or twenty-five, since the day the clocks go back is twenty-five hours long and a chart that always drew twenty-four would put an hour's arrivals somewhere they did not happen.
 
 **It is followed, never dragged.** The day it shows is the day the reader is in and the coloured bar is the hour they have reached, both read off the list as they scroll it. A second scroll of its own, on the same screen and at right angles to the first, would be two ways of moving through one page and a way of putting the two out of step ; the strip moves by being followed.
+
+## Two kinds of moment, and only one of them counts back from now
+
+**A story's moment is relative and an article's is absolute**, which is not an inconsistency but the difference between the two things. What a front page says about a story is how fresh it is : `il y a 3 minutes` is exactly that, and it is the reason the line is there. An article is a thing with a date, and the date is what a reader wants of it.
+
+Article rows read `il y a 2 heures` before, and a list of one morning's articles came out as twenty phrasings of the same hour, none of them comparable at a glance and all of them going stale while the page sat open. Two articles an hour apart are `9:05` and `10:12`, and the reader does the subtraction they were going to do anyway. The day and the month come with it, and the year only where it is not this one : a stamp reading `11:15` is unreadable in a list reaching back three days, and one carrying `2026` on every line of today's news is a column of noise.
+
+**A story's moment is a glyph and no words.** It read `mis à jour il y a 21 minutes`, which is a sentence in a row of shorthand : the rooms are marks rather than names and the arrivals are a sparkline rather than a count, and the line has no room to be the one part that explains itself. The mark is `clock.arrow.circlepath`, which is what a rendered article already wears for a revision, so a reader who has opened one article has met it. What the words said is said to VoiceOver, which has nothing to look at.
 
 ## The dateline
 
