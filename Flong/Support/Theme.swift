@@ -182,6 +182,15 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
         scheme == .dark ? dark : light
     }
 
+    /// The colour a control takes, or nothing where the system's own is what
+    /// is wanted.
+    ///
+    /// Nothing under ``standard``, for the reason ``paints`` gives, and nothing
+    /// at all wherever glass floats over a photograph : see ``Themed``.
+    func accent(in scheme: ColorScheme) -> Color? {
+        paints ? palette(in: scheme).accent.color : nil
+    }
+
     /// The ground a raised thing sits on : a card, a row of a form, a well.
     ///
     /// The system's own where the theme does not paint, which is what the
@@ -376,6 +385,14 @@ struct Themed: ViewModifier {
                 // the ink is, so the whole application follows from this one
                 // line without a screen having heard of a palette.
                 .foregroundStyle(palette.ink.color)
+                // **A tint stops at the edge of a photograph.** Glass adapts
+                // what it draws to whatever is behind it, which is the whole
+                // reason the controls on an article may float over a picture
+                // nobody chose ; a tint is an instruction, and an instruction
+                // overrides the adaptation. A warm brown cross over a red
+                // photograph is a control the reader cannot find. So a screen
+                // whose glass sits over an image hands the tint back to the
+                // system, which ``ArticleScreen`` does with ``Theme/accent(in:)``.
                 .tint(palette.accent.color)
                 // A list draws the system's grouped background, and a themed
                 // page with a grey trough down the middle of it is a page in
