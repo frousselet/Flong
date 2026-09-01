@@ -22,8 +22,9 @@ import Foundation
 ///   themselves. Starred articles is the state of one article, yes or no, and
 ///   that state is what travels : the collection itself is not a thing that
 ///   exists anywhere, it is what the answers add up to. Favourite sources asks
-///   the question of the publisher instead, and the answer is no less the
-///   reader's for being written a row further out.
+///   the question of the publisher instead, and favourite authors of whoever
+///   signed the piece ; in both the answer is no less the reader's for being
+///   written a row further out.
 /// - A **made** one is filled article by article, and the pair of the two is
 ///   what travels : this article, in that collection. It rides on the article's
 ///   own record, so a filing costs a field and not a record.
@@ -55,10 +56,32 @@ nonisolated struct ArticleCollection: Identifiable, Hashable, Sendable {
     /// reader who follows `lemonde.fr` closely and has starred four of its
     /// pieces has one square holding a morning's worth and another holding
     /// four, which is exactly the distinction.
+    ///
+    /// **A favourite author is the third of those judgements**, and it is about
+    /// neither the article nor the paper : a reader follows a writer across the
+    /// papers they write for, which is a thing no subscription can express. It
+    /// stars nothing either, and it stands third in the row so that the three
+    /// are read as three.
+    ///
+    /// **The order is the order of the page**, since these are the squares the
+    /// reader did not make and cannot arrange. The three judgements come first,
+    /// each about a different thing : an article, a publisher, a writer. Then
+    /// the notes, which are the reader's own words. Then the authors, which is
+    /// the one square that opens on people rather than on articles, and which
+    /// belongs at the end for exactly that reason.
     nonisolated enum BuiltIn: String, Hashable, Sendable, CaseIterable {
         case starred
-        case annotated
         case favouriteSources
+        case favouriteAuthors
+        case annotated
+        /// Every byline there is, which is a directory and not a collection of
+        /// articles. It is here because it is a square on that page and the
+        /// reader reads it as one ; it is the only one that opens on a list of
+        /// people, and ``ArticleStore`` answers no articles for it on purpose.
+        case authors
+
+        /// Where it goes on the page.
+        var rank: Int { Self.allCases.firstIndex(of: self) ?? 0 }
     }
 
     var kind: Kind

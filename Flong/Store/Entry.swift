@@ -130,7 +130,9 @@ nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
         self.url = url
         self.title = title
         self.excerpt = excerpt
-        self.author = author
+        // Normalized once, here, so every later question about a byline is
+        // an exact comparison the index can answer : see ``Author``.
+        self.author = Author.name(from: author)
         self.language = language
         self.publishedAt = publishedAt
         self.updatedAt = updatedAt

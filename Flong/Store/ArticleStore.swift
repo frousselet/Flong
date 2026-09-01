@@ -170,6 +170,10 @@ nonisolated enum ArticleFilter: Hashable, Sendable {
     /// shows. The members are passed rather than the address : the grouping is
     /// worked out from the feeds themselves and never stored on a row.
     case feeds([UUID])
+    /// Everything one writer signed, matched on the byline exactly : an author
+    /// is a name and Flong never guesses that two spellings are one person.
+    /// See ``Author``.
+    case author(String)
 
     /// The condition and its arguments, as SQL.
     fileprivate func condition(now: Date) -> (String, StatementArguments) {
@@ -185,6 +189,7 @@ nonisolated enum ArticleFilter: Hashable, Sendable {
             ids.isEmpty
                 ? ("0", [])
                 : ("e.feed_id IN (\(databaseQuestionMarks(count: ids.count)))", StatementArguments(ids))
+        case .author(let name): ("e.author = ?", [name])
         }
     }
 }
@@ -568,6 +573,12 @@ nonisolated struct ArticleStore: Sendable {
         case .builtIn(.starred): ("e.is_starred = 1", [])
         case .builtIn(.annotated): ("COALESCE(e.annotation, '') <> ''", [])
         case .builtIn(.favouriteSources): (Self.fromAFavouriteSource("e"), [])
+        case .builtIn(.favouriteAuthors): (AuthorStore.byAFavouriteAuthor("e"), [])
+        // A directory of people rather than a set of articles : the square
+        // opens on ``AuthorsScreen``, and there is no list of articles for it
+        // to answer. Nothing asks this, and it says nothing rather than
+        // quietly answering the whole stream.
+        case .builtIn(.authors): ("0", [])
         case .made(let name):
             (
                 """

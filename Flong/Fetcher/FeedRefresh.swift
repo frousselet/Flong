@@ -340,7 +340,7 @@ nonisolated struct FeedRefresh: Sendable {
             entry.title = item.title ?? entry.title
             entry.url = item.url ?? entry.url
             entry.excerpt = excerpt ?? entry.excerpt
-            entry.author = item.author ?? entry.author
+            entry.author = Author.name(from: item.author) ?? entry.author
             entry.publishedAt = item.publishedAt ?? entry.publishedAt
             entry.updatedAt = item.updatedAt ?? entry.updatedAt
             entry.language = language ?? entry.language

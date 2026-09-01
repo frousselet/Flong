@@ -34,7 +34,7 @@ struct StoreTests {
         let expected: Set<String> = [
             "feed", "entry", "entry_body", "tag", "tag_binding",
             "rule", "saved_query", "read_state_block", "sync_state", "sync_record", "entry_fts", "story",
-            "story_member", "story_topic", "topic_preference", "topic", "source_name",
+            "story_member", "story_topic", "topic_preference", "topic", "source_name", "favourite_author",
         ]
         #expect(expected.isSubset(of: tables))
     }
@@ -53,7 +53,7 @@ struct StoreTests {
                 "v11.severalTopics", "v12.duplicates", "v13.keyWhatIsAlreadyHere", "v14.vocabulary",
                 "v15.askedOnce", "v16.whyItWasKept", "v17.archiveLedger", "v18.oneArticle",
                 "v19.marksThatArriveFirst", "v20.secureThePictures", "v21.threeKindsOfSubject",
-                "v22.twoKindsOfSubject", "v23.publishersRatherThanFolders",
+                "v22.twoKindsOfSubject", "v23.publishersRatherThanFolders", "v24.theWriters",
             ]
         )
     }
@@ -85,6 +85,44 @@ struct StoreTests {
         #expect(feed.title == "Le Monde")
         #expect(feed.domain == "lemonde.fr")
         #expect(!feed.isFavourite)
+    }
+
+    @Test("The bylines already stored are put through the rule the new ones go through")
+    func bylinesAreNormalized() throws {
+        let queue = try DatabaseQueue()
+        // The schema as it stood while nothing ever asked the column a
+        // question, so nothing ever minded how it was spelled.
+        try AppDatabase.migrator.migrate(queue, upTo: "v23.publishersRatherThanFolders")
+
+        let feed = UUID.v7()
+        let untidy = UUID.v7()
+        let tidy = UUID.v7()
+        try queue.write { db in
+            try db.execute(
+                sql: "INSERT INTO feed (id, url, title, created_at) VALUES (?, ?, ?, ?)",
+                arguments: [feed, "https://feeds.example.com/paper.xml", "Le Papier", Date()]
+            )
+            for (id, guid, author) in [(untidy, "urn:1", "\n  Marie\n  Curie\n"), (tidy, "urn:2", "Marie Curie")] {
+                try db.execute(
+                    sql: """
+                        INSERT INTO entry (id, feed_id, guid, title, author, received_at, is_read, is_starred,
+                                           is_hidden, has_media)
+                        VALUES (?, ?, ?, ?, ?, ?, 0, 0, 0, 0)
+                        """,
+                    arguments: [id, feed, guid, "Un titre", author, Date()]
+                )
+            }
+        }
+
+        try AppDatabase.migrator.migrate(queue)
+
+        // One writer, not two : the two rows were the same person badly
+        // typeset, and a list that answered `Marie Curie` twice is a list the
+        // reader cannot trust.
+        let bylines = try queue.read { db in
+            try String.fetchAll(db, sql: "SELECT DISTINCT author FROM entry WHERE author IS NOT NULL")
+        }
+        #expect(bylines == ["Marie Curie"])
     }
 
     @Test("A name written over a publisher round trips with every column filled")

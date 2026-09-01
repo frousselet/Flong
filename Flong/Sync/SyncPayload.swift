@@ -29,6 +29,7 @@ nonisolated struct SyncPayload: Sendable {
     private let subscriptions: SubscriptionStore
     private let marks: MarkStore
     private let collections: CollectionStore
+    private let authors: AuthorStore
     private let readStates: ReadStateStore
     private let embedder: Embedder
     private let state: SyncState
@@ -39,6 +40,7 @@ nonisolated struct SyncPayload: Sendable {
         self.subscriptions = SubscriptionStore(database)
         self.marks = MarkStore(database)
         self.collections = CollectionStore(database)
+        self.authors = AuthorStore(database)
         self.readStates = ReadStateStore(database)
         self.embedder = Embedder()
         self.state = SyncState(database)
@@ -77,6 +79,9 @@ nonisolated struct SyncPayload: Sendable {
         if !names.isEmpty || !described.isEmpty {
             records.append(SyncRecords.record(forCollections: names, dynamic: described, in: zone))
         }
+        for author in try await authors.favourites() {
+            records.append(SyncRecords.record(forFavouriteAuthor: author, in: zone))
+        }
         records += try await CatchUpHeaders.records(in: database, zone: zone)
 
         return records
@@ -110,6 +115,10 @@ nonisolated struct SyncPayload: Sendable {
             if !made.isEmpty || !described.isEmpty {
                 records["collections"] = SyncRecords.record(forCollections: made, dynamic: described, in: zone)
             }
+        }
+        for author in try await authors.favourites() {
+            let name = SyncRecords.name(forFavouriteAuthor: author)
+            if names.contains(name) { records[name] = SyncRecords.record(forFavouriteAuthor: author, in: zone) }
         }
         for block in try await readStates.blocks() {
             let name = SyncRecords.name(forReadStatePeriod: block.period, kind: block.kind)
@@ -241,6 +250,13 @@ nonisolated struct SyncPayload: Sendable {
                     _ = try await collections.createDynamic(name, matching: query)
                 }
 
+            case SyncRecords.RecordType.favouriteAuthor:
+                guard let author = SyncRecords.favouriteAuthor(from: record) else { continue }
+                // The writer may be one this device has never read. The
+                // favourite is kept all the same : it is a decision, and the
+                // articles that answer to it turn up whenever they turn up.
+                try await authors.setFavourite(author, true)
+
             case SyncRecords.RecordType.readState:
                 guard let block = SyncRecords.readStateBlock(from: record) else { continue }
                 applied.readArticles += try await readStates.merge(block)
@@ -273,6 +289,8 @@ nonisolated struct SyncPayload: Sendable {
                 if try await unmark(named: name) { applied.removed += 1 }
             } else if name.hasPrefix("source-") {
                 if try await forgetSourceName(named: name) { applied.removed += 1 }
+            } else if name.hasPrefix("author-") {
+                if try await forgetFavouriteAuthor(named: name) { applied.removed += 1 }
             }
         }
 
@@ -289,6 +307,19 @@ nonisolated struct SyncPayload: Sendable {
         else { return false }
 
         try await subscriptions.rename(domain: match.domain, to: nil)
+        return true
+    }
+
+    /// Takes back a favourite another device gave up.
+    ///
+    /// Names are digests, so the writer is found by walking the handful the
+    /// reader singled out rather than read back out of the record name.
+    private func forgetFavouriteAuthor(named name: String) async throws -> Bool {
+        let favourites = try await authors.favourites()
+        guard let match = favourites.first(where: { SyncRecords.name(forFavouriteAuthor: $0) == name })
+        else { return false }
+
+        try await authors.setFavourite(match, false)
         return true
     }
 

@@ -162,6 +162,7 @@ final class AppModel {
     private let subscriptions: SubscriptionStore
     private let articles: ArticleStore
     private let collectionStore: CollectionStore
+    private let authorStore: AuthorStore
     private let marks: MarkStore
     private let spotlight: SpotlightIndex
     private let digestService: DigestService
@@ -199,6 +200,17 @@ final class AppModel {
     /// Held here rather than in the screen alone so that a row tapped in a
     /// collection is one the window can place when it opens it.
     private(set) var collectionArticles: [ArticleSummary] = []
+
+    /// Everybody who has signed something, for the authors page.
+    private(set) var authors: [Author] = []
+    /// The writer whose page is open, and what they signed.
+    ///
+    /// Read from the store rather than picked out of ``authors`` : the page can
+    /// be opened on a favourite nothing is signed by yet, and it has to be able
+    /// to say so and to undo the favourite.
+    private(set) var openedAuthor: Author?
+    private(set) var authorArticles: [ArticleSummary] = []
+
     private(set) var article: Article?
     /// Whether the page an article lives at is being fetched, so the reader is
     /// told rather than left wondering why the text is short.
@@ -741,6 +753,7 @@ final class AppModel {
         let articles = ArticleStore(database)
         self.articles = articles
         self.collectionStore = CollectionStore(database)
+        self.authorStore = AuthorStore(database)
         self.marks = MarkStore(database)
         self.spotlight = SpotlightIndex(articles, subscriptions)
         self.digestService = DigestService(database)
@@ -1533,6 +1546,9 @@ final class AppModel {
         openStory = nil
         storyArticles = [:]
         collectionArticles = []
+        authors = []
+        openedAuthor = nil
+        authorArticles = []
         digestTopic = .frontPage
         searchText = ""
         report = nil
@@ -1726,12 +1742,36 @@ final class AppModel {
     /// Which collections the article being read is in.
     private(set) var articleCollections: [String] = []
 
+    /// Whether whoever signed the article being read is one of the reader's.
+    ///
+    /// Held rather than asked of ``authors`` : that list is loaded by the
+    /// authors page, and an article can be opened from anywhere.
+    private(set) var articleAuthorIsFavourite = false
+
     func loadArticleCollections() async {
         guard let id = article?.id else {
             articleCollections = []
+            articleAuthorIsFavourite = false
             return
         }
         articleCollections = (try? await collectionStore.collections(of: id)) ?? []
+
+        guard let author = article?.author else {
+            articleAuthorIsFavourite = false
+            return
+        }
+        articleAuthorIsFavourite = (try? await authorStore.isFavourite(author)) ?? false
+    }
+
+    /// Singles out whoever signed the article being read, or stops.
+    ///
+    /// The same act as the star on their row in the authors list, reached from
+    /// where a reader actually forms the opinion : having just read the piece.
+    func toggleFavouriteAuthorOfOpenedArticle() async {
+        guard let author = article?.author else { return }
+
+        await setFavouriteAuthor(author, !articleAuthorIsFavourite)
+        articleAuthorIsFavourite = !articleAuthorIsFavourite
     }
 
     /// Puts the article being read into a collection.
@@ -1758,6 +1798,69 @@ final class AppModel {
         await loadArticleCollections()
         await loadCollections()
         await apply(marks: [opened.id])
+    }
+
+    // MARK: - Authors
+
+    /// Everybody who has signed something on this device.
+    ///
+    /// Asked of the articles rather than of a table of people : there is no row
+    /// for a writer and there could not be one, since what a feed hands over is
+    /// a byline. See ``AuthorStore``.
+    func loadAuthors() async {
+        do {
+            authors = try await authorStore.all()
+        } catch {
+            Log.store.error("The authors could not be read : \(error, privacy: .public)")
+        }
+    }
+
+    /// Singles a writer out, or stops.
+    ///
+    /// It stars nothing and it changes nothing about the articles : a favourite
+    /// author is a judgement about who wrote a piece, exactly as a favourite
+    /// source is one about who published it, and section 13 keeps the star a
+    /// judgement about the article itself.
+    ///
+    /// **The `no` travels.** The favourite is one record named after the writer,
+    /// so two devices singling out the same person write one record between
+    /// them, and taking the favourite back deletes it rather than leaving a
+    /// decision the reader undid to be handed back by iCloud.
+    func setFavouriteAuthor(_ name: String, _ isFavourite: Bool) async {
+        do {
+            try await authorStore.setFavourite(name, isFavourite)
+
+            let record = SyncRecords.name(forFavouriteAuthor: name)
+            if isFavourite {
+                await cloud?.enqueue(recordNames: [record])
+            } else {
+                await cloud?.enqueue(deletions: [record])
+            }
+
+            // The list the reader is looking at, and the square that counts
+            // what the favourites hold, which has just changed under them.
+            //
+            // Only when there is a list to put right : this is reached from an
+            // article's own menu too, and grouping every byline in the store to
+            // update a page nobody has opened is a scan of the whole corpus for
+            // nothing.
+            if !authors.isEmpty { await loadAuthors() }
+            if openedAuthor?.name == name { openedAuthor?.isFavourite = isFavourite }
+            await loadCollections()
+        } catch {
+            failure = .notSaved
+            Log.store.error("The author could not be marked : \(error, privacy: .public)")
+        }
+    }
+
+    /// Opens one writer's page : who they are, and what they signed.
+    func loadAuthor(_ name: String) async {
+        do {
+            openedAuthor = try await authorStore.author(named: name)
+            authorArticles = try await articles.summaries(.author(name))
+        } catch {
+            Log.store.error("An author could not be read : \(error, privacy: .public)")
+        }
     }
 
     func loadCollection(_ kind: ArticleCollection.Kind) async {

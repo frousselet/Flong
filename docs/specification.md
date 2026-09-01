@@ -86,6 +86,10 @@ The group is also **who an article is shown to be from**, everywhere it is shown
 
 **Favourite source** : a publisher the reader singled out. It is not a starred article and it makes none : the star stays a judgement about an article, this is a judgement about who wrote it, and the two fill different squares on the collections page.
 
+**Author** : whoever a feed says signed an article, which is a byline and never a person : there is no row for a writer and there could not be one. The name, trimmed and with its inner whitespace collapsed, is the whole of the identity, and two spellings are two authors. See `docs/technical/authors.md`.
+
+**Favourite author** : a writer the reader singled out. The third of the three judgements, and the only one that crosses publishers : a reader follows a byline through whatever paper it appears in, which no subscription can express. It stars nothing and it changes nothing about the articles.
+
 **Rule** : a condition expressed in the query language, paired with a list of actions.
 
 **Saved query** : a named query, reusable as a view, as a rule condition, or as the source of a widget.
@@ -394,13 +398,17 @@ Three natures, and what travels is different for each. That is not an implementa
 
 | Nature | What it is | What travels |
 | ------ | ---------- | ------------ |
-| **Built-in** | A question every reader's articles answer about themselves : starred articles, notes. Favourite sources asks it of the publisher instead, and the answer rides on the feed's record | The state of one article, yes or no, on that article's own record |
+| **Built-in** | A question every reader's articles answer about themselves : starred articles, notes. Favourite sources asks it of the publisher instead, and the answer rides on the feed's record ; favourite authors asks it of the byline, and the answer is a record of its own | The state of one article, yes or no, on that article's own record |
 | **Made** | Filled article by article | The pair, this article in that collection, as a field on the article's record |
 | **Dynamic** | Described rather than filled | The description, and never what answers it |
 
 Nothing new was needed in the store for any of it. A built-in one is a column ; a made one is a tag under a `collection/` root bound through `tag_binding`, which section 4 already described ; a dynamic one is the `saved_query` of section 5 holding a name and an expression of the query language of section 12. All three had been in the schema since v1.
 
 **The dynamic one is the reason to have three.** It costs one small record whether it holds nothing or ten thousand articles, because a description is a description. It also has no membership to keep in step : it answers itself, at the moment it is asked, from whatever the reader has.
+
+**Five built-in squares, and one of them is not a set of articles.** Three are judgements, each about a different thing : the star is about the piece, the favourite source about who printed it, the favourite author about who wrote it. Notes is the reader's own words. The fifth, **authors**, is a directory of every byline this device has read, and it is the only square on that page that opens on people rather than on articles ; the number under it counts names. It is not stored anywhere : the list is a question the articles answer about themselves, grouped on the `author` column, so nothing goes stale and there is no row standing for a writer who no longer signs anything here. `docs/technical/authors.md` sets out why an author is a name matched exactly and never a person guessed at.
+
+**A favourite author is one record, and its deletion is the `no`.** The writers themselves are worked out from the articles, so there is nothing to send about the thousands nobody has an opinion on ; a reader following a few dozen bylines spends a few dozen records of the budget of section 7. The record is named after the writer, so two devices singling out the same person write one record between them, and the presence of the record is the whole of the answer.
 
 **Made, never unmade.** A name arriving from another device is created ; a name absent from what arrived is not deleted. Deleting is therefore local until every device has been told by other means, which is the price of not carrying a tombstone for every name ever used. Membership is the other way round : what arrives about one article is the whole truth about it, so a collection missing from its list is one it was taken out of.
 
@@ -535,6 +543,8 @@ Every source sits under a heading, the ones alone under theirs included. A list 
 The mark of a publisher stands once, at the head of its group, and the rows under it are desks with names and nothing more.
 
 A source can be made a **favourite**, which is the reader saying this publisher is one of theirs. It is not the star an article wears : it stars nothing, it reorders nothing, and it changes nothing the front page ranks. It marks the row, and it fills a square on the collections page beside the starred articles, where the two are plainly different things.
+
+An **author** can be made a favourite the same way, from the authors page or from the menu of an article they signed. It is the same kind of judgement about a different thing, and it is the only one that crosses publishers : a reader follows a byline through whatever paper it turns up in. Like the other two it stars nothing, and it fills a square of its own beside them.
 
 A source can also be **removed**, from a swipe on its trailing edge or from its long press, and a whole publisher from its heading's menu, which is the second thing that menu does. It is the one thing in this panel that cannot be undone, so it asks first, and the sentence it asks with names what goes rather than warning in the abstract : the articles go with the source, the ones the reader starred, wrote on or filed included. What goes with them is everything that was only there because of that source, here and in the reader's iCloud, which is what carries the removal to their other devices. `docs/technical/removing-a-source.md` sets out what is reached, what is deliberately not, and why.
 

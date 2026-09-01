@@ -453,6 +453,24 @@ struct ArticleScreen: View {
                     Label("Mark as unread", systemImage: "circle")
                 }
 
+                // Singling out whoever wrote it, from where the opinion is
+                // actually formed : the reader has just finished the piece.
+                // Inside this menu and not beside the star, since the star is a
+                // judgement about the article and this is one about the person,
+                // and since the bar holds three items and a fourth was not
+                // worth the overflow it would earn.
+                if let author = article.author, !author.isEmpty {
+                    Button {
+                        Task { await model.toggleFavouriteAuthorOfOpenedArticle() }
+                    } label: {
+                        Label(
+                            model.articleAuthorIsFavourite
+                                ? "Remove from favourite authors" : "Add to favourite authors",
+                            systemImage: model.articleAuthorIsFavourite ? "star.slash" : "signature"
+                        )
+                    }
+                }
+
                 if let url = article.url {
                     ShareLink(item: url) {
                         Label("Share", systemImage: "square.and.arrow.up")
