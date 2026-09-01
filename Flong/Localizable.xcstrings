@@ -2,6 +2,36 @@
   "sourceLanguage" : "en",
   "strings" : {
     "" : {},
+    "%1$@ added to %2$@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ a ajout\u00e9 dans %2$@"
+          }
+        }
+      }
+    },
+    "%1$lld added to %2$@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld ajout\u00e9s dans %2$@"
+          }
+        }
+      }
+    },
+    "%lld added to your shared collections" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld ajout\u00e9s dans vos collections partag\u00e9es"
+          }
+        }
+      }
+    },
     "%@, read" : {
       "localizations" : {
         "fr" : {
@@ -536,12 +566,42 @@
         }
       }
     },
+    "Added to %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajout\u00e9 dans %@"
+          }
+        }
+      }
+    },
     "Added by others" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ajout\u00e9s par d\u2019autres"
+          }
+        }
+      }
+    },
+    "Additions to shared collections" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouts aux collections partag\u00e9es"
+          }
+        }
+      }
+    },
+    "Additions are announced from Notifications" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les ajouts s\u2019annoncent depuis Notifications"
           }
         }
       }
@@ -2122,6 +2182,16 @@
         }
       }
     },
+    "Say nothing about this one" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ne rien dire pour celle-ci"
+          }
+        }
+      }
+    },
     "Search" : {
       "localizations" : {
         "fr" : {
@@ -2641,6 +2711,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Télécoms"
+          }
+        }
+      }
+    },
+    "Tell me about additions" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "M\u2019annoncer les ajouts"
           }
         }
       }

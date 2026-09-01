@@ -45,6 +45,32 @@ struct SharedCollectionScreen: View {
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         .navigationTitle(Text(verbatim: title))
+        // **Per collection, and only once the notices are on at all.** A switch
+        // that quietens one collection, on a device that has been told to say
+        // nothing about any of them, is a switch with nothing to do : it would
+        // read as broken the first time a reader used it and heard nothing
+        // either way. Where they are off, this says where the answer lives.
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    if model.wantsCollaborationNotices {
+                        let isQuiet = model.mutedSharedCollections.contains(zone)
+                        Button {
+                            model.setNotices(isQuiet, forSharedCollection: zone)
+                        } label: {
+                            Label(
+                                isQuiet ? "Tell me about additions" : "Say nothing about this one",
+                                systemImage: isQuiet ? "bell" : "bell.slash"
+                            )
+                        }
+                    } else {
+                        Label("Additions are announced from Notifications", systemImage: "bell.slash")
+                    }
+                } label: {
+                    Label("Actions", systemImage: "ellipsis")
+                }
+            }
+        }
         .overlay {
             if model.sharedArticles.isEmpty {
                 ContentUnavailableView {

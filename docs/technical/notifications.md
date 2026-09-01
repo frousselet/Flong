@@ -46,6 +46,20 @@ Everything that was already open when the reader turned the notices on is not ne
 
 Announced after the model has written the headlines rather than before, so what the reader is shown is the written headline and not the title of whichever article happened to be nearest the middle of the group.
 
+## Somebody added to a shared collection
+
+**The one notice here that is a person and not a calculation.** Everything else Flong may say is something it worked out on its own, from feeds nobody else touched. This is somebody doing something, which is why the person leads the sentence and the collection follows it : a notice reading `2 new articles`, leaving the reader to work out who and where, would be the least useful way to say the most interesting thing in the application.
+
+**The people are counted and not the filings.** One person adding four pieces is one thing happening ; four names would be four things. Where several people filed into one collection, the collection is named in the title and the people are listed underneath. Where they filed into several, the title says so rather than naming one of them and being wrong about the rest.
+
+**A switch that only appears when there is something for it to be about.** A device in no shared collection is a device whose reader has never seen one, and a question about something they have never seen is a question they cannot answer. The switch arrives in the panel the moment they share a collection or accept an invitation to one.
+
+**And a switch per collection, which is the point of it.** A reader in four shared collections is usually loud about one. The quiet ones are stored as a list of the quiet ones and never of the loud ones : storing the opposite would have every collection they were newly invited to arrive silent and look broken. It is by zone, since two people may perfectly well call a collection the same thing, and it travels with the reader like every other thing they want. The per-collection switch is only offered where the notices are on at all, since one that quietened a collection nothing was ever said about would read as broken the first time it was used.
+
+**Nothing is said about what the reader filed themselves**, and the muted collections are left out of the query rather than filtered after it, so that a muted collection cannot move the watermark past one that is not.
+
+**When a thing arrived is not changed by somebody editing their list.** A participant's list is rewritten whole every time any of it changes, so the moment a row turned up here has to survive that rewrite : without it, an article that had been here a week would be stamped as new the moment its filer added something else, and announced all over again. `SharedEntryStore.replace` reads the existing arrival times and keeps them.
+
 ## Where it happens
 
 The digest is rebuilt wherever articles arrive : at launch, on the clock, on returning to the foreground, on the reader's own command, in the opportunistic background refresh and in the full pass. Only the background ones are moments the reader is not looking, and they are what this exists for.
