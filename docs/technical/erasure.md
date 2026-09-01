@@ -25,7 +25,7 @@ Deleting fewer than all six is not a reset but a pause, since three of them woul
 | The database | Every table, dropped and built again from the migrations : the feeds, the articles, the bodies, the stories, the subjects, the collections, the read states, and the tokens and record tags that told this device what iCloud already knew |
 | The keychain | Every feed credential and every site session, deleted by service rather than one by one, so a secret whose subscription is already gone goes with the rest |
 | The key-value store | Every preference, local and in iCloud : the name, the picture, which body an article opens on, the notices, and the identifier this device writes its archive under |
-| Spotlight | The index of marked articles, emptied by the ordinary rebuild, which now writes nothing because there is nothing to write |
+| Spotlight | The index of what the reader chose and of the front page's stories, emptied by the ordinary rebuild, which now writes nothing because there is nothing to write |
 | The record zone | Deleted from the reader's private CloudKit database, through the engine's own pending database changes |
 | iCloud Drive | The whole `Stream` folder, every device's days and not only this one's |
 

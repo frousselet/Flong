@@ -476,6 +476,28 @@ nonisolated struct ArticleStore: Sendable {
         "\(table).feed_id IN (SELECT id FROM feed WHERE is_favourite = 1)"
     }
 
+    /// An article the reader chose, which is what the system index holds.
+    ///
+    /// **Five ways of choosing, one condition, written once.** Three of them
+    /// are about the article itself and are made one article at a time : a
+    /// star, a note, a filing. Two are made once and stand for everything that
+    /// follows : a publisher singled out, a writer singled out. All five are
+    /// the reader saying this one, and none of them is the stream saying it.
+    ///
+    /// It is deliberately wider than ``Retention/marked``, which is what a
+    /// purge may not take. A favourite is a judgement about a source or a
+    /// writer rather than about an article, so it earns an article a place in
+    /// the system search without earning it a place a purge has to work
+    /// around.
+    static func wasChosen(_ table: String) -> String {
+        """
+        (\(table).is_starred = 1 OR COALESCE(\(table).annotation, '') <> ''
+         OR \(table).id IN (SELECT target_id FROM tag_binding WHERE target_kind = 'entry')
+         OR \(fromAFavouriteSource(table))
+         OR \(AuthorStore.byAFavouriteAuthor(table)))
+        """
+    }
+
     /// What is in one collection of the first two natures, newest first.
     ///
     /// A dynamic one is not here : it is a description, answered by the ordinary
@@ -498,13 +520,13 @@ nonisolated struct ArticleStore: Sendable {
         }
     }
 
-    /// An article the reader has marked, as the indexer needs it.
+    /// An article the reader chose, as the indexer needs it.
     ///
-    /// What makes an article worth handing to Spotlight is that the reader did
-    /// something to it : starred it, wrote on it, or filed it. Everything else
-    /// is a cache, and a system-wide index of a cache is an index of things
-    /// nobody chose.
-    nonisolated struct Marked: Hashable, Sendable {
+    /// What makes an article worth handing to Spotlight is that the reader
+    /// chose it, one way or another : see ``wasChosen(_:)`` for the five of
+    /// them. Everything else is a cache, and a system-wide index of a cache is
+    /// an index of things nobody chose.
+    nonisolated struct Chosen: Hashable, Sendable {
         var id: UUID
         var title: String
         var plainText: String?
@@ -518,11 +540,41 @@ nonisolated struct ArticleStore: Sendable {
         var markedAt: Date
     }
 
-    /// Every article the reader has marked, for the indexer.
+    /// One chosen article, named and dated and nothing else.
+    ///
+    /// What asking whether Spotlight is up to date is allowed to cost. The
+    /// answer is almost always yes, and reading a corpus of full texts back out
+    /// of the store to arrive at it would cost more than the rebuild it decided
+    /// against.
+    nonisolated struct Choice: Hashable, Sendable {
+        var id: UUID
+        var chosenAt: Date
+    }
+
+    /// What the index should be holding, without what it should be holding
+    /// about it.
+    ///
+    /// In the store's own order, which is the identifier, so that two readings
+    /// of one unchanged store are two identical answers.
+    func choices() async throws -> [Choice] {
+        try await database.writer.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT e.id AS id, e.received_at AS received_at FROM entry e
+                    WHERE e.is_hidden = 0 AND e.duplicate_of IS NULL AND \(Self.wasChosen("e"))
+                    ORDER BY e.id
+                    """
+            )
+            .map { Choice(id: $0["id"], chosenAt: $0["received_at"]) }
+        }
+    }
+
+    /// Every article the reader chose, for the indexer.
     ///
     /// Narrowed to a few of them when only a few changed, so that starring one
     /// article does not read every mark there is back out of the database.
-    func marked(_ ids: [UUID]? = nil) async throws -> [Marked] {
+    func chosen(_ ids: [UUID]? = nil) async throws -> [Chosen] {
         let narrowing = ids.map { " AND e.id IN (\(databaseQuestionMarks(count: $0.count)))" } ?? ""
         let arguments = StatementArguments(ids ?? [])
 
@@ -537,15 +589,13 @@ nonisolated struct ArticleStore: Sendable {
                     FROM entry e
                     JOIN feed f ON f.id = e.feed_id
                     LEFT JOIN entry_body b ON b.entry_id = e.id
-                    WHERE e.is_hidden = 0 AND e.duplicate_of IS NULL
-                      AND (e.is_starred = 1 OR COALESCE(e.annotation, '') <> ''
-                           OR e.id IN (SELECT target_id FROM tag_binding WHERE target_kind = 'entry'))
+                    WHERE e.is_hidden = 0 AND e.duplicate_of IS NULL AND \(Self.wasChosen("e"))
                     \(narrowing)
                     """,
                 arguments: arguments
             )
             .map { row in
-                Marked(
+                Chosen(
                     id: row["id"],
                     title: row["title"],
                     plainText: row["plain_text"],

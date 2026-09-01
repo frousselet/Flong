@@ -107,7 +107,7 @@ A single application, shared code, distinct interface layers per platform.
 | `Sanitizer` | whitelist-based HTML sanitization |
 | `Extractor` | full-text extraction, reader mode. `docs/technical/extraction.md` |
 | `Store` | SQLite through GRDB, migrations, purge |
-| `Indexer` | FTS5 for every article, Core Spotlight for the marked ones |
+| `Indexer` | FTS5 for every article, Core Spotlight for what the reader chose |
 | `Search` | The query language, and its compilation to SQL |
 | `Enricher` | vectors, classification, rule execution |
 | `Sync` | `CKSyncEngine` on the private database |
@@ -309,9 +309,9 @@ Size is Dynamic Type and belongs to the system. Leading and column width are not
 | Index | Scope | Technology | Target volume |
 | ----- | ----- | ---------- | ------------- |
 | full text | every local article | SQLite FTS5, contentless | hundreds of thousands |
-| system | the marked articles | Core Spotlight | a few thousand |
+| system | what the reader chose, and the front page | Core Spotlight | a few thousand |
 
-Core Spotlight cannot serve as the primary index : `contentDescription` is capped at around three hundred characters, and the recommendation is to stay within a few thousand items per application, beyond which search performance degrades severely. It suits the marked articles perfectly, with two immediate benefits : what the reader kept shows up in system Spotlight, and natural-language semantic search comes from the system.
+Core Spotlight cannot serve as the primary index : `contentDescription` is capped at around three hundred characters, and the recommendation is to stay within a few thousand items per application, beyond which search performance degrades severely. It suits what the reader chose perfectly, with two immediate benefits : what the reader kept shows up in system Spotlight, and natural-language semantic search comes from the system.
 
 ### Lexical index
 
@@ -323,13 +323,19 @@ A full rebuild is possible at any time, on the order of a minute over the target
 
 ### System index
 
-The marked articles are handed to Core Spotlight with title, excerpt, author, date, tags and thumbnail. An article is marked when the reader did something to it : starred it, wrote on it, or filed it in a collection. Everything else is a cache nobody chose, and a system-wide index of a cache is an index of things nobody asked for. `CSIndexExtensionRequestHandler` is implemented so Spotlight schedules reindexing itself under favourable conditions, device asleep or idle, outside the application lifecycle.
+Two things go into Core Spotlight, and each of them is chosen rather than collected.
+
+**The articles the reader chose**, with title, excerpt, author, date, tags and thumbnail. There are five ways of choosing one. Three are about the article itself and are made one article at a time : starring it, writing on it, filing it in a collection. Two are made once and stand for everything that follows : singling out a publisher, singling out a writer. Everything else is a cache nobody chose, and a system-wide index of a cache is an index of things nobody asked for. The two favourites are deliberately wider than what a purge may not take : a judgement about a source or a writer earns an article a place in the system search without earning it a place a purge has to work around.
+
+**The stories on the front page**, no more and no less, with their headline, their line, their subjects and the rooms covering them. A story is where the digest starts and it is what a reader watching a subject is actually looking for, so the system search has to be able to find one. They are not marks and they are not kept : they age off the page, and they age out of the index with it. They live in a Spotlight domain of their own, which is what makes `no more and no less` cheap : the page is written by emptying that domain and writing it again.
+
+Deciding whether the index is up to date costs a pass over the chosen articles' identifiers and dates ; deciding that it is not costs their full texts as well. The first happens after every catch-up that brought something, the second almost never. `CSIndexExtensionRequestHandler` is implemented so Spotlight schedules reindexing itself under favourable conditions, device asleep or idle, outside the application lifecycle.
 
 The Spotlight index is local and private, and is never shared between the devices of one account. Every device indexes on its own behalf.
 
 ### Semantic search
 
-Over the marked articles only, through Core Spotlight semantic search, falling back on vectors computed by the application and cosine similarity, which needs no particular index structure at this scale.
+Over what the reader chose only, through Core Spotlight semantic search, falling back on vectors computed by the application and cosine similarity, which needs no particular index structure at this scale.
 
 The stream is not vectorized. Grouping the reprints of one wire story was implemented that way, measured, and abandoned : the system's sentence embeddings scored two unrelated French articles at 0.93 and two about the same event at 0.92. The digest groups on shared vocabulary instead, weighted by rarity, which separates them cleanly and needs no model at all. `docs/technical/digest.md` carries the measurement.
 
@@ -728,7 +734,7 @@ Flong is not affiliated with any third-party service. Service names cited in the
 | background tasks never triggered | functional | foreground refresh as the primary mechanism, background tasks treated as a bonus |
 | `BGContinuedProcessingTask` unreliable | functional | resumable tasks in idempotent batches, a persisted resume point |
 | articles missed by a switched-off device | functional | thirty-day catch-up headers |
-| Core Spotlight caps | design | use restricted to the marked articles, sized under the caps by construction |
+| Core Spotlight caps | design | use restricted to what the reader chose and to one page of stories ; a reader who singles out a prolific publisher is the one case that can grow past a few thousand items |
 | model divergence between devices | data | identifier and revision stored, local recomputation rather than mixing |
 | drift towards a mandatory Mac | product | no macOS-exclusive feature allowed, blocking install test on an iPhone alone |
 | traffic multiplied by device count | externality | systematic HTTP conditionality, pseudo-random stagger |

@@ -38,7 +38,7 @@ It is one transaction. A source half removed would be worse than one not removed
 
 **The keychain.** The credential is keyed by the row that has just gone, so a moment later nothing in the application could name it : it would sit there, unreachable, until the reader deleted everything. Section 20 of the specification is careful about exactly this, so the secret goes first. The site sessions do not : see below.
 
-**Spotlight.** Only the marked articles were ever handed to it, so only those are taken back, by identifier. The rebuild would find the drift on its own eventually ; taking them out now is what keeps a system search from opening an article that is not there.
+**Spotlight.** The marks are taken back by identifier, since that is what they are known by. What a favourite source or a favourite writer had chosen is not : it was never a mark, and it leaves with the rows rather than through a decision anybody made. So the removal ends by asking whether the index and the store still agree, which they no longer do, and the index is written again. Taking them out now is what keeps a system search from opening an article that is not there.
 
 **iCloud.** Four kinds of record, queued for deletion through the engine :
 

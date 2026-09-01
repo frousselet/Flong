@@ -9,6 +9,7 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //
 
+import CoreSpotlight
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -168,6 +169,22 @@ struct AppShell: View {
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: OPMLDocument.types) { result in
             guard case .success(let url) = result else { return }
             Task { await model.importOPML(from: url) }
+        }
+        // A result from the system search opens what it stands for, and the two
+        // things it can stand for are not opened the same way : an article is
+        // read over everything, a story is a page in the digest. Nothing is
+        // loaded first, exactly as when the reader taps a row.
+        .onContinueUserActivity(CSSearchableItemActionType) { activity in
+            let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String
+            switch identifier.flatMap(SpotlightResult.init) {
+            case .article(let id):
+                reading = Reading(id: id)
+            case .story(let id):
+                section = .digest
+                digestPath = [.story(id)]
+            case nil:
+                break
+            }
         }
         .task {
             // Before anything else that could take a while : a notification

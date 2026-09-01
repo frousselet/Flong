@@ -144,8 +144,8 @@ struct MarkTests {
 
     // MARK: - What the indexer is given
 
-    @Test("Spotlight is offered the marked articles and nothing else")
-    func marked() async throws {
+    @Test("Spotlight is offered what the reader chose article by article")
+    func chosenOneAtATime() async throws {
         let starred = try await add("Étoilé")
         let noted = try await add("Annoté")
         let filed = try await add("Classé")
@@ -156,14 +156,59 @@ struct MarkTests {
         _ = try await collections.create("Typographie")
         try await collections.add([filed.id], to: "Typographie")
 
-        let marked = try await articles.marked()
-        #expect(Set(marked.map(\.title)) == ["Étoilé", "Annoté", "Classé"])
+        let chosen = try await articles.chosen()
+        #expect(Set(chosen.map(\.title)) == ["Étoilé", "Annoté", "Classé"])
         // The body comes along, since it is what a system-wide search matches.
-        #expect(marked.allSatisfy { $0.plainText?.isEmpty == false })
+        #expect(chosen.allSatisfy { $0.plainText?.isEmpty == false })
 
         // And narrowed, for the one article a star just changed.
-        #expect(try await articles.marked([starred.id, noted.id]).count == 2)
-        #expect(try await articles.marked([starred.id]).map(\.title) == ["Étoilé"])
+        #expect(try await articles.chosen([starred.id, noted.id]).count == 2)
+        #expect(try await articles.chosen([starred.id]).map(\.title) == ["Étoilé"])
+    }
+
+    @Test("Singling out a publisher chooses everything it has served")
+    func chosenBySource() async throws {
+        try await add("Premier")
+        try await add("Second")
+        #expect(try await articles.chosen().isEmpty)
+
+        try await subscriptions.setFavourite(feed.id, true)
+        #expect(Set(try await articles.chosen().map(\.title)) == ["Premier", "Second"])
+
+        // And the decision is undone as plainly as it was made : nothing was
+        // starred, so nothing stays behind.
+        try await subscriptions.setFavourite(feed.id, false)
+        #expect(try await articles.chosen().isEmpty)
+    }
+
+    @Test("Singling out a writer chooses everything they signed")
+    func chosenByAuthor() async throws {
+        let signed = try await add("Signé")
+        let other = try await add("Anonyme")
+        try await database.writer.write { db in
+            try AuthorStore.index(signed.id, byline: "Claire Ancelin", in: db)
+            try AuthorStore.index(other.id, byline: nil, in: db)
+        }
+
+        let authors = AuthorStore(database)
+        try await authors.setFavourite("Claire Ancelin", true)
+        #expect(try await articles.chosen().map(\.title) == ["Signé"])
+
+        try await authors.setFavourite("Claire Ancelin", false)
+        #expect(try await articles.chosen().isEmpty)
+    }
+
+    @Test("What the index should hold is answered without reading a single body")
+    func choices() async throws {
+        let starred = try await add("Étoilé")
+        try await add("Ignoré")
+        try await articles.setStarred([starred.id], to: true)
+
+        let choices = try await articles.choices()
+        #expect(choices.map(\.id) == [starred.id])
+        // The same store answered twice is the same answer, which is the whole
+        // point : it is compared with what Spotlight was last told.
+        #expect(try await articles.choices() == choices)
     }
 
     // MARK: - What a purge may not take

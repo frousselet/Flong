@@ -125,8 +125,8 @@ struct FullTextTests {
 
         let article = try #require(await articles.article(id: entry.id))
         #expect(article.extractedHTML?.contains("les fédérations de parents d'élèves") == true)
-        let marked = try #require(await articles.marked([entry.id]).first)
-        #expect(marked.plainText?.contains("fédérations de parents") == true)
+        let chosen = try #require(await articles.chosen([entry.id]).first)
+        #expect(chosen.plainText?.contains("fédérations de parents") == true)
     }
 
     // MARK: - What is never fetched
