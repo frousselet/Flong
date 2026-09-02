@@ -104,9 +104,15 @@ nonisolated enum ProfilePicture {
     /// and not `FR` by accident. A name in a script with no case, or one made
     /// of a single word, gives what it gives : nothing is invented.
     static func initials(first: String, last: String) -> String? {
+        // **Letters, and nothing else.** A row that has no name to show falls
+        // back to the address the invitation went to, and a telephone number
+        // initialled that way is a circle with a `3` in it, against a person.
+        // Nothing is better : the generic face says `somebody` where a digit
+        // says something that is not true.
         let letters = [first, last]
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .compactMap { $0.first }
+            .filter(\.isLetter)
             .map { String($0).localizedUppercase }
 
         return letters.isEmpty ? nil : letters.joined()

@@ -2546,6 +2546,16 @@ final class AppModel {
 
         guard let known = try? await sharedCollections.all() else { return }
 
+        // **The address book is asked for at the moment it would help and at no
+        // other.** Not at launch and not on the chance : only where a
+        // collection actually holds somebody this device cannot name, which is
+        // somebody invited who has not accepted yet. That is the one moment the
+        // reader can see what the question is for, and refusing costs them the
+        // name and nothing else. See ``AddressBook``.
+        if AddressBook.mayAsk, shareMembers.values.flatMap({ $0 }).contains(where: \.isUnnamed) {
+            await AddressBook.ask()
+        }
+
         var corrected = false
         for collection in known {
             if let read = rosterReadAt[collection.zoneName], Date().timeIntervalSince(read) < Self.rosterInterval {
@@ -2590,7 +2600,7 @@ final class AppModel {
         var faces: [String: CGImage] = [:]
         var pictures: [String: Data] = [:]
         for member in shareMembers.values.flatMap({ $0 }) {
-            guard let picture = member.picture else { continue }
+            guard let picture = member.face else { continue }
             pictures[member.id] = picture
             if decodedPictures[member.id] == picture, let face = memberFaces[member.id] {
                 faces[member.id] = face

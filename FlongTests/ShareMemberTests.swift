@@ -205,6 +205,70 @@ struct ShareMemberTests {
         #expect(all["shared-other"]?.count == 1)
     }
 
+    // MARK: - What the reader's own address book adds
+
+    /// Somebody invited who has not accepted has no identity for CloudKit to
+    /// resolve, so the row is the address the invitation went to. The reader
+    /// knows who that is, because it is in their contacts.
+    @Test("A name out of the address book stands in front of a bare address")
+    func prefersTheAddressBookToAnAddress() {
+        var member = ShareMember(zoneName: zone, key: "a", shareName: "33695754884")
+        #expect(member.displayName == "33695754884")
+        #expect(member.isUnnamed)
+
+        member.contactName = "Elise Hupin Jouan"
+        #expect(member.displayName == "Elise Hupin Jouan")
+        #expect(!member.isUnnamed)
+    }
+
+    /// It is looked up only for somebody the share would not name, so what it
+    /// stands in front of is never a person's own name for themselves.
+    @Test("A name of their own is never overruled by the address book")
+    func doesNotOverruleTheirOwnName() {
+        let member = ShareMember(zoneName: zone, key: "a", name: "Ada", contactName: "Somebody else")
+        #expect(member.displayName == "Ada")
+    }
+
+    @Test("A face off their own card comes before one out of the address book")
+    func prefersTheirOwnFace() {
+        var member = ShareMember(zoneName: zone, key: "a", contactPicture: Data([9]))
+        #expect(member.face == Data([9]))
+
+        member.picture = Data([1])
+        #expect(member.face == Data([1]))
+    }
+
+    /// The reader is drawn from their own profile : asking the address book who
+    /// this device belongs to is the wrong question of the wrong book.
+    @Test("The reader is never somebody to look up")
+    func doesNotLookUpTheReader() {
+        #expect(!ShareMember(zoneName: zone, key: "a", isMe: true).isUnnamed)
+    }
+
+    @Test("What the address book says is kept apart from the other two halves")
+    func keepsTheThreeSourcesApart() async throws {
+        let key = SyncRecords.memberKey(forParticipantNamed: "_them")
+        try await store.reconcile(
+            [ShareMember(zoneName: zone, key: key, shareName: "33695754884", standing: .invited)],
+            inZone: zone
+        )
+        try await store.note(name: "Elise", picture: Data([7]), for: key, inZone: zone)
+
+        var found = try await store.members(inZone: zone).first
+        #expect(found?.displayName == "Elise")
+        #expect(found?.shareName == "33695754884")
+
+        // A roster arriving again leaves it standing, exactly as it leaves a
+        // card standing.
+        try await store.reconcile(
+            [ShareMember(zoneName: zone, key: key, shareName: "33695754884", standing: .accepted)],
+            inZone: zone
+        )
+        found = try await store.members(inZone: zone).first
+        #expect(found?.contactName == "Elise")
+        #expect(found?.standing == .accepted)
+    }
+
     // MARK: - The order they are read in
 
     @Test("The owner comes first, then whoever has joined, then the invitations")
@@ -266,6 +330,11 @@ struct ShareMemberTests {
     @Test("Initials are the first letter of the first name and of the last")
     func takesInitials() {
         #expect(ProfilePicture.initials(of: "François Rousselet") == "FR")
+        // A telephone number initialled would be a circle with a `3` in it,
+        // against a person : nothing is better, and the generic face says
+        // `somebody` where a digit says something untrue.
+        #expect(ProfilePicture.initials(of: "33695754884") == nil)
+        #expect(ProfilePicture.initials(of: "+33 6 95 75 48 84") == nil)
         #expect(ProfilePicture.initials(of: "Ada King Lovelace") == "AL")
         #expect(ProfilePicture.initials(of: "Prince") == "P")
         #expect(ProfilePicture.initials(of: "   ") == nil)

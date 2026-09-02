@@ -157,6 +157,41 @@ nonisolated enum ShareParticipants {
         return roster(of: confirmed ?? share, in: zoneID.zoneName, me: me, isOwnShare: isOwnShare)
     }
 
+    /// The addresses of the people this share will not name, by the key their
+    /// row is under.
+    ///
+    /// **Only the ones with no name at all.** Somebody who has accepted is
+    /// named by CloudKit, which is their own name for themselves and is not
+    /// this reader's to overrule ; somebody who has not is a bare address, and
+    /// that is what the address book is asked about. So a lookup never stands
+    /// in front of a name : see ``AddressBook``.
+    static func unnamed(in share: CKShare, me: String?, isOwnShare: Bool) -> [String: String] {
+        share.participants.reduce(into: [:]) { found, participant in
+            guard participant.userIdentity.nameComponents == nil else { return }
+
+            let stated = participant.userIdentity.userRecordID?.recordName
+            let isMe = isTheReader(
+                record: stated,
+                isOwner: participant.role == .owner,
+                isOwnShare: isOwnShare,
+                me: me
+            )
+            // The reader is drawn from their own profile and never looked up :
+            // asking the address book who this device belongs to would be
+            // asking the wrong question of the wrong book.
+            guard !isMe else { return }
+
+            let record = stated
+            guard let key = key(of: participant, record: record),
+                let address = participant.userIdentity.lookupInfo?.emailAddress
+                    ?? participant.userIdentity.lookupInfo?.phoneNumber,
+                !address.isEmpty
+            else { return }
+
+            found[key] = address
+        }
+    }
+
     // MARK: - Naming one person
 
     /// What both halves of a member name this person by.

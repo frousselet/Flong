@@ -113,6 +113,19 @@ actor CollectionSharing {
         let roster = ShareParticipants.roster(of: share, in: zone, me: me, isOwnShare: owner == nil)
         try? await members.reconcile(roster, inZone: zone)
 
+        // **And what the reader's own address book calls the ones the share
+        // would not name.** Somebody who has not accepted an invitation yet has
+        // no identity for CloudKit to resolve, so the row is the telephone
+        // number the invitation went to : the reader knows perfectly well who
+        // that is, because it is in their contacts. It is written into columns
+        // of its own and it never travels : see ``AddressBook``.
+        let unnamed = ShareParticipants.unnamed(in: share, me: me, isOwnShare: owner == nil)
+        let known = await AddressBook.people(at: unnamed)
+        for (key, _) in unnamed {
+            let person = known[key]
+            try? await members.note(name: person?.name, picture: person?.picture, for: key, inZone: zone)
+        }
+
         return (try? await members.members(inZone: zone)) ?? []
     }
 

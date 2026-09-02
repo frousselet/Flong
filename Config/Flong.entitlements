@@ -27,6 +27,10 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<!-- Reading the address book on a sandboxed Mac, for the one lookup
+	     described by `NSContactsUsageDescription`. -->
+	<key>com.apple.security.personal-information.addressbook</key>
+	<true/>
 	<key>com.apple.security.personal-information.location</key>
 	<true/>
 </dict>
