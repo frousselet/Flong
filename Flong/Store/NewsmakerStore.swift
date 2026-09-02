@@ -190,13 +190,21 @@ nonisolated struct NewsmakerStore: Sendable {
 
     // MARK: - Who there is
 
-    /// Everybody the articles on this device name, and the reader's own among
-    /// them.
+    /// The people the directory lists : everybody five articles name, and the
+    /// reader's own whatever their count.
+    ///
+    /// **The threshold is applied here and never on the way in.** Every name an
+    /// article gives is stored, because somebody at four articles becomes
+    /// somebody at five the moment the next one lands. See
+    /// ``Newsmaker/leastArticles`` for what the number is and what it was
+    /// measured against.
     ///
     /// A favourite with nothing to their name is in the list all the same, with
-    /// a count of nothing. It is a decision the reader made, and a decision does
-    /// not disappear because the purge took the last article it was about, or
-    /// because it reached this device before the articles did.
+    /// a count of nothing, and so is one with three articles. It is a decision
+    /// the reader made, and a decision does not disappear because the purge
+    /// took the last article it was about, because it reached this device
+    /// before the articles did, or because the press has not written enough
+    /// about them yet.
     func all() async throws -> [Newsmaker] {
         try await database.writer.read { db in
             let favourites = Set(try String.fetchAll(db, sql: "SELECT name FROM favourite_newsmaker"))
@@ -212,12 +220,19 @@ nonisolated struct NewsmakerStore: Sendable {
                 tallies[row["name"], default: Tally()].add(count, of: Self.publisher(of: row))
             }
 
-            var found = tallies.map { name, tally in
-                Newsmaker(
+            var found = tallies.compactMap { name, tally -> Newsmaker? in
+                let isFavourite = favourites.contains(name)
+                let notifies = notified.contains(name)
+                // Too few articles name them, and nobody asked after them : the
+                // long tail is people one piece mentioned once, and a directory
+                // nobody can read is a directory nobody opens.
+                guard tally.count >= Newsmaker.leastArticles || isFavourite || notifies else { return nil }
+
+                return Newsmaker(
                     name: name,
                     count: tally.count,
-                    isFavourite: favourites.contains(name),
-                    notifies: notified.contains(name),
+                    isFavourite: isFavourite,
+                    notifies: notifies,
                     publishers: tally.ranked
                 )
             }
@@ -373,20 +388,33 @@ nonisolated struct NewsmakerStore: Sendable {
             let directory = try Row.fetchOne(
                 db,
                 sql: """
-                    SELECT (SELECT COUNT(DISTINCT m.name) FROM entry_newsmaker m
-                            JOIN entry e ON e.id = m.entry_id
-                            WHERE \(Self.shown("e"))) AS named,
-                           (SELECT COUNT(*) FROM favourite_newsmaker f
+                    SELECT (SELECT COUNT(*) FROM (
+                                SELECT m.name FROM entry_newsmaker m
+                                JOIN entry e ON e.id = m.entry_id
+                                WHERE \(Self.shown("e"))
+                                GROUP BY m.name
+                                HAVING COUNT(*) >= ?
+                                    OR m.name IN (SELECT name FROM favourite_newsmaker)
+                                    OR m.name IN (SELECT name FROM notified_newsmaker)
+                            )) AS listed,
+                           (SELECT COUNT(*) FROM (
+                                SELECT name FROM favourite_newsmaker
+                                UNION SELECT name FROM notified_newsmaker
+                            ) d
                             WHERE NOT EXISTS (SELECT 1 FROM entry_newsmaker m
                                               JOIN entry e ON e.id = m.entry_id
-                                              WHERE m.name = f.name AND \(Self.shown("e")))) AS forgotten,
+                                              WHERE m.name = d.name AND \(Self.shown("e")))) AS decided,
                            \(Self.cover(where: Self.aboutSomebody("i"))) AS cover
-                    """
+                    """,
+                arguments: [Newsmaker.leastArticles]
             )
-            // The people, counted, and never their articles : this square is a
-            // way in to a list of names, so the number under it is the number
-            // of rows the reader will find there.
-            let people = (directory?["named"] as Int? ?? 0) + (directory?["forgotten"] as Int? ?? 0)
+            // **The same question ``all()`` answers, asked as a count.** The
+            // number under a square that opens on a list has to be the length
+            // of that list : one saying six hundred over a page showing
+            // twenty-three would have told the reader the wrong thing before
+            // they touched it. So the threshold is here too, and so are the
+            // people the reader singled out whatever their count.
+            let people = (directory?["listed"] as Int? ?? 0) + (directory?["decided"] as Int? ?? 0)
             if people > 0 {
                 found.append(ArticleCollection(kind: .builtIn(.newsmakers), count: people, cover: directory?["cover"]))
             }

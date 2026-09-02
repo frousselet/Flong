@@ -83,11 +83,10 @@ struct AppModelTests {
 
         await model.load()
 
-        #expect(model.smartLists.map(\.kind) == [.digest, .unread, .today, .starred, .all])
-        // The views above the sources carry no count : `Non lus` is a number a
-        // reader meets everywhere else, and `Tous les articles` beside one is
-        // the size of the corpus answering nothing they asked.
-        #expect(model.smartLists.allSatisfy { $0.articleCount == 0 })
+        #expect(model.fixedViews.map(\.kind) == [.digest, .unread, .today, .starred, .all])
+        // They carry no count. Nothing lists them any more either : they stay
+        // in the sidebar because `filter` resolves the selection through it.
+        #expect(model.fixedViews.allSatisfy { $0.articleCount == 0 })
 
         // A paper with a feed per desk is one group ; a blog on a host of its
         // own is another, and it gets a heading like everything else.
@@ -198,7 +197,7 @@ struct AppModelTests {
         #expect(model.article?.id == id)
         #expect(model.article?.bodyHTML == "<p>one</p>")
         #expect(model.summaries.first?.isRead == true)
-        #expect(model.smartLists.first?.articleCount == 0)
+        #expect(model.fixedViews.first?.articleCount == 0)
     }
 
     @Test("An article can be put back in the unread pile")
@@ -247,7 +246,7 @@ struct AppModelTests {
         await model.markAllRead()
 
         #expect(model.summaries.isEmpty)
-        #expect(model.smartLists.first?.articleCount == 0)
+        #expect(model.fixedViews.first?.articleCount == 0)
     }
 
     // MARK: - Searching

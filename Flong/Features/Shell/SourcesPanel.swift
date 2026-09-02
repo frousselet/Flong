@@ -105,12 +105,6 @@ struct SourcesPanel: View {
             head
 
             List {
-                Section {
-                    ForEach(model.smartLists.filter { $0.kind != .digest }) { item in
-                        row(item)
-                    }
-                }
-
                 ForEach(model.sourceGroups) { group in
                     Section {
                         ForEach(group.children) { source in
@@ -495,24 +489,17 @@ struct SourcesPanel: View {
         if case .group(let domain) = group.kind { domain } else { nil }
     }
 
-    @ViewBuilder
+    /// One desk of one publisher, which is the only kind of row the list holds.
+    ///
+    /// **A source wears no mark of its own.** The mark is the publisher's and
+    /// stands once, at the head of the group ; a row here is a desk of that
+    /// publisher, and a favicon repeated down six desks is one column saying
+    /// the same thing six times over.
     private func row(_ item: SidebarItem) -> some View {
         Button {
             go(to: item.kind)
         } label: {
-            // A source wears no mark of its own. The mark is the publisher's
-            // and stands once, at the head of the group ; a row here is a desk
-            // of that publisher, and the views above are the application's own
-            // and wear the application's symbols.
-            if case .feed = item.kind {
-                line(of: item)
-            } else {
-                Label {
-                    line(of: item)
-                } icon: {
-                    Image(systemName: Self.icon(of: item.kind))
-                }
-            }
+            line(of: item)
         }
         .buttonStyle(.plain)
     }
@@ -530,10 +517,9 @@ struct SourcesPanel: View {
                     .accessibilityLabel(Text("Favourite source"))
             }
             Spacer(minLength: 8)
-            // Nought for the views above the sources, which is what takes
-            // their counts off the list : `Non lus` is a number a reader is
-            // shown everywhere else already, and `Tous les articles` beside a
-            // count is the size of the corpus answering nothing.
+            // What that desk has given the reader. A source that has given
+            // them nothing shows no `0` : a nought beside a name reads as a
+            // failure of the page rather than as the state of the stream.
             if item.articleCount > 0 {
                 Text(item.articleCount, format: .number)
                     .font(theme.metadata)
@@ -542,26 +528,9 @@ struct SourcesPanel: View {
         }
     }
 
-    @ViewBuilder
-    private func title(of item: SidebarItem) -> some View {
-        switch item.kind {
-        case .digest: Text("Digest")
-        case .unread: Text("Unread")
-        case .today: Text("Today")
-        case .starred: Text("Starred articles")
-        case .all: Text("All articles")
-        case .group, .feed: Text(verbatim: item.title ?? "")
-        }
-    }
-
-    private static func icon(of kind: SidebarItem.Kind) -> String {
-        switch kind {
-        case .digest: "newspaper.fill"
-        case .unread: "circle.inset.filled"
-        case .today: "sun.max"
-        case .starred: "star"
-        case .all: "tray.full"
-        case .group, .feed: "dot.radiowaves.up.forward"
-        }
+    /// Verbatim : a source is called what its publisher calls it, or what the
+    /// reader wrote over it.
+    private func title(of item: SidebarItem) -> Text {
+        Text(verbatim: item.title ?? "")
     }
 }
