@@ -10,6 +10,7 @@
 //
 
 import CoreGraphics
+import CryptoKit
 import Foundation
 import OSLog
 import UserNotifications
@@ -212,6 +213,10 @@ final class AppModel {
     private let sharing: CollectionSharing
     private let sharedCollections: SharedCollectionStore
     private let sharedEntries: SharedEntryStore
+    private let sharedMembers: ShareMemberStore
+    /// Where the digest of the card last published into each zone is kept, so
+    /// that a reader who changed nothing about themselves writes nothing.
+    private let syncState: SyncState
     /// The common pool of section 8, as this device holds its copy.
     private let pool: PoolStore
     /// The public side of the container, made on the first page that needs it.
@@ -255,6 +260,33 @@ final class AppModel {
     /// people fill has to say who put a thing in it, and saying so against the
     /// reader's own is telling them what they already know.
     private(set) var filedBy: [String: String] = [:]
+
+    /// Who is in each shared collection, by the zone standing for it.
+    ///
+    /// Every collection at once rather than the open one, because the grid
+    /// draws a face against every square and would otherwise ask one question
+    /// per square.
+    private(set) var shareMembers: [String: [ShareMember]] = [:]
+
+    /// Their faces, decoded, by the member they belong to.
+    ///
+    /// Decoded once here rather than at each draw : a face pile is redrawn
+    /// every time the grid scrolls, and a JPEG decoded on that path is a
+    /// decode nobody asked for. Kept beside the members rather than inside
+    /// them so that a ``ShareMember`` stays a plain value the store can hand
+    /// across.
+    private(set) var memberFaces: [String: CGImage] = [:]
+
+    /// What each decoded face was decoded from, so that a read which changed
+    /// nothing decodes nothing.
+    private var decodedPictures: [String: Data] = [:]
+
+    /// When each zone's roster was last read back from iCloud.
+    ///
+    /// The share is a round trip per collection and the page asks on every
+    /// appearance ; what is in the store is what gets drawn, and this is only
+    /// about how often it is corrected.
+    private var rosterReadAt: [String: Date] = [:]
 
     /// Everybody who has signed something, for the authors page.
     private(set) var authors: [Author] = []
@@ -419,6 +451,9 @@ final class AppModel {
         guard let data else {
             preferences.picture = nil
             picture = nil
+            // The face the other people in a shared collection see is this
+            // one, so taking it away has to reach them too.
+            Task { await publishMemberCards() }
             return true
         }
         guard let scaled = ProfilePicture.scaled(data) else {
@@ -427,6 +462,7 @@ final class AppModel {
         }
         preferences.picture = scaled
         picture = ProfilePicture.image(scaled)
+        Task { await publishMemberCards() }
         return true
     }
 
@@ -1053,6 +1089,8 @@ final class AppModel {
         self.sharing = CollectionSharing(database: database)
         self.sharedCollections = SharedCollectionStore(database)
         self.sharedEntries = SharedEntryStore(database)
+        self.sharedMembers = ShareMemberStore(database)
+        self.syncState = SyncState(database)
         self.authorStore = AuthorStore(database)
         self.newsmakerStore = NewsmakerStore(database)
         self.marks = MarkStore(database)
@@ -1963,10 +2001,16 @@ final class AppModel {
         // against a digest of the one already published before it is written.
         await offerToPool()
 
+        // Who this reader is, in the collections they share and the ones they
+        // were invited to. Free for a reader whose name and face are the ones
+        // already published, which is every launch but the first.
+        await publishMemberCards()
+
         // An invitation accepted before there was a window says so now.
         await ShareAcceptance.pending.onArrival { [weak self] _ in
             await self?.sharedCloud?.synchronize()
             await self?.loadCollections()
+            await self?.loadShareMembers()
         }
     }
 
@@ -2421,18 +2465,22 @@ final class AppModel {
             // their own, and a store that reached into it would be answering a
             // question about somebody else's data.
             collections = try await collectionStore.all() + sharedCollections.invited(from: sharedEntries)
-            sharedCollectionNames = try await sharedCollections.ownedNames()
+            ownedShareZones = try await sharedCollections.ownedZones()
         } catch {
             Log.store.error("The collections could not be read : \(error, privacy: .public)")
         }
     }
 
-    /// Which of the reader's own collections they have shared.
+    /// Which of the reader's own collections they have shared, and the zone
+    /// each of them stands in.
     ///
     /// Local to this device and read from the store rather than from CloudKit :
     /// the page says it against a square, and a square should not wait on the
     /// network to know what to draw.
-    private(set) var sharedCollectionNames: Set<String> = []
+    private(set) var ownedShareZones: [String: String] = [:]
+
+    /// The same, as the set the pages that only ask *whether* want.
+    var sharedCollectionNames: Set<String> { Set(ownedShareZones.keys) }
 
     /// Reads back which collections are shared, without the rest of the page.
     ///
@@ -2440,7 +2488,7 @@ final class AppModel {
     /// the system's sheet, so this device only learns that one exists after the
     /// reader has come back from it.
     func loadSharedCollections() async {
-        sharedCollectionNames = (try? await sharedCollections.ownedNames()) ?? []
+        ownedShareZones = (try? await sharedCollections.ownedZones()) ?? [:]
     }
 
     /// What the share sheet is handed when the reader invites somebody.
@@ -2449,9 +2497,162 @@ final class AppModel {
     /// sheet's own preparation handler, once the reader has actually picked
     /// somebody, so a sheet opened and dismissed leaves nothing behind.
     nonisolated func invitation(toCollectionNamed name: String) -> SharedCollectionItem {
-        SharedCollectionItem(name: name, sharing: sharing) { [database, sharing, credentials] in
-            await sharing.push(collectionNamed: name, from: database, credentials: credentials)
+        let reader = readerName(from: preferences)
+        let picture = preferences.picture
+
+        return SharedCollectionItem(name: name, sharing: sharing) { [database, sharing, credentials] in
+            await sharing.push(
+                collectionNamed: name,
+                from: database,
+                credentials: credentials,
+                readerNamed: reader,
+                picture: picture
+            )
         }
+    }
+
+    // MARK: - Who is in a shared collection
+
+    /// Everybody in the collections this device knows about, and their faces.
+    ///
+    /// **The store first and iCloud after.** What is written down is drawn at
+    /// once, so a grid of squares is complete before anything is asked of the
+    /// network and stays complete on a device that has none. The share is then
+    /// read back to correct it, at most once in a while per collection, and the
+    /// page is written again only if that actually said something new.
+    ///
+    /// It is also where the reader's own card goes out from, which costs
+    /// nothing when they have not changed their name or their face : see
+    /// ``publishMemberCards()``.
+    func loadShareMembers() async {
+        await readShareMembers()
+        await publishMemberCards()
+
+        guard let known = try? await sharedCollections.all() else { return }
+
+        var corrected = false
+        for collection in known {
+            if let read = rosterReadAt[collection.zoneName], Date().timeIntervalSince(read) < Self.rosterInterval {
+                continue
+            }
+            rosterReadAt[collection.zoneName] = Date()
+            await sharing.refreshMembers(
+                inZone: collection.zoneName,
+                ownedBy: collection.isOwned ? nil : collection.ownerName
+            )
+            corrected = true
+        }
+
+        if corrected { await readShareMembers() }
+    }
+
+    /// How long a roster stands before it is worth asking iCloud again.
+    private static let rosterInterval: TimeInterval = 10 * 60
+
+    private func readShareMembers() async {
+        shareMembers = (try? await sharedMembers.all()) ?? [:]
+
+        // The faces of the people who are still here, decoding only the ones
+        // whose bytes are not the ones already decoded.
+        var faces: [String: CGImage] = [:]
+        var pictures: [String: Data] = [:]
+        for member in shareMembers.values.flatMap({ $0 }) {
+            guard let picture = member.picture else { continue }
+            pictures[member.id] = picture
+            if decodedPictures[member.id] == picture, let face = memberFaces[member.id] {
+                faces[member.id] = face
+            } else if let face = ProfilePicture.image(picture) {
+                faces[member.id] = face
+            }
+        }
+        memberFaces = faces
+        decodedPictures = pictures
+    }
+
+    /// Everybody in one collection, for the page showing it.
+    func members(of kind: ArticleCollection.Kind) -> [ShareMember] {
+        switch kind {
+        case .shared(let zone, _): shareMembers[zone] ?? []
+        case .made(let name): ownedShareZones[name].flatMap { shareMembers[$0] } ?? []
+        default: []
+        }
+    }
+
+    /// Whether the reader may take somebody out of this collection.
+    ///
+    /// **Only out of one of their own.** A share is the owner's to change and
+    /// the server refuses everybody else, so a participant is shown who is in a
+    /// collection without being offered a button that could not work. Leaving
+    /// one is a different act and lives where it always has, in the system's
+    /// own sheet.
+    func mayRemoveMembers(of kind: ArticleCollection.Kind) -> Bool {
+        guard case .made(let name) = kind else { return false }
+        return ownedShareZones[name] != nil
+    }
+
+    /// Takes one person out of a collection the reader owns.
+    ///
+    /// What they filed stays where it is : they wrote it into the collection,
+    /// and taking somebody out of a share is about what they may see from now
+    /// on rather than about unsaying what they said.
+    func removeMember(_ member: ShareMember, fromCollectionNamed name: String) async {
+        do {
+            try await sharing.remove(member.id, fromCollectionNamed: name)
+            await readShareMembers()
+        } catch {
+            failure = .notSaved
+            Log.sync.error("Somebody could not be taken out : \(error, privacy: .public)")
+        }
+    }
+
+    /// Says who this reader is, in every collection they share or were invited
+    /// to.
+    ///
+    /// **Free for a reader who changed nothing**, since what was last written
+    /// into each zone is compared against a digest before anything is sent.
+    /// Per zone rather than once, so a collection joined this morning gets the
+    /// card even though the name and the face are the same as yesterday's.
+    private func publishMemberCards() async {
+        guard let known = try? await sharedCollections.all(), !known.isEmpty else { return }
+
+        let reader = name
+        let picture = preferences.picture
+        let digest = Self.digest(ofCardNamed: reader, picture: picture)
+
+        for collection in known {
+            let key = "shared.card." + collection.zoneName
+            guard digest != (try? await syncState.value(for: key)) else { continue }
+
+            if collection.isOwned {
+                guard await sharing.publishCard(named: reader, picture: picture, inZone: collection.zoneName) else {
+                    continue
+                }
+            } else {
+                await sharedCloud?.publishCard(
+                    named: reader,
+                    picture: picture,
+                    inZone: collection.zoneName,
+                    ownedBy: collection.ownerName
+                )
+            }
+            try? await syncState.setValue(digest, for: key)
+        }
+    }
+
+    private nonisolated static func digest(ofCardNamed name: String?, picture: Data?) -> Data {
+        var spelled = Data((name ?? "").utf8)
+        spelled.append(picture ?? Data())
+        return Data(SHA256.hash(data: spelled))
+    }
+
+    /// The reader's name as one line, from the preferences rather than from the
+    /// model, for the paths that leave the main actor behind.
+    private nonisolated func readerName(from preferences: Preferences) -> String? {
+        let whole = [preferences.firstName, preferences.lastName]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        return whole.isEmpty ? nil : whole
     }
 
     // MARK: - Filing into somebody else's collection
@@ -2671,8 +2872,14 @@ final class AppModel {
     /// The whole list goes each time, so a filing and an unfiling travel the
     /// same way and a push that failed is made good by the next one.
     private func pushIfShared(_ name: String) async {
-        guard sharedCollectionNames.contains(name) else { return }
-        await sharing.push(collectionNamed: name, from: database, credentials: credentials)
+        guard ownedShareZones[name] != nil else { return }
+        await sharing.push(
+            collectionNamed: name,
+            from: database,
+            credentials: credentials,
+            readerNamed: self.name,
+            picture: preferences.picture
+        )
     }
 
     func unfileArticle(from name: String) async {

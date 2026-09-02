@@ -248,6 +248,10 @@ A made collection may be shared with other iCloud users, who may file into it. A
 
 **What arrives is not the reader's article.** It came from a feed they do not follow, it lives in a table of its own, and it is never counted unread, never purged, never indexed as theirs and never re-shared. Where they already hold the piece, their own copy is shown instead.
 
+**Who is in a collection is shown, by face where there is one and by initials otherwise.** The share is the authority on the roster, on who owns the collection and on who may write in it, since CloudKit sets all of that and no client can forge it. It has no face to give and often no name, so each participant writes **one card of their own** into the zone, carrying the name and the picture from their own profile : one record per person, written by nobody else, so a face cannot be put against somebody who did not choose it. The two halves never overwrite each other, and what is known is written down so that a square draws its faces without waiting on the network.
+
+**The owner may take somebody out**, from the collection's own page. The share is theirs alone to change and the server refuses everybody else, so the button exists only for them ; leaving a collection stays where it has always been, in the system's own sheet. What the person filed stays in the collection : removal is about what they may see from now on, not about unsaying what they said.
+
 `docs/technical/collaboration.md` carries the design and the reasoning.
 
 ---

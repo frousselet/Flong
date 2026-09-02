@@ -40,6 +40,8 @@ nonisolated enum SyncRecords {
         static let sharedCollection = "SharedCollection"
         /// What one participant filed into a shared collection.
         static let sharedList = "SharedList"
+        /// Who one participant is : the name they gave themselves, and a face.
+        static let sharedMember = "SharedMember"
     }
 
     // MARK: - A collection that is shared
@@ -97,6 +99,42 @@ nonisolated enum SyncRecords {
         guard name.hasPrefix("list-"), let last = name.lastIndex(of: "-"), last > name.startIndex else { return nil }
         let key = String(name[..<last]) + "-"
         return key == "list-" ? nil : key
+    }
+
+    /// One participant's card in a shared collection : who they are.
+    ///
+    /// **Named after the person, exactly as their list is**, and for the same
+    /// reason : each of them writes only their own, so nobody can put a name or
+    /// a face against somebody else. It is also what lets the two sources of a
+    /// roster meet on one row, since the share names a participant by the same
+    /// record in the container that this is derived from.
+    ///
+    /// One record and no chunks : a name and a face scaled to the size a face
+    /// is drawn at is a few tens of kilobytes, and there is nothing to cut.
+    static func name(forSharedMemberBy participant: CKRecord.ID) -> String {
+        memberKey(forParticipantNamed: participant.recordName)
+    }
+
+    /// The same name, from the record identifier the share gives rather than
+    /// from the container's answer about this device.
+    static func memberKey(forParticipantNamed record: String) -> String {
+        "member-" + digest(record)
+    }
+
+    /// Somebody invited whom CloudKit has not resolved to an account yet.
+    ///
+    /// They have no record in the container to be named after, so they are
+    /// named after the address the invitation went to, which is the only stable
+    /// thing about them. It changes to the real one the day they accept, and
+    /// the row under the old key goes with the roster it is no longer in.
+    static func memberKey(forInvitationTo address: String) -> String {
+        "invited-" + digest(address)
+    }
+
+    /// Whether a record name is a participant's card, which is what tells one
+    /// apart from a list when a deletion arrives carrying nothing else.
+    static func memberKey(ofRecordNamed name: String) -> String? {
+        name.hasPrefix("member-") ? name : nil
     }
 
     // MARK: - Names

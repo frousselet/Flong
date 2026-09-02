@@ -325,4 +325,29 @@ struct LocalizationTests {
                 == "Ne plus notifier les articles à leur sujet"
         )
     }
+
+    @Test("The people in a shared collection are named in French")
+    func shareMembers() {
+        #expect(String(localized: "In this collection", locale: french) == "Dans cette collection")
+        #expect(String(localized: "You", locale: french) == "Vous")
+        #expect(String(localized: "Someone", locale: french) == "Quelqu'un")
+        #expect(String(localized: "Invited", locale: french) == "Invitation envoyée")
+        #expect(String(localized: "Shared this", locale: french) == "A partagé")
+        #expect(String(localized: "Reading only", locale: french) == "Lecture seule")
+        #expect(String(localized: "Remove from the collection", locale: french) == "Retirer de la collection")
+        #expect(String(localized: "\("Ada")", locale: french) == "Ada")
+        #expect(String(localized: "Remove \("Ada")?", locale: french) == "Retirer Ada ?")
+        #expect(String(localized: "this person", locale: french) == "cette personne")
+
+        // What is not said in the question is said under it : a reader who
+        // takes somebody out has to know what happens to what they filed.
+        #expect(
+            String(localized: "They lose the collection. What they already filed stays in it.", locale: french)
+                == "La personne perd la collection. Ce qu'elle y a déjà ajouté y reste."
+        )
+
+        // Read out where the faces themselves say nothing.
+        #expect(String(localized: "\(1) people", locale: french) == "1 personne")
+        #expect(String(localized: "\(4) people", locale: french) == "4 personnes")
+    }
 }

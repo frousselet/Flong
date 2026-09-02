@@ -31,6 +31,18 @@ struct CollectionScreen: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
+                // Who the reader let in, above what is in it. Nothing at all
+                // for a collection that was never shared, which is most of
+                // them : see ``MembersStrip``.
+                MembersStrip(
+                    members: model.members(of: kind),
+                    faces: model.memberFaces,
+                    mayRemove: model.mayRemoveMembers(of: kind)
+                ) { member in
+                    guard case .made(let name) = kind else { return }
+                    Task { await model.removeMember(member, fromCollectionNamed: name) }
+                }
+
                 ForEach(model.collectionArticles) { article in
                     ArticleRow(article: article, zoom: zoom) { open(article.id) }
                 }
@@ -130,6 +142,7 @@ struct CollectionScreen: View {
         .task {
             await model.loadCollection(kind)
             await model.loadSharedCollections()
+            await model.loadShareMembers()
         }
     }
 }

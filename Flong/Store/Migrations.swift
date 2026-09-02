@@ -830,6 +830,53 @@ nonisolated extension AppDatabase {
             }
         }
 
+        // Who is in each shared collection.
+        //
+        // **Written down, because a square must not wait on the network to
+        // know what to draw.** The roster itself is a `CKShare`, which is one
+        // fetch per collection ; the grid shows every collection at once, and
+        // a page that asked iCloud before it could draw a face would show
+        // holes on every launch and on every flight. So what was last known is
+        // kept, drawn straight away, and corrected when the share answers.
+        //
+        // **Two sources in one row, in columns that never overwrite each
+        // other.** The share says who is a participant, in what role, and
+        // whether they have accepted : CloudKit sets it and no client can
+        // forge it, which is what makes it worth believing. The card says what
+        // that person calls themselves in Flong and what their face is : they
+        // wrote it themselves, into the collection's own zone, exactly as they
+        // write what they file. Neither knows what the other holds, so a
+        // roster fetch never clears a face and a card never invents a role.
+        migrator.registerMigration("v36.whoIsInIt") { db in
+            try db.create(table: "share_member") { table in
+                table.column("zone_name", .text).notNull()
+                // Named the way their card is named, so the two sources land on
+                // one row : the key is derived from the person's own record in
+                // the container, which the share gives and which their card is
+                // filed under.
+                table.column("member_key", .text).notNull()
+                // Their record in the container, where it is known. A person
+                // invited and not yet resolved to an account has none, and is
+                // shown as invited rather than not shown.
+                table.column("user_record", .text)
+                // What they call themselves in Flong, off their own card.
+                table.column("name", .text)
+                // What CloudKit is willing to call them, off the share. It may
+                // be nothing at all, and nothing is better than an identifier.
+                table.column("share_name", .text)
+                // Their face, off their own card, already scaled to the size a
+                // face is drawn at.
+                table.column("picture", .blob)
+                table.column("is_owner", .boolean).notNull().defaults(to: false)
+                table.column("is_me", .boolean).notNull().defaults(to: false)
+                table.column("may_write", .boolean).notNull().defaults(to: true)
+                table.column("status", .text).notNull().defaults(to: "unknown")
+                table.column("updated_at", .datetime).notNull()
+
+                table.primaryKey(["zone_name", "member_key"])
+            }
+        }
+
         return migrator
     }
 

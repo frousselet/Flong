@@ -148,6 +148,23 @@ actor SharedSync {
         engine.state.add(pendingRecordZoneChanges: records.map { .saveRecord($0.recordID) })
     }
 
+    /// Says who this reader is, in a collection somebody else shared.
+    ///
+    /// **The only place a face can come from.** A `CKUserIdentity` carries
+    /// none, so a participant who never writes a card is drawn by the other
+    /// people in the collection under their initials, or under nothing at all.
+    /// It is one small record, named after them and written by nobody else,
+    /// exactly as their list is.
+    func publishCard(named name: String?, picture: Data?, inZone zoneName: String, ownedBy owner: String) async {
+        guard let engine, let me = await participant() else { return }
+
+        let zoneID = CKRecordZone.ID(zoneName: zoneName, ownerName: owner)
+        let card = ShareMember.card(name: name, picture: picture, by: me, in: zoneID)
+
+        pending[card.recordID] = card
+        engine.state.add(pendingRecordZoneChanges: [.saveRecord(card.recordID)])
+    }
+
     /// What this reader's own list is named, wherever they file.
     ///
     /// The same on every device of theirs, since it is worked out from their

@@ -9,6 +9,7 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //
 
+import CoreGraphics
 import SwiftUI
 
 /// What the reader kept, in squares rather than in a line.
@@ -142,6 +143,10 @@ struct CollectionsScreen: View {
             Text("It fills itself with whatever matches, and goes on filling itself. Try `title:Swift` or `is:unread`.")
         }
         .task { await model.loadCollections() }
+        // Who is in the shared ones, drawn from what is written down and then
+        // corrected against iCloud : a square must not wait on a round trip
+        // to know what to draw.
+        .task { await model.loadShareMembers() }
     }
 
     /// One band of squares, which draws nothing at all when it holds nothing.
@@ -156,7 +161,11 @@ struct CollectionsScreen: View {
                     Button {
                         open(collection.kind)
                     } label: {
-                        CollectionSquare(collection: collection)
+                        CollectionSquare(
+                            collection: collection,
+                            members: model.members(of: collection.kind),
+                            faces: model.memberFaces
+                        )
                     }
                     .buttonStyle(.plain)
                 }
@@ -205,6 +214,10 @@ struct CollectionsScreen: View {
 /// between the reader and the picture they came to recognize.
 struct CollectionSquare: View {
     let collection: ArticleCollection
+    /// Who is in it, for the collections that are shared. Empty for every
+    /// other square, which is most of them.
+    var members: [ShareMember] = []
+    var faces: [String: CGImage] = [:]
 
     @Environment(\.theme) private var theme
 
@@ -249,6 +262,16 @@ struct CollectionSquare: View {
                 }
             }
             .clipShape(.rect(cornerRadius: 12))
+            // **Who is in it, on the picture rather than under it.** The name
+            // goes below because type laid over a photograph needs a scrim to
+            // stay readable, and a scrim is a thing between the reader and the
+            // picture ; a ringed face carries its own contrast and needs none,
+            // and it says the collection is shared in the same glance that
+            // says what is in it.
+            .overlay(alignment: .bottomTrailing) {
+                MemberPile(members: members, faces: faces)
+                    .padding(7)
+            }
     }
 
     static func name(of kind: ArticleCollection.Kind) -> Text {
