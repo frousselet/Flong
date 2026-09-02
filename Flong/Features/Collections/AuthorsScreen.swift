@@ -80,6 +80,8 @@ struct AuthorsScreen: View {
                         open(author.name)
                     } favourite: {
                         Task { await model.setFavouriteAuthor(author.name, !author.isFavourite) }
+                    } notify: {
+                        Task { await model.setNotifications(!author.notifies, forAuthor: author.name) }
                     }
                 }
             } header: {
@@ -138,6 +140,7 @@ struct AuthorRow: View {
     let author: Author
     let open: () -> Void
     let favourite: () -> Void
+    let notify: () -> Void
 
     @Environment(\.theme) private var theme
     @Environment(\.publishers) private var publishers
@@ -209,6 +212,18 @@ struct AuthorRow: View {
                 Label(
                     author.isFavourite ? "Remove from favourite authors" : "Add to favourite authors",
                     systemImage: author.isFavourite ? "star.slash" : "star"
+                )
+            }
+
+            // In the menu and not beside the star. The star is the row's own
+            // control because it is what this page is a directory of ; being
+            // told about somebody is a standing request to be interrupted, and
+            // one made by a mis-tap is one the reader would have to work out
+            // the cause of.
+            Button(action: notify) {
+                Label(
+                    author.notifies ? "Stop notifying new articles" : "Notify every new article",
+                    systemImage: author.notifies ? "bell.slash" : "bell"
                 )
             }
         }

@@ -121,25 +121,34 @@ nonisolated struct Announcement: Hashable, Sendable {
         return Announcement(title: title, body: body, thread: Thread.filings)
     }
 
-    /// What the sources the reader asked about have just published.
+    /// What the sources and the writers the reader asked about have just
+    /// published.
     ///
     /// **Every article, which is what the reader asked for.** The stories are a
     /// calculation : several newsrooms, one subject, and an opening worth
     /// interrupting somebody for. This is the opposite question, asked source
-    /// by source : a reader who follows one newsletter, one blog or one
-    /// colleague wants to know when *they* publish, and a piece nobody else
-    /// covers never becomes a story and would never be announced.
+    /// by source and writer by writer : a reader who follows one newsletter,
+    /// one blog or one colleague wants to know when *they* publish, and a piece
+    /// nobody else covers never becomes a story and would never be announced.
+    ///
+    /// **One notice per article, however many ways it was asked for.** A writer
+    /// the reader follows very often writes for a source they follow as well ;
+    /// the store answers the two questions at once, so an article that answers
+    /// both is here once, and it is here once in this sentence too.
     ///
     /// Nothing to say about none, which is the ordinary case : almost every
-    /// pass brings articles from sources the reader asked nothing about.
+    /// pass brings articles nobody asked anything about.
     ///
     /// **One article leads with its own headline**, for the same reason a lone
-    /// story does : the headline is the news, and the source it came from is
-    /// what the body is for. A tap opens it.
+    /// story does : the headline is the news. Underneath goes where it came
+    /// from, which is the source, and the person in front of it where it is
+    /// somebody the reader asked about : that is the byline the application
+    /// itself writes under every headline, and it is the answer to `why am I
+    /// being told this`. A tap opens it.
     ///
-    /// **Several from one source are counted under its name**, since the source
-    /// is what the reader asked about and naming it once is shorter than
-    /// repeating it. **Several sources are counted and then listed**, the
+    /// **Several are counted under what was asked about**, the person where
+    /// there was one and the source otherwise, since naming it once is shorter
+    /// than repeating it. **Several of those are counted and then listed**, the
     /// headlines giving way to the names : a reader told `5 new articles` and
     /// left to work out where from would have to open the application to learn
     /// what they were just told.
@@ -149,27 +158,32 @@ nonisolated struct Announcement: Hashable, Sendable {
         guard arrivals.count > 1 else {
             return Announcement(
                 title: first.title,
-                body: first.source,
+                // The person and where they wrote it, joined the way the
+                // application's own bylines are. Not `X in Y` : a preposition
+                // between two names is a sentence to translate, and it reads
+                // worse than the two names do.
+                body: first.author.map { "\($0) · \(first.source)" } ?? first.source,
                 thread: Thread.newArticles,
                 article: first.id
             )
         }
 
         // In the order they arrived, and deduplicated : a source that served
-        // four articles in one pass is one name.
-        var sources: [String] = []
-        for arrival in arrivals where !sources.contains(arrival.source) { sources.append(arrival.source) }
+        // four articles in one pass is one name, and so is a writer who signed
+        // three of them.
+        var subjects: [String] = []
+        for arrival in arrivals where !subjects.contains(arrival.subject) { subjects.append(arrival.subject) }
 
-        guard sources.count == 1, let source = sources.first else {
+        guard subjects.count == 1, let subject = subjects.first else {
             return Announcement(
                 title: String(localized: "\(arrivals.count) new articles"),
-                body: ListFormatter.localizedString(byJoining: sources),
+                body: ListFormatter.localizedString(byJoining: subjects),
                 thread: Thread.newArticles
             )
         }
 
         return Announcement(
-            title: String(localized: "\(source) : \(arrivals.count) new articles"),
+            title: String(localized: "\(subject) : \(arrivals.count) new articles"),
             // A middle dot rather than commas, as the stories are joined : a
             // headline may hold commas of its own.
             body: arrivals.map(\.title).joined(separator: " · "),

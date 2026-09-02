@@ -33,6 +33,7 @@ nonisolated enum SyncRecords {
         static let catchUp = "CatchUp"
         static let collections = "Collections"
         static let favouriteAuthor = "FavouriteAuthor"
+        static let notifiedAuthor = "NotifiedAuthor"
         /// What a shared collection is called, in the zone standing for it.
         static let sharedCollection = "SharedCollection"
         /// What one participant filed into a shared collection.
@@ -108,6 +109,7 @@ nonisolated enum SyncRecords {
     /// Two devices that single out the same person compute the same name and
     /// write one record between them, and nothing has to be reconciled.
     static func name(forFavouriteAuthor author: String) -> String { "author-" + digest(author) }
+    static func name(forNotifiedAuthor author: String) -> String { "told-" + digest(author) }
 
     /// One marked article, named after the article and not after the device.
     ///
@@ -335,6 +337,30 @@ nonisolated enum SyncRecords {
         )
         record["name"] = author
         return record
+    }
+
+    /// One writer the reader asked to be told about.
+    ///
+    /// The same shape as the favourite above and a record of its own, since the
+    /// two are different judgements : a reader may want to hear from somebody
+    /// they have no wish to gather a page about. A record apiece, and its
+    /// deletion is the `no`.
+    static func record(forNotifiedAuthor author: String, in zone: CKRecordZone.ID) -> CKRecord {
+        let record = CKRecord(
+            recordType: RecordType.notifiedAuthor,
+            recordID: CKRecord.ID(recordName: name(forNotifiedAuthor: author), zoneID: zone)
+        )
+        record["name"] = author
+        return record
+    }
+
+    static func notifiedAuthor(from record: CKRecord) -> String? {
+        guard record.recordType == RecordType.notifiedAuthor,
+            let name = record["name"] as? String,
+            !name.isEmpty
+        else { return nil }
+
+        return name
     }
 
     static func favouriteAuthor(from record: CKRecord) -> String? {

@@ -1239,7 +1239,57 @@ final class AppModel {
         }
     }
 
-    /// Tells the reader what the sources they asked about have just published.
+    /// The writers the reader asked to be told about, in the order a list shows
+    /// them.
+    private(set) var notifiedAuthors: [String] = []
+
+    func loadNotifiedAuthors() async {
+        notifiedAuthors = (try? await authorStore.notified()) ?? []
+    }
+
+    /// Asks to be told when a writer publishes, or stops asking.
+    ///
+    /// **The same switch as the one on a source, asked of a person.** A reader
+    /// who follows somebody follows them wherever they write, which is the
+    /// whole point of asking of the person rather than of the paper : the
+    /// article turns up whichever feed carried it.
+    ///
+    /// It singles nobody out : the favourite beside it gathers a page, and this
+    /// interrupts. A reader may well want one without the other.
+    ///
+    /// **The `no` travels**, like the favourite's : one record named after the
+    /// writer, deleted when they stop asking, so a decision they undid is not
+    /// handed back to them by iCloud.
+    func setNotifications(_ wanted: Bool, forAuthor name: String) async {
+        if wanted {
+            guard await authorizeNotifications() else { return }
+            preferences.articlesAnnouncedAt = Date()
+        }
+
+        do {
+            try await authorStore.setNotifies(name, wanted)
+
+            let record = SyncRecords.name(forNotifiedAuthor: name)
+            if wanted {
+                await cloud?.enqueue(recordNames: [record])
+            } else {
+                await cloud?.enqueue(deletions: [record])
+            }
+
+            // Only where there is a list to put right : this is reached from a
+            // person's own page as well, and grouping every byline in the store
+            // for a page nobody has opened is a scan of the corpus for nothing.
+            if !authors.isEmpty { await loadAuthors() }
+            if openedAuthor?.name == name { openedAuthor?.notifies = wanted }
+            await loadNotifiedAuthors()
+        } catch {
+            failure = .notSaved
+            Log.store.error("The writer could not be set to announce : \(error, privacy: .public)")
+        }
+    }
+
+    /// Tells the reader what the sources and the writers they asked about have
+    /// just published.
     ///
     /// **The watermark moves whether anything was said or not**, exactly as it
     /// does for the stories and for the collaborations : what it records is
@@ -1250,13 +1300,15 @@ final class AppModel {
     /// so that asking about their first one starts from that moment rather than
     /// from whatever a silent pass had stamped.
     func announceNewArticles() async {
-        let asked = (try? await subscriptions.announcing()) ?? []
-        guard !asked.isEmpty else { return }
+        let sources = (try? await subscriptions.announcing()) ?? []
+        let writers = (try? await authorStore.notified()) ?? []
+        guard !sources.isEmpty || !writers.isEmpty else { return }
 
         guard let since = preferences.articlesAnnouncedAt else {
-            // A source asked about on another device, whose decision has just
-            // arrived here. What it published before this device heard about it
-            // is not news, so the clock starts now and this pass says nothing.
+            // A source or a writer asked about on another device, whose
+            // decision has just arrived here. What they published before this
+            // device heard about it is not news, so the clock starts now and
+            // this pass says nothing.
             preferences.articlesAnnouncedAt = Date()
             return
         }

@@ -733,27 +733,45 @@ nonisolated struct ArticleStore: Sendable {
         }
     }
 
-    /// One article a source the reader asked to be told about has just
-    /// published.
+    /// One article the reader asked to be told about, whether they asked of the
+    /// source or of whoever signed it.
     ///
-    /// The three things a notice needs and nothing else : what to say, what to
-    /// say it came from, and where a tap lands. A summary would carry an
-    /// excerpt, a picture and a read state, none of which a notification has
-    /// anywhere to put.
+    /// What a notice needs and nothing else : what to say, what to say it came
+    /// from, and where a tap lands. A summary would carry an excerpt, a picture
+    /// and a read state, none of which a notification has anywhere to put.
     nonisolated struct Arrival: Identifiable, Hashable, Sendable {
         let id: UUID
         let title: String
-        /// What the source is called, which is what the notice names.
+        /// What the source is called.
         let source: String
+        /// The writer the reader asked about who signed it, when that is why it
+        /// is here at all.
+        ///
+        /// `nil` for an article that arrived because of its source. It is never
+        /// the whole byline : what the notice names is the person the reader
+        /// asked about, and a piece signed by four people where they asked
+        /// about one is news about that one.
+        let author: String?
+
+        /// What the reader asked about, which is what a notice about several of
+        /// these counts them under.
+        ///
+        /// The person where there is one, since a person is the more precise
+        /// of the two answers and the one the reader chose to follow wherever
+        /// they write.
+        var subject: String { author ?? source }
     }
 
-    /// What the sources the reader asked about have published since a moment,
+    /// What the reader asked to be told about has published since a moment,
     /// oldest first.
     ///
-    /// **Asked of the feeds and not of the articles.** A reader asks about a
-    /// handful of sources out of hundreds, and the partial index on the column
-    /// covers exactly those, so a pass that brought nothing from any of them
-    /// costs one look at almost nothing.
+    /// **One question and not two, which is what keeps an article from being
+    /// announced twice.** A writer the reader follows very often writes for a
+    /// source they follow as well, and asking the two questions separately
+    /// would put that article in both answers : one notice about the source and
+    /// a second, moments later, about the person. It is one row here whichever
+    /// of the two brought it, and the person leads the wording since asking
+    /// about somebody is the more particular of the two requests.
     ///
     /// **When it arrived here, and not when it was published.** A source that
     /// backfills a month of articles published them a month ago and served them
@@ -771,19 +789,35 @@ nonisolated struct ArticleStore: Sendable {
             try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT e.id AS id, e.title AS title, f.title AS source
+                    SELECT e.id AS id, e.title AS title, f.title AS source,
+                           (SELECT a.name FROM entry_author a
+                            JOIN notified_author n ON n.name = a.name
+                            WHERE a.entry_id = e.id
+                            ORDER BY a.position LIMIT 1) AS author
                     FROM entry e
                     JOIN feed f ON f.id = e.feed_id
-                    WHERE f.notifies_new_articles = 1
-                      AND e.received_at > ?
+                    WHERE e.received_at > ?
                       AND e.is_hidden = 0 AND e.duplicate_of IS NULL AND e.is_read = 0
+                      AND (
+                            f.notifies_new_articles = 1
+                            OR EXISTS (
+                                SELECT 1 FROM entry_author a
+                                JOIN notified_author n ON n.name = a.name
+                                WHERE a.entry_id = e.id
+                            )
+                          )
                     ORDER BY e.received_at
                     LIMIT ?
                     """,
                 arguments: [moment, limit]
             )
             .map { row in
-                Arrival(id: row["id"], title: row["title"], source: row["source"] ?? "")
+                Arrival(
+                    id: row["id"],
+                    title: row["title"],
+                    source: row["source"] ?? "",
+                    author: row["author"]
+                )
             }
         }
     }

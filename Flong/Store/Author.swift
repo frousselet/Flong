@@ -42,6 +42,13 @@ nonisolated struct Author: Identifiable, Hashable, Sendable {
     /// Whether the reader singled them out.
     var isFavourite: Bool
 
+    /// Whether the reader asked to be told when they publish.
+    ///
+    /// Not the favourite above under another name. A favourite writer is
+    /// somebody the reader wants gathered on a page of their own ; this is
+    /// somebody worth being interrupted for, wherever they happen to write.
+    var notifies: Bool = false
+
     /// Where they write, by publisher, most published in first.
     ///
     /// **The domains and not the marks.** A publisher's mark is drawn from

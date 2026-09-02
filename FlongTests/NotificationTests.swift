@@ -439,7 +439,7 @@ struct AnnouncingTests {
 @Suite("What Flong says about a source's own articles")
 struct SourceAnnouncementTests {
     private func arrival(_ title: String, from source: String = "Le Monde") -> ArticleStore.Arrival {
-        ArticleStore.Arrival(id: .v7(), title: title, source: source)
+        ArticleStore.Arrival(id: .v7(), title: title, source: source, author: nil)
     }
 
     @Test("A pass that brought nothing from those sources says nothing")
@@ -501,6 +501,54 @@ struct SourceAnnouncementTests {
         #expect(announcement.body.contains("Le Monde"))
         #expect(announcement.body.contains("Swift by Sundell"))
         #expect(!announcement.body.contains("Une réforme"))
+    }
+
+    @Test("An article by a writer the reader asked about names them under the headline")
+    func onePerson() throws {
+        let article = ArticleStore.Arrival(
+            id: .v7(),
+            title: "Une réforme du calendrier scolaire",
+            source: "Le Monde",
+            author: "Claire Ancelin"
+        )
+        let announcement = try #require(Announcement.newArticles([article]))
+
+        #expect(announcement.title == "Une réforme du calendrier scolaire")
+        // The person and where they wrote it, joined the way the application's
+        // own bylines are : it is the answer to `why am I being told this`.
+        #expect(announcement.body == "Claire Ancelin · Le Monde")
+        #expect(announcement.article == article.id)
+    }
+
+    @Test("Several by one writer are counted under their name, not their papers")
+    func severalByOnePerson() throws {
+        // The whole point of asking of a person : they are followed wherever
+        // they write, so two papers in one notice is the notice working.
+        let articles = [
+            ArticleStore.Arrival(id: .v7(), title: "Une réforme", source: "Le Monde", author: "Claire Ancelin"),
+            ArticleStore.Arrival(id: .v7(), title: "Un procès", source: "Libération", author: "Claire Ancelin"),
+        ]
+        let announcement = try #require(Announcement.newArticles(articles))
+
+        #expect(announcement.title.contains("Claire Ancelin"))
+        #expect(announcement.title.contains("2"))
+        #expect(announcement.body == "Une réforme · Un procès")
+    }
+
+    @Test("A writer and a source in one pass are listed as the two things asked about")
+    func peopleAndPapers() throws {
+        let articles = [
+            arrival("Une réforme"),
+            ArticleStore.Arrival(id: .v7(), title: "Un procès", source: "Libération", author: "Claire Ancelin"),
+        ]
+        let announcement = try #require(Announcement.newArticles(articles))
+
+        #expect(announcement.title.contains("2"))
+        // What the reader asked about is what they are told : the paper for the
+        // one, the person for the other.
+        #expect(announcement.body.contains("Le Monde"))
+        #expect(announcement.body.contains("Claire Ancelin"))
+        #expect(!announcement.body.contains("Libération"))
     }
 
     @Test("These notices are grouped under a thread of their own")
@@ -609,6 +657,109 @@ struct ArrivedArticleTests {
         try await article("Copie", of: feed, receivedAt: now.addingTimeInterval(60), duplicateOf: first)
 
         #expect(try await articles.arrived(since: now).map(\.title) == ["Une réforme"])
+    }
+
+    /// A writer the reader asked about, and an article they signed.
+    private func signed(
+        _ title: String,
+        by writer: String,
+        of feed: Feed,
+        receivedAt: Date
+    ) async throws -> UUID {
+        var entry = Entry(
+            feedID: feed.id,
+            guid: "urn:\(title)",
+            title: title,
+            author: writer,
+            receivedAt: receivedAt
+        )
+        entry.hasMedia = false
+        try await database.writer.write { db in
+            try entry.insert(db)
+            try AuthorStore.index(entry.id, byline: writer, in: db)
+        }
+        return entry.id
+    }
+
+    @Test("A writer the reader asked about is announced wherever they write")
+    func aWriterAnywhere() async throws {
+        let quiet = try await source("Libération", at: "liberation.example.com", announcing: false)
+        try await AuthorStore(database).setNotifies("Claire Ancelin", true)
+
+        try await signed("Un procès", by: "Claire Ancelin", of: quiet, receivedAt: now.addingTimeInterval(60))
+        try await signed("Autre chose", by: "Paul Rey", of: quiet, receivedAt: now.addingTimeInterval(60))
+
+        // The source says nothing and is not meant to : what was asked about is
+        // the person, and they are followed into whichever paper carries them.
+        let arrived = try await articles.arrived(since: now)
+        #expect(arrived.map(\.title) == ["Un procès"])
+        #expect(arrived.first?.author == "Claire Ancelin")
+        #expect(arrived.first?.source == "Libération")
+    }
+
+    @Test("An article that answers both questions is announced once")
+    func neverTwice() async throws {
+        // The ordinary case, and the one that would be wrong twice over : a
+        // writer somebody follows very often writes for a paper they follow as
+        // well. Asked as two questions this article is in both answers, and the
+        // reader gets one notice about the paper and a second, moments later,
+        // about the person.
+        let loud = try await source("Le Monde", at: "lemonde.example.com", announcing: true)
+        try await AuthorStore(database).setNotifies("Claire Ancelin", true)
+        try await signed("Une réforme", by: "Claire Ancelin", of: loud, receivedAt: now.addingTimeInterval(60))
+
+        let arrived = try await articles.arrived(since: now)
+        #expect(arrived.count == 1)
+        // And the person leads the wording, since asking about somebody is the
+        // more particular of the two requests.
+        #expect(arrived.first?.author == "Claire Ancelin")
+        #expect(arrived.first?.subject == "Claire Ancelin")
+    }
+
+    @Test("A byline naming several people answers for the one asked about")
+    func theOneAskedAbout() async throws {
+        let quiet = try await source("Libération", at: "liberation.example.com", announcing: false)
+        try await AuthorStore(database).setNotifies("Paul Rey", true)
+        try await signed(
+            "Une enquête",
+            by: "Claire Ancelin et Paul Rey",
+            of: quiet,
+            receivedAt: now.addingTimeInterval(60)
+        )
+
+        // A piece signed by two people where the reader asked about one is news
+        // about that one, and the notice names them rather than the byline.
+        let arrived = try await articles.arrived(since: now)
+        #expect(arrived.count == 1)
+        #expect(arrived.first?.author == "Paul Rey")
+    }
+
+    @Test("Asking about a writer, and stopping")
+    func askingAboutAWriter() async throws {
+        let store = AuthorStore(database)
+
+        try await store.setNotifies("Claire Ancelin", true)
+        #expect(try await store.notified() == ["Claire Ancelin"])
+        // It singles nobody out : the favourite gathers a page, and this
+        // interrupts. A reader may well want one without the other.
+        #expect(try await store.favourites().isEmpty)
+
+        try await store.setNotifies("Claire Ancelin", false)
+        #expect(try await store.notified().isEmpty)
+    }
+
+    @Test("A writer asked about is on their own page even with nothing to their name")
+    func aWriterWithNothingHere() async throws {
+        let store = AuthorStore(database)
+        try await store.setNotifies("Claire Ancelin", true)
+
+        // The decision arrived from another device, or the purge took the last
+        // of what they signed. The page still exists, and it still has to be
+        // able to undo the decision.
+        let author = try await store.author(named: "Claire Ancelin")
+        #expect(author?.notifies == true)
+        #expect(author?.isFavourite == false)
+        #expect(try await store.all().contains { $0.name == "Claire Ancelin" && $0.notifies })
     }
 
     @Test("The sources that announce are the ones asked for, in the order a list shows them")
@@ -783,6 +934,73 @@ struct AnnouncingSourceTests {
         await model.announceNewArticles()
 
         #expect(announcer.posted.isEmpty)
+    }
+
+    @Test("A writer the reader asked about is announced, and only once")
+    func aWriterIsAnnouncedOnce() async throws {
+        let feed = try await source()
+        // The paper announces too, which is the case that used to say
+        // everything twice.
+        await asked(about: feed, from: now)
+        await model.setNotifications(true, forAuthor: "Claire Ancelin")
+        preferences.articlesAnnouncedAt = now
+        model.isReading = false
+
+        var entry = Entry(
+            feedID: feed.id,
+            guid: "urn:reforme",
+            title: "Une réforme",
+            author: "Claire Ancelin",
+            receivedAt: now.addingTimeInterval(60)
+        )
+        entry.hasMedia = false
+        try await database.writer.write { db in
+            try entry.insert(db)
+            try AuthorStore.index(entry.id, byline: "Claire Ancelin", in: db)
+        }
+
+        await model.announceNewArticles()
+
+        #expect(announcer.posted.count == 1)
+        #expect(announcer.posted.first?.title == "Une réforme")
+        #expect(announcer.posted.first?.body == "Claire Ancelin · Le Monde")
+    }
+
+    @Test("A refusal leaves the writer alone")
+    func refusedForAWriter() async throws {
+        announcer.granted = false
+
+        await model.setNotifications(true, forAuthor: "Claire Ancelin")
+
+        #expect(try await AuthorStore(database).notified().isEmpty)
+        #expect(model.notificationStatus == .denied)
+        #expect(preferences.articlesAnnouncedAt == nil)
+    }
+
+    @Test("A reader who asked about a writer alone still hears about them")
+    func aWriterWithoutASource() async throws {
+        let feed = try await source()
+        await model.setNotifications(true, forAuthor: "Claire Ancelin")
+        preferences.articlesAnnouncedAt = now
+        model.isReading = false
+
+        var entry = Entry(
+            feedID: feed.id,
+            guid: "urn:proces",
+            title: "Un procès",
+            author: "Claire Ancelin",
+            receivedAt: now.addingTimeInterval(60)
+        )
+        entry.hasMedia = false
+        try await database.writer.write { db in
+            try entry.insert(db)
+            try AuthorStore.index(entry.id, byline: "Claire Ancelin", in: db)
+        }
+
+        // No source announces anything : the clock has to run for a reader who
+        // asked only about people.
+        await model.announceNewArticles()
+        #expect(announcer.posted.map(\.title) == ["Un procès"])
     }
 
     @Test("A decision arriving from another device says nothing about the backlog")
