@@ -11,6 +11,10 @@
 
 import SwiftUI
 
+#if os(iOS)
+    import UIKit
+#endif
+
 /// Search, where the system puts search.
 ///
 /// Its own section rather than a field bolted to the front page : a query
@@ -24,6 +28,9 @@ import SwiftUI
 /// back, and at the foot of the page, directly above the field, what is worth
 /// searching for this morning. Nothing here shows the whole stream, which every
 /// other section already does and which nobody opened the search tab to read.
+///
+/// Its head is every other section's : a large title, the panels in the leading
+/// corner and the reader's own menu opposite.
 struct SearchScreen: View {
     let model: AppModel
     let zoom: Namespace.ID
@@ -41,16 +48,33 @@ struct SearchScreen: View {
     @Environment(\.theme) private var theme
     @Environment(\.colorScheme) private var scheme
     @FocusState private var isTyping: Bool
+    #if os(iOS)
+        /// Whether the software keyboard is up, which is what decides how much
+        /// of the foot of the page the field is floating over. The system says
+        /// so and nothing else can : a field is focused whether or not a
+        /// keyboard was drawn for it, and a reader with one plugged in is
+        /// focused with no keyboard at all.
+        @State private var isKeyboardUp = false
+    #endif
 
-    /// How much of the foot of the page the search field floats over.
+    /// How much of the foot of the page the search field floats over, once the
+    /// keyboard is up.
     ///
-    /// **A measurement, because there is nothing to ask.** The system draws the
-    /// field over the bottom of this page in both keyboard states and puts it
-    /// in no safe area : a bar placed there is drawn behind it, and the
-    /// keyboard's own accessory never attaches to a field a tab presents. So
-    /// the page keeps this much of its foot clear, and the subjects sit
-    /// directly above the field instead of under it.
-    private static let fieldClearance: CGFloat = 88
+    /// **A measurement, because there is nothing to ask.** With the keyboard
+    /// down the field sits inside the bottom safe area and the page already
+    /// stops above it ; with the keyboard up the field floats over the content,
+    /// in no safe area at all, and nothing the page can ask says how tall it
+    /// is. A bar put there is drawn behind it, and the keyboard's own accessory
+    /// never attaches to a field a tab presents. So the page keeps this much of
+    /// its foot clear, and only then.
+    private static let fieldClearance: CGFloat = 56
+
+    /// The air between the last subject and the field.
+    ///
+    /// Small on purpose : the subjects are what the field is about to be filled
+    /// with, and a gap wide enough to read as a margin makes them furniture
+    /// belonging to the page rather than to the field.
+    private static let fieldAir: CGFloat = 12
 
     var body: some View {
         // **Two pages, not one page with two states.** A page of results is a
@@ -67,12 +91,24 @@ struct SearchScreen: View {
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollDismissesKeyboard(.interactively)
+        // The same head as every other section : a large title that shrinks
+        // into the bar as the reader scrolls into the page, the panels in one
+        // corner and the reader's own menu in the other. Search used to carry
+        // neither, on the theory that a reader who is searching is not
+        // organizing ; what that actually did was make one section of four
+        // look like a different application.
         .navigationTitle(Text("Search"))
-        #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-        #endif
         .toolbar {
-            if menu != nil {
+            if let menu {
+                ToolbarItem(placement: .sectionLeading) {
+                    SourcesButton(model: model, open: menu)
+                }
+                ToolbarItem(placement: .sectionLeading) {
+                    TopicsButton(model: model)
+                }
+                ToolbarItem(placement: .sectionLeading) {
+                    NotificationsButton(model: model)
+                }
                 ReaderCorner(model: model, work: model.currentWork)
             }
         }
@@ -80,6 +116,14 @@ struct SearchScreen: View {
             text: Binding(get: { model.searchText }, set: { model.searchText = $0 }),
             prompt: Text("Search your articles")
         )
+        // **The head of the page stays put while the field is active.** The
+        // system hides the navigation bar for as long as a search field is
+        // presented, and this field is presented from the moment the reader
+        // arrives : that left this one section of four with no title, no
+        // panels and no reader's corner, which is not a search screen, it is a
+        // different application. This is the modifier that asks for the
+        // toolbar to be kept.
+        .searchPresentationToolbarBehavior(.avoidHidingContent)
         .searchFocused($isTyping)
         .onSubmit(of: .search) { model.remember(model.searchText) }
         .overlay {
@@ -87,6 +131,14 @@ struct SearchScreen: View {
                 ContentUnavailableView.search
             }
         }
+        #if os(iOS)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+                isKeyboardUp = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                isKeyboardUp = false
+            }
+        #endif
         .task {
             model.selection = .all
             await model.loadArticles()
@@ -103,11 +155,19 @@ struct SearchScreen: View {
         }
     }
 
+    /// How much of the foot of the page to leave to the field.
+    private var clearance: CGFloat {
+        #if os(iOS)
+            (isKeyboardUp ? Self.fieldClearance : 0) + Self.fieldAir
+        #else
+            Self.fieldAir
+        #endif
+    }
+
     /// What a query answers.
     private var results: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                name
                 answered
                 ForEach(model.summaries) { article in
                     ArticleRow(article: article, zoom: zoom) { read(article.id) }
@@ -134,12 +194,11 @@ struct SearchScreen: View {
         GeometryReader { page in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    name
                     recents
                     Spacer(minLength: Editorial.rhythm)
                     subjects
                 }
-                .frame(minHeight: max(0, page.size.height - Self.fieldClearance), alignment: .top)
+                .frame(minHeight: max(0, page.size.height - clearance), alignment: .top)
                 .editorialColumn()
                 .padding(.horizontal, 22)
             }
@@ -153,26 +212,6 @@ struct SearchScreen: View {
                 }
             }
         }
-    }
-
-    /// The name of the section, in the page rather than in a bar.
-    ///
-    /// **Because there is no bar.** The system hides the navigation bar for as
-    /// long as a search field is presented, and this field is presented from
-    /// the moment the reader arrives, so a page that left its name to
-    /// ``navigationTitle`` would be a page with nothing at the top of it at
-    /// all. The title stays declared for the Mac, where the field lives in the
-    /// toolbar and the window says its own name.
-    @ViewBuilder
-    private var name: some View {
-        #if os(iOS)
-            Text("Search")
-                .font(.system(.largeTitle, weight: .bold))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 4)
-                .padding(.bottom, Editorial.tightRhythm)
-                .accessibilityAddTraits(.isHeader)
-        #endif
     }
 
     // MARK: - What the reader looked for before

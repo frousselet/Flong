@@ -80,6 +80,38 @@ struct SearchSubjectTests {
         #expect(subjects.count <= SearchSubjects.limit)
     }
 
+    @Test("Three are offered, and taking one brings the next in")
+    func alwaysThree() {
+        let queue = ["iPhone 18 Pro", "Trump Iran", "Budget 2027", "Piétons Caen", "Etats Unis"]
+
+        #expect(SearchSubjects.offered(from: queue) == ["iPhone 18 Pro", "Trump Iran", "Budget 2027"])
+
+        // The reader searched for the first : it joins the searches above and
+        // the fourth steps into the place it left. Three, still.
+        let after = SearchSubjects.offered(from: queue, excluding: ["iphone 18 pro"])
+        #expect(after == ["Trump Iran", "Budget 2027", "Piétons Caen"])
+
+        // And again.
+        #expect(
+            SearchSubjects.offered(from: queue, excluding: ["iPhone 18 Pro", "Trump Iran"])
+                == ["Budget 2027", "Piétons Caen", "Etats Unis"]
+        )
+    }
+
+    @Test("What is typed narrows the three to what it is heading towards")
+    func narrowing() {
+        let queue = ["iPhone 18 Pro", "Trump Iran", "Budget 2027"]
+
+        #expect(SearchSubjects.offered(from: queue, matching: "tru") == ["Trump Iran"])
+        // What is already typed in full is not offered back.
+        #expect(SearchSubjects.offered(from: queue, matching: "Trump Iran").isEmpty)
+    }
+
+    @Test("More are kept than are shown")
+    func theQueueIsDeeperThanTheOffer() {
+        #expect(SearchSubjects.pool > SearchSubjects.limit)
+    }
+
     @Test("What the reader already searched for is not offered again")
     func excluded() {
         let subjects = SearchSubjects.subjects(

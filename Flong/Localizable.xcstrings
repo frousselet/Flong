@@ -1,7 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "" : {},
+    "" : {
+
+    },
     "%@ : %lld new articles" : {
       "comment" : "A notification. The first argument is the name of a source, the second how many articles it has just published.",
       "localizations" : {
@@ -1331,86 +1333,6 @@
         }
       }
     },
-    "Hide the address" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Masquer l’adresse"
-          }
-        }
-      }
-    },
-    "Neither this feed's address nor the articles it has carried hold one." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ni l’adresse de ce flux ni les articles qu’il a portés n’en comportent."
-          }
-        }
-      }
-    },
-    "Show the address" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Afficher l’adresse"
-          }
-        }
-      }
-    },
-    "The address is kept in the keychain and never in the database. Tap the eye to read it, and edit it here like any other." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’adresse est conservée dans le trousseau et jamais dans la base. Touchez l’œil pour la lire, et modifiez-la ici comme n’importe quelle autre."
-          }
-        }
-      }
-    },
-    "Tick a parameter that carries your subscription : Flong takes exactly those off an address it hands to somebody else, in a shared collection or an export. Nothing here changes how the feed is fetched, and a parameter is added or removed in the address above." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cochez un paramètre qui porte votre abonnement : Flong retire exactement ceux-là d’une adresse qu’il transmet à quelqu’un d’autre, dans une collection partagée ou un export. Rien ici ne change la façon dont le flux est récupéré, et un paramètre s’ajoute ou se retire dans l’adresse ci-dessus."
-          }
-        }
-      }
-    },
-    "Turning this off writes the address above back into the database and into your iCloud, in the open." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Désactiver cette option réécrit l’adresse ci-dessus en clair dans la base et dans votre iCloud."
-          }
-        }
-      }
-    },
-    "Type the address this source is served at." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Saisissez l’adresse à laquelle cette source est servie."
-          }
-        }
-      }
-    },
-    "What identifies you in these addresses" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce qui vous identifie dans ces adresses"
-          }
-        }
-      }
-    },
     "Écologie" : {
       "comment" : "The former name of the Environment section, kept so a rename can find it",
       "localizations" : {
@@ -1883,6 +1805,16 @@
         }
       }
     },
+    "Hide the address" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masquer l’adresse"
+          }
+        }
+      }
+    },
     "History" : {
       "localizations" : {
         "fr" : {
@@ -2242,6 +2174,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nom"
+          }
+        }
+      }
+    },
+    "Neither this feed's address nor the articles it has carried hold one." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ni l’adresse de ce flux ni les articles qu’il a portés n’en comportent."
           }
         }
       }
@@ -2710,16 +2652,6 @@
         }
       }
     },
-    "Science" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sciences"
-          }
-        }
-      }
-    },
     "Say what you are looking for, in your own words." : {
       "comment" : "Under the empty search screen. The field takes a sentence, not a syntax.",
       "localizations" : {
@@ -2727,6 +2659,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dites ce que vous cherchez, avec vos mots."
+          }
+        }
+      }
+    },
+    "Science" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sciences"
           }
         }
       }
@@ -2742,6 +2684,16 @@
         }
       }
     },
+    "Search authors" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher un auteur"
+          }
+        }
+      }
+    },
     "Search your articles" : {
       "comment" : "The placeholder in the search field.",
       "localizations" : {
@@ -2749,16 +2701,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rechercher dans vos articles"
-          }
-        }
-      }
-    },
-    "Search authors" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rechercher un auteur"
           }
         }
       }
@@ -2869,6 +2811,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Partagées avec moi"
+          }
+        }
+      }
+    },
+    "Show the address" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher l’adresse"
           }
         }
       }
@@ -3084,6 +3036,7 @@
       }
     },
     "Starred" : {
+      "comment" : "One thing a typed sentence was understood to ask for.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -3276,39 +3229,6 @@
         }
       }
     },
-    "This month" : {
-      "comment" : "A moment a typed sentence was understood to name.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce mois-ci"
-          }
-        }
-      }
-    },
-    "This week" : {
-      "comment" : "A moment a typed sentence was understood to name.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette semaine"
-          }
-        }
-      }
-    },
-    "This year" : {
-      "comment" : "A moment a typed sentence was understood to name.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette année"
-          }
-        }
-      }
-    },
     "That file is not an image" : {
       "localizations" : {
         "fr" : {
@@ -3325,6 +3245,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette ville n'a pas pu être lue. Essayez-en une autre."
+          }
+        }
+      }
+    },
+    "The address is kept in the keychain and never in the database. Tap the eye to read it, and edit it here like any other." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’adresse est conservée dans le trousseau et jamais dans la base. Touchez l’œil pour la lire, et modifiez-la ici comme n’importe quelle autre."
           }
         }
       }
@@ -3471,6 +3401,17 @@
         }
       }
     },
+    "This month" : {
+      "comment" : "A moment a typed sentence was understood to name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce mois-ci"
+          }
+        }
+      }
+    },
     "This site left no session. Sign in on its page, then say so." : {
       "localizations" : {
         "fr" : {
@@ -3491,6 +3432,38 @@
         }
       }
     },
+    "This week" : {
+      "comment" : "A moment a typed sentence was understood to name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette semaine"
+          }
+        }
+      }
+    },
+    "This year" : {
+      "comment" : "A moment a typed sentence was understood to name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette année"
+          }
+        }
+      }
+    },
+    "Tick a parameter that carries your subscription : Flong takes exactly those off an address it hands to somebody else, in a shared collection or an export. Nothing here changes how the feed is fetched, and a parameter is added or removed in the address above." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cochez un paramètre qui porte votre abonnement : Flong retire exactement ceux-là d’une adresse qu’il transmet à quelqu’un d’autre, dans une collection partagée ou un export. Rien ici ne change la façon dont le flux est récupéré, et un paramètre s’ajoute ou se retire dans l’adresse ci-dessus."
+          }
+        }
+      }
+    },
     "Tidying up" : {
       "localizations" : {
         "fr" : {
@@ -3502,6 +3475,7 @@
       }
     },
     "Today" : {
+      "comment" : "A moment a typed sentence was understood to name.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -3531,6 +3505,16 @@
         }
       }
     },
+    "Turning this off writes the address above back into the database and into your iCloud, in the open." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Désactiver cette option réécrit l’adresse ci-dessus en clair dans la base et dans votre iCloud."
+          }
+        }
+      }
+    },
     "TV series" : {
       "localizations" : {
         "fr" : {
@@ -3541,7 +3525,18 @@
         }
       }
     },
+    "Type the address this source is served at." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saisissez l’adresse à laquelle cette source est servie."
+          }
+        }
+      }
+    },
     "Unread" : {
+      "comment" : "One thing a typed sentence was understood to ask for.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
@@ -3661,6 +3656,16 @@
         }
       }
     },
+    "What identifies you in these addresses" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui vous identifie dans ces adresses"
+          }
+        }
+      }
+    },
     "What it is looking for" : {
       "comment" : "The placeholder for a dynamic collection's query",
       "localizations" : {
@@ -3723,17 +3728,6 @@
         }
       }
     },
-    "Written on" : {
-      "comment" : "One thing a typed sentence was understood to ask for.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Annotés"
-          }
-        }
-      }
-    },
     "Writing the headlines" : {
       "localizations" : {
         "fr" : {
@@ -3750,6 +3744,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Écrit par le modèle. %@"
+          }
+        }
+      }
+    },
+    "Written on" : {
+      "comment" : "One thing a typed sentence was understood to ask for.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annotés"
           }
         }
       }

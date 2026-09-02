@@ -34,6 +34,15 @@ nonisolated enum SearchSubjects {
     /// list, and what Photos offers in the same place.
     static let limit = 3
 
+    /// How many are worked out, of which ``limit`` are shown.
+    ///
+    /// **More than are shown, because taking one takes it away.** A subject the
+    /// reader searches for joins the searches above it and stops being offered,
+    /// and a page that had worked out exactly three would answer that by
+    /// showing two. What is kept is a queue : the fourth steps into the place
+    /// the first left.
+    static let pool = 12
+
     /// The longest a subject may be.
     ///
     /// Three words. Past that it stops being a subject and becomes the
@@ -47,7 +56,7 @@ nonisolated enum SearchSubjects {
     /// - Parameter excluding: what not to offer, which is what the reader has
     ///   already searched for : a suggestion the page is showing two rows above
     ///   is a suggestion that wastes its line.
-    static func subjects(in headlines: [String], excluding: [String] = [], limit: Int = limit) -> [String] {
+    static func subjects(in headlines: [String], excluding: [String] = [], limit: Int = pool) -> [String] {
         var taken: Set<String> = Set(excluding.map(key))
         var subjects: [String] = []
 
@@ -66,6 +75,37 @@ nonisolated enum SearchSubjects {
         }
 
         return subjects
+    }
+
+    /// The three to show, of everything that was worked out.
+    ///
+    /// **Three, always three.** A subject the reader searches for joins the
+    /// searches above it and stops being worth offering ; a page that showed
+    /// whatever was left would answer a tap by having one fewer thing to say.
+    /// The queue is what makes the fourth step into the place the first left.
+    ///
+    /// - Parameter typed: what is in the field, which narrows the offer to the
+    ///   subjects the reader is heading towards. Empty offers the head of the
+    ///   queue.
+    static func offered(
+        from queue: [String],
+        excluding searched: [String] = [],
+        matching typed: String = "",
+        limit: Int = limit
+    ) -> [String] {
+        let searched = Set(searched.map { $0.localizedLowercase })
+        let typed = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return
+            queue
+            .filter { subject in
+                guard !searched.contains(subject.localizedLowercase) else { return false }
+                guard !typed.isEmpty else { return true }
+                return subject.localizedCaseInsensitiveContains(typed)
+                    && subject.localizedCaseInsensitiveCompare(typed) != .orderedSame
+            }
+            .prefix(limit)
+            .map { $0 }
     }
 
     /// What one headline is about, in at most ``maximumWords`` words.

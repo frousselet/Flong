@@ -928,6 +928,10 @@ final class AppModel {
 
     /// What is worth searching for, from what the feeds are full of.
     ///
+    /// A queue rather than the three that are shown : a subject the reader
+    /// searches for joins the searches above it and stops being offered, and
+    /// the next one steps into the place it left.
+    ///
     /// Read once, when the digest is, rather than worked out every time the
     /// page draws itself : naming the people and places in twenty headlines is
     /// a pass over twenty headlines, and a computed property would do it again
@@ -946,19 +950,7 @@ final class AppModel {
     /// offer : it is on the page two rows above, and a suggestion that repeats
     /// a row wastes its line.
     var searchSuggestions: [String] {
-        let text = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else {
-            let recent = Set(recentSearches.map { $0.localizedLowercase })
-            return Array(searchSubjects.filter { !recent.contains($0.localizedLowercase) }.prefix(SearchSubjects.limit))
-        }
-
-        return
-            searchSubjects
-            .filter {
-                $0.localizedCaseInsensitiveContains(text) && $0.localizedCaseInsensitiveCompare(text) != .orderedSame
-            }
-            .prefix(SearchSubjects.limit)
-            .map { $0 }
+        SearchSubjects.offered(from: searchSubjects, excluding: recentSearches, matching: searchText)
     }
 
     init(
