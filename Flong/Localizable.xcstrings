@@ -1065,6 +1065,17 @@
         }
       }
     },
+    "Clear" : {
+      "comment" : "The control that drops every search the reader ran before.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Effacer"
+          }
+        }
+      }
+    },
     "Climate" : {
       "localizations" : {
         "fr" : {
@@ -1746,6 +1757,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Oublier toutes les préférences"
+          }
+        }
+      }
+    },
+    "Forget this search" : {
+      "comment" : "The accessibility label of the cross that drops one past search.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oublier cette recherche"
           }
         }
       }
@@ -2524,6 +2546,17 @@
         }
       }
     },
+    "Recent" : {
+      "comment" : "The heading over the searches the reader ran before.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récentes"
+          }
+        }
+      }
+    },
     "Religion" : {
       "localizations" : {
         "fr" : {
@@ -2625,11 +2658,23 @@
       }
     },
     "Search" : {
+      "comment" : "The name of the search section, as a heading. A noun, not the verb the field asks with.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rechercher"
+            "value" : "Recherche"
+          }
+        }
+      }
+    },
+    "Search your articles" : {
+      "comment" : "The placeholder in the search field.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher dans vos articles"
           }
         }
       }

@@ -387,7 +387,7 @@ tag:veille/ios (title:"vision pro" OR title:visionos) -site:medium.com after:202
 
 Input compatibility with the FreshRSS syntax, `intitle:`, `intext:`, `author:`, `date:`, silently translated at parse time so migrating users are not thrown off.
 
-Input assistance : completion of feed and tag names, a live result count, and explicit flagging of expensive expressions.
+Input assistance : the section opens with the cursor in the field, offering above the keyboard the completion of feed and tag names or, where there is nothing to complete, the words of the grammar itself, with a live result count and explicit flagging of expensive expressions. The last ten queries are kept, newest first and without repeats, carried between the reader's devices by the key-value store and never by a record.
 
 ---
 

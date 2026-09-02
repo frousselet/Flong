@@ -59,14 +59,23 @@ nonisolated final class Preferences: @unchecked Sendable {
         static let collaborationNotices = "notify.collaborations"
         static let mutedCollections = "notify.muted-collections"
         static let collaborationsAnnouncedAt = "notify.collaborations-announced-at"
+        static let recentSearches = "search.recent"
 
         /// Every key, for the one operation that has to name all of them.
         static let all = [
             articleBody, theme, firstName, lastName, picture, city, country, countryCode, device,
             newStoryNotices, storiesAnnouncedAt, articlesAnnouncedAt, collaborationNotices,
-            mutedCollections, collaborationsAnnouncedAt,
+            mutedCollections, collaborationsAnnouncedAt, recentSearches,
         ]
     }
+
+    /// How many searches are remembered.
+    ///
+    /// Ten, which is about what a page can offer without becoming a log of
+    /// everything the reader has ever wondered. Past that the eleventh is
+    /// dropped rather than the list growing : a preference store of one
+    /// megabyte is not a place to keep a history.
+    static let recentSearchLimit = 10
 
     /// The largest picture that may be kept.
     ///
@@ -325,6 +334,33 @@ nonisolated final class Preferences: @unchecked Sendable {
         let made = UUID().uuidString
         local.set(made, forKey: Key.device)
         return made
+    }
+
+    // MARK: - What the reader looked for
+
+    /// The queries the reader last ran, newest first.
+    ///
+    /// **Carried between the devices**, like everything else the reader
+    /// decided. A query in this application is not a word typed into a box, it
+    /// is a sentence in the language of section 12 with fields, states and
+    /// dates in it, and a reader who worked one out on the Mac should not have
+    /// to work it out again on the phone.
+    ///
+    /// Capped at ``recentSearchLimit`` on the way in rather than on the way
+    /// out, so the store never holds more than is ever shown.
+    var recentSearches: [String] {
+        get {
+            if let cloud, let carried = cloud.array(forKey: Key.recentSearches) as? [String] {
+                return carried
+            }
+            return local.array(forKey: Key.recentSearches) as? [String] ?? []
+        }
+        set {
+            let kept = Array(newValue.prefix(Self.recentSearchLimit))
+            local.set(kept, forKey: Key.recentSearches)
+            cloud?.set(kept, forKey: Key.recentSearches)
+            cloud?.synchronize()
+        }
     }
 
     // MARK: - Starting over

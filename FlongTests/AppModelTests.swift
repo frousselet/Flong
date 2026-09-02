@@ -293,15 +293,84 @@ struct AppModelTests {
         await model.load()
 
         model.searchText = "feed:quot"
-        #expect(model.searchSuggestions == ["feed:\"Le Quotidien\""])
+        #expect(model.searchOffers.map(\.query) == ["feed:\"Le Quotidien\""])
+        // The pill says what is being added, not what has already been typed.
+        #expect(model.searchOffers.map(\.fragment) == ["feed:\"Le Quotidien\""])
 
         // The tags there are to complete are the collections. A source is no
         // longer filed under anything, so nothing about it answers to `tag:`.
         model.searchText = "réforme tag:vei"
-        #expect(model.searchSuggestions == ["réforme tag:collection/Veille"])
+        #expect(model.searchOffers.map(\.query) == ["réforme tag:collection/Veille"])
+        #expect(model.searchOffers.map(\.fragment) == ["tag:collection/Veille"])
+    }
 
+    @Test("With nothing to complete, the field offers the language itself")
+    func offeringTheGrammar() async throws {
+        try await subscriptions.subscribe(
+            to: Subscription(address: "https://a.example.com/f.xml", title: "Le Quotidien")
+        )
+        await model.load()
+
+        // Nothing typed : the states, then the fields there is anything to
+        // complete. No collection has been made, so `tag:` is not offered.
+        #expect(
+            model.searchOffers.map(\.fragment) == [
+                "is:unread", "is:starred", "has:media", "feed:", "author:", "title:",
+            ])
+        #expect(model.searchOffers.allSatisfy { $0.fragment == $0.query })
+
+        // A word that completes nothing still gets the grammar, and taking an
+        // offer narrows what was typed rather than replacing it.
         model.searchText = "réforme"
-        #expect(model.searchSuggestions.isEmpty)
+        #expect(model.searchOffers.first?.query == "réforme is:unread")
+
+        // What the query already says is not offered again.
+        model.searchText = "réforme is:unread"
+        #expect(!model.searchOffers.contains { $0.fragment == "is:unread" })
+    }
+
+    @Test("A search that was run is remembered, newest first and only once")
+    func rememberingSearches() async throws {
+        let suite = "recent-searches-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let model = AppModel(database: database, preferences: Preferences(cloud: nil, local: defaults))
+
+        model.remember("réforme")
+        model.remember("is:unread feed:\"Le Quotidien\"")
+        #expect(model.recentSearches == ["is:unread feed:\"Le Quotidien\"", "réforme"])
+
+        // The same search again moves to the top rather than appearing twice,
+        // whatever case it was typed in and whatever it was padded with.
+        model.remember("  RÉFORME  ")
+        #expect(model.recentSearches == ["RÉFORME", "is:unread feed:\"Le Quotidien\""])
+
+        // A field holding nothing is not a search that was made.
+        model.remember("   ")
+        #expect(model.recentSearches.count == 2)
+
+        // Past the cap the oldest goes rather than the list growing.
+        for index in 0..<Preferences.recentSearchLimit { model.remember("query \(index)") }
+        #expect(model.recentSearches.count == Preferences.recentSearchLimit)
+        #expect(!model.recentSearches.contains("RÉFORME"))
+
+        model.forget(search: model.recentSearches[0])
+        #expect(model.recentSearches.count == Preferences.recentSearchLimit - 1)
+
+        model.forgetSearches()
+        #expect(model.recentSearches.isEmpty)
+        #expect(Preferences(cloud: nil, local: defaults).recentSearches.isEmpty)
+    }
+
+    @Test("What was searched for on one device is there on the next")
+    func searchesCarry() async throws {
+        let suite = "carried-searches-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let preferences = Preferences(cloud: nil, local: defaults)
+        AppModel(database: database, preferences: preferences).remember("tag:collection/Veille")
+
+        #expect(AppModel(database: database, preferences: preferences).recentSearches == ["tag:collection/Veille"])
     }
 
     // MARK: - Subscribing
