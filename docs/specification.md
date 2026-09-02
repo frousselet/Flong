@@ -387,7 +387,15 @@ tag:veille/ios (title:"vision pro" OR title:visionos) -site:medium.com after:202
 
 Input compatibility with the FreshRSS syntax, `intitle:`, `intext:`, `author:`, `date:`, silently translated at parse time so migrating users are not thrown off.
 
-**The grammar is not the interface.** It is what a dynamic collection is described with, what the FreshRSS import understands and what the compiler is given ; it is never what the reader is asked to type. The search section opens with the cursor in the field and offers above the keyboard what is worth searching for right now, read from the headlines of the stories on the digest, on no model at all so that the offer is the same on every device. A live result count, and explicit flagging of expensive expressions. The last ten searches are kept, newest first and without repeats, carried between the reader's devices by the key-value store and never by a record.
+**The grammar is not the interface.** It is what a dynamic collection is described with, what the FreshRSS import understands and what the compiler is given ; it is never what the reader is asked to type. What they type is a sentence.
+
+**A sentence is read on the device.** `les articles du Monde sur l'Iran cette semaine` is split into what it is about, who published it, who wrote it, whether it was read and when, and those pieces become a tree exactly as a typed query would. The model is never asked to write a query : it says what the sentence names, in pieces, and the compiler stays the only thing that builds SQL. It can only name things the reader has : a publication and a writer are matched against the sources actually followed and the bylines actually held, and a name matching nothing goes back into the words. A word the sentence never contained is dropped, since a model is entitled to be helpful and a word it adds narrows a search the reader never narrowed.
+
+**Without a model the sentence is still read, and read well.** The words that say nothing go, including the handful that are the reader talking about their feed reader rather than about the news, and a publication is looked up against the sources they follow, which needs no model at all. What is left is joined as it always was. Section 14 treats the model as a feature flag and this is what that means here : the same sentence answers on every device, and Apple Intelligence makes it sharper rather than possible.
+
+**A search that narrows itself says so.** Whatever was understood beyond the words is written above the results, so a reader who gets fewer articles than they expected knows why and can take a word out.
+
+The section opens with the cursor in the field and offers above the keyboard what is worth searching for right now, read from the headlines of the stories on the digest, on no model at all so that the offer is the same on every device. A live result count, and explicit flagging of expensive expressions. The last ten searches are kept, newest first and without repeats, carried between the reader's devices by the key-value store and never by a record.
 
 ---
 
@@ -472,7 +480,7 @@ Purge by age and by volume, with a configurable global cap expressed in days and
 
 Optional, switchable off, never required for nominal operation.
 
-Classification, automatic tagging and summaries by the system model, through the Foundation Models framework.
+Classification, automatic tagging, summaries and the reading of a typed sentence by the system model, through the Foundation Models framework.
 
 Constraints built in from the start :
 

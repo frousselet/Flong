@@ -21,9 +21,9 @@ import SwiftUI
 /// cursor is in the field the moment they arrive, the keyboard is up, and the
 /// page under it is about searching rather than about articles : what they
 /// looked for before, which is the thing worth offering somebody who has come
-/// back, and above the keyboard the words the language is made of. Nothing
-/// here shows the whole stream, which every other section already does and
-/// which nobody opened the search tab to read.
+/// back, and at the foot of the page, directly above the field, what is worth
+/// searching for this morning. Nothing here shows the whole stream, which every
+/// other section already does and which nobody opened the search tab to read.
 struct SearchScreen: View {
     let model: AppModel
     let zoom: Namespace.ID
@@ -42,28 +42,30 @@ struct SearchScreen: View {
     @Environment(\.colorScheme) private var scheme
     @FocusState private var isTyping: Bool
 
+    /// How much of the foot of the page the search field floats over.
+    ///
+    /// **A measurement, because there is nothing to ask.** The system draws the
+    /// field over the bottom of this page in both keyboard states and puts it
+    /// in no safe area : a bar placed there is drawn behind it, and the
+    /// keyboard's own accessory never attaches to a field a tab presents. So
+    /// the page keeps this much of its foot clear, and the subjects sit
+    /// directly above the field instead of under it.
+    private static let fieldClearance: CGFloat = 88
+
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                name
-                if model.isShowingResults {
-                    ForEach(model.summaries) { article in
-                        ArticleRow(article: article, zoom: zoom) { read(article.id) }
-                    }
-                } else {
-                    recents
-                }
+        // **Two pages, not one page with two states.** A page of results is a
+        // list that scrolls ; a page with no query is a page whose furniture
+        // sits at the two ends of what is on screen, the searches at the top
+        // and what is worth searching for at the bottom, just above the field.
+        // One layout doing both was a layout doing neither.
+        Group {
+            if model.isShowingResults {
+                results
+            } else {
+                opening
             }
-            .editorialColumn()
-            .padding(.horizontal, 22)
-            .padding(.bottom, 90)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
-        // And at the foot as well, which no other section needs : this is the
-        // one page whose own content sits in the bottom safe area, and a count
-        // with the page passing sharply through it is not a count anybody can
-        // read.
-        .scrollEdgeEffectStyle(.soft, for: .bottom)
         .scrollDismissesKeyboard(.interactively)
         .navigationTitle(Text("Search"))
         #if os(iOS)
@@ -81,17 +83,10 @@ struct SearchScreen: View {
         .searchFocused($isTyping)
         .onSubmit(of: .search) { model.remember(model.searchText) }
         .overlay {
-            if !model.isShowingResults, model.recentSearches.isEmpty {
-                ContentUnavailableView {
-                    Label("Search", systemImage: "magnifyingglass")
-                } description: {
-                    Text("Say what you are looking for, in your own words.")
-                }
-            } else if model.isShowingResults, model.summaries.isEmpty {
+            if model.isShowingResults, model.summaries.isEmpty {
                 ContentUnavailableView.search
             }
         }
-        .safeAreaInset(edge: .bottom) { above }
         .task {
             model.selection = .all
             await model.loadArticles()
@@ -105,6 +100,58 @@ struct SearchScreen: View {
             try? await Task.sleep(for: .milliseconds(120))
             guard !Task.isCancelled else { return }
             isTyping = true
+        }
+    }
+
+    /// What a query answers.
+    private var results: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                name
+                answered
+                ForEach(model.summaries) { article in
+                    ArticleRow(article: article, zoom: zoom) { read(article.id) }
+                }
+            }
+            .editorialColumn()
+            .padding(.horizontal, 22)
+            .padding(.bottom, 90)
+        }
+    }
+
+    /// The page before there is a query : what was searched for, and what is
+    /// worth searching for.
+    ///
+    /// **The subjects are content and not a bar.** Every bar this page could
+    /// hang them from is the bar the system draws the search field in once the
+    /// keyboard is up, so a pinned row of pills is a row of pills behind the
+    /// field ; the keyboard's own accessory never attaches to a search field a
+    /// tab presents. What does work is what Photos does : the page is as tall
+    /// as what is on screen, the searches sit at its head, and the subjects at
+    /// its foot, which is directly above the field without anything having been
+    /// pinned anywhere.
+    private var opening: some View {
+        GeometryReader { page in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    name
+                    recents
+                    Spacer(minLength: Editorial.rhythm)
+                    subjects
+                }
+                .frame(minHeight: max(0, page.size.height - Self.fieldClearance), alignment: .top)
+                .editorialColumn()
+                .padding(.horizontal, 22)
+            }
+        }
+        .overlay {
+            if model.recentSearches.isEmpty, model.searchSuggestions.isEmpty {
+                ContentUnavailableView {
+                    Label("Search", systemImage: "magnifyingglass")
+                } description: {
+                    Text("Say what you are looking for, in your own words.")
+                }
+            }
         }
     }
 
@@ -160,14 +207,9 @@ struct SearchScreen: View {
         }
     }
 
-    // MARK: - What is offered above the keyboard
+    // MARK: - What is worth searching for
 
-    /// What sits between the page and the search field.
-    ///
-    /// Two things, never both : what the query is answering, once there is a
-    /// query, and what is worth searching for before there is one. A count and
-    /// a stack of pills on top of each other would push the page a further line
-    /// up every time the reader typed a character.
+    /// The subjects, stacked at the foot of the page.
     ///
     /// **Stacked rather than in a row.** A subject is a phrase and phrases are
     /// not the same length ; a row of them is a row that scrolls sideways, and
@@ -175,17 +217,8 @@ struct SearchScreen: View {
     /// not suggest anything. Three, on their own lines, left where the eye
     /// already is.
     @ViewBuilder
-    private var above: some View {
-        if model.isShowingResults, !model.summaries.isEmpty {
-            Text("\(model.summaries.count) results")
-                .font(theme.metadata)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .glassEffect(.regular, in: .capsule)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-        } else if !model.searchSuggestions.isEmpty {
+    private var subjects: some View {
+        if !model.searchSuggestions.isEmpty {
             GlassEffectContainer(spacing: 8) {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(model.searchSuggestions, id: \.self) { subject in
@@ -203,10 +236,38 @@ struct SearchScreen: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 22)
-                .padding(.vertical, 8)
             }
         }
+    }
+
+    /// What the search answered, and what it was read as answering.
+    ///
+    /// **A search that narrows itself has to say so.** A sentence naming a
+    /// paper and a week is read as one, which is the whole point of typing a
+    /// sentence, and a reader who was not told would see a third of the
+    /// articles they expected and conclude the search was broken.
+    ///
+    /// At the head of the results rather than pinned over them : it is a fact
+    /// about the search, read once, and the foot of this page belongs to the
+    /// field.
+    @ViewBuilder
+    private var answered: some View {
+        if !model.summaries.isEmpty {
+            answer
+                .font(.system(.footnote, weight: .semibold))
+                .textCase(.uppercase)
+                .kerning(0.6)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, Editorial.tightRhythm)
+        }
+    }
+
+    private var answer: Text {
+        let understood = model.understood
+        guard !understood.isEmpty else { return Text("\(model.summaries.count) results") }
+
+        return Text("\(understood.joined(separator: " · ")) · \(model.summaries.count) results")
     }
 
     // MARK: - Doing what was asked

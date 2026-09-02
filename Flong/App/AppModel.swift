@@ -794,12 +794,79 @@ final class AppModel {
             search = Task {
                 try? await Task.sleep(for: .milliseconds(150))
                 guard !Task.isCancelled else { return }
+
+                // **The words first, the sentence after.** Reading a sentence
+                // takes the model a second or so, and a search field that
+                // showed nothing for a second would be a search field that
+                // felt broken. The words answer immediately, which is what
+                // every search field has always done, and the reading narrows
+                // them when it arrives.
+                reading = nil
+                readingOf = nil
                 await loadArticles()
+
+                guard !Task.isCancelled else { return }
+                await understand(searchText)
             }
         }
     }
 
     private var search: Task<Void, Never>?
+
+    /// What the model made of the sentence, when it made anything.
+    private(set) var reading: QuestionReading?
+    /// The sentence it was made of, so a reading is never used for another one.
+    private var readingOf: String?
+
+    /// What the sentence was understood to ask for, in the reader's own words.
+    ///
+    /// Empty where nothing was understood beyond the words themselves, which is
+    /// most searches and every search on a device with no model.
+    /// What the sentence was understood to ask for, in the reader's own words.
+    ///
+    /// The model's reading where there is one, and otherwise whatever the
+    /// sentence named that this device can look up on its own : a publication
+    /// the reader follows is recognized with no model at all.
+    var understood: [String] {
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let reading, readingOf == trimmed { return reading.understood }
+
+        return QuestionReader.plainly(trimmed, in: vocabulary)?.understood ?? []
+    }
+
+    /// Reads what was typed as the sentence it is.
+    ///
+    /// **Nothing is narrowed by a name the reader does not follow.** The model
+    /// is handed the sources, the feeds and the bylines this device actually
+    /// holds, and a publication it invents matches none of them and goes back
+    /// into the words. See ``QuestionReader``.
+    private func understand(_ sentence: String) async {
+        let sentence = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !sentence.isEmpty else { return }
+
+        guard let read = await QuestionReader().read(sentence, in: vocabulary) else { return }
+        // The reader has typed on while the model was thinking, and an answer
+        // about a sentence that is no longer in the field is an answer to
+        // nothing.
+        guard !Task.isCancelled, searchText.trimmingCharacters(in: .whitespacesAndNewlines) == sentence else { return }
+
+        reading = read
+        readingOf = sentence
+        await loadArticles()
+    }
+
+    /// What there is to name, so that a name in a sentence can be matched to it.
+    private var vocabulary: QuestionReader.Vocabulary {
+        QuestionReader.Vocabulary(
+            sources: sourceGroups.compactMap { item in
+                guard case .group(let host) = item.kind else { return nil }
+                return QuestionReader.Vocabulary.Source(name: item.title ?? host, host: host)
+            },
+            feeds: sidebar.flatMap { [$0] + $0.children }
+                .compactMap { if case .feed = $0.kind { $0.title } else { nil } },
+            authors: authors.map(\.name)
+        )
+    }
 
     /// What the reader has looked for before, newest first.
     ///
@@ -844,9 +911,16 @@ final class AppModel {
     }
 
     /// The query as it is understood, or `nil` when the field is empty.
+    ///
+    /// The model's reading of the sentence where there is one for this exact
+    /// sentence, and the words themselves otherwise : the parser still answers
+    /// for everybody, which is what section 15 means by the path without a
+    /// model always being there.
     var query: QueryNode? {
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
+        if let reading, readingOf == trimmed { return reading.query }
+        if let plain = QuestionReader.plainly(trimmed, in: vocabulary) { return plain.query }
 
         let node = QueryParser.parse(trimmed)
         return node == .all ? nil : node
