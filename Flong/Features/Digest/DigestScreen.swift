@@ -23,6 +23,7 @@ struct DigestScreen: View {
     let zoom: Namespace.ID
     @Binding var isAddingFeed: Bool
     @Binding var isChoosingFile: Bool
+    @Binding var isSeeingPopular: Bool
     let open: (Route) -> Void
 
     @Environment(\.theme) private var theme
@@ -222,10 +223,11 @@ struct DigestScreen: View {
             ContentUnavailableView {
                 Label("No feed yet", systemImage: "dot.radiowaves.up.forward")
             } description: {
-                Text("Add a feed, or import an OPML file to bring your subscriptions over.")
+                Text("Add a feed, import an OPML file, or see what other readers follow.")
             } actions: {
                 Button("Add a feed") { isAddingFeed = true }
                 Button("Import an OPML file") { isChoosingFile = true }
+                Button("Popular feeds") { isSeeingPopular = true }
             }
         } else if let name = model.digestTopic.name {
             ContentUnavailableView {

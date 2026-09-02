@@ -1,6 +1,10 @@
 # Synchronization
 
-The reader's own private CloudKit database, and nothing else. No server, no account to create, no third party. A device without iCloud is not a broken device : section 3 says Flong is fully usable on one, and the sidebar stays quiet rather than complaining.
+The reader's own private CloudKit database. No server, no account to create, no third party.
+
+Two other databases of the same container are reached and neither is this page's subject : a collection shared with somebody lives in a zone of its own on the shared database, in `docs/technical/collaboration.md`, and the addresses a reader chooses to offer the other readers sit in the public one, in `docs/technical/popular-feeds.md`. Everything here is about the private database.
+
+A device without iCloud is not a broken device : section 3 says Flong is fully usable on one, and the sidebar stays quiet rather than complaining.
 
 `CKSyncEngine` owns everything that is hard about synchronization : the scheduling, the batching, the subscriptions, the retries and the backoff. Flong answers the two questions it cannot, which is all `SyncPayload` does : what this device has to say, and what to do with what it hears.
 

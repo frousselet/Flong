@@ -498,6 +498,46 @@
         }
       }
     },
+    "%lld readers have shared their sources so far." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld reader has shared their sources so far."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld readers have shared their sources so far."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lecteur a partagé ses sources jusqu'ici."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lecteurs ont partagé leurs sources jusqu'ici."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld results" : {
       "localizations" : {
         "en" : {
@@ -618,6 +658,16 @@
         }
       }
     },
+    "A source is suggested once ten readers follow it, or once somebody vouched for does." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une source est suggérée dès que dix lecteurs la suivent, ou dès qu'une personne de confiance la suit."
+          }
+        }
+      }
+    },
     "A source that moves keeps its articles, everything you marked on them and the collections they are filed into. It is asked again at once, and your other devices follow." : {
       "localizations" : {
         "fr" : {
@@ -672,12 +722,12 @@
         }
       }
     },
-    "Add a feed, or import an OPML file to bring your subscriptions over." : {
+    "Add a feed, import an OPML file, or see what other readers follow." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajoutez un flux, ou importez un fichier OPML pour reprendre vos abonnements."
+            "value" : "Ajoutez un flux, importez un fichier OPML, ou voyez ce que suivent les autres lecteurs."
           }
         }
       }
@@ -1231,6 +1281,16 @@
         }
       }
     },
+    "Contributor code" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code de contributeur"
+          }
+        }
+      }
+    },
     "Create" : {
       "localizations" : {
         "fr" : {
@@ -1404,12 +1464,102 @@
         }
       }
     },
+    "Flong asks the address for itself before following it, exactly as it would one you typed." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flong interroge l'adresse lui-même avant de la suivre, exactement comme une adresse que vous auriez saisie."
+          }
+        }
+      }
+    },
     "Flong reads the people out of the articles themselves, in the background. Somebody appears here once five articles have named them." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Flong lit les personnes dans les articles eux-mêmes, en arrière-plan. Quelqu'un apparaît ici dès que cinq articles l'ont cité."
+          }
+        }
+      }
+    },
+    "Follow" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suivre"
+          }
+        }
+      }
+    },
+    "Followed by %lld readers" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Followed by %lld reader"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Followed by %lld readers"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Suivi par %lld lecteur"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Suivi par %lld lecteurs"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Followed by other readers" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suivis par d'autres lecteurs"
+          }
+        }
+      }
+    },
+    "Include in popular feeds" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inclure dans les flux populaires"
+          }
+        }
+      }
+    },
+    "Its address counts towards what Flong suggests to other readers. A secret address, one with a password and one carrying a parameter you marked as yours are never shared, whatever this says." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Son adresse compte dans ce que Flong suggère aux autres lecteurs. Une adresse secrète, une adresse avec un mot de passe et une adresse portant un paramètre que vous avez désigné comme vôtre ne sont jamais partagées, quoi que dise ce réglage."
           }
         }
       }
@@ -1435,12 +1585,32 @@
         }
       }
     },
+    "Not now" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas maintenant"
+          }
+        }
+      }
+    },
     "Nothing about them here" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rien à leur sujet ici"
+          }
+        }
+      }
+    },
+    "Nothing to suggest yet" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien à suggérer pour l'instant"
           }
         }
       }
@@ -1455,12 +1625,43 @@
         }
       }
     },
+    "Only the addresses of the sources you follow, and never a name, an article or anything you wrote. An address that is itself a secret, one carrying a parameter you marked as yours, and one behind a password are never shared. Turning this off takes your list back out." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uniquement les adresses des sources que vous suivez, et jamais un nom, un article ou quoi que ce soit que vous ayez écrit. Une adresse qui est elle-même un secret, une adresse portant un paramètre que vous avez désigné comme vôtre et une adresse protégée par un mot de passe ne sont jamais partagées. Désactiver ceci retire votre liste."
+          }
+        }
+      }
+    },
+    "Popular feeds" : {
+      "comment" : "The third way to find a source, beside an address and an OPML file : what other readers follow.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flux populaires"
+          }
+        }
+      }
+    },
     "Reading who is in the news" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lecture des personnalités"
+          }
+        }
+      }
+    },
+    "Remove" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer"
           }
         }
       }
@@ -1485,12 +1686,52 @@
         }
       }
     },
+    "Share my sources" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partager mes sources"
+          }
+        }
+      }
+    },
+    "Share the sources I follow" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partager les sources que je suis"
+          }
+        }
+      }
+    },
+    "Sharing publishes the addresses of the sources you follow, and nothing else : no name, no article, nothing you wrote. The addresses that are secrets, and those carrying a parameter you marked as yours, are never published. You can stop at any time, and your list is taken back out." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le partage publie les adresses des sources que vous suivez, et rien d'autre : pas de nom, pas d'article, rien de ce que vous avez écrit. Les adresses qui sont elles-mêmes des secrets, et celles portant un paramètre que vous avez désigné comme vôtre, ne sont jamais publiées. Vous pouvez arrêter à tout moment, et votre liste est alors retirée."
+          }
+        }
+      }
+    },
     "Stop notifying articles about them" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ne plus notifier les articles à leur sujet"
+          }
+        }
+      }
+    },
+    "This list is made by its readers" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette liste est faite par ses lecteurs"
           }
         }
       }
@@ -1505,12 +1746,54 @@
         }
       }
     },
+    "Trust" : {
+      "comment" : "Adds one reader to the roster of those believed on their own.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faire confiance"
+          }
+        }
+      }
+    },
+    "Vouched for" : {
+      "comment" : "Said of a source somebody on the roster follows, and of the roster itself.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommandé"
+          }
+        }
+      }
+    },
     "What named them has been purged, or has not arrived yet." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qui les citait a été purgé, ou n'est pas encore arrivé."
+          }
+        }
+      }
+    },
+    "What these readers follow is suggested at once, without waiting for ten people to follow it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que ces lecteurs suivent est suggéré immédiatement, sans attendre que dix personnes le suivent."
+          }
+        }
+      }
+    },
+    "Your contributor code" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre code de contributeur"
           }
         }
       }

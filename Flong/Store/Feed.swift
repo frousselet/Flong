@@ -39,6 +39,7 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
         case loadsImages = "loads_images"
         case isFavourite = "is_favourite"
         case notifiesNewArticles = "notifies_new_articles"
+        case isShared = "is_shared"
         case createdAt = "created_at"
     }
 
@@ -107,6 +108,20 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
     /// to be interrupted for, which is a great deal more to ask, and a reader
     /// with forty favourites would be a reader with forty notifications a day.
     var notifiesNewArticles: Bool
+
+    /// Whether this source is one of those the reader offers the others.
+    ///
+    /// **It only ever says no.** Contributing at all is a separate question,
+    /// asked once and answered in the reader's own panel, and a reader who has
+    /// not said yes to it publishes nothing whatever this column holds. What
+    /// this is for is the source they follow and would rather nobody knew they
+    /// followed, which is a decision about one publisher and belongs on the
+    /// publisher's row.
+    ///
+    /// On by default, and travelling with the record like the two switches
+    /// above it : a reader who took one source out of what they offer did not
+    /// mean only on their phone.
+    var isShared: Bool
     var createdAt: Date
 
     init(
@@ -132,6 +147,7 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
         loadsImages: Bool = true,
         isFavourite: Bool = false,
         notifiesNewArticles: Bool = false,
+        isShared: Bool = true,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -156,6 +172,7 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
         self.loadsImages = loadsImages
         self.isFavourite = isFavourite
         self.notifiesNewArticles = notifiesNewArticles
+        self.isShared = isShared
         self.createdAt = createdAt
     }
 
@@ -186,6 +203,7 @@ nonisolated extension Feed {
         static let title = Column(CodingKeys.title)
         static let isFavourite = Column(CodingKeys.isFavourite)
         static let notifiesNewArticles = Column(CodingKeys.notifiesNewArticles)
+        static let isShared = Column(CodingKeys.isShared)
     }
 }
 

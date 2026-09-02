@@ -28,6 +28,8 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **Sources you pay for stay readable.** A per-subscriber address, HTTP Basic or a token, kept in the keychain and never in the database, an export or a log.
 
+**The readers suggest sources to each other.** Beside an address and an OPML file there is a third way in : the feeds enough other readers follow. A source is suggested once ten people follow it, or once somebody vouched for does. You are asked once before anything of yours goes in, only addresses ever travel, and a source whose address is a secret, one behind a password and one carrying a parameter you marked as yours are never shared.
+
 **A collection can be shared**, through the system's own share sheet. What travels is the excerpt the feed published, never the article, because the article is not yours to hand anybody.
 
 **Enrichment happens on the device.** Headlines, summaries and filing come from the system model, in your own language whatever language the articles are in, and no article content is sent anywhere.
@@ -65,11 +67,13 @@ xcodebuild build -project Flong.xcodeproj -scheme Flong -destination 'platform=m
 
 ## Privacy
 
-Nothing leaves the device but your own private CloudKit database, the requests to the feeds themselves, and the pictures those feeds point at. No telemetry, no tracker, no third-party service.
+Nothing leaves the device but your own private CloudKit database, a collection you chose to share, the requests to the feeds themselves, and the pictures those feeds point at. No telemetry, no tracker, no third-party service.
+
+The popular feeds are the one thing you may publish to other readers, and only after saying so : a list of the addresses you follow, never a name, an article or anything you wrote. Turning it off takes your list back out.
 
 Feed credentials and secret feed addresses live in the keychain only. Where you say you read from is the name of a town and the code of a country, never a coordinate.
 
-There is no account to close, so the reader's panel deletes everything instead : the database, the keychain, the preferences, the Spotlight index, the CloudKit zone and the archive.
+There is no account to close, so the reader's panel deletes everything instead : the database, the keychain, the preferences, the Spotlight index, the CloudKit zone, the archive, and the list of addresses you were offering the other readers.
 
 ## Other services
 
@@ -80,7 +84,7 @@ Flong is not a client for any service. FreshRSS, Miniflux, Feedbin and Feedly ar
 | Document | Contents |
 | -------- | -------- |
 | [`docs/specification.md`](docs/specification.md) | The product and technical specification : the reference for every decision |
-| [`docs/technical/`](docs/technical/) | One page per subject : feed identity, fetching, ingestion, search, marks, sync, sharing, the digest, authors, newsmakers, the interface, erasure |
+| [`docs/technical/`](docs/technical/) | One page per subject : feed identity, fetching, ingestion, search, marks, sync, sharing, popular feeds, the digest, authors, newsmakers, the interface, erasure |
 | [`CHANGELOG.md`](CHANGELOG.md) | Change history, following [Keep a Changelog](https://keepachangelog.com/) |
 | [`CLAUDE.md`](CLAUDE.md) | Working conventions : architecture, guidelines, git and release workflow |
 

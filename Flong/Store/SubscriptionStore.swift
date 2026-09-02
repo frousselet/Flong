@@ -79,6 +79,11 @@ nonisolated struct SourceEdit: Hashable, Sendable {
     /// Whether every article this source publishes is worth interrupting the
     /// reader for.
     var notifiesNewArticles: Bool = false
+    /// Whether this source is one of those the reader offers the others.
+    ///
+    /// Only ever consulted for a reader who contributes at all, which is a
+    /// separate question asked once : see ``Feed/isShared``.
+    var isShared: Bool = true
 }
 
 /// What editing one source came to, and what has to follow it outside the store.
@@ -316,6 +321,7 @@ nonisolated struct SubscriptionStore: Sendable {
             feed.refreshInterval = edited.refreshInterval.map(Self.bounded)
             feed.isFavourite = edited.isFavourite
             feed.notifiesNewArticles = edited.notifiesNewArticles
+            feed.isShared = edited.isShared
             try feed.update(db)
 
             return SourceChange(

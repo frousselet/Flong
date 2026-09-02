@@ -16,9 +16,9 @@ At the foot of the reader's panel, in a card of its own : red glass carrying the
 
 It asks before it acts, and the sentence it asks with names what goes rather than warning in the abstract : the subscriptions, the articles, what was kept, the sites signed in to, here and in iCloud. The confirmation is destructive and the panel closes when the work is done, so the reader lands on an application that looks like a first launch rather than on a settings page reporting a success.
 
-## Six places hold something
+## Seven places hold something
 
-Deleting fewer than all six is not a reset but a pause, since three of them would fill the other three back up at the next exchange.
+Deleting fewer than all seven is not a reset but a pause, since three of them would fill the first three back up at the next exchange.
 
 | Where | What goes |
 | ----- | --------- |
@@ -28,13 +28,14 @@ Deleting fewer than all six is not a reset but a pause, since three of them woul
 | Spotlight | The index of what the reader chose and of the front page's stories, emptied by the ordinary rebuild, which now writes nothing because there is nothing to write |
 | The record zone | Deleted from the reader's private CloudKit database, through the engine's own pending database changes |
 | iCloud Drive | The whole `Stream` folder, every device's days and not only this one's |
+| The public database | The list of addresses the reader was offering the other readers, withdrawn before the identifier it is named after is forgotten. The only one of these that sits outside the reader's own account, and the only one another person would otherwise still be able to read : see `docs/technical/popular-feeds.md` |
 
 Two more are emptied because they hold the publishers' bytes rather than the reader's : the picture cache, memory and disk, and any notice still standing in the notification centre, which after a reset would be a headline that opens nothing.
 
 ## The order is the design
 
 1. **Stop everything that writes.** The enrichment is cancelled and waited for, and the window stops following the store. Dropping tables under a `DatabaseRegionObservation` is how a window goes deaf for the rest of the process.
-2. **Tell iCloud first**, while the change tokens that address the zone are still in the database that is about to be erased.
+2. **Tell iCloud first**, while the change tokens that address the zone are still in the database that is about to be erased. The offer in the public database goes in the same breath, while the key-value store still holds the identifier its records are named after.
 3. **Then this device** : the tables, the keychain, Spotlight, the notices, the pictures.
 4. **The reader's own choices last**, since the window reads its name and its face back from them. Each is emptied through the window, which writes the empty value to the store, before the keys themselves are removed.
 5. **Then back to work.** The page is read back from the empty store, the watcher and the clock start again, and the sync engine is started from nothing, which recreates an empty zone. An application that had to be relaunched after a reset would be saying the reset broke it.
