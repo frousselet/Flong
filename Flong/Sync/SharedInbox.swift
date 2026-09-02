@@ -30,10 +30,12 @@ import OSLog
 nonisolated struct SharedInbox: Sendable {
     private let entries: SharedEntryStore
     private let collections: SharedCollectionStore
+    private let members: ShareMemberStore
 
     init(_ database: AppDatabase) {
         self.entries = SharedEntryStore(database)
         self.collections = SharedCollectionStore(database)
+        self.members = ShareMemberStore(database)
     }
 
     /// Whether a record belongs to a shared collection rather than to the
@@ -67,6 +69,14 @@ nonisolated struct SharedInbox: Sendable {
                 let key = Key(zone: zone.zoneName, list: listKey)
                 lists[key, default: (SharedList.author(of: record), [])].entries += SharedList.entries(from: record)
 
+            case SyncRecords.RecordType.sharedMember:
+                // Who somebody is, written by nobody but themselves. It says
+                // nothing about their standing in the share, and the store
+                // leaves that half of the row alone : see
+                // ``ShareMemberStore/remember(card:)``.
+                guard let card = ShareMember.card(from: record) else { continue }
+                try? await members.remember(card: card)
+
             default:
                 break
             }
@@ -83,6 +93,14 @@ nonisolated struct SharedInbox: Sendable {
     /// keyed by the name of the record that brought it.
     func apply(deletions: [CKRecord.ID]) async {
         for id in deletions {
+            // A card that has gone is somebody who stopped saying who they
+            // are, not somebody who left : the share is what says who is in a
+            // collection, so the row goes and the next roster puts back
+            // whatever it still lists, under initials rather than a face.
+            if let memberKey = SyncRecords.memberKey(ofRecordNamed: id.recordName) {
+                try? await members.forget(memberKey: memberKey, inZone: id.zoneID.zoneName)
+                continue
+            }
             guard let listKey = SyncRecords.listKey(ofRecordNamed: id.recordName) else { continue }
             try? await entries.replace([], inList: listKey, by: "", inZone: id.zoneID.zoneName)
         }
@@ -97,6 +115,7 @@ nonisolated struct SharedInbox: Sendable {
     func forget(zone: CKRecordZone.ID) async {
         try? await entries.forget(zoneName: zone.zoneName)
         try? await collections.forget(zoneName: zone.zoneName)
+        try? await members.forget(zoneName: zone.zoneName)
         Log.sync.notice("A shared collection was withdrawn, and is gone from here")
     }
 

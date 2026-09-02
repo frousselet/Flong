@@ -72,19 +72,23 @@ nonisolated struct SharedCollectionStore: Sendable {
         }
     }
 
-    /// The names of the reader's collections that are shared, for a page that
-    /// wants to say so against each square without asking once per square.
-    func ownedNames() async throws -> Set<String> {
+    /// The reader's own collections that are shared, and the zone each of them
+    /// stands in.
+    ///
+    /// For a page that wants to say so against each square without asking once
+    /// per square, and that needs the zone to know who is in it : a made
+    /// collection is known by its name and everything about the sharing of it
+    /// is known by the zone.
+    func ownedZones() async throws -> [String: String] {
         try await database.writer.read { db in
-            try Set(
-                String.fetchAll(
-                    db,
-                    sql: """
-                        SELECT collection_name FROM shared_collection
-                        WHERE is_owned = 1 AND collection_name IS NOT NULL
-                        """
-                )
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT collection_name, zone_name FROM shared_collection
+                    WHERE is_owned = 1 AND collection_name IS NOT NULL
+                    """
             )
+            .reduce(into: [:]) { found, row in found[row["collection_name"] as String] = row["zone_name"] as String }
         }
     }
 

@@ -498,6 +498,47 @@
         }
       }
     },
+    "%lld people" : {
+      "comment" : "What a pile of faces is read out as, where the faces themselves say nothing.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld person"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld people"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld personne"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld personnes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld readers have shared their sources." : {
       "localizations" : {
         "en" : {
@@ -1617,12 +1658,34 @@
         }
       }
     },
+    "In this collection" : {
+      "comment" : "Over the people in a shared collection, on the page showing it.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans cette collection"
+          }
+        }
+      }
+    },
     "Include in popular feeds" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Inclure dans les flux populaires"
+          }
+        }
+      }
+    },
+    "Invited" : {
+      "comment" : "Against somebody who has not accepted the invitation yet.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invitation envoyée"
           }
         }
       }
@@ -1761,6 +1824,17 @@
         }
       }
     },
+    "Reading only" : {
+      "comment" : "Against a participant who may read a collection but not file into it.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture seule"
+          }
+        }
+      }
+    },
     "Reading who is in the news" : {
       "localizations" : {
         "fr" : {
@@ -1781,12 +1855,33 @@
         }
       }
     },
+    "Remove %@?" : {
+      "comment" : "Asked before somebody is taken out of a shared collection. The argument is their name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer %@ ?"
+          }
+        }
+      }
+    },
     "Remove from favourite newsmakers" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirer des personnalités favorites"
+          }
+        }
+      }
+    },
+    "Remove from the collection" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer de la collection"
           }
         }
       }
@@ -1817,6 +1912,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Partager les sources que je suis"
+          }
+        }
+      }
+    },
+    "Shared this" : {
+      "comment" : "Against whoever owns a shared collection.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A partagé"
+          }
+        }
+      }
+    },
+    "Someone" : {
+      "comment" : "Against a participant CloudKit will not name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quelqu'un"
           }
         }
       }
@@ -1869,6 +1986,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ils peuvent toujours lire et utiliser Flong. Ce qu'ils proposent ne compte pour personne, et ce que proposent leurs filleuls non plus."
+          }
+        }
+      }
+    },
+    "They lose the collection. What they already filed stays in it." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La personne perd la collection. Ce qu'elle y a déjà ajouté y reste."
           }
         }
       }
@@ -2006,6 +2133,17 @@
         }
       }
     },
+    "You" : {
+      "comment" : "Against the reader's own face, in the list of people in a shared collection.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous"
+          }
+        }
+      }
+    },
     "Your contributor code" : {
       "localizations" : {
         "fr" : {
@@ -2034,6 +2172,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Votre iCloud ne les détient plus : un autre appareil a cessé de les suivre. Retirer une source emporte ses articles, y compris ceux que vous avez gardés, et c'est définitif.\n\n%@"
+          }
+        }
+      }
+    },
+    "this person" : {
+      "comment" : "Stands in for a name in the question above, for somebody who cannot be named.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cette personne"
           }
         }
       }

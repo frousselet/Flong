@@ -111,4 +111,17 @@ nonisolated enum ProfilePicture {
 
         return letters.isEmpty ? nil : letters.joined()
     }
+
+    /// The same, for a name that arrives as one line rather than in two fields.
+    ///
+    /// The first word and the last, which is what a participant's name is : the
+    /// share gives it whole, and a card carries whatever the person typed. A
+    /// name of one word gives one letter, and an address somebody was invited
+    /// at gives its first, which is still better than a face with nothing in
+    /// it.
+    static func initials(of name: String) -> String? {
+        let words = name.split(whereSeparator: \.isWhitespace)
+        guard let first = words.first else { return nil }
+        return initials(first: String(first), last: words.count > 1 ? String(words[words.count - 1]) : "")
+    }
 }

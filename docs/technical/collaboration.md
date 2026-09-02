@@ -72,6 +72,7 @@ What goes in the zone is decided by the size of an excerpt. Three hundred charac
 | ----------- | ------- | ------- |
 | `SharedCollection` | zone | the name, a word about it, when it was made |
 | `SharedList` | participant, chunked | everything that person filed : per article, its title, its truncated link, its date, its byline, its excerpt, the address of its picture, and the name of the source |
+| `SharedMember` | participant | who that person is : the name and the picture from their own profile. See below |
 | `cloudkit.share` | zone | the participants and their permissions. CloudKit writes it, we do not |
 
 **One writer per record, which is a shape this project already uses.** Section 7 says it of the stream archives : *file synchronization goes wrong when two devices write one file and somebody has to resolve a conflict nobody can resolve correctly*, so each device writes only inside a folder of its own. The same argument holds here with participants in the place of devices. Each person writes their own list and reads everybody else's, two people filing at once cannot collide, and there is no conflict resolution to write. Taking an article back out is a rewrite of your own list, and a rewrite of a record one person owns is not a lost update.
@@ -93,6 +94,24 @@ Locally, two tables : one for the shared collections this device knows about, wh
 **Write access is still per participant, not per share.** `CKShare.ParticipantPermission` is set person by person in the system's own manage-share sheet, and the owner may well invite somebody read-only. So a device holding a read-only participation offers no way to file, and a save that goes out anyway is refused with `permissionFailure` and handled rather than logged and forgotten.
 
 **And each device removes its own secrets.** When somebody files an article from a feed only they are subscribed to, it is their device that truncates the address, against their own keychain, because nobody else can know which of those parameters were theirs. The rule of the previous section is not the owner's to apply on everyone's behalf : it belongs to whichever device is doing the writing.
+
+## Who is in it, and how anybody would know
+
+Attribution was settled above : `CKRecord.creatorUserRecordID` says which participant filed what, the server sets it, and no client can forge it. Turning that identifier into somebody a reader recognizes is a second question, and the share only half answers it.
+
+**`CKShare` is the authority on the roster and on nothing else a reader can see.** It says who is a participant, which of them owns the collection, who may write in it and who has actually accepted. That is exactly the part that must not be forgeable, and it is not : CloudKit writes it. What it gives for showing is `CKUserIdentity`, which carries the components of a name for a participant the system is willing to name, the address the invitation went to, and **no picture at all**. There is no photograph anywhere in the API.
+
+**The only other place a face could come from is Contacts, and it is the wrong place.** `CKUserIdentity.contactIdentifiers` is populated only when the application already holds Contacts access, so the picture costs a permission prompt over the reader's whole address book, asked by an application whose entire story is that it has no account and knows nobody. It would also be the wrong face : it is the one *this* reader happens to have filed for that person, not the one that person chose.
+
+**So each participant says who they are, in a card of their own.** One `SharedMember` record per person per zone, named after their record in the container exactly as their list is, carrying the name and the picture they set in their own profile. It is the shape the rest of this note already argued for : one writer per record, so two people cannot collide, and nobody can put a name or a face against somebody who did not choose it. It costs one small record per person per collection, and the picture is the one the preferences already hold, scaled to two hundred and fifty-six pixels on the way in, so it is a few tens of kilobytes and needs no `CKAsset`.
+
+It arrives from another person's device, so it is treated as everything else that does : the name is bounded and stripped of the control characters and direction overrides, and the picture is put back through the same scaling a picture of the reader's own goes through, which refuses a megabyte of anything that is not an image rather than storing it and trying to draw it.
+
+**The two halves are written down side by side and never overwrite each other.** A roster that arrives leaves the face standing ; a card that arrives does not invent a role. It is written down rather than fetched because the grid draws a face against every square : a page that asked iCloud once per square before it could draw would show holes on every launch and every time the network was away. The share is read back at most once in a while per collection, and the store is corrected only when the fetch actually succeeded : an empty roster is a fetch that failed, never a collection nobody is in.
+
+Where both halves are missing, the person is drawn by their initials, and where there is not even a name, by nothing. An opaque identifier is worse than silence, because it looks like information.
+
+**Taking somebody out is the owner's, and it is not the same act as leaving.** `CKShare.removeParticipant(_:)` and a save, against the private database, which is the only database an owner's share is in ; the server refuses everybody else, which is the right place for that rule to live. A participant who wants out leaves through the system's own sheet, where leaving has always been. What the person filed stays : they wrote it into the collection, in a record of their own, and removal is about what they may see from now on rather than about unsaying what they said. The interface says that in the confirmation rather than leaving it to be discovered.
 
 ## Addresses, and the parameters on them
 

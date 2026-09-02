@@ -39,6 +39,7 @@ struct StoreTests {
             "entry_newsmaker", "favourite_newsmaker", "notified_newsmaker",
             "pool_list", "pool_entry", "pool_trust",
             "pool_vouch", "pool_authorised", "pool_ban", "pool_block", "pending_deletion",
+            "share_member",
         ]
         #expect(expected.isSubset(of: tables))
     }
@@ -62,6 +63,7 @@ struct StoreTests {
                 "v28.whatSomebodyElseFiled", "v29.aSourceThatMoved", "v30.aSourceWorthInterrupting",
                 "v31.aWriterWorthInterrupting", "v32.whoTheArticlesAreAbout",
                 "v33.whatEverybodyElseFollows", "v34.whoLetThemIn", "v35.aDeletionThatSurvives",
+                "v36.whoIsInIt",
             ]
         )
     }

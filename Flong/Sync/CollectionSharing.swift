@@ -34,6 +34,7 @@ actor CollectionSharing {
 
     private let store: SharedCollectionStore
     private let entries: SharedEntryStore
+    private let members: ShareMemberStore
 
     init(
         database: AppDatabase,
@@ -42,6 +43,7 @@ actor CollectionSharing {
         self.container = container
         self.store = SharedCollectionStore(database)
         self.entries = SharedEntryStore(database)
+        self.members = ShareMemberStore(database)
     }
 
     // MARK: - Who put what in
@@ -71,6 +73,87 @@ actor CollectionSharing {
         return authors.reduce(into: [:]) { found, pair in
             guard pair.value != me, let name = names[pair.value] else { return }
             found[pair.key] = name
+        }
+    }
+
+    // MARK: - Who is in it
+
+    /// Reads the share of one collection and writes down who it lists.
+    ///
+    /// **A round trip, so it is not what a page draws from.** The store is,
+    /// and this is what corrects the store : a grid of twenty collections
+    /// cannot ask iCloud twenty questions before it draws a face, and a reader
+    /// on a train would watch every one of them fail.
+    ///
+    /// Nothing is written when the share cannot be read. A fetch that failed
+    /// says nothing about who is in a collection, and treating it as an empty
+    /// roster would empty the collection because the network was down.
+    ///
+    /// `owner` is `nil` for one of the reader's own collections, whose share is
+    /// in their private database. A collection they were invited to has its
+    /// share in the shared one, under the owner named here.
+    @discardableResult
+    func refreshMembers(inZone zone: String, ownedBy owner: String?) async -> [ShareMember] {
+        let database = owner == nil ? container.privateCloudDatabase : container.sharedCloudDatabase
+        let zoneID = CKRecordZone.ID(zoneName: zone, ownerName: owner ?? CKCurrentUserDefaultName)
+
+        guard let share = await ShareParticipants.share(inZone: zoneID, from: database) else { return [] }
+
+        let me = try? await container.userRecordID().recordName
+        let roster = ShareParticipants.roster(of: share, in: zone, me: me)
+        try? await members.reconcile(roster, inZone: zone)
+
+        return (try? await members.members(inZone: zone)) ?? []
+    }
+
+    /// Takes one person out of a collection the reader owns.
+    ///
+    /// **Only from a collection of theirs.** A share is the owner's to change
+    /// and the server refuses everybody else, so this addresses the private
+    /// database and no other : a participant who wants out leaves through the
+    /// system's own sheet, which is where leaving has always lived.
+    ///
+    /// **What they filed stays.** They wrote it into the collection, in a
+    /// record of their own, and taking somebody out of a share is about what
+    /// they may see from now on. Unsaying what they said is a different act and
+    /// is not this one.
+    func remove(_ member: String, fromCollectionNamed name: String) async throws {
+        guard let existing = try await store.owned(named: name) else { return }
+        let zoneID = CKRecordZone.ID(zoneName: existing.zoneName, ownerName: CKCurrentUserDefaultName)
+
+        let me = try? await container.userRecordID().recordName
+        let roster = try await ShareParticipants.remove(
+            member,
+            fromShareIn: zoneID,
+            from: container.privateCloudDatabase,
+            me: me
+        )
+
+        try? await members.reconcile(roster, inZone: existing.zoneName)
+        Log.sync.notice("Somebody was taken out of a shared collection")
+    }
+
+    /// Writes this reader's own card into one collection of theirs.
+    ///
+    /// **The only place a participant's face can come from.** A
+    /// `CKUserIdentity` carries none, so what is not written here is not drawn
+    /// anywhere : the other people in the collection see initials, or nothing.
+    ///
+    /// One small record and nothing else touched, so a reader who changes their
+    /// picture does not resend everything they filed.
+    @discardableResult
+    func publishCard(named name: String?, picture: Data?, inZone zoneName: String) async -> Bool {
+        guard let me = try? await container.userRecordID() else { return false }
+
+        let zoneID = CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
+        let card = ShareMember.card(name: name, picture: picture, by: me, in: zoneID)
+
+        do {
+            _ = try await container.privateCloudDatabase.modifyRecords(saving: [card], deleting: [])
+            return true
+        } catch {
+            Log.sync.error("A card could not be sent : \(error.localizedDescription, privacy: .public)")
+            return false
         }
     }
 
@@ -168,7 +251,19 @@ actor CollectionSharing {
     /// record for the removal to reach anybody.
     ///
     /// A collection nobody was invited to does nothing here.
-    func push(collectionNamed name: String, from database: AppDatabase, credentials: CredentialStoring) async {
+    ///
+    /// The reader's own card goes with it. It is one small record and it is
+    /// what puts a face rather than an identifier against everything they file,
+    /// so it travels with the filings rather than waiting for a pass of its
+    /// own : a participant invited today should not have to wait until the
+    /// owner next edits their profile to learn who invited them.
+    func push(
+        collectionNamed name: String,
+        from database: AppDatabase,
+        credentials: CredentialStoring,
+        readerNamed reader: String?,
+        picture: Data?
+    ) async {
         guard let existing = try? await store.owned(named: name),
             let me = try? await container.userRecordID()
         else { return }
@@ -177,7 +272,9 @@ actor CollectionSharing {
 
         do {
             let filed = try await SharedEntry.entries(in: database, collectionNamed: name, credentials: credentials)
-            let records = SharedList.records(for: filed, by: me, in: zoneID)
+            let records =
+                SharedList.records(for: filed, by: me, in: zoneID)
+                + [ShareMember.card(name: reader, picture: picture, by: me, in: zoneID)]
             _ = try await container.privateCloudDatabase.modifyRecords(saving: records, deleting: [])
             Log.sync.notice("Sent \(filed.count) excerpts to a shared collection")
         } catch let error as CKError where error.code == .zoneNotFound {
@@ -213,6 +310,7 @@ actor CollectionSharing {
         }
 
         try? await store.forget(zoneName: existing.zoneName)
+        try? await members.forget(zoneName: existing.zoneName)
     }
 
     /// Records where the invitation points, once the system has made one.

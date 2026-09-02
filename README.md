@@ -30,7 +30,7 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **The readers suggest sources to each other.** Beside an address and an OPML file there is a third way in : the feeds enough other readers follow. Anybody can see the list ; adding to it takes an invitation, since every member can bring in twenty people and each of them answers for who they brought. A source is suggested once ten members follow it. You are asked once before anything of yours goes in, only addresses ever travel, and a source whose address is a secret, one behind a password and one carrying a parameter you marked as yours are never shared.
 
-**A collection can be shared**, through the system's own share sheet. What travels is the excerpt the feed published, never the article, because the article is not yours to hand anybody.
+**A collection can be shared**, through the system's own share sheet. What travels is the excerpt the feed published, never the article, because the article is not yours to hand anybody. Everybody in it is shown on its square and along the top of it, under the face and the name each of them chose, and whoever shared it can take somebody back out.
 
 **Enrichment happens on the device.** Headlines, summaries and filing come from the system model, in your own language whatever language the articles are in, and no article content is sent anywhere.
 

@@ -27,16 +27,38 @@ struct SharedCollectionScreen: View {
     let zone: String
     let title: String
 
+    /// The collection as the rest of the application names one, which is what
+    /// the members of it are asked for by.
+    private var kind: ArticleCollection.Kind { .shared(zone: zone, title: title) }
+
     @Environment(\.openURL) private var openURL
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
+                // Who else is here, before what they put here. A collection
+                // somebody shared is a room as much as it is a list, and the
+                // reader is owed the people in it before the reading.
+                MembersStrip(members: model.members(of: kind), faces: model.memberFaces)
+
                 ForEach(model.sharedArticles, id: \.guid) { entry in
                     SharedArticleRow(entry: entry, by: model.filedBy[entry.guid]) {
                         guard let address = entry.url.flatMap(URL.init(string:)) else { return }
                         openURL(address)
                     }
+                }
+
+                // Under the people rather than over them : a collection with
+                // nobody's filings in it yet still has its members, and an
+                // empty state laid over the page would hide the one thing
+                // there is to see.
+                if model.sharedArticles.isEmpty {
+                    ContentUnavailableView {
+                        Label("Nothing in it yet", systemImage: "folder.badge.person.crop")
+                    } description: {
+                        Text("What anyone files into this collection shows up here.")
+                    }
+                    .padding(.top, 40)
                 }
             }
             .editorialColumn()
@@ -71,16 +93,8 @@ struct SharedCollectionScreen: View {
                 }
             }
         }
-        .overlay {
-            if model.sharedArticles.isEmpty {
-                ContentUnavailableView {
-                    Label("Nothing in it yet", systemImage: "folder.badge.person.crop")
-                } description: {
-                    Text("What anyone files into this collection shows up here.")
-                }
-            }
-        }
-        .task { await model.loadCollection(.shared(zone: zone, title: title)) }
+        .task { await model.loadCollection(kind) }
+        .task { await model.loadShareMembers() }
     }
 }
 
