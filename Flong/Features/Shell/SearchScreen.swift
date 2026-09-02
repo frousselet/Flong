@@ -141,11 +141,11 @@ struct SearchScreen: View {
             }
         }
         #if os(iOS)
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
-                isKeyboardUp = true
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) {
+                keyboard($0, isUp: true)
             }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-                isKeyboardUp = false
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) {
+                keyboard($0, isUp: false)
             }
         #endif
         .task {
@@ -164,14 +164,48 @@ struct SearchScreen: View {
         }
     }
 
-    /// How much of the foot of the page to leave to the field.
-    private var clearance: CGFloat {
+    /// The subjects, floating over the page for as long as there is a keyboard
+    /// to float above.
+    ///
+    /// **They come and go with the keyboard.** They are what to type, and a
+    /// reader who has put the keyboard away has stopped typing : the page is
+    /// then theirs to read, and three pills standing over it are three pills
+    /// in the way. They arrive from below and leave the same way, with the
+    /// keyboard rather than after it, which is why the notification is what
+    /// drives them and not a state change of the field's.
+    ///
+    /// On the Mac there is no keyboard to fold : the reader is always typing,
+    /// so the subjects are always there.
+    @ViewBuilder
+    private var floating: some View {
         #if os(iOS)
-            (isKeyboardUp ? Self.fieldClearance : 0) + Self.fieldAir
+            if isKeyboardUp {
+                subjects
+                    .editorialColumn()
+                    .padding(.horizontal, Self.fieldInset)
+                    .padding(.bottom, Self.fieldClearance + Self.fieldAir)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         #else
-            Self.fieldAir
+            subjects
+                .editorialColumn()
+                .padding(.horizontal, Self.fieldInset)
+                .padding(.bottom, Self.fieldAir)
         #endif
     }
+
+    #if os(iOS)
+        /// Moves with the keyboard rather than after it.
+        ///
+        /// The notification says how long the system is taking, and taking the
+        /// same time is the whole of what makes the two read as one movement :
+        /// a duration of one's own is a stack of pills that arrives late or
+        /// leaves early, whichever way the guess went.
+        private func keyboard(_ notification: Notification, isUp: Bool) {
+            let seconds = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double
+            withAnimation(.easeOut(duration: seconds ?? 0.25)) { isKeyboardUp = isUp }
+        }
+    #endif
 
     /// What a query answers.
     private var results: some View {
@@ -200,22 +234,20 @@ struct SearchScreen: View {
     /// its foot, which is directly above the field without anything having been
     /// pinned anywhere.
     private var opening: some View {
-        GeometryReader { page in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    // The searches stand in the column the rest of the
-                    // application is set in ; the subjects stand under the
-                    // field, which is not in that column.
-                    VStack(alignment: .leading, spacing: 0) { recents }
-                        .padding(.horizontal, 22)
-                    Spacer(minLength: Editorial.rhythm)
-                    subjects
-                        .padding(.horizontal, Self.fieldInset)
-                }
-                .frame(minHeight: max(0, page.size.height - clearance), alignment: .top)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) { recents }
                 .editorialColumn()
-            }
+                .padding(.horizontal, 22)
         }
+        // **Floating, not at the foot of the page.** They were the last thing
+        // in the content, which is right for a page holding one or two past
+        // searches and wrong for a page holding ten : the stack scrolled away
+        // with the rest and passed behind the field. Pinned, they stay where
+        // the reader is about to type, and the searches scroll behind them.
+        //
+        // The inset also reserves their height, so the last search can still
+        // be scrolled clear of them.
+        .safeAreaInset(edge: .bottom) { floating }
         .overlay {
             if model.recentSearches.isEmpty, model.searchSuggestions.isEmpty {
                 ContentUnavailableView {
