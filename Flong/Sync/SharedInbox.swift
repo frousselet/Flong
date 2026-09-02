@@ -31,11 +31,13 @@ nonisolated struct SharedInbox: Sendable {
     private let entries: SharedEntryStore
     private let collections: SharedCollectionStore
     private let members: ShareMemberStore
+    private let removals: SharedRemovalStore
 
     init(_ database: AppDatabase) {
         self.entries = SharedEntryStore(database)
         self.collections = SharedCollectionStore(database)
         self.members = ShareMemberStore(database)
+        self.removals = SharedRemovalStore(database)
     }
 
     /// Whether a record belongs to a shared collection rather than to the
@@ -68,6 +70,17 @@ nonisolated struct SharedInbox: Sendable {
                 guard let listKey = SyncRecords.listKey(ofRecordNamed: record.recordID.recordName) else { continue }
                 let key = Key(zone: zone.zoneName, list: listKey)
                 lists[key, default: (SharedList.author(of: record), [])].entries += SharedList.entries(from: record)
+
+            case SyncRecords.RecordType.sharedRemovals:
+                // **Only the owner's counts.** A participant has write access
+                // to the zone and could save one of these ; the zone says who
+                // owns it and the server says who wrote the record, so the two
+                // are compared and anybody else's is left where it is. On the
+                // reader's own zone there is nothing to compare : it is theirs
+                // and they wrote it.
+                guard let guids = SharedRemovals.guids(from: record, ownedBy: isOwned ? nil : zone.ownerName)
+                else { continue }
+                try? await removals.apply(guids, inZone: zone.zoneName)
 
             case SyncRecords.RecordType.sharedMember:
                 // Who somebody is, written by nobody but themselves. It says
@@ -116,6 +129,7 @@ nonisolated struct SharedInbox: Sendable {
         try? await entries.forget(zoneName: zone.zoneName)
         try? await collections.forget(zoneName: zone.zoneName)
         try? await members.forget(zoneName: zone.zoneName)
+        try? await removals.forget(zoneName: zone.zoneName)
         Log.sync.notice("A shared collection was withdrawn, and is gone from here")
     }
 

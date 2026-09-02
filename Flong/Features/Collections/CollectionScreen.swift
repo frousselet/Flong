@@ -22,11 +22,13 @@ struct CollectionScreen: View {
     /// of this screen's making.
     let zoom: Namespace.ID
     let open: (UUID) -> Void
+    /// Opens an excerpt somebody sent, which is read in the application like
+    /// anything else rather than handed to a browser.
+    let read: (SharedEntry) -> Void
 
     @State private var isRenaming = false
     @State private var renamed = ""
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
 
     var body: some View {
         ScrollView {
@@ -43,33 +45,13 @@ struct CollectionScreen: View {
                     Task { await model.removeMember(member, fromCollectionNamed: name) }
                 }
 
-                ForEach(model.collectionArticles) { article in
-                    ArticleRow(article: article, zoom: zoom) { open(article.id) }
-                }
-
-                // **What the other people in this collection put in it.**
-                // Under a heading, and as excerpts rather than as rows, because
-                // they are : these came from feeds this device does not follow
-                // and there is no article here to open. Without them the owner
-                // of a shared collection would be the one person in it who
-                // could not see the collaboration.
-                if !model.sharedArticles.isEmpty {
-                    Text("Added by others")
-                        .font(.system(.footnote, weight: .semibold))
-                        .textCase(.uppercase)
-                        .kerning(0.6)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, Editorial.rhythm)
-                        .padding(.bottom, 2)
-
-                    ForEach(model.sharedArticles, id: \.guid) { entry in
-                        SharedArticleRow(entry: entry, by: model.filedBy[entry.guid]) {
-                            guard let address = entry.url.flatMap(URL.init(string:)) else { return }
-                            openURL(address)
-                        }
-                    }
-                }
+                // **One run of rows, whoever filed each of them.** What the
+                // reader filed and what the other people in the collection
+                // filed were two bands under two headings, which said the two
+                // were different kinds of thing. They are not : they are what
+                // is in the collection, and who put a thing there is a line on
+                // the row rather than a wall between them.
+                CollectionRows(model: model, kind: kind, zoom: zoom, open: open, read: read)
             }
             .editorialColumn()
             .padding(.horizontal, 22)

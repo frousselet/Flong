@@ -113,6 +113,32 @@ Where both halves are missing, the person is drawn by their initials, and where 
 
 **Taking somebody out is the owner's, and it is not the same act as leaving.** `CKShare.removeParticipant(_:)` and a save, against the private database, which is the only database an owner's share is in ; the server refuses everybody else, which is the right place for that rule to live. A participant who wants out leaves through the system's own sheet, where leaving has always been. What the person filed stays : they wrote it into the collection, in a record of their own, and removal is about what they may see from now on rather than about unsaying what they said. The interface says that in the confirmation rather than leaving it to be discovered.
 
+## What the owner takes out
+
+The question this note left open, answered by the shape it said would answer it.
+
+**A person takes back what they put in.** That falls out of one list per participant and is not a rule anybody had to write : their list is theirs and nobody else may rewrite it, which is what removes conflict resolution from the whole design. It is also not enough. An owner who has invited four people into a collection they made needs to be able to take a thing out of it, and reaching into somebody's record to delete a line is exactly the thing that must never happen.
+
+**So the owner writes a list of their own saying what is out.** One record per zone, named after the writer like everything else, carrying the identities of the articles that have been taken down. Every device applies it the same way and the answer does not depend on which of the two records arrives first : union, commutative, idempotent, like every other merge in section 7.
+
+**It is a filter and never a deletion.** This is the part worth stating plainly, because the obvious implementation is wrong : deleting the rows would be undone by the very next thing that person files, since a list is rewritten whole every time any of it changes and would bring the article straight back. Nothing is deleted. The row stays where it is and is never shown, which also means applying one removal twice does nothing the first did not.
+
+**Only the owner's copy counts.** A participant has write access to the zone and can perfectly well save a record of this type. Naming it after the writer means theirs is a record of their own rather than one that overwrites the owner's, and the check on the way in is one line : the zone says who owns it, the server says who wrote the record, and anything else is left where it is.
+
+**What leaves is the filing and never the article.** A piece the reader follows the source of stays in their stream with everything they have said about it ; one somebody else filed stays in theirs. The confirmation says so, because it is the half a reader would otherwise discover afterwards.
+
+## Reading what was shared
+
+The first version sent the reader to the publisher's own page, on the argument that the article is not here. It still is not. That turned out to be a reason to fetch it rather than a reason to hand the reader to Safari.
+
+**The machinery already exists and is the same one.** `FullText` fetches a page through the same `FeedFetcher` as everything else, so the same user agent, the same token bucket for the host and the same caps ; `ArticleExtractor` pulls the article out of the navigation and the share bars around it ; `ArticleDocument` sets it in the reader's own type on the reader's own paper. What was missing was a way in that takes an address rather than a row, since a shared entry has no row and must never have one.
+
+**Asked as the reader where the reader has signed in.** `FullText.session(for:in:)` matches the site rather than the exact host, so a session signed in on `lemonde.fr` covers an article on `abonnes.lemonde.fr`. A publisher the reader subscribes to therefore serves them the article rather than the teaser, in a collection somebody shared exactly as in their own stream, and where the page gives nothing the sign-in is offered on the spot. The session is the one the rest of the application uses, it stays in the keychain, and it is sent to that site and to no other.
+
+**Nothing is written down.** The article is held for as long as the reading and then forgotten : it never enters `entry`, is never counted unread, never purged, never indexed and never re-shared. What is kept for the session is what has already been fetched, so a reader who closes an article and opens it again is not a second reason to ask its publisher for it.
+
+**And the excerpt is on screen first.** It is what the feed published and it is worth reading while the page is being fetched ; a publisher who cannot be reached leaves the reader with it rather than with a blank page. It is plain text and it is escaped on the way into the document, which is the second lock : a sender who put markup where text was expected has written characters and not tags.
+
 ## Addresses, and the parameters on them
 
 This is where the credential rule has actual work to do, and it turns out to be worth doing whether anything is ever shared or not.
@@ -190,4 +216,4 @@ More than a bolt-on, and worth knowing before starting.
 ## What I need decided
 
 - **The non-goal.** Section 2 forbids this in writing. Amending it is the first commit or there is no second one.
-- **Whether the owner may take down somebody else's entry.** No is the simple rule and one writer per record gives it for free : you take back what you put in, and nothing else. Yes needs a list of their own saying what they have taken down, which merges the same way and is not much more. Now that writing is in from the start, this is the last question the shape depends on.
+- **Whether the owner may take down somebody else's entry.** ~~No is the simple rule and one writer per record gives it for free : you take back what you put in, and nothing else. Yes needs a list of their own saying what they have taken down, which merges the same way and is not much more.~~ **Decided : yes**, by the second of those, and it cost about what this predicted. See *What the owner takes out* above.

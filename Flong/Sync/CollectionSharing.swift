@@ -35,6 +35,7 @@ actor CollectionSharing {
     private let store: SharedCollectionStore
     private let entries: SharedEntryStore
     private let members: ShareMemberStore
+    private let removals: SharedRemovalStore
 
     init(
         database: AppDatabase,
@@ -44,6 +45,7 @@ actor CollectionSharing {
         self.store = SharedCollectionStore(database)
         self.entries = SharedEntryStore(database)
         self.members = ShareMemberStore(database)
+        self.removals = SharedRemovalStore(database)
     }
 
     // MARK: - Who put what in
@@ -154,6 +156,38 @@ actor CollectionSharing {
         } catch {
             Log.sync.error("A card could not be sent : \(error.localizedDescription, privacy: .public)")
             return false
+        }
+    }
+
+    // MARK: - Taking something out
+
+    /// Takes one article out of a collection the reader owns, whoever filed it.
+    ///
+    /// **The one thing an owner can do that a participant cannot**, and the
+    /// shape that lets them do it without anybody rewriting anybody's record :
+    /// their own list of what is out, merged as a union like everything else in
+    /// section 7. ``SharedRemovals`` says why it is a filter rather than a
+    /// deletion, and why the filer's own list is left exactly as it is.
+    ///
+    /// The store is written first and the record pushed after : the page shows
+    /// the removal at once, and whether iCloud was reachable is a separate
+    /// question that the next removal makes good.
+    func takeDown(_ guid: String, fromCollectionNamed name: String) async {
+        guard let existing = try? await store.owned(named: name),
+            let me = try? await container.userRecordID()
+        else { return }
+
+        try? await removals.remove(guid, inZone: existing.zoneName)
+
+        guard let guids = try? await removals.guids(inZone: existing.zoneName) else { return }
+        let zoneID = CKRecordZone.ID(zoneName: existing.zoneName, ownerName: CKCurrentUserDefaultName)
+        let record = SharedRemovals.record(for: guids, by: me, in: zoneID)
+
+        do {
+            _ = try await container.privateCloudDatabase.modifyRecords(saving: [record], deleting: [])
+            Log.sync.notice("Something was taken out of a shared collection")
+        } catch {
+            Log.sync.error("A removal could not be sent : \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -311,6 +345,7 @@ actor CollectionSharing {
 
         try? await store.forget(zoneName: existing.zoneName)
         try? await members.forget(zoneName: existing.zoneName)
+        try? await removals.forget(zoneName: existing.zoneName)
     }
 
     /// Records where the invitation points, once the system has made one.

@@ -56,6 +56,27 @@ nonisolated struct SharedEntry: Hashable, Sendable, Codable {
     /// What the publisher is called, which travels whether the address does.
     var sourceTitle: String?
 
+    /// When this device first saw it, which never travels.
+    ///
+    /// **What an undated article sorts by.** Plenty of feeds date nothing, and
+    /// a shared collection now shows the reader's own articles and everybody
+    /// else's in one run of rows : an excerpt with no date would fall to the
+    /// bottom of it for ever, under pieces from last year, which is not where
+    /// something that arrived this morning belongs. ``ArticleSummary`` answers
+    /// the same question the same way, with the moment it reached the device.
+    ///
+    /// It is left out of the coding keys on purpose : it is a fact about this
+    /// device and about no other, and a record carrying it would be telling
+    /// the recipient when the sender happened to be looking.
+    var receivedAt: Date?
+
+    private enum CodingKeys: String, CodingKey {
+        case guid, title, url, excerpt, author, publishedAt, imageURL, feedURL, sourceTitle
+    }
+
+    /// What a row is sorted by, published or failing that arrived.
+    var date: Date { publishedAt ?? receivedAt ?? .distantPast }
+
     // MARK: - What arrives
 
     /// The same entry, bounded, for something another person's device wrote.

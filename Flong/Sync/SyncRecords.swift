@@ -42,6 +42,8 @@ nonisolated enum SyncRecords {
         static let sharedList = "SharedList"
         /// Who one participant is : the name they gave themselves, and a face.
         static let sharedMember = "SharedMember"
+        /// What the owner of a shared collection has taken out of it.
+        static let sharedRemovals = "SharedRemovals"
     }
 
     // MARK: - A collection that is shared
@@ -135,6 +137,23 @@ nonisolated enum SyncRecords {
     /// apart from a list when a deletion arrives carrying nothing else.
     static func memberKey(ofRecordNamed name: String) -> String? {
         name.hasPrefix("member-") ? name : nil
+    }
+
+    /// What the owner has taken out of a shared collection.
+    ///
+    /// **Named after the writer like everything else in the zone**, even
+    /// though only one person's copy is ever honoured. A fixed name would be a
+    /// record every participant could write, so one of them could overwrite
+    /// the owner's ; named after the writer, a participant's stray record is a
+    /// record of their own that nobody reads. ``SharedRemovals`` says which one
+    /// counts and why.
+    static func name(forSharedRemovalsBy participant: CKRecord.ID) -> String {
+        "removed-" + digest(participant.recordName)
+    }
+
+    /// Whether a record name is a list of removals.
+    static func removalsKey(ofRecordNamed name: String) -> String? {
+        name.hasPrefix("removed-") ? name : nil
     }
 
     // MARK: - Names

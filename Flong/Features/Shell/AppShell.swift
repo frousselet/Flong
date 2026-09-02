@@ -36,6 +36,16 @@ nonisolated struct Reading: Identifiable, Hashable {
     let id: UUID
 }
 
+/// An excerpt somebody shared, being read.
+///
+/// Its own kind of reading because it is its own kind of thing : there is no
+/// row in the store behind it, so it is carried whole rather than by an
+/// identifier something could be looked up by.
+nonisolated struct ReadingShared: Identifiable, Hashable {
+    let entry: SharedEntry
+    var id: String { entry.guid }
+}
+
 /// Which part of the application the reader is in.
 ///
 /// Named `AppSection` rather than `Section`, which is a view SwiftUI already
@@ -70,6 +80,7 @@ struct AppShell: View {
     /// it is read over everything, so it is presented rather than pushed, and
     /// it belongs to the window rather than to a section.
     @State private var reading: Reading?
+    @State private var readingShared: ReadingShared?
     @State private var isAddingFeed = false
     @State private var isChoosingFile = false
     @State private var isSeeingPopular = false
@@ -167,6 +178,13 @@ struct AppShell: View {
         // from is still there when they put the article down.
         .sheet(item: $reading) { article in
             zoomed(ArticleScreen(model: model, articleID: article.id), from: article.id)
+                .themed()
+        }
+        // An excerpt somebody shared, read over everything exactly as one of
+        // the reader's own articles is. It is not one of their articles and
+        // never becomes one : see ``SharedArticleScreen``.
+        .sheet(item: $readingShared) { shared in
+            SharedArticleScreen(model: model, entry: shared.entry)
                 .themed()
         }
         .sheet(isPresented: $isAddingFeed) {
@@ -392,10 +410,23 @@ struct AppShell: View {
         // articles, so it is a different page and not the same page with a
         // condition in every row.
         case .collection(.shared(let zone, let title)):
-            SharedCollectionScreen(model: model, zone: zone, title: title)
+            SharedCollectionScreen(
+                model: model,
+                zone: zone,
+                title: title,
+                zoom: zoom,
+                open: { reading = Reading(id: $0) },
+                read: { readingShared = ReadingShared(entry: $0) }
+            )
 
         case .collection(let kind):
-            CollectionScreen(model: model, kind: kind, zoom: zoom) { reading = Reading(id: $0) }
+            CollectionScreen(
+                model: model,
+                kind: kind,
+                zoom: zoom,
+                open: { reading = Reading(id: $0) },
+                read: { readingShared = ReadingShared(entry: $0) }
+            )
 
         case .author(let name):
             AuthorScreen(model: model, name: name, zoom: zoom) { reading = Reading(id: $0) }

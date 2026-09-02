@@ -94,6 +94,46 @@ nonisolated struct FullText: Sendable {
         return nil
     }
 
+    /// Fetches a page and extracts the article, keeping nothing.
+    ///
+    /// **For a piece this device does not hold.** An excerpt somebody shared
+    /// points at an article from a feed the reader does not follow : there is
+    /// no row to read it out of and there must not be one, since a shared entry
+    /// never enters `entry`. So the page is fetched, the article pulled out of
+    /// it and handed straight back, and the store is not touched at all.
+    ///
+    /// Everything else is the same as for the reader's own articles : the same
+    /// fetcher, so the same user agent, the same token bucket for the host and
+    /// the same caps, and the same session where the reader has signed in to
+    /// the site. A publisher they subscribe to serves them the article rather
+    /// than the teaser, in a shared collection exactly as anywhere else.
+    ///
+    /// Returns `nil` where the page could not be reached or held no article,
+    /// which is not an error : the excerpt is what stands in its place.
+    func article(at url: URL) async -> String? {
+        guard url.scheme?.hasPrefix("http") == true else { return nil }
+
+        let session = Self.session(for: url, in: sessions)
+        let request = FetchRequest(url: url, cookies: session?.valid() ?? [])
+
+        guard case .updated(let document) = await fetcher.fetch(request) else { return nil }
+
+        let html = PageText.text(of: document.data, contentType: document.contentType)
+        guard let extracted = ArticleExtractor.extract(html, from: document.url) else {
+            if session != nil {
+                Log.enrich.notice("A subscribed site answered with no article : the session may have expired")
+            }
+            return nil
+        }
+
+        // It worked, which is the only honest proof a session still does.
+        if var session, let host = FeedURL.room(of: url) {
+            session.lastWorkedAt = Date()
+            try? sessions.setSession(session, for: host)
+        }
+        return extracted
+    }
+
     /// Fetches the page, extracts the article and keeps it.
     ///
     /// Returns what it found, or `nil` when the page could not be reached or

@@ -145,6 +145,17 @@ nonisolated struct SharedEntryStore: Sendable {
         }
     }
 
+    /// What the owner has taken out, which every read of a collection leaves
+    /// out.
+    ///
+    /// **A filter and not a deletion**, since the filer's list still carries
+    /// the article and their next edit would send it again : see
+    /// ``SharedRemovals``. Written as a sub-select rather than carried into
+    /// Swift, so a collection of a thousand excerpts is still one query.
+    private static let notRemoved = """
+        AND guid NOT IN (SELECT guid FROM shared_removal WHERE zone_name = shared_entry.zone_name)
+        """
+
     /// Everything in one shared collection, most recently published first.
     ///
     /// `excluding` leaves out one participant's list, which is what the owner
@@ -156,6 +167,7 @@ nonisolated struct SharedEntryStore: Sendable {
                 db,
                 sql: """
                     SELECT * FROM shared_entry WHERE zone_name = ? AND (? IS NULL OR list_key <> ?)
+                    \(Self.notRemoved)
                     ORDER BY COALESCE(published_at, received_at) DESC
                     """,
                 arguments: [zoneName, listKey, listKey]
@@ -256,6 +268,7 @@ nonisolated struct SharedEntryStore: Sendable {
                 sql: """
                     SELECT * FROM shared_entry
                     WHERE received_at > ? AND (? IS NULL OR list_key <> ?)
+                    \(Self.notRemoved)
                     ORDER BY received_at
                     """,
                 arguments: [since, listKey, listKey]
@@ -282,7 +295,10 @@ nonisolated struct SharedEntryStore: Sendable {
             publishedAt: row["published_at"],
             imageURL: row["image_url"],
             feedURL: row["feed_url"],
-            sourceTitle: row["source_title"]
+            sourceTitle: row["source_title"],
+            // Never sent and never received : it is when this device saw it,
+            // and it is what an excerpt no feed dated sorts by.
+            receivedAt: row["received_at"]
         )
     }
 }
