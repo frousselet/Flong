@@ -154,6 +154,10 @@ More than a bolt-on, and worth knowing before starting.
 
 **The production schema.** `docs/technical/sync.md` already carries the warning and this adds to it : two new record types and the share, deployed from the CloudKit console before any build leaves this machine, and again the next time a field is added.
 
+**The application has to declare that it accepts a share at all.** `CKSharingSupported` in the `Info.plist` is what lets the system route an `icloud.com/share/` link to Flong. Without it the system looks the application up in the App Store instead, and a recipient tapping an invitation is told they need a newer version which does not exist : the two delegates are never reached, and nothing in the application can notice, since nothing in the application was asked. It is the first thing to check when a share will not open, and it is worse to diagnose than it sounds, because the message blames the version rather than the declaration.
+
+**Testing it before the application ships.** A build on TestFlight is an App Store build : it talks to the **production** CloudKit environment, where a build run from Xcode talks to development. A share made on one is invisible to the other, so both ends of a test have to be the same kind of build, and the schema has to have been deployed to production in the CloudKit console. The share link itself needs nothing from the App Store once `CKSharingSupported` is declared and the application is installed on the recipient's device.
+
 **Testing.** `CloudSync` is described in its own header as the one file that cannot be tested from the outside, and sharing makes that worse : it wants two accounts and two devices. So the parts that can be tested must be, and they are the parts that matter : the encoding and decoding of a `SharedList`, the truncation of a link and of a picture's address, the caps on what arrives, and the identity match against a local article. The share flow itself is verified by hand.
 
 ## What I would build, in what order

@@ -96,7 +96,16 @@ nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
         case .invalidAddress: "This address is not one Flong can follow."
         case .unreachableFeed: "This address could not be reached."
         case .noFeedFound: "No feed was found at this address."
-        case .notSignedIn: "This site left no session. Sign in on its page, then say so."
+        // **It names the one cause a reader cannot guess.** A passkey is
+        // handled by Safari and not by a web view inside an application, so
+        // Google, Apple and the rest fail there with an error about Bluetooth
+        // and nearby devices that says nothing about where they are. Every
+        // site that offers a passkey offers something else beside it.
+        case .notSignedIn:
+            """
+            This site left no session. Sign in on its page, then say so. \
+            A sign-in with a passkey cannot finish here : choose another method on the site.
+            """
         case .notDeleted: "Not everything could be deleted. Try again in a moment."
         case .notRemoved: "This source could not be removed. Try again in a moment."
         case .addressAlreadyFollowed: "Another source is already followed at this address."
