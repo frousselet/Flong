@@ -342,8 +342,17 @@ final class AppModel {
     /// device that reads the pool and never writes to it.
     private(set) var poolIdentity: String?
 
-    /// Who the roster names, for the one reader who may rewrite it.
+    /// Who the author believes on their own.
     private(set) var trustedContributors: Set<String> = []
+    /// Who the author cut out, with everybody they brought in.
+    private(set) var bannedContributors: Set<String> = []
+    /// The addresses the author withholds, whoever follows them.
+    private(set) var blockedAddresses: [PoolBlock] = []
+    /// Who this reader brought into the pool.
+    private(set) var sponsoredContributors: Set<String> = []
+    /// Whether this reader was brought in at all, which is what decides
+    /// whether anything of theirs is ever published.
+    private(set) var poolIsAuthorised = false
 
     /// What is following the store, and the periodic refresh, for as long as
     /// there is a window.
@@ -2183,6 +2192,10 @@ final class AppModel {
         popularFeeds = []
         poolContributors = 0
         trustedContributors = []
+        bannedContributors = []
+        blockedAddresses = []
+        sponsoredContributors = []
+        poolIsAuthorised = false
         preferences.forgetEverything()
 
         forgetWhatIsShown()
@@ -3440,6 +3453,7 @@ final class AppModel {
         isReadingPool = true
         let changed = await poolExchange?.refresh() == true
         isReadingPool = false
+        await loadPoolStanding()
         if changed { await loadPopularFeeds() }
     }
 
@@ -3450,7 +3464,7 @@ final class AppModel {
         let exchange = PoolExchange(database: database)
         poolExchange = exchange
         poolIdentity = await exchange.identity()
-        trustedContributors = (try? await pool.trusted()) ?? []
+        await loadPoolStanding()
     }
 
     func loadPopularFeeds() async {
@@ -3489,7 +3503,7 @@ final class AppModel {
     private func offerToPool() async {
         guard contributesToPool == true else { return }
         await startPool()
-        guard let poolExchange else { return }
+        guard let poolExchange, poolIsAuthorised else { return }
 
         let secrets = (try? credentials.everySecretParameter()) ?? [:]
         let credentialed = (try? credentials.identifiers()) ?? []
@@ -3509,20 +3523,109 @@ final class AppModel {
         await loadPopularFeeds()
     }
 
-    /// Whether this device is the one that may rewrite the roster.
-    var mayEditRoster: Bool { PoolTrust.isRoot(poolIdentity) }
+    // MARK: - Who may put anything in
 
-    /// Rewrites who is believed on their own.
-    func setTrustedContributors(_ creators: Set<String>) async {
+    /// Whether this reader may put anything into the pool.
+    ///
+    /// The pool is closed : somebody already in has to have brought them.
+    /// ``PoolTrust`` says how, and why nothing is published before this is
+    /// true.
+    var isSponsoredIntoPool: Bool { poolIsAuthorised }
+
+    /// Whether this device is the author's, which is the only one that may
+    /// cut somebody out or withhold an address.
+    var mayDecideForThePool: Bool { PoolTrust.isRoot(poolIdentity) }
+
+    /// Brings somebody into the pool, or stops.
+    ///
+    /// **Anybody already in may do this**, which is the whole shape of it : the
+    /// author does not hand out every invitation, they hand out the first ones.
+    /// What a sponsor takes on is said on the screen before they do it, since
+    /// cutting somebody out cuts everybody who came in through them.
+    func sponsor(_ code: String) async {
+        let code = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty, code != poolIdentity else { return }
+        await setSponsored(sponsoredContributors.union([code]))
+    }
+
+    func stopSponsoring(_ code: String) async {
+        await setSponsored(sponsoredContributors.subtracting([code]))
+    }
+
+    private func setSponsored(_ codes: Set<String>) async {
         await startPool()
-        guard let poolExchange, mayEditRoster else { return }
+        guard let poolExchange, isSponsoredIntoPool else { return }
 
-        if await poolExchange.publishRoster(naming: creators, as: preferences.poolIdentifier) {
-            trustedContributors = (try? await pool.trusted()) ?? []
+        if await poolExchange.publishVouch(sponsoring: codes, as: preferences.poolIdentifier) {
+            await loadPoolStanding()
             await loadPopularFeeds()
         } else {
             failure = .notSaved
         }
+    }
+
+    /// Rewrites who is believed on their own.
+    func setTrustedContributors(_ creators: Set<String>) async {
+        await decide { $0.trusted = creators }
+    }
+
+    /// Cuts somebody out of the pool, along with everybody they brought in.
+    func ban(_ code: String) async {
+        let code = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty else { return }
+        await decide { $0.banned.insert(code) }
+    }
+
+    func lift(_ code: String) async {
+        await decide { $0.banned.remove(code) }
+    }
+
+    /// Withholds an address, whoever follows it.
+    ///
+    /// **The address is remembered here and travels as a digest.** One reason
+    /// to withhold an address is that it should never have been public, and a
+    /// list of forbidden addresses published in the open would broadcast the
+    /// very thing it exists to hold back.
+    func block(_ address: URL) async {
+        try? await pool.remember(address.absoluteString)
+        await decide { $0.blocked.insert(PoolAuthority.digest(of: address.absoluteString)) }
+    }
+
+    func unblock(_ block: PoolBlock) async {
+        await decide { $0.blocked.remove(block.digest) }
+    }
+
+    private func decide(_ change: (inout PoolAuthority) -> Void) async {
+        await startPool()
+        guard let poolExchange, mayDecideForThePool else { return }
+
+        var authority = PoolAuthority(
+            trusted: trustedContributors,
+            banned: bannedContributors,
+            blocked: Set(blockedAddresses.map(\.digest))
+        )
+        change(&authority)
+
+        if await poolExchange.publishAuthority(authority, as: preferences.poolIdentifier) {
+            await loadPoolStanding()
+            await loadPopularFeeds()
+        } else {
+            failure = .notSaved
+        }
+    }
+
+    /// Who offered one address, so a ban can be aimed at somebody.
+    func offerers(of feed: PopularFeed) async -> [String] {
+        (try? await pool.offerers(of: feed.url)) ?? []
+    }
+
+    /// Everything this device knows about who stands where in the pool.
+    private func loadPoolStanding() async {
+        trustedContributors = (try? await pool.trusted()) ?? []
+        bannedContributors = (try? await pool.banned()) ?? []
+        blockedAddresses = (try? await pool.blocked()) ?? []
+        sponsoredContributors = (try? await pool.sponsored(by: poolIdentity)) ?? []
+        poolIsAuthorised = (try? await pool.isAuthorised(poolIdentity)) ?? false
     }
 
     /// One source, whole, for the screen that edits it.

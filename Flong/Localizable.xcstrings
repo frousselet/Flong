@@ -912,6 +912,16 @@
         }
       }
     },
+    "Allow again" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autoriser de nouveau"
+          }
+        }
+      }
+    },
     "Another source is already followed at this address." : {
       "localizations" : {
         "fr" : {
@@ -1102,6 +1112,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "En automatique, Flong suit le rythme du flux : environ %@ entre deux articles."
+          }
+        }
+      }
+    },
+    "Ban" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exclure"
           }
         }
       }
@@ -1317,6 +1337,27 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Culture"
+          }
+        }
+      }
+    },
+    "Cut out" : {
+      "comment" : "Contributors the author has cut out of the common pool.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exclus"
+          }
+        }
+      }
+    },
+    "Cutting one of them out also cuts everybody they brought in." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exclure l'un d'eux exclut aussi tous ceux qu'il a parrainés."
           }
         }
       }
@@ -1564,6 +1605,16 @@
         }
       }
     },
+    "Never suggested, whoever follows them. Only a fingerprint of the address is published, so a private address stays private." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jamais suggérées, quel que soit le nombre de lecteurs. Seule une empreinte de l'adresse est publiée, donc une adresse confidentielle le reste."
+          }
+        }
+      }
+    },
     "Newsmakers" : {
       "comment" : "The collection that lists everybody the articles are about",
       "localizations" : {
@@ -1625,6 +1676,16 @@
         }
       }
     },
+    "Only readers somebody has brought in can add to the list. Give your code to a reader who is already in. Nothing of yours is published until then." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seuls les lecteurs parrainés peuvent alimenter la liste. Donnez votre code à un lecteur qui en fait déjà partie. Rien de ce qui est à vous n'est publié avant."
+          }
+        }
+      }
+    },
     "Only the addresses of the sources you follow. Not your name, not an article, not a word you wrote. A secret address is never shared, nor a source behind a password. Turn this off and your list is taken back out." : {
       "localizations" : {
         "fr" : {
@@ -1642,6 +1703,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Flux populaires"
+          }
+        }
+      }
+    },
+    "Readers you brought in" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les lecteurs que vous avez parrainés"
           }
         }
       }
@@ -1706,12 +1777,43 @@
         }
       }
     },
+    "Sponsor" : {
+      "comment" : "Brings one reader into the common pool.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parrainer"
+          }
+        }
+      }
+    },
     "Stop notifying articles about them" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ne plus notifier les articles à leur sujet"
+          }
+        }
+      }
+    },
+    "They can add to the popular feeds, and bring in others themselves. If one of them is cut out, everybody they brought in goes too." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ils peuvent alimenter les flux populaires, et parrainer à leur tour. Si l'un d'eux est exclu, tous ceux qu'il a parrainés le sont aussi."
+          }
+        }
+      }
+    },
+    "They can still read and use Flong. What they offer counts for nobody, and so does what everybody they brought in offers." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ils peuvent toujours lire et utiliser Flong. Ce qu'ils proposent ne compte pour personne, et ce que proposent leurs filleuls non plus."
           }
         }
       }
@@ -1768,6 +1870,16 @@
         }
       }
     },
+    "Waiting for somebody to bring you in" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente d'un parrainage"
+          }
+        }
+      }
+    },
     "What named them has been purged, or has not arrived yet." : {
       "localizations" : {
         "fr" : {
@@ -1784,6 +1896,46 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce que suivent ces lecteurs est suggéré tout de suite, sans attendre dix personnes."
+          }
+        }
+      }
+    },
+    "Who offered it" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qui l'a proposée"
+          }
+        }
+      }
+    },
+    "Withheld addresses" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adresses retirées"
+          }
+        }
+      }
+    },
+    "Withheld from another device" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirée depuis un autre appareil"
+          }
+        }
+      }
+    },
+    "Withhold" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer de la liste"
           }
         }
       }

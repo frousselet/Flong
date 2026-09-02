@@ -65,11 +65,17 @@ actor PoolExchange {
     private let container: CKContainer
     private let store: PoolStore
     private let state: SyncState
+    private let root: String?
 
-    init(database: AppDatabase, container: CKContainer = CKContainer(identifier: CloudSync.containerIdentifier)) {
+    init(
+        database: AppDatabase,
+        container: CKContainer = CKContainer(identifier: CloudSync.containerIdentifier),
+        root: String? = PoolTrust.root
+    ) {
         self.container = container
-        self.store = PoolStore(database)
+        self.store = PoolStore(database, root: root)
         self.state = SyncState(database)
+        self.root = root
     }
 
     private var database: CKDatabase { container.publicCloudDatabase }
@@ -165,7 +171,7 @@ actor PoolExchange {
     /// same as folding it in once.
     @discardableResult
     func refresh() async -> Bool {
-        await readRoster()
+        await readAuthority()
 
         var since = await cursor()
         var absorbed = 0
@@ -225,37 +231,114 @@ actor PoolExchange {
         }
     }
 
-    /// Reads the roster, and believes it only if the author wrote it.
-    private func readRoster() async {
-        guard PoolTrust.root != nil else { return }
+    /// Reads what the author decided, and who everybody brought in.
+    ///
+    /// **Before the lists, on every pass.** The graph decides whose list is
+    /// stored at all, so a pass that folded lists in first would be storing
+    /// rows it is about to have to delete, and a device learning about a ban
+    /// would act on it one pass late.
+    ///
+    /// **The whole of it, every time.** These records are one small one per
+    /// member of a closed pool, and the graph has to be complete to be walked :
+    /// a partial fetch would cut branches that are merely absent, which is the
+    /// one mistake that would silently un-invite people.
+    private func readAuthority() async -> Bool {
+        guard root != nil else { return false }
 
-        let query = CKQuery(recordType: PoolRecords.RecordType.roster, predicate: NSPredicate(value: true))
+        var grew = false
+
+        if let authority = await fetchAuthority() {
+            grew = ((try? await store.setAuthority(authority)) ?? false) || grew
+        }
+
+        let vouches = await fetchVouches()
+        if !vouches.isEmpty {
+            grew = ((try? await store.absorb(vouches)) ?? false) || grew
+        }
+
+        // Somebody who was let in since the last pass has a list this device
+        // declined to store. The cursor goes back to the beginning so it is
+        // asked for again ; a ban needs nothing of the sort, since the rows go
+        // with the walk.
+        if grew { await forgetCursor() }
+
+        return grew
+    }
+
+    private func fetchAuthority() async -> PoolAuthority? {
+        let query = CKQuery(recordType: PoolRecords.RecordType.authority, predicate: NSPredicate(value: true))
 
         do {
             let (matches, _) = try await database.records(matching: query, resultsLimit: 20)
-            let rosters = matches.compactMap { _, result -> Set<String>? in
+            return matches.compactMap { _, result -> PoolAuthority? in
                 guard let record = try? result.get() else { return nil }
-                return PoolTrust.trusted(in: record)
-            }
-            guard let trusted = rosters.first else { return }
-            try await store.setTrusted(trusted)
+                return PoolAuthority.read(record, root: self.root)
+            }.first
         } catch {
-            Log.sync.error("The roster could not be read : \(error.localizedDescription, privacy: .public)")
+            Log.sync.error(
+                "What the author decided could not be read : \(error.localizedDescription, privacy: .public)")
+            return nil
         }
     }
 
-    /// Writes the roster, which only the author's own device may do.
+    private func fetchVouches() async -> [PoolVouch.Received] {
+        let query = CKQuery(recordType: PoolRecords.RecordType.vouch, predicate: NSPredicate(value: true))
+        var vouches: [PoolVouch.Received] = []
+        var cursor: CKQueryOperation.Cursor?
+
+        do {
+            for pass in 0..<Self.passLimit {
+                let page =
+                    if let cursor {
+                        try await database.records(continuingMatchFrom: cursor, resultsLimit: Self.pageLimit)
+                    } else {
+                        try await database.records(matching: query, resultsLimit: Self.pageLimit)
+                    }
+                _ = pass
+                vouches += page.matchResults.compactMap { _, result -> PoolVouch.Received? in
+                    guard let record = try? result.get() else { return nil }
+                    return PoolVouch.received(record)
+                }
+                guard let next = page.queryCursor else { break }
+                cursor = next
+            }
+        } catch {
+            Log.sync.error("The sponsorships could not be read : \(error.localizedDescription, privacy: .public)")
+        }
+
+        return vouches
+    }
+
+    /// Writes what the author decided, which only their own device may do.
     @discardableResult
-    func publishRoster(naming creators: Set<String>, as contributor: UUID) async -> Bool {
+    func publishAuthority(_ authority: PoolAuthority, as contributor: UUID) async -> Bool {
         guard PoolTrust.isRoot(await identity()) else { return false }
 
         do {
-            let record = PoolTrust.record(naming: creators, by: contributor)
+            let record = PoolAuthority.record(authority, by: contributor)
             _ = try await database.modifyRecords(saving: [record], deleting: [], savePolicy: .allKeys)
-            try await store.setTrusted(creators)
+            try await store.setAuthority(authority)
             return true
         } catch {
-            Log.sync.error("The roster was refused : \(error.localizedDescription, privacy: .public)")
+            Log.sync.error("What the author decided was refused : \(error.localizedDescription, privacy: .public)")
+            return false
+        }
+    }
+
+    /// Writes who this reader brought in, which anybody already in may do.
+    @discardableResult
+    func publishVouch(sponsoring codes: Set<String>, as contributor: UUID) async -> Bool {
+        do {
+            let record = PoolVouch.record(sponsoring: codes, by: contributor)
+            _ = try await database.modifyRecords(saving: [record], deleting: [], savePolicy: .allKeys)
+            if let mine = await identity() {
+                try await store.absorb([
+                    PoolVouch.Received(creator: mine, sponsored: codes, modifiedAt: Date())
+                ])
+            }
+            return true
+        } catch {
+            Log.sync.error("The sponsorship was refused : \(error.localizedDescription, privacy: .public)")
             return false
         }
     }
