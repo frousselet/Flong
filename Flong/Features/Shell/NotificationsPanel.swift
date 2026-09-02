@@ -49,12 +49,13 @@ struct NotificationsPanel: View {
         model.notificationStatus == .denied
     }
 
-    /// The sources the reader asked to be told about, which are switches like
-    /// any other and belong in the one panel that holds them all.
+    /// The sources and the writers the reader asked to be told about, which are
+    /// switches like any other and belong in the one panel that holds them all.
     private var sources: [Feed] { model.announcingSources }
+    private var writers: [String] { model.notifiedAuthors }
 
-    /// How many source rows the panel stands tall enough to show before the
-    /// rest is scrolled to.
+    /// How many rows the panel stands tall enough to show before the rest is
+    /// scrolled to.
     private static let shownSources = 4
 
     /// How tall the panel stands.
@@ -72,15 +73,15 @@ struct NotificationsPanel: View {
         // The sources the reader asked about, up to the point where the panel
         // would be the whole page. Past that they scroll, and the reader can
         // pull the panel up to see the rest at once.
-        let announced: CGFloat =
-            sources.isEmpty ? 0 : 40 + CGFloat(min(sources.count, Self.shownSources)) * 62
+        let rows = min(sources.count + writers.count, Self.shownSources)
+        let announced: CGFloat = rows == 0 ? 0 : 40 + CGFloat(rows) * 62
         return (isRefused ? 250 : 132) + switches + announced
     }
 
     /// What the panel may be pulled to, which is the whole page only when there
     /// is more in it than a panel can hold.
     private var detents: Set<PresentationDetent> {
-        sources.count > Self.shownSources ? [.height(height), .large] : [.height(height)]
+        sources.count + writers.count > Self.shownSources ? [.height(height), .large] : [.height(height)]
     }
 
     var body: some View {
@@ -135,23 +136,36 @@ struct NotificationsPanel: View {
         .themed()
         .presentationDetents(detents)
         .presentationDragIndicator(.visible)
-        .task { await model.refreshNotificationStatus() }
+        .task {
+            await model.refreshNotificationStatus()
+            // The sources come with the sidebar, which is always in step ; the
+            // writers are a question nothing else in the window asks, so the
+            // panel asks it when it opens.
+            await model.loadNotifiedAuthors()
+        }
     }
 
-    /// The sources that announce everything they publish, one row apiece.
+    /// The sources and the writers that announce everything they publish, one
+    /// row apiece.
     ///
     /// **Only where there are any**, exactly as the shared collections are :
-    /// the switch that puts a source here is on the source itself, where the
-    /// decision about a publisher belongs, and a heading over an empty list
-    /// would be the panel asking a question with nowhere to answer it.
+    /// the switch that puts one here is on the source or on the person, where
+    /// the decision belongs, and a heading over an empty list would be the
+    /// panel asking a question with nowhere to answer it.
     ///
-    /// A row is a source that is on, so switching one off takes it out of the
-    /// list. This is where they are all seen at once and quietened, which is
-    /// the thing a reader wants when several of them turn out to be louder than
-    /// they expected ; adding one is done where the source is.
+    /// **One list and not two.** They are two kinds of thing to the machinery
+    /// and one thing to the reader, who is looking at what may interrupt them ;
+    /// a heading apiece over two rows each would be filing where there is
+    /// nothing to file. The glyph says which is which : a publisher wears the
+    /// aerial the sources list gives it, a person wears a signature.
+    ///
+    /// A row is one that is on, so switching it off takes it out of the list.
+    /// This is where they are all seen at once and quietened, which is what a
+    /// reader wants when several turn out to be louder than they expected ;
+    /// adding one is done where the source or the writer is.
     @ViewBuilder
     private var announcingSources: some View {
-        if !sources.isEmpty {
+        if !sources.isEmpty || !writers.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text("New articles")
                     .font(.footnote)
@@ -160,33 +174,49 @@ struct NotificationsPanel: View {
                 ScrollView {
                     VStack(spacing: 8) {
                         ForEach(sources) { source in
-                            Toggle(
-                                isOn: Binding(
-                                    get: { true },
-                                    set: { wanted in
-                                        Task { await model.setNotifications(wanted, forSource: source.id) }
-                                    }
-                                )
-                            ) {
-                                // Verbatim : it is what the publisher calls
-                                // itself, or what the reader called it.
-                                Label {
-                                    Text(verbatim: source.title)
-                                        .lineLimit(1)
-                                } icon: {
-                                    Image(systemName: "bell")
-                                }
+                            // Verbatim : it is what the publisher calls itself,
+                            // or what the reader called it.
+                            announcing(source.title, icon: "dot.radiowaves.up.forward") { wanted in
+                                await model.setNotifications(wanted, forSource: source.id)
                             }
-                            .disabled(isRefused)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 10)
-                            .background(theme.surface(in: scheme), in: .rect(cornerRadius: 14))
+                        }
+                        // Verbatim too : a person is called what they are
+                        // called in every language.
+                        ForEach(writers, id: \.self) { writer in
+                            announcing(writer, icon: "signature") { wanted in
+                                await model.setNotifications(wanted, forAuthor: writer)
+                            }
                         }
                     }
                 }
                 .scrollBounceBehavior(.basedOnSize)
             }
         }
+    }
+
+    /// One thing that may interrupt the reader, and the switch that stops it.
+    private func announcing(
+        _ name: String,
+        icon: String,
+        set: @escaping (Bool) async -> Void
+    ) -> some View {
+        Toggle(
+            isOn: Binding(
+                get: { true },
+                set: { wanted in Task { await set(wanted) } }
+            )
+        ) {
+            Label {
+                Text(verbatim: name)
+                    .lineLimit(1)
+            } icon: {
+                Image(systemName: icon)
+            }
+        }
+        .disabled(isRefused)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(theme.surface(in: scheme), in: .rect(cornerRadius: 14))
     }
 
     /// What the panel is, and the way out on the platform that needs one.

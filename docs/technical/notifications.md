@@ -26,7 +26,7 @@ A refusal is final until the reader goes to the system settings : asking again d
 
 ## New stories
 
-The first of the three.
+The first of the four.
 
 A story is several articles, from several newsrooms, about one thing : the unit of the front page, and the whole difference between watching a field and watching a list of what arrived. A story opening is the moment the press starts covering something, which is the one thing in a feed reader worth interrupting somebody for.
 
@@ -52,6 +52,8 @@ Announced after the model has written the headlines rather than before, so what 
 
 The question the stories cannot answer. A story is several newsrooms covering one thing, which is the right unit for the press and the wrong one for a reader who follows one newsletter, one blog or one colleague : a piece nobody else covers never becomes a story, so it would never be announced, and it is exactly the piece that reader is waiting for.
 
+**Asked of a source or of a writer**, which are two switches and one notice : see the section below for why an article that answers both is announced once.
+
 **The switch is on the source and not in the panel.** It is a decision about a publisher, like the favourite beside it, so it lives on the feed's own row and travels in the feed's own record : a reader who asked to be told about one paper on their phone did not mean only on their phone. A list of identifiers in the key-value store would be a second place naming sources, going stale the moment one is unsubscribed from and needing a rule of its own for what happens when one moves.
 
 **It is not the favourite under another name.** A favourite source is one the reader wants near the top of their own lists ; this is one they want to be interrupted for, which is a great deal more to ask. A reader with forty favourites who found they had signed up for forty notifications a day would turn the lot off, and the two are deliberately separate switches, in separate lines of the same menu and separate sections of the same editor.
@@ -71,6 +73,30 @@ The question the stories cannot answer. A story is several newsrooms covering on
 **Announced where the articles land, and not where the model runs.** The stories are announced after the headlines are written, since the written headline is what the notice says ; this needs nothing written and nothing grouped, so it is said at the end of every pass that fetched, the twenty-five seconds of a background refresh included. Those are the moments the reader is not looking, and they are what this exists for.
 
 **A decision arriving from another device says nothing about the backlog.** The switch travels ; the watermark does not. A device that has never said anything and meets a source already switched on stamps its watermark and stays silent for that pass, so the next one is the first that can speak.
+
+## Every article of one writer
+
+The same request, asked of a person. A reader who follows somebody follows them wherever they write, which is the whole point of asking of the writer rather than of the paper : the article turns up whichever feed carried it, and a person who moves papers is not a subscription to redo.
+
+**A table of its own, and not a flag on the favourites.** A favourite writer is somebody the reader wants gathered on a page ; this is somebody worth being interrupted for, and they are different judgements exactly as they are for a source. A column on `favourite_author` would have meant making somebody a favourite in order to hear from them, and a row there whose flags both said no would be a favourite that is not one : the presence of that row is the whole of what it says. So `notified_author` mirrors it, one row per writer asked about, and its deletion is the `no`.
+
+**Named after the writer, like everything else about them.** There is no row per person and there could not be one : what a feed hands over is a byline, so the name is the identity and it is matched exactly. `docs/technical/authors.md` sets out why.
+
+**A byline naming several people answers for the one asked about.** The row per person that sits beside each article is what makes that possible : a piece signed `Claire Ancelin et Paul Rey` where the reader asked about Paul Rey is news about Paul Rey, and the notice names him rather than reading out the byline.
+
+### One notice per article, however many ways it was asked for
+
+The thing that would be wrong twice over. A writer somebody follows very often writes for a paper they follow as well, so an article can answer both requests at once ; asked as two questions it lands in both answers, and the reader gets one notice about the paper and a second, moments later, about the person.
+
+**So it is one question.** `ArticleStore.arrived(since:)` asks for what arrived from an announcing source *or* signed by a writer asked about, in one statement, and an article is one row in the answer whichever of the two brought it. The guarantee is by construction rather than by filtering afterwards, which is what keeps it true for a case nobody thought of.
+
+**The person leads the wording** where both apply, since asking about somebody is the more particular of the two requests. Under a single headline goes the person and the paper, joined the way the application's own bylines are : it is the answer to *why am I being told this*. Several are counted under whatever was asked about, the person where there was one and the source otherwise ; several of those are counted and then listed by name.
+
+### Where the switch is
+
+On the person's own page, in the toolbar beside the star, and in the long press on a row of the authors directory. The bell is never merged with the star : one control doing both would have every reader who liked forty bylines signed up for forty notifications a day.
+
+The notifications panel lists the writers beside the sources, in one list and not two. They are two kinds of thing to the machinery and one thing to the reader, who is looking at what may interrupt them ; the glyph says which is which, a publisher wearing the aerial the sources list gives it and a person a signature.
 
 ## Somebody added to a shared collection
 
@@ -101,6 +127,8 @@ The delegate has to be in place before launching finishes, or a notification tap
 The delivery needs an authorization, a bundle and a device, none of which a test can rely on, and none of which is where the mistakes are. `Announcing` is the seam : `Notifier` is the system, `MemoryAnnouncer` is a list a test reads back.
 
 What that buys is coverage of everything that can actually be wrong : the wording and the plural, the headline leading rather than being buried, the written line taking the place of the newsrooms when there is one, the middle dot rather than commas, which stories count as new, that nothing is said twice, that nothing is said while the reader is reading and that it is not saved up for later either, that a refusal leaves the switch where it was, and that a reader who asked for nothing has their watermark left alone so that turning the notices on later starts from that moment.
+
+For a writer it buys the guarantee that matters most : that an article from a source that announces, signed by a writer who is asked about, is announced once and not twice, which is a property of the query rather than of the wording. And that a byline naming several people answers for the one the reader asked about.
 
 For a source's own articles it buys the same : the wording for one article, for several from one source and for several from several, which articles count as new, that what arrived here is what is asked about rather than what is dated today, that what is read, hidden or a second copy is left out, that a refusal leaves the source alone rather than saving a switch that can never fire, and that a decision arriving from another device does not announce that source's backlog.
 

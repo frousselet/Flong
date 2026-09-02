@@ -44,6 +44,22 @@ struct AuthorScreen: View {
         // Verbatim : a person is called what they are called in every language.
         .navigationTitle(Text(verbatim: name))
         .toolbar {
+            // **The bell before the star, and never merged with it.** Singling
+            // a writer out gathers a page about them ; asking to be told about
+            // them interrupts the reader wherever they write, which is a great
+            // deal more to ask. One control doing both would have every reader
+            // who liked forty bylines signed up for forty notifications a day.
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task { await model.setNotifications(!notifies, forAuthor: name) }
+                } label: {
+                    Label(
+                        notifies ? "Stop notifying new articles" : "Notify every new article",
+                        systemImage: notifies ? "bell.fill" : "bell"
+                    )
+                }
+            }
+
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     Task { await model.setFavouriteAuthor(name, !isFavourite) }
@@ -74,5 +90,9 @@ struct AuthorScreen: View {
 
     private var isFavourite: Bool {
         model.openedAuthor?.name == name && model.openedAuthor?.isFavourite == true
+    }
+
+    private var notifies: Bool {
+        model.openedAuthor?.name == name && model.openedAuthor?.notifies == true
     }
 }

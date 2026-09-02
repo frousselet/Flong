@@ -73,6 +73,7 @@ nonisolated struct AuthorStore: Sendable {
     func all() async throws -> [Author] {
         try await database.writer.read { db in
             let favourites = Set(try String.fetchAll(db, sql: "SELECT name FROM favourite_author"))
+            let notified = Set(try String.fetchAll(db, sql: "SELECT name FROM notified_author"))
 
             // One row per writer and per source, added up here rather than in
             // SQL : the count is over the people and the marks are over the
@@ -89,11 +90,22 @@ nonisolated struct AuthorStore: Sendable {
                     name: name,
                     count: tally.count,
                     isFavourite: favourites.contains(name),
+                    notifies: notified.contains(name),
                     publishers: tally.ranked
                 )
             }
-            found += favourites.subtracting(tallies.keys)
-                .map { Author(name: $0, count: 0, isFavourite: true) }
+            // A decision with nothing to its name is still a decision, and
+            // asking to be told about somebody is one of them : a writer asked
+            // about on another device may have signed nothing this one holds.
+            found += favourites.union(notified).subtracting(tallies.keys)
+                .map {
+                    Author(
+                        name: $0,
+                        count: 0,
+                        isFavourite: favourites.contains($0),
+                        notifies: notified.contains($0)
+                    )
+                }
 
             return found.sorted(by: Author.before)
         }
@@ -111,9 +123,10 @@ nonisolated struct AuthorStore: Sendable {
                 sql: """
                     SELECT (SELECT COUNT(*) FROM entry_author a JOIN entry e ON e.id = a.entry_id
                             WHERE a.name = ? AND \(Self.shown("e"))) AS count,
-                           EXISTS(SELECT 1 FROM favourite_author f WHERE f.name = ?) AS favourite
+                           EXISTS(SELECT 1 FROM favourite_author f WHERE f.name = ?) AS favourite,
+                           EXISTS(SELECT 1 FROM notified_author n WHERE n.name = ?) AS notified
                     """,
-                arguments: [name, name]
+                arguments: [name, name, name]
             )
             guard let row else { return nil }
 
@@ -126,11 +139,12 @@ nonisolated struct AuthorStore: Sendable {
                 name: name,
                 count: row["count"],
                 isFavourite: (row["favourite"] as Int) == 1,
+                notifies: (row["notified"] as Int) == 1,
                 publishers: tally.ranked
             )
             // Nobody : no article and no decision carries this name, so there
             // is no page to draw.
-            return author.count == 0 && !author.isFavourite ? nil : author
+            return author.count == 0 && !author.isFavourite && !author.notifies ? nil : author
         }
     }
 
@@ -155,6 +169,38 @@ nonisolated struct AuthorStore: Sendable {
             } else {
                 try db.execute(sql: "DELETE FROM favourite_author WHERE name = ?", arguments: [name])
             }
+        }
+    }
+
+    /// Asks to be told when a writer publishes, or stops asking.
+    ///
+    /// **The same shape as the favourite above, and a different question.** The
+    /// row is the request and its deletion is the `no`, so there is nothing
+    /// stored about the thousands of writers nobody has an opinion on.
+    ///
+    /// It singles nobody out : a reader may want to hear from somebody they
+    /// have no wish to gather a page about, and the other way round.
+    func setNotifies(_ raw: String, _ notifies: Bool, at date: Date = Date()) async throws {
+        guard let name = Author.name(from: raw) else { return }
+
+        try await database.writer.write { db in
+            if notifies {
+                try db.execute(
+                    sql: "INSERT OR IGNORE INTO notified_author (id, name, created_at) VALUES (?, ?, ?)",
+                    arguments: [UUID.v7(), name, date]
+                )
+            } else {
+                try db.execute(sql: "DELETE FROM notified_author WHERE name = ?", arguments: [name])
+            }
+        }
+    }
+
+    /// Every writer the reader asked to be told about, in the order a page
+    /// shows them.
+    func notified() async throws -> [String] {
+        try await database.writer.read { db in
+            try String.fetchAll(db, sql: "SELECT name FROM notified_author")
+                .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
         }
     }
 

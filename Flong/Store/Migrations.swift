@@ -645,6 +645,28 @@ nonisolated extension AppDatabase {
             )
         }
 
+        // A writer the reader wants to be told about.
+        //
+        // **A table of its own, and not a column on the favourites.** The two
+        // are different judgements, exactly as they are for a source : a
+        // favourite writer is somebody the reader wants gathered on a page,
+        // and this is somebody they want to be interrupted for. A flag on
+        // `favourite_author` would have meant making somebody a favourite in
+        // order to hear from them, and a row there whose flag said `no` to both
+        // questions would be a favourite that is not one : the presence of that
+        // row is the whole of what it says.
+        //
+        // Named after the writer like everything else about them. There is no
+        // row per person and there could not be one : what a feed hands over is
+        // a byline, so the name is the identity, matched exactly.
+        migrator.registerMigration("v31.aWriterWorthInterrupting") { db in
+            try db.create(table: "notified_author") { table in
+                table.primaryKey("id", .blob)
+                table.column("name", .text).notNull().unique()
+                table.column("created_at", .datetime).notNull()
+            }
+        }
+
         return migrator
     }
 
