@@ -1404,12 +1404,12 @@
         }
       }
     },
-    "Flong reads the people out of the articles themselves, in the background. They appear here as it goes." : {
+    "Flong reads the people out of the articles themselves, in the background. Somebody appears here once five articles have named them." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Flong lit les personnes dans les articles eux-mêmes, en arrière-plan. Elles apparaissent ici au fur et à mesure."
+            "value" : "Flong lit les personnes dans les articles eux-mêmes, en arrière-plan. Quelqu'un apparaît ici dès que cinq articles l'ont cité."
           }
         }
       }

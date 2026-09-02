@@ -1017,7 +1017,12 @@ final class AppModel {
     }
 
     /// The fixed views, which every reader has whatever they follow.
-    var smartLists: [SidebarItem] {
+    ///
+    /// **Nothing lists them any more**, the sources panel having dropped the
+    /// band that did : the tabs are where a reader goes now, and `Flux` is the
+    /// whole stream. They stay in ``sidebar`` because ``filter`` resolves the
+    /// selection through it, and `.all` is what a window opens on.
+    var fixedViews: [SidebarItem] {
         sidebar.filter { item in
             switch item.kind {
             case .digest, .unread, .today, .starred, .all: true

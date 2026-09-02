@@ -46,6 +46,20 @@ Forty people per article. Almost nothing reaches it ; what it stops is the one a
 
 **What is not cleaned is what no spelling rule can see.** `Cheval de Troie`, `James Webb Space Telescope` and `Here Comes Santa Claus` all reach the directory, because the tagger says they are people and nothing about how they are written says otherwise. That is the same limit `authors.md` records about `Rédaction` : deciding a well-formed name is not a person is a judgement about the world, not a fact about the spelling.
 
+## Five articles, or the reader asked
+
+601 people came out of a stream of 1,274 articles, and 498 of them were named by exactly one. A directory nobody can read is a directory nobody opens, so **the list is the people five distinct articles name**.
+
+**The threshold is applied to the question, never to the reading.** Every name is stored. Somebody at four articles becomes somebody at five the moment the next one lands, and a rule applied on the way in could never let that happen. `NewsmakerStore.all()` filters, `collections()` counts the same set so the number under the square is the length of the list it opens, and `newsmaker(named:)` answers for anybody at all, since a favourite below the threshold still has a page.
+
+**Articles and not mentions**, which the same measurement settled. Counting the times a name is written would have let through the portrait and the interview : `Ridley` named fourteen times in one article, `Anne Uginet` eleven, `Louis Mollard` eleven, each of them the subject of a single piece rather than somebody the press is covering. Two thirds of what that reading added was of that kind. What this page is for is the person several papers keep coming back to.
+
+**What it costs is visible and was accepted.** Over a fortnight of sixteen feeds, five articles leaves 23 people and excludes Elon Musk at four, Mark Zuckerberg and Gérald Darmanin at three. A longer stream carries them over ; a purged one may take them back out, which is correct, since the directory says what this device holds.
+
+**A decision the reader made is never hidden.** Somebody they singled out or asked to be told about is listed whatever their count, exactly as a favourite with nothing at all to their name is. The row is there so the decision can be seen and undone.
+
+**The search field is the list's, and reaches no further.** Typing a name searches what the directory holds, so somebody at four articles is not found there either. That keeps the square's count, the list and the search saying one thing.
+
 ## A surname folds into the full name the same article gives it
 
 A paper names somebody in full once and by their surname for the rest of the piece. Kept apart, `Donald Trump` and `Trump` are two rows, one holding the first paragraph of every article and the other holding the rest, and neither of them is the person.

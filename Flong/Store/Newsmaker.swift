@@ -96,6 +96,34 @@ nonisolated struct Newsmaker: Identifiable, Hashable, Sendable {
     /// a directory nobody can then read.
     static let mostPerArticle = 40
 
+    /// How many articles have to name somebody before the directory lists them.
+    ///
+    /// **Five, and it is a rule about the directory rather than about the
+    /// reading.** Every name an article gives is stored : the threshold is
+    /// applied to the question the directory asks, never to what is written
+    /// down, since somebody at four articles becomes somebody at five the
+    /// moment the next one lands, and a rule applied on the way in could never
+    /// let that happen.
+    ///
+    /// Measured on a real stream of 1,274 articles from sixteen feeds : 601
+    /// people, of whom 103 are named by two articles and 23 by five. The tail
+    /// is people named once, and a directory nobody can read is a directory
+    /// nobody opens.
+    ///
+    /// **Articles and not mentions.** Counting the times a name is written
+    /// instead would let through the portrait and the interview, which name
+    /// their subject a dozen times in one piece : measured the same way, that
+    /// is where two thirds of the difference came from, and somebody named
+    /// fourteen times in one article is the subject of that article rather than
+    /// somebody the press is covering. What this page is for is the person
+    /// several papers keep coming back to.
+    ///
+    /// **A decision the reader made is never hidden by it.** Somebody they
+    /// singled out or asked to be told about is in the directory whatever their
+    /// count, exactly as a favourite with nothing at all to their name is : the
+    /// row is there so the decision can be seen and undone.
+    static let leastArticles = 5
+
     /// The longest a name may be, in words.
     ///
     /// Five. Past that the tagger has joined a run of names into one, which is

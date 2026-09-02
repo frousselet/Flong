@@ -67,6 +67,20 @@ struct NewsmakerStoreTests {
         return entry
     }
 
+    /// One person, in as many articles as the directory asks for.
+    ///
+    /// The tests go through the threshold rather than round it : what the
+    /// directory shows is what five articles said, not what one did.
+    private func articles(
+        _ count: Int,
+        saying text: String,
+        from source: String = "https://feeds.papier.example.com/une.xml"
+    ) async throws {
+        for number in 0..<count {
+            try await article("Article \(number) de \(source)", saying: text, from: source)
+        }
+    }
+
     /// Runs the job to its end, which is what a pass does.
     private func readEverything() async throws {
         while true {
@@ -226,14 +240,14 @@ struct NewsmakerStoreTests {
 
     @Test("An article is read once, and one that named nobody is never asked about again")
     func queue() async throws {
-        try await article("Une rencontre", saying: "Donald Trump a parlé mardi soir.")
+        try await articles(Newsmaker.leastArticles, saying: "Donald Trump a parlé mardi soir.")
         try await article("Le budget en cinq graphiques", saying: "Les recettes reculent de trois points.")
 
-        #expect(try await newsmakers.outstandingCount() == 2)
+        #expect(try await newsmakers.outstandingCount() == Newsmaker.leastArticles + 1)
         try await readEverything()
         #expect(try await newsmakers.outstandingCount() == 0)
 
-        // The second named nobody, which is a real answer : it has no rows and
+        // The last named nobody, which is a real answer : it has no rows and
         // it is out of the queue all the same.
         #expect(try await newsmakers.all().map(\.name) == ["Donald Trump"])
     }
@@ -258,16 +272,16 @@ struct NewsmakerStoreTests {
         try await database.writer.write { db in try NewsmakerStore.reread(entry.id, in: db) }
         try await readEverything()
 
-        let found = try await newsmakers.all()
-        #expect(found.count == 1)
-        #expect(found.first?.count == 1)
+        // Asked of the person rather than of the directory : one article is
+        // below the threshold, and what is being tested here is the rows.
+        #expect(try await newsmakers.newsmaker(named: "Donald Trump")?.count == 1)
     }
 
     @Test("An article a publisher rewrote keeps nobody it no longer names")
     func rewritten() async throws {
         let entry = try await article("Une rencontre", saying: "Donald Trump a parlé mardi soir.")
         try await readEverything()
-        #expect(try await newsmakers.all().map(\.name) == ["Donald Trump"])
+        #expect(try await newsmakers.newsmaker(named: "Donald Trump")?.count == 1)
 
         try await database.writer.write { db in
             try db.execute(
@@ -278,7 +292,8 @@ struct NewsmakerStoreTests {
         }
         try await readEverything()
 
-        #expect(try await newsmakers.all().map(\.name) == ["Emmanuel Macron"])
+        #expect(try await newsmakers.newsmaker(named: "Donald Trump") == nil)
+        #expect(try await newsmakers.newsmaker(named: "Emmanuel Macron")?.count == 1)
     }
 
     @Test("A duplicate and a hidden article are not read : neither is shown anywhere")
@@ -292,7 +307,8 @@ struct NewsmakerStoreTests {
 
         #expect(try await newsmakers.outstandingCount() == 1)
         try await readEverything()
-        #expect(try await newsmakers.all().map(\.name) == ["Donald Trump"])
+        #expect(try await newsmakers.newsmaker(named: "Donald Trump")?.count == 1)
+        #expect(try await newsmakers.newsmaker(named: "Emmanuel Macron") == nil)
     }
 
     // MARK: - Who there is
@@ -303,9 +319,7 @@ struct NewsmakerStoreTests {
         try await article("Une autre", saying: "Donald Trump est attendu jeudi.")
         try await readEverything()
 
-        let found = try await newsmakers.all()
-        #expect(found.map(\.name) == ["Donald Trump"])
-        #expect(found.first?.count == 2)
+        #expect(try await newsmakers.newsmaker(named: "Donald Trump")?.count == 2)
     }
 
     @Test("A row names the publishers writing about them, the ones writing most first")
@@ -328,7 +342,7 @@ struct NewsmakerStoreTests {
         // The publisher and never the desk : two feeds served from one address
         // are one mark. The host is taken as it stands, `feeds.` included, for
         // the reason the sources list takes it that way.
-        let trump = try #require(try await newsmakers.all().first)
+        let trump = try #require(try await newsmakers.newsmaker(named: "Donald Trump"))
         #expect(trump.publishers == ["feeds.papier.example.com", "feeds.gazette.example.com"])
         #expect(try await newsmakers.newsmaker(named: "Donald Trump")?.publishers == trump.publishers)
     }
@@ -394,10 +408,16 @@ struct NewsmakerStoreTests {
         try await readEverything()
 
         try await newsmakers.setFavourite("Donald Trump", true)
+        // A favourite is in the directory whatever their count.
+        #expect(try await newsmakers.all().map(\.name) == ["Donald Trump"])
+
         try await newsmakers.setFavourite("Donald Trump", false)
 
         #expect(try await newsmakers.favourites().isEmpty)
-        #expect(try await newsmakers.all().map(\.name) == ["Donald Trump"])
+        // And with the decision taken back, one article is one article : they
+        // leave the directory and the rows about them stay where they were.
+        #expect(try await newsmakers.all().isEmpty)
+        #expect(try await newsmakers.newsmaker(named: "Donald Trump")?.count == 1)
     }
 
     @Test("Asking to be told about somebody singles nobody out, and the other way round")
@@ -426,25 +446,72 @@ struct NewsmakerStoreTests {
         #expect(arrived.first?.subject == "Donald Trump")
     }
 
+    // MARK: - What the directory leaves out
+
+    @Test("Somebody too few articles name is not in the directory, and their rows are there all the same")
+    func threshold() async throws {
+        try await articles(Newsmaker.leastArticles - 1, saying: "Emmanuel Macron a parlé mercredi matin.")
+        try await readEverything()
+
+        // The long tail is people one piece mentioned once, and a directory
+        // nobody can read is a directory nobody opens.
+        #expect(try await newsmakers.all().isEmpty)
+        // Nothing was thrown away : the threshold is a rule about the question
+        // the directory asks, and the next article is what carries them over.
+        #expect(try await newsmakers.newsmaker(named: "Emmanuel Macron")?.count == Newsmaker.leastArticles - 1)
+
+        try await article("Une de plus", saying: "Emmanuel Macron a parlé jeudi.")
+        try await readEverything()
+
+        #expect(try await newsmakers.all().map(\.name) == ["Emmanuel Macron"])
+    }
+
+    @Test("A decision the reader made is never hidden by the threshold")
+    func decisionsAreExempt() async throws {
+        try await article("Une rencontre", saying: "Donald Trump a parlé mardi soir.")
+        try await article("Une autre", saying: "Emmanuel Macron a parlé mercredi matin.")
+        try await readEverything()
+        #expect(try await newsmakers.all().isEmpty)
+
+        // One singled out, one asked about : two different decisions, and both
+        // put the person in the directory so the decision can be undone.
+        try await newsmakers.setFavourite("Donald Trump", true)
+        try await newsmakers.setNotifies("Emmanuel Macron", true)
+
+        #expect(try await newsmakers.all().map(\.name) == ["Donald Trump", "Emmanuel Macron"])
+        #expect(try await newsmakers.collections().first?.count == 2)
+    }
+
     // MARK: - The two squares
 
     @Test("The newsmakers square counts people, and the favourites square counts articles")
     func squares() async throws {
-        try await article("Une rencontre", saying: "Donald Trump a parlé à Emmanuel Macron mardi soir.")
-        try await article("Une autre", saying: "Donald Trump est attendu jeudi.")
+        try await articles(Newsmaker.leastArticles, saying: "Donald Trump a parlé mardi soir.")
+        try await article("Une rencontre", saying: "Emmanuel Macron a parlé mercredi matin.")
         try await readEverything()
         try await newsmakers.setFavourite("Donald Trump", true)
 
         let found = try await newsmakers.collections()
-        #expect(found.first { $0.kind == .builtIn(.newsmakers) }?.count == 2)
-        #expect(found.first { $0.kind == .builtIn(.favouriteNewsmakers) }?.count == 2)
+        // **The square counts the rows the list will show.** Trump clears the
+        // threshold ; Macron, named once, does not, and the number under a
+        // square that opens on a list has to be the length of that list.
+        #expect(found.first { $0.kind == .builtIn(.newsmakers) }?.count == 1)
+        #expect(try await newsmakers.all().count == 1)
+        // The favourites square counts articles rather than people.
+        #expect(found.first { $0.kind == .builtIn(.favouriteNewsmakers) }?.count == Newsmaker.leastArticles)
     }
 
     @Test("Neither square is drawn when there is nothing in it")
     func emptySquares() async throws {
         #expect(try await newsmakers.collections().isEmpty)
 
+        // Named by one article, which is not enough : nothing is drawn at all
+        // rather than a square opening on nobody.
         try await article("Une rencontre", saying: "Donald Trump a parlé mardi soir.")
+        try await readEverything()
+        #expect(try await newsmakers.collections().isEmpty)
+
+        try await articles(Newsmaker.leastArticles, saying: "Emmanuel Macron a parlé mercredi matin.")
         try await readEverything()
 
         // The directory, and no favourites square until somebody is one.
@@ -461,9 +528,7 @@ struct NewsmakerStoreTests {
 
     @Test("The squares reach the collections page in the order of the page")
     func order() async throws {
-        try await article(
-            "Une rencontre", saying: "Donald Trump a parlé mardi soir.",
-            image: URL(string: "https://img.example.com/a.jpg"))
+        try await articles(Newsmaker.leastArticles, saying: "Donald Trump a parlé mardi soir.")
         try await readEverything()
         try await newsmakers.setFavourite("Donald Trump", true)
 

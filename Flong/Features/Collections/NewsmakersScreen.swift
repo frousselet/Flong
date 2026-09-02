@@ -62,13 +62,12 @@ struct NewsmakersScreen: View {
                 ContentUnavailableView {
                     Label("Nobody named yet", systemImage: "person.crop.rectangle.stack")
                 } description: {
-                    // What an empty page here means is almost never that the
-                    // feeds name nobody : it is that the articles have not been
-                    // read yet, which is a job that runs in the background and
-                    // finishes on its own. The reader is told that rather than
-                    // left thinking something is broken.
+                    // Two reasons a page here is empty, and neither is that
+                    // something is broken : the articles have not been read
+                    // yet, which is a job that finishes on its own, or nobody
+                    // has been named often enough. The reader is told both.
                     Text(
-                        "Flong reads the people out of the articles themselves, in the background. They appear here as it goes."
+                        "Flong reads the people out of the articles themselves, in the background. Somebody appears here once five articles have named them."
                     )
                 }
             } else if found.isEmpty {
