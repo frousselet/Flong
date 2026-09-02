@@ -61,6 +61,24 @@ struct LocalizationTests {
         #expect(String(localized: "Authors", locale: french) == "Auteurs")
     }
 
+    @Test("What Flong says about a source it was asked about is in French too")
+    func tellingAboutASource() {
+        #expect(String(localized: "Notify every new article", locale: french) == "Notifier chaque nouvel article")
+        #expect(
+            String(localized: "Stop notifying new articles", locale: french)
+                == "Ne plus notifier les nouveaux articles"
+        )
+        #expect(String(localized: "New articles", locale: french) == "Nouveaux articles")
+
+        // The notice itself, which is the part a reader reads outside the
+        // application and the one nobody would notice was English.
+        #expect(String(localized: "\(3) new articles", locale: french) == "3 nouveaux articles")
+        #expect(
+            String(localized: "\("Le Monde") : \(3) new articles", locale: french)
+                == "Le Monde : 3 nouveaux articles"
+        )
+    }
+
     @Test("The editor of a source is in French too")
     func editingASource() {
         #expect(String(localized: "Edit the source", locale: french) == "Modifier la source")

@@ -49,6 +49,14 @@ struct NotificationsPanel: View {
         model.notificationStatus == .denied
     }
 
+    /// The sources the reader asked to be told about, which are switches like
+    /// any other and belong in the one panel that holds them all.
+    private var sources: [Feed] { model.announcingSources }
+
+    /// How many source rows the panel stands tall enough to show before the
+    /// rest is scrolled to.
+    private static let shownSources = 4
+
     /// How tall the panel stands.
     ///
     /// Fixed rather than half the screen : the panel holds one switch, and a
@@ -61,7 +69,18 @@ struct NotificationsPanel: View {
     /// number here.
     private var height: CGFloat {
         let switches: CGFloat = model.hasSharedCollections ? 62 : 0
-        return (isRefused ? 250 : 132) + switches
+        // The sources the reader asked about, up to the point where the panel
+        // would be the whole page. Past that they scroll, and the reader can
+        // pull the panel up to see the rest at once.
+        let announced: CGFloat =
+            sources.isEmpty ? 0 : 40 + CGFloat(min(sources.count, Self.shownSources)) * 62
+        return (isRefused ? 250 : 132) + switches + announced
+    }
+
+    /// What the panel may be pulled to, which is the whole page only when there
+    /// is more in it than a panel can hold.
+    private var detents: Set<PresentationDetent> {
+        sources.count > Self.shownSources ? [.height(height), .large] : [.height(height)]
     }
 
     var body: some View {
@@ -104,6 +123,8 @@ struct NotificationsPanel: View {
                 .background(theme.surface(in: scheme), in: .rect(cornerRadius: 14))
             }
 
+            announcingSources
+
             if isRefused {
                 refusal
             }
@@ -112,9 +133,60 @@ struct NotificationsPanel: View {
         .padding(.top, 20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .themed()
-        .presentationDetents([.height(height)])
+        .presentationDetents(detents)
         .presentationDragIndicator(.visible)
         .task { await model.refreshNotificationStatus() }
+    }
+
+    /// The sources that announce everything they publish, one row apiece.
+    ///
+    /// **Only where there are any**, exactly as the shared collections are :
+    /// the switch that puts a source here is on the source itself, where the
+    /// decision about a publisher belongs, and a heading over an empty list
+    /// would be the panel asking a question with nowhere to answer it.
+    ///
+    /// A row is a source that is on, so switching one off takes it out of the
+    /// list. This is where they are all seen at once and quietened, which is
+    /// the thing a reader wants when several of them turn out to be louder than
+    /// they expected ; adding one is done where the source is.
+    @ViewBuilder
+    private var announcingSources: some View {
+        if !sources.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("New articles")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(sources) { source in
+                            Toggle(
+                                isOn: Binding(
+                                    get: { true },
+                                    set: { wanted in
+                                        Task { await model.setNotifications(wanted, forSource: source.id) }
+                                    }
+                                )
+                            ) {
+                                // Verbatim : it is what the publisher calls
+                                // itself, or what the reader called it.
+                                Label {
+                                    Text(verbatim: source.title)
+                                        .lineLimit(1)
+                                } icon: {
+                                    Image(systemName: "bell")
+                                }
+                            }
+                            .disabled(isRefused)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(theme.surface(in: scheme), in: .rect(cornerRadius: 14))
+                        }
+                    }
+                }
+                .scrollBounceBehavior(.basedOnSize)
+            }
+        }
     }
 
     /// What the panel is, and the way out on the platform that needs one.

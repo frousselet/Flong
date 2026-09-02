@@ -68,7 +68,11 @@ struct Notifier: Announcing {
         content.title = announcement.title
         content.body = announcement.body
         content.threadIdentifier = announcement.thread
-        if let story = announcement.story { content.userInfo = [Key.story: story.uuidString] }
+        if let story = announcement.story {
+            content.userInfo = [Key.story: story.uuidString]
+        } else if let article = announcement.article {
+            content.userInfo = [Key.article: article.uuidString]
+        }
 
         // No trigger : a trigger of nil is delivered immediately, and there is
         // nothing here worth scheduling for later.
@@ -110,6 +114,7 @@ struct Notifier: Announcing {
 
     enum Key {
         static let story = "story"
+        static let article = "article"
     }
 }
 
@@ -149,13 +154,24 @@ final class MemoryAnnouncer: Announcing {
 final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationRouter()
 
-    /// A story tapped before anything was listening.
-    private var waiting: UUID?
-    private var open: ((UUID) -> Void)?
+    /// What a notice leads to, which is not one kind of thing.
+    ///
+    /// A story is a page in the digest and an article is read over everything,
+    /// exactly as a result from the system index is : the two are not opened
+    /// the same way, and a single identifier would have the window guess which
+    /// it was holding.
+    nonisolated enum Tap: Hashable, Sendable {
+        case story(UUID)
+        case article(UUID)
+    }
+
+    /// What was tapped before anything was listening.
+    private var waiting: Tap?
+    private var open: ((Tap) -> Void)?
 
     /// Starts listening, and takes whatever was tapped before there was a
     /// window.
-    func listen(_ open: @escaping (UUID) -> Void) {
+    func listen(_ open: @escaping (Tap) -> Void) {
         self.open = open
 
         if let waiting {
@@ -168,14 +184,22 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
-        guard let named = response.notification.request.content.userInfo[Notifier.Key.story] as? String,
-            let story = UUID(uuidString: named)
-        else { return }
+        let information = response.notification.request.content.userInfo
+        let tapped: Tap? =
+            if let named = information[Notifier.Key.story] as? String, let story = UUID(uuidString: named) {
+                .story(story)
+            } else if let named = information[Notifier.Key.article] as? String, let article = UUID(uuidString: named) {
+                .article(article)
+            } else {
+                nil
+            }
+
+        guard let tapped else { return }
 
         guard let open else {
-            waiting = story
+            waiting = tapped
             return
         }
-        open(story)
+        open(tapped)
     }
 }

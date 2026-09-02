@@ -733,6 +733,61 @@ nonisolated struct ArticleStore: Sendable {
         }
     }
 
+    /// One article a source the reader asked to be told about has just
+    /// published.
+    ///
+    /// The three things a notice needs and nothing else : what to say, what to
+    /// say it came from, and where a tap lands. A summary would carry an
+    /// excerpt, a picture and a read state, none of which a notification has
+    /// anywhere to put.
+    nonisolated struct Arrival: Identifiable, Hashable, Sendable {
+        let id: UUID
+        let title: String
+        /// What the source is called, which is what the notice names.
+        let source: String
+    }
+
+    /// What the sources the reader asked about have published since a moment,
+    /// oldest first.
+    ///
+    /// **Asked of the feeds and not of the articles.** A reader asks about a
+    /// handful of sources out of hundreds, and the partial index on the column
+    /// covers exactly those, so a pass that brought nothing from any of them
+    /// costs one look at almost nothing.
+    ///
+    /// **When it arrived here, and not when it was published.** A source that
+    /// backfills a month of articles published them a month ago and served them
+    /// tonight, and a notice about the ones dated today would be silent about
+    /// everything the reader actually just received.
+    ///
+    /// What is hidden, what is a second copy of an article already here and
+    /// what another device has already read are all left out : a rule the
+    /// reader wrote to never see something is not undone by a notification, the
+    /// same article arriving through two of one newsroom's feeds is one piece
+    /// of news, and being told about what they read on the iPad an hour ago is
+    /// worse than not being told.
+    func arrived(since moment: Date, limit: Int = 20) async throws -> [Arrival] {
+        try await database.writer.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT e.id AS id, e.title AS title, f.title AS source
+                    FROM entry e
+                    JOIN feed f ON f.id = e.feed_id
+                    WHERE f.notifies_new_articles = 1
+                      AND e.received_at > ?
+                      AND e.is_hidden = 0 AND e.duplicate_of IS NULL AND e.is_read = 0
+                    ORDER BY e.received_at
+                    LIMIT ?
+                    """,
+                arguments: [moment, limit]
+            )
+            .map { row in
+                Arrival(id: row["id"], title: row["title"], source: row["source"] ?? "")
+            }
+        }
+    }
+
     // MARK: - Writing
 
     /// Marks articles read or unread.

@@ -619,6 +619,32 @@ nonisolated extension AppDatabase {
             }
         }
 
+        // A source the reader wants to be interrupted for.
+        //
+        // **On the feed and not in the preferences.** It is a decision about a
+        // publisher, like the favourite beside it, and the record about that
+        // source is where a decision about it belongs : a list of identifiers
+        // in the key-value store would be a second place naming sources, going
+        // stale the moment one is unsubscribed from and needing a rule of its
+        // own for what happens when one moves.
+        //
+        // Off for every source there is, which is what a reader who has never
+        // asked for a notification means.
+        migrator.registerMigration("v30.aSourceWorthInterrupting") { db in
+            try db.alter(table: "feed") { table in
+                table.add(column: "notifies_new_articles", .boolean).notNull().defaults(to: false)
+            }
+            // Only the few sources that announce are ever asked for, on every
+            // pass that brings articles, so the question is answered by an
+            // index over almost nothing rather than by a scan of the sources.
+            try db.create(
+                index: "feed_announcing",
+                on: "feed",
+                columns: ["notifies_new_articles"],
+                condition: Column("notifies_new_articles") == true
+            )
+        }
+
         return migrator
     }
 

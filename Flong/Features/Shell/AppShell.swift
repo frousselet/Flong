@@ -191,9 +191,18 @@ struct AppShell: View {
             // tapped from a cold start has been waiting since before the
             // window existed, and the reader is looking at the wrong page
             // until it is claimed.
-            NotificationRouter.shared.listen { story in
-                section = .digest
-                digestPath = [.story(story)]
+            NotificationRouter.shared.listen { tapped in
+                // The two things a notice can be about are not opened the same
+                // way, exactly as the two a system search result can be about
+                // are not : a story is a page in the digest, an article is read
+                // over everything.
+                switch tapped {
+                case .story(let id):
+                    section = .digest
+                    digestPath = [.story(id)]
+                case .article(let id):
+                    reading = Reading(id: id)
+                }
             }
 
             // The background tasks were registered while the application

@@ -242,13 +242,15 @@ nonisolated struct SyncPayload: Sendable {
 
                 // The upsert completes a feed and never overwrites it, which is
                 // right for an import and wrong here : a name the reader wrote,
-                // a site they corrected and a source they singled out on
-                // another device are the later word on the matter, and a
+                // a site they corrected, a source they singled out and a
+                // source they asked to be told about on another device are the
+                // later word on the matter, and a
                 // decision that never travelled is one they made and then
                 // watched disappear on the next device they picked up.
                 try await subscriptions.adopt(
                     subscription,
                     isFavourite: SyncRecords.isFavourite(from: record),
+                    notifies: SyncRecords.notifies(from: record),
                     at: followed.feed.id
                 )
 

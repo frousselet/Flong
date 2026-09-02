@@ -29,6 +29,19 @@ xcodebuild -list -project Flong.xcodeproj          # Targets, configurations and
 xcrun simctl list devices available                # Pick a simulator for -destination
 ```
 
+### Running the application
+
+**Never run Flong on the Mac.** Every launch, every test run and every screenshot goes through the iOS Simulator, on `iPhone 17 Pro` with the latest installed runtime. The macOS destination is for compiling only : `xcodebuild build -destination 'platform=macOS'` to check the platform still builds, and never `xcodebuild test`, `run`, or anything else that opens a window on the user's own machine.
+
+```bash
+xcrun simctl boot 'iPhone 17 Pro'
+open -a Simulator
+xcodebuild build -project Flong.xcodeproj -scheme Flong \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' -derivedDataPath build
+xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/Flong.app
+xcrun simctl launch booted com.rslt.Flong
+```
+
 ### Testing
 
 **Always test on the latest Pro iPhone with the latest installed iOS runtime**, today `iPhone 17 Pro` on iOS 26.5. Ask `xcrun simctl list devices available` and `xcrun simctl list runtimes` rather than reusing a device left over from an earlier session, and name the runtime in the destination so a newer one being installed does not silently move the target.
