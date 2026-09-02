@@ -335,6 +335,17 @@ nonisolated struct FeedRefresh: Sendable {
             .fetchOne(db)
 
         if var entry = existing {
+            // What the prose said before this refresh, so that a piece a
+            // publisher actually rewrote can be told from the same piece served
+            // again unchanged, which is what almost every refresh serves.
+            let wasTitled = entry.title
+            let wasExcerpted = entry.excerpt
+            let wasWritten = try String.fetchOne(
+                db,
+                sql: "SELECT plain_text FROM entry_body WHERE entry_id = ?",
+                arguments: [entry.id]
+            )
+
             // What the reader did to an article is theirs : an update rewrites
             // the article, never its read or starred state.
             entry.title = item.title ?? entry.title
@@ -353,6 +364,21 @@ nonisolated struct FeedRefresh: Sendable {
             // reworded the feed, and the picture already shown stays.
             entry.imageURL = cover ?? entry.imageURL
             entry.canonicalKey = key ?? entry.canonicalKey
+            // **Who the piece is about follows the prose it is read out of.**
+            // Nobody is read here : that is a model over a whole text and this
+            // is the ingestion write, which is exactly where it may not run.
+            // The article goes back in the queue and `NewsmakersJob` reads it
+            // again. See ``NewsmakerStore``.
+            //
+            // Only where the prose really changed. A refresh serves the twenty
+            // most recent articles of a feed every time, and re-reading all of
+            // them at every pass would be the whole corpus, hourly, for a
+            // handful of pieces a publisher touched.
+            let rewritten =
+                entry.title != wasTitled || entry.excerpt != wasExcerpted
+                || (plainText != nil && plainText != wasWritten)
+            if rewritten { entry.newsmakersAt = nil }
+
             try entry.update(db)
             // A publisher who rewrites a byline changes who wrote the piece,
             // so the people beside it are written again rather than added to.

@@ -30,6 +30,7 @@ nonisolated struct SyncPayload: Sendable {
     private let marks: MarkStore
     private let collections: CollectionStore
     private let authors: AuthorStore
+    private let newsmakers: NewsmakerStore
     private let readStates: ReadStateStore
     private let embedder: Embedder
     private let state: SyncState
@@ -41,6 +42,7 @@ nonisolated struct SyncPayload: Sendable {
         self.marks = MarkStore(database)
         self.collections = CollectionStore(database)
         self.authors = AuthorStore(database)
+        self.newsmakers = NewsmakerStore(database)
         self.readStates = ReadStateStore(database)
         self.embedder = Embedder()
         self.state = SyncState(database)
@@ -85,6 +87,12 @@ nonisolated struct SyncPayload: Sendable {
         for author in try await authors.notified() {
             records.append(SyncRecords.record(forNotifiedAuthor: author, in: zone))
         }
+        for person in try await newsmakers.favourites() {
+            records.append(SyncRecords.record(forFavouriteNewsmaker: person, in: zone))
+        }
+        for person in try await newsmakers.notified() {
+            records.append(SyncRecords.record(forNotifiedNewsmaker: person, in: zone))
+        }
         records += try await CatchUpHeaders.records(in: database, zone: zone)
 
         return records
@@ -126,6 +134,18 @@ nonisolated struct SyncPayload: Sendable {
         for author in try await authors.notified() {
             let name = SyncRecords.name(forNotifiedAuthor: author)
             if names.contains(name) { records[name] = SyncRecords.record(forNotifiedAuthor: author, in: zone) }
+        }
+        for person in try await newsmakers.favourites() {
+            let name = SyncRecords.name(forFavouriteNewsmaker: person)
+            if names.contains(name) {
+                records[name] = SyncRecords.record(forFavouriteNewsmaker: person, in: zone)
+            }
+        }
+        for person in try await newsmakers.notified() {
+            let name = SyncRecords.name(forNotifiedNewsmaker: person)
+            if names.contains(name) {
+                records[name] = SyncRecords.record(forNotifiedNewsmaker: person, in: zone)
+            }
         }
         for block in try await readStates.blocks() {
             let name = SyncRecords.name(forReadStatePeriod: block.period, kind: block.kind)
@@ -296,6 +316,17 @@ nonisolated struct SyncPayload: Sendable {
                 // and never one that travelled.
                 try await authors.setNotifies(author, true)
 
+            case SyncRecords.RecordType.favouriteNewsmaker:
+                guard let person = SyncRecords.favouriteNewsmaker(from: record) else { continue }
+                // The person may be one no article here has named yet, and the
+                // favourite is kept all the same : it is a decision, and the
+                // articles that answer to it turn up whenever they turn up.
+                try await newsmakers.setFavourite(person, true)
+
+            case SyncRecords.RecordType.notifiedNewsmaker:
+                guard let person = SyncRecords.notifiedNewsmaker(from: record) else { continue }
+                try await newsmakers.setNotifies(person, true)
+
             case SyncRecords.RecordType.readState:
                 guard let block = SyncRecords.readStateBlock(from: record) else { continue }
                 applied.readArticles += try await readStates.merge(block)
@@ -332,6 +363,10 @@ nonisolated struct SyncPayload: Sendable {
                 if try await forgetFavouriteAuthor(named: name) { applied.removed += 1 }
             } else if name.hasPrefix("told-") {
                 if try await forgetNotifiedAuthor(named: name) { applied.removed += 1 }
+            } else if name.hasPrefix("newsmaker-") {
+                if try await forgetFavouriteNewsmaker(named: name) { applied.removed += 1 }
+            } else if name.hasPrefix("about-") {
+                if try await forgetNotifiedNewsmaker(named: name) { applied.removed += 1 }
             }
         }
 
@@ -375,6 +410,30 @@ nonisolated struct SyncPayload: Sendable {
         else { return false }
 
         try await authors.setNotifies(match, false)
+        return true
+    }
+
+    /// Takes back a favourite another device gave up.
+    ///
+    /// Found the same way and for the same reason as the writers' : the name is
+    /// a digest, so it is matched against the handful the reader singled out
+    /// rather than read back out of the record name.
+    private func forgetFavouriteNewsmaker(named name: String) async throws -> Bool {
+        let favourites = try await newsmakers.favourites()
+        guard let match = favourites.first(where: { SyncRecords.name(forFavouriteNewsmaker: $0) == name })
+        else { return false }
+
+        try await newsmakers.setFavourite(match, false)
+        return true
+    }
+
+    /// Takes back somebody another device stopped asking about.
+    private func forgetNotifiedNewsmaker(named name: String) async throws -> Bool {
+        let notified = try await newsmakers.notified()
+        guard let match = notified.first(where: { SyncRecords.name(forNotifiedNewsmaker: $0) == name })
+        else { return false }
+
+        try await newsmakers.setNotifies(match, false)
         return true
     }
 

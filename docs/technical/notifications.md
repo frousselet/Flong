@@ -82,6 +82,10 @@ The same request, asked of a person. A reader who follows somebody follows them 
 
 **Named after the writer, like everything else about them.** There is no row per person and there could not be one : what a feed hands over is a byline, so the name is the identity and it is matched exactly. `docs/technical/authors.md` sets out why.
 
+**And the same again, asked of somebody an article is about.** `notified_newsmaker` is the writers' table with the question changed : a reader following a person hears whenever any paper writes about them, whoever signed it. It is named after the person for the same reason and matched exactly for the same reason, and it carries a record prefix of its own so that following a writer and following somebody of the same name stay two decisions.
+
+**The people are read out of what a pass brought before that pass announces anything.** The watermark moves whether a notice was posted or not, so somebody found a moment after the announcement would be a notice the reader never gets, for ever. `docs/technical/newsmakers.md` sets out what that costs and how it is bounded.
+
 **A byline naming several people answers for the one asked about.** The row per person that sits beside each article is what makes that possible : a piece signed `Claire Ancelin et Paul Rey` where the reader asked about Paul Rey is news about Paul Rey, and the notice names him rather than reading out the byline.
 
 ### One notice per article, however many ways it was asked for

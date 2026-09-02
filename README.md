@@ -18,7 +18,9 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **You can follow a writer rather than a paper.** Every byline your feeds have signed is searchable, and singling one out gives you everything that person wrote, wherever it appeared.
 
-**A source, or a writer, can tell you when it publishes.** Ask it of a newsletter, a blog or a colleague, and every article they put out is announced as it arrives ; ask it of a person and you follow them wherever they write. The front page is the press covering one thing ; this is the one voice you did not want to miss. Asking both ways about the same article still tells you once.
+**And you can follow whoever the news is about.** No feed says who an article is about, so Flong reads the people out of the headline and the prose itself, on your device and without Apple Intelligence. Look somebody up and you get every paper writing about them, whoever signed it.
+
+**A source, a writer or a newsmaker can tell you when there is something.** Ask it of a newsletter, a blog or a colleague and every article they put out is announced as it arrives ; ask it of a person you read about and you hear whenever anybody writes about them. The front page is the press covering one thing ; this is the one voice, or the one name, you did not want to miss. Asking several ways about the same article still tells you once.
 
 **What you mark stays.** Star an article, write on it, file it in a collection : the mark rides on the article itself, follows you to your other devices, and no purge ever touches it.
 
@@ -78,7 +80,7 @@ Flong is not a client for any service. FreshRSS, Miniflux, Feedbin and Feedly ar
 | Document | Contents |
 | -------- | -------- |
 | [`docs/specification.md`](docs/specification.md) | The product and technical specification : the reference for every decision |
-| [`docs/technical/`](docs/technical/) | One page per subject : feed identity, fetching, ingestion, search, marks, sync, sharing, the digest, the interface, erasure |
+| [`docs/technical/`](docs/technical/) | One page per subject : feed identity, fetching, ingestion, search, marks, sync, sharing, the digest, authors, newsmakers, the interface, erasure |
 | [`CHANGELOG.md`](CHANGELOG.md) | Change history, following [Keep a Changelog](https://keepachangelog.com/) |
 | [`CLAUDE.md`](CLAUDE.md) | Working conventions : architecture, guidelines, git and release workflow |
 

@@ -58,6 +58,19 @@ struct LocalizationTests {
         #expect(String(localized: "Favourite authors", locale: french) == "Auteurs favoris")
         #expect(String(localized: "Add to favourite authors", locale: french) == "Ajouter aux auteurs favoris")
         #expect(String(localized: "Remove from favourite authors", locale: french) == "Retirer des auteurs favoris")
+
+        // The fourth, about who the article is about rather than who signed it.
+        // `Personnalités favorites` and `Auteurs favoris` have to stay two
+        // different words in French as they are in English : the whole of the
+        // distinction is that they are different judgements.
+        #expect(String(localized: "Favourite newsmakers", locale: french) == "Personnalités favorites")
+        #expect(
+            String(localized: "Add to favourite newsmakers", locale: french) == "Ajouter aux personnalités favorites"
+        )
+        #expect(
+            String(localized: "Remove from favourite newsmakers", locale: french)
+                == "Retirer des personnalités favorites"
+        )
         #expect(String(localized: "Authors", locale: french) == "Auteurs")
     }
 
@@ -249,5 +262,28 @@ struct LocalizationTests {
         #expect(String(localized: "\(42) feeds added", locale: french) == "42 flux ajoutés")
         #expect(String(localized: "\(3) already followed", locale: french) == "3 déjà suivis")
         #expect(String(localized: "\(1) ignored", locale: french) == "1 ignoré")
+    }
+
+    @Test("The two directories of people are named apart in French too")
+    func directories() {
+        // One is who signed a piece, the other who it is about, and a reader
+        // looking at two squares side by side has to be able to tell them
+        // apart at a glance.
+        #expect(String(localized: "Authors", locale: french) == "Auteurs")
+        #expect(String(localized: "Newsmakers", locale: french) == "Personnalités")
+        #expect(String(localized: "Search newsmakers", locale: french) == "Rechercher une personnalité")
+        #expect(String(localized: "All newsmakers", locale: french) == "Toutes les personnalités")
+        #expect(String(localized: "Nobody named yet", locale: french) == "Personne n'est encore cité")
+
+        // The bell says what it interrupts for, and for a person the articles
+        // are about that is not `a new article` but `an article about them`.
+        #expect(
+            String(localized: "Notify every article about them", locale: french)
+                == "Notifier chaque article à leur sujet"
+        )
+        #expect(
+            String(localized: "Stop notifying articles about them", locale: french)
+                == "Ne plus notifier les articles à leur sujet"
+        )
     }
 }

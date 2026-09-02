@@ -1,5 +1,7 @@
 # Authors
 
+An author is who **wrote** an article. `docs/technical/newsmakers.md` covers the other kind of person in a feed reader, who a piece is **about**, which no format states at all and which is therefore read out of the prose ; a great deal of what follows applies there too, and that page says where it stops.
+
 A feed that names who wrote an article hands over a byline : a piece of text in a field. Flong shows those bylines as a page of their own, lets the reader single out the ones they follow, and does nothing else with them. This page is about what an author is taken to be, what is cleaned off a byline before it becomes one, and what follows from both.
 
 ## An author is a name, not a person
@@ -99,6 +101,8 @@ A favourite that arrives naming a writer this device has never read is kept all 
 The first is the only square on the collections page that opens on people. Everything else there opens on a list of articles, so `ArticleStore` answers no articles for it on purpose rather than quietly answering the whole stream, and the count under it has to be a count of names : a square saying `1 240 articles` that opened on eighty rows would have told the reader the wrong thing before they touched it.
 
 Neither square is drawn when it holds nothing, which is how every built-in square behaves. A reader whose feeds sign nothing is not shown an empty shelf of authors.
+
+`NewsmakerStore` answers the same two squares about who a piece is about, in the same shapes and for the same reasons. `docs/technical/newsmakers.md` covers it.
 
 ## Where they write, on the row
 

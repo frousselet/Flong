@@ -72,25 +72,39 @@ nonisolated struct ArticleCollection: Identifiable, Hashable, Sendable {
     /// **A favourite author is the third of those judgements**, and it is about
     /// neither the article nor the paper : a reader follows a writer across the
     /// papers they write for, which is a thing no subscription can express. It
-    /// stars nothing either, and it stands third in the row so that the three
-    /// are read as three.
+    /// stars nothing either, and it stands third in the row so that the four
+    /// are read as four.
+    ///
+    /// **A favourite newsmaker is the fourth, and it is about none of the other
+    /// three.** It is a judgement about who the article is *about*, which is
+    /// the one thing in a feed that no field ever carried : a reader who
+    /// follows Emmanuel Macron wants what every paper writes about him, whoever
+    /// signed it and whoever printed it. It stars nothing either.
     ///
     /// **The order is the order of the page**, since these are the squares the
-    /// reader did not make and cannot arrange. The three judgements come first,
-    /// each about a different thing : an article, a publisher, a writer. Then
-    /// the notes, which are the reader's own words. Then the authors, which is
-    /// the one square that opens on people rather than on articles, and which
-    /// belongs at the end for exactly that reason.
+    /// reader did not make and cannot arrange. The four judgements come first,
+    /// each about a different thing : an article, a publisher, a writer, a
+    /// subject. Then the notes, which are the reader's own words. Then the two
+    /// directories, which are the only squares that open on people rather than
+    /// on articles, and which belong at the end for exactly that reason.
     nonisolated enum BuiltIn: String, Hashable, Sendable, CaseIterable {
         case starred
         case favouriteSources
         case favouriteAuthors
+        case favouriteNewsmakers
         case annotated
         /// Every byline there is, which is a directory and not a collection of
         /// articles. It is here because it is a square on that page and the
-        /// reader reads it as one ; it is the only one that opens on a list of
+        /// reader reads it as one ; it is one of the two that open on a list of
         /// people, and ``ArticleStore`` answers no articles for it on purpose.
         case authors
+        /// Everybody the articles are about, which is the other directory.
+        ///
+        /// It stands last, after the writers, because the two are read as a
+        /// pair and the writers are the one a feed actually states : who signed
+        /// a piece is a field, and who it is about is something Flong worked
+        /// out. See ``Newsmaker``.
+        case newsmakers
 
         /// Where it goes on the page.
         var rank: Int { Self.allCases.firstIndex(of: self) ?? 0 }

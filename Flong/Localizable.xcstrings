@@ -458,6 +458,46 @@
         }
       }
     },
+    "%lld newsmakers" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld newsmaker"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld newsmakers"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld personnalité"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld personnalités"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld results" : {
       "localizations" : {
         "en" : {
@@ -672,6 +712,16 @@
         }
       }
     },
+    "Add to favourite newsmakers" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter aux personnalités favorites"
+          }
+        }
+      }
+    },
     "Add to favourite sources" : {
       "localizations" : {
         "fr" : {
@@ -798,6 +848,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Tous les auteurs"
+          }
+        }
+      }
+    },
+    "All newsmakers" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toutes les personnalités"
           }
         }
       }
@@ -1329,6 +1389,118 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Collections dynamiques"
+          }
+        }
+      }
+    },
+    "Favourite newsmakers" : {
+      "comment" : "The collection of the articles about somebody the reader singled out",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personnalités favorites"
+          }
+        }
+      }
+    },
+    "Flong reads the people out of the articles themselves, in the background. They appear here as it goes." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flong lit les personnes dans les articles eux-mêmes, en arrière-plan. Elles apparaissent ici au fur et à mesure."
+          }
+        }
+      }
+    },
+    "Newsmakers" : {
+      "comment" : "The collection that lists everybody the articles are about",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personnalités"
+          }
+        }
+      }
+    },
+    "Nobody named yet" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Personne n'est encore cité"
+          }
+        }
+      }
+    },
+    "Nothing about them here" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien à leur sujet ici"
+          }
+        }
+      }
+    },
+    "Notify every article about them" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifier chaque article à leur sujet"
+          }
+        }
+      }
+    },
+    "Reading who is in the news" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture des personnalités"
+          }
+        }
+      }
+    },
+    "Remove from favourite newsmakers" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer des personnalités favorites"
+          }
+        }
+      }
+    },
+    "Search newsmakers" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher une personnalité"
+          }
+        }
+      }
+    },
+    "Stop notifying articles about them" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ne plus notifier les articles à leur sujet"
+          }
+        }
+      }
+    },
+    "What named them has been purged, or has not arrived yet." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui les citait a été purgé, ou n'est pas encore arrivé."
           }
         }
       }

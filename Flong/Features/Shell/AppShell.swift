@@ -22,6 +22,9 @@ nonisolated enum Route: Hashable {
     /// One writer, by their byline : see ``Author`` for why the name is the
     /// whole of the identity.
     case author(String)
+    /// One person the articles are about, by their name : see ``Newsmaker``,
+    /// where the identity is a name for exactly the same reason.
+    case newsmaker(String)
 }
 
 /// The article being read, when one is.
@@ -373,6 +376,12 @@ struct AppShell: View {
         case .collection(.builtIn(.authors)):
             AuthorsScreen(model: model) { path.wrappedValue.append(.author($0)) }
 
+        // The other one that opens on people. Matched before the general
+        // collection for the same reason, and next to it so that the pair is
+        // read as a pair here too.
+        case .collection(.builtIn(.newsmakers)):
+            NewsmakersScreen(model: model) { path.wrappedValue.append(.newsmaker($0)) }
+
         // One somebody else shared holds excerpts and not this device's
         // articles, so it is a different page and not the same page with a
         // condition in every row.
@@ -384,6 +393,9 @@ struct AppShell: View {
 
         case .author(let name):
             AuthorScreen(model: model, name: name, zoom: zoom) { reading = Reading(id: $0) }
+
+        case .newsmaker(let name):
+            NewsmakerScreen(model: model, name: name, zoom: zoom) { reading = Reading(id: $0) }
 
         }
     }

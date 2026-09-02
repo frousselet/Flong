@@ -52,6 +52,7 @@ nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
         case vectorModel = "vector_model"
         case vectorRevision = "vector_revision"
         case duplicateOf = "duplicate_of"
+        case newsmakersAt = "newsmakers_at"
     }
 
     var id: UUID
@@ -102,6 +103,19 @@ nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
     /// the reader through a second feed of the same newsroom. A duplicate is
     /// kept and shown nowhere.
     var duplicateOf: UUID?
+
+    /// When the people this article names were read out of it, or `nil` where
+    /// they have not been.
+    ///
+    /// **The date is the answer, and no rows is not.** Reading who an article
+    /// is about is a model over the whole of its text, so it happens in a
+    /// resumable job rather than in the write that stores the article, and the
+    /// job has to be able to tell an article it has never read from one it read
+    /// and found nobody in. See ``Newsmaker`` and ``NewsmakerStore``.
+    ///
+    /// It is set back to `nil` when a publisher rewrites the piece, which is
+    /// what makes the people follow the prose.
+    var newsmakersAt: Date?
 
     init(
         id: UUID = .v7(),
