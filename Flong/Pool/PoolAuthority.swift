@@ -50,13 +50,19 @@ nonisolated enum PoolTrust {
     /// is written here rather than fetched because a fetched anchor is no
     /// anchor at all.
     ///
-    /// **`nil` until it is filled in, and then nobody is in.** A closed pool
-    /// with no root is a pool with no members : the page shows nothing rather
-    /// than showing something nobody vouched for. That is the safe way round,
-    /// and it makes filling this in the one thing standing between the feature
-    /// and working at all. The value is the author's own contributor code,
-    /// which their panel shows them.
-    static let root: String? = nil
+    /// **It is written in the open, and it has to be.** It is compiled into
+    /// every copy of the application, so it is on every device that installs
+    /// one and can be read out of the binary by anybody who cares to : an
+    /// anchor that were secret would be no anchor. Nothing authorises anybody
+    /// for presenting it either, since every trust decision here reads
+    /// ``CKRecord/creatorUserRecordID``, which the server stamps and no client
+    /// can write. Knowing this string lets nobody sponsor, ban, block or vouch
+    /// for anything.
+    ///
+    /// **`nil` means nobody is in**, which is the safe way round and was the
+    /// shipped value until this was filled in : a closed pool with no anchor
+    /// shows nothing rather than showing what nobody vouched for.
+    static let root: String? = "_abe0e9185467c5104d98ad0cd5ada25e"
 
     /// How many people one contributor may bring in.
     ///
