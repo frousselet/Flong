@@ -93,6 +93,11 @@ actor CloudSync {
         if await serialization() == nil {
             await enqueueEverything()
         }
+
+        // And whatever was removed while there was no engine to tell. A launch
+        // with no network fails the account check above and leaves this nil for
+        // the whole of a session in which the reader may remove a source.
+        await sendOutstandingDeletions()
     }
 
     /// Sends and fetches now, which is what a pull to refresh means.
@@ -186,6 +191,10 @@ actor CloudSync {
         self.engine = nil
         try? await state.setEngineState(nil)
         try? await state.forgetEveryRecord()
+        // Nothing left to delete one record at a time : the zone holding them
+        // has gone, and an intention outliving it would be a deletion queued
+        // for ever against a zone that answers `zoneNotFound`.
+        try? await state.forgetEveryDeletion()
         status = .idle(lastSynchronized: nil)
     }
 
@@ -198,20 +207,68 @@ actor CloudSync {
             engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))])
             engine.state.add(pendingRecordZoneChanges: names.map { .saveRecord(recordID(for: $0)) })
             Log.sync.notice("Queued \(names.count) records for a first exchange")
+
+            // Everything this device holds is what it holds ; what it has
+            // removed is not in that answer and has to be said separately, or
+            // a repair would quietly cancel every removal waiting to be sent.
+            await sendOutstandingDeletions()
         } catch {
             Log.sync.error("Nothing could be queued : \(error.localizedDescription, privacy: .public)")
         }
     }
 
     /// Queues what changed, which is what every local edit calls.
-    func enqueue(recordNames names: [String]) {
-        guard let engine, !names.isEmpty else { return }
-        engine.state.add(pendingRecordZoneChanges: names.map { .saveRecord(recordID(for: $0)) })
+    ///
+    /// A record that is being saved is a record that is not being deleted : a
+    /// source removed and then followed again at the same address writes the
+    /// same name, and an intention to delete it left standing would take it
+    /// away again on the next pass.
+    func enqueue(recordNames names: [String]) async {
+        guard !names.isEmpty else { return }
+
+        // Read before written, and almost always nothing : this runs on every
+        // pass, with the read states and the catch-up headers of the whole
+        // exchange, and a write that took the lock each time to delete nothing
+        // would be a cost paid for a case that arises once in a very long while.
+        let outstanding = Set((try? await state.outstandingDeletions()) ?? [])
+        let cancelled = outstanding.intersection(names)
+        if !cancelled.isEmpty { try? await state.forgetDeletions(Array(cancelled)) }
+
+        engine?.state.add(pendingRecordZoneChanges: names.map { .saveRecord(recordID(for: $0)) })
     }
 
-    func enqueue(deletions names: [String]) {
-        guard let engine, !names.isEmpty else { return }
+    /// Queues records for deletion, and writes the intention down first.
+    ///
+    /// **Written down because nothing else could bring it back.** The row a
+    /// deletion is about has just gone, so a queue that was lost was a deletion
+    /// lost for good : the engine may not be there yet, an account check may
+    /// have failed at launch, a reset drops what is pending, and a send the
+    /// server refuses is not retried by anybody. Every one of those left a
+    /// source removed here still standing on the reader's other device, and
+    /// nothing anywhere that would ever try again.
+    ///
+    /// The ledger is what ``sendOutstandingDeletions()`` reads, and a name
+    /// leaves it when the server says the record has gone.
+    func enqueue(deletions names: [String]) async {
+        guard !names.isEmpty else { return }
+
+        try? await state.rememberDeletions(names)
+        engine?.state.add(pendingRecordZoneChanges: names.map { .deleteRecord(recordID(for: $0)) })
+    }
+
+    /// Queues again everything the server has not confirmed gone.
+    ///
+    /// Called whenever an engine appears, so a removal decided while there was
+    /// none is carried out at the first exchange that can carry it out rather
+    /// than never.
+    func sendOutstandingDeletions() async {
+        guard let engine else { return }
+
+        let names = (try? await state.outstandingDeletions()) ?? []
+        guard !names.isEmpty else { return }
+
         engine.state.add(pendingRecordZoneChanges: names.map { .deleteRecord(recordID(for: $0)) })
+        Log.sync.notice("Queued \(names.count) deletions the server has not confirmed")
     }
 
     /// Deletes from iCloud everything one source ever put there.
@@ -232,7 +289,7 @@ actor CloudSync {
         if let sourceName { names.append(sourceName) }
         names += (try? await state.names(startingWith: SyncRecords.namePrefix(forCatchUpFeed: url))) ?? []
 
-        enqueue(deletions: names)
+        await enqueue(deletions: names)
         Log.sync.notice("Queued \(names.count) records for deletion with a source")
     }
 
@@ -241,8 +298,8 @@ actor CloudSync {
     func enqueueCatchUp(now: Date = Date()) async {
         do {
             let changes = try await payload.catchUpChanges(now: now)
-            enqueue(recordNames: changes.records.map(\.recordID.recordName))
-            enqueue(deletions: changes.expired)
+            await enqueue(recordNames: changes.records.map(\.recordID.recordName))
+            await enqueue(deletions: changes.expired)
         } catch {
             Log.sync.error("The catch up headers failed : \(error.localizedDescription, privacy: .public)")
         }
@@ -252,10 +309,56 @@ actor CloudSync {
     func enqueueReadStates() async {
         do {
             let records = try await payload.readStateChanges()
-            enqueue(recordNames: records.map(\.recordID.recordName))
+            await enqueue(recordNames: records.map(\.recordID.recordName))
         } catch {
             Log.sync.error("The read states could not be compacted : \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    // MARK: - What iCloud actually holds
+
+    /// The names of every record standing in the reader's zone right now.
+    ///
+    /// **Asked of the server directly, and not through the engine.** The engine
+    /// answers what has changed since a token, which is the right question
+    /// almost always and the wrong one here : a deletion that never arrived is
+    /// not a change the server will mention again, and a device that missed one
+    /// can only learn of it by seeing what is there now and noticing what is
+    /// not. Its own tokens are left alone, so this costs a read and disturbs
+    /// nothing.
+    ///
+    /// `nil` rather than an empty answer where there is nothing to ask : no
+    /// account, no zone yet, or a network that did not reply. The two are not
+    /// the same thing at all, one of them meaning `everything you hold is
+    /// gone`, and a repair that could not read the zone must do nothing rather
+    /// than everything.
+    func recordNamesInCloud() async -> Set<String>? {
+        guard engine != nil else { return nil }
+
+        var names: Set<String> = []
+        var token: CKServerChangeToken?
+
+        do {
+            while true {
+                let changes = try await container.privateCloudDatabase.recordZoneChanges(
+                    inZoneWith: zoneID,
+                    since: token
+                )
+
+                for (id, result) in changes.modificationResultsByID {
+                    guard case .success = result else { continue }
+                    names.insert(id.recordName)
+                }
+
+                guard changes.moreComing else { break }
+                token = changes.changeToken
+            }
+        } catch {
+            Log.sync.error("The zone could not be read : \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+
+        return names
     }
 
     private func recordID(for name: String) -> CKRecord.ID {
@@ -337,6 +440,13 @@ extension CloudSync: CKSyncEngineDelegate {
         try? await state.remember(changes.modifications.map(\.record))
         try? await state.forget(changes.deletions.map(\.recordID.recordName))
 
+        // A record the server has just said is gone is one this device no
+        // longer has to have deleted, whichever device asked for it. Two
+        // removing the same source at once is the ordinary case, and the one
+        // that arrives second would otherwise send a deletion for the sake of
+        // being told the record was never there.
+        try? await state.forgetDeletions(changes.deletions.map(\.recordID.recordName))
+
         // **The reader's own shared collections are in this database too.** A
         // zone-wide share lives in the owner's private database, so what a
         // participant files into one of the reader's collections arrives here
@@ -376,6 +486,12 @@ extension CloudSync: CKSyncEngineDelegate {
     private func handle(_ sent: CKSyncEngine.Event.SentRecordZoneChanges) async {
         try? await state.remember(sent.savedRecords)
         try? await state.forget(sent.deletedRecordIDs.map(\.recordName))
+
+        // The server has confirmed these are gone, which is the only thing that
+        // ends an intention to delete. Anything still in the ledger is queued
+        // again at the next exchange.
+        try? await state.forgetDeletions(sent.deletedRecordIDs.map(\.recordName))
+        await handleFailed(deletions: sent.failedRecordDeletes)
 
         for failure in sent.failedRecordSaves {
             switch failure.error.code {
@@ -424,6 +540,46 @@ extension CloudSync: CKSyncEngineDelegate {
                 }
             }
         }
+    }
+
+    /// What to do about a deletion the server refused.
+    ///
+    /// **Nothing looked at these at all, and that is half of why a removal went
+    /// missing.** The failed saves below have been sorted out since the
+    /// beginning ; a failed delete was dropped where it fell, with no log line
+    /// and nobody to try again, so one refusal, from a moment of no network or
+    /// a server asking to be left alone, was a source that stayed on the
+    /// reader's other device for good.
+    ///
+    /// The ledger is what makes the answer simple. A record the server says it
+    /// does not have is a record that has gone, whoever deleted it, so the
+    /// intention is finished with. Everything else is left standing and queued
+    /// again at the next exchange, which is what a retry is here.
+    private func handleFailed(deletions failures: [CKRecord.ID: Error]) async {
+        guard !failures.isEmpty else { return }
+
+        var finished: [String] = []
+        for (id, error) in failures {
+            switch (error as? CKError)?.code {
+            case .unknownItem:
+                // Already gone, which is the outcome that was wanted.
+                finished.append(id.recordName)
+
+            case .zoneNotFound:
+                // The zone itself has gone, so everything in it has. Putting it
+                // back is the repair path of the failed saves ; there is
+                // nothing left here to delete out of it.
+                finished.append(id.recordName)
+
+            default:
+                if SyncFailure.isTransient(error) {
+                    status = SyncFailure.status(for: error)
+                }
+                Log.sync.notice("A deletion was refused and will be tried again")
+            }
+        }
+
+        try? await state.forgetDeletions(finished)
     }
 
     private func handle(_ change: CKSyncEngine.Event.AccountChange) async {

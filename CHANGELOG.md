@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- A source removed on one device is removed on the others : the intention to delete a record is written down before it is queued, so a removal decided while the sync engine was not there, dropped by a repair, or refused once by the server is carried out at the next exchange instead of being lost in silence, with a `Tidy the sources` command in the reader's own panel to put right the devices already wrong by offering, by name, every source their iCloud no longer holds.
 - A collection shared with somebody can be opened : `CKSharingSupported` was missing from the `Info.plist`, so the system looked Flong up in the App Store rather than handing it the share, and a recipient tapping an invitation was told they needed a newer version that does not exist.
 - Flong no longer terminates when two rebuilds of the Spotlight index overlap : `beginBatch()` on an index that already has one open throws an Objective-C exception no Swift `catch` can stop, and the window opening, a catch-up bringing articles and singling somebody out could all ask for one at once.
 - A sign-in that leaves no session now says why : a passkey is Safari's and cannot be used in a web view inside an application, so the site has to be asked for another method.

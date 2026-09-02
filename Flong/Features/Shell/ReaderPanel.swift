@@ -63,6 +63,7 @@ struct ReaderPanel: View {
     @State private var trustingCode = ""
     @State private var banningCode = ""
     @State private var isDeletingEverything = false
+    @State private var tidy: AppModel.SourceTidy?
 
     #if os(iOS)
         @State private var chosen: PhotosPickerItem?
@@ -82,6 +83,7 @@ struct ReaderPanel: View {
                 sharing
                 if model.isSponsoredIntoPool { sponsoring }
                 if model.mayDecideForThePool { deciding }
+                tidying
                 sites
 
                 #if DEBUG
@@ -129,6 +131,32 @@ struct ReaderPanel: View {
             Text(
                 "Your subscriptions, every article, everything you kept and every site you are signed in to, on this device and in your iCloud. This cannot be undone. Another device that still has them will put its own copy back."
             )
+        }
+        .alert(
+            tidyTitle,
+            isPresented: Binding(get: { tidy != nil }, set: { if !$0 { tidy = nil } }),
+            presenting: tidy
+        ) { answer in
+            if case .stranded(let feeds) = answer {
+                Button("Remove", role: .destructive) {
+                    Task { await model.removeSources(feeds) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } else {
+                Button("OK", role: .cancel) {}
+            }
+        } message: { answer in
+            switch answer {
+            case .stranded(let feeds):
+                // The names are the publishers' own and are not translated.
+                Text(
+                    "Your iCloud no longer has these, so another device stopped following them. Removing one takes its articles with it, the ones you kept included, and cannot be undone.\n\n\(feeds.map(\.title).joined(separator: "\n"))"
+                )
+            case .settled:
+                Text("Every source here is one your iCloud still has.")
+            case .unavailable:
+                Text("Nothing was changed. Try again when this device is back on the network.")
+            }
         }
         .sheet(isPresented: $isChoosingPlace) {
             PlacePicker(model: model)
@@ -547,6 +575,52 @@ struct ReaderPanel: View {
             get: { model.contributesToPool == true },
             set: { wanted in Task { await model.setContributingToPool(wanted) } }
         )
+    }
+
+    // MARK: - Sources another device stopped following
+
+    /// The repair for a source removed on another device that never went here.
+    ///
+    /// **Under the reader's own face because it is about their devices** rather
+    /// than about any one publisher : the sources panel acts on the source in
+    /// front of it, and this is the question of what the rest of their devices
+    /// believe. It sits beside the sites for the same reason those do.
+    ///
+    /// It removes nothing on its own. What it finds is put back to the reader
+    /// by name, because a source going takes its articles with it, the kept
+    /// ones included, and that cannot be undone.
+    private var tidying: some View {
+        Section {
+            Button {
+                Task { tidy = await model.findSourcesRemovedElsewhere() }
+            } label: {
+                HStack(spacing: 8) {
+                    Label("Tidy the sources", systemImage: "sparkles")
+                    if model.isTidyingSources {
+                        Spacer()
+                        ProgressView().controlSize(.small)
+                    }
+                }
+            }
+            .accessibilityIdentifier("tidy-sources")
+            .disabled(model.isTidyingSources)
+        } header: {
+            Text("Sources")
+        } footer: {
+            Text(
+                "Asks your iCloud which sources it still holds, and offers to remove the ones you stopped following on another device. Nothing goes until you have seen the list."
+            )
+        }
+    }
+
+    /// What the alert about the tidying is headed, which is the one thing the
+    /// alert needs before it knows which answer it is showing.
+    private var tidyTitle: Text {
+        switch tidy {
+        case .stranded: Text("Sources removed elsewhere")
+        case .settled: Text("Nothing to tidy")
+        default: Text("Your iCloud could not be asked")
+        }
     }
 
     // MARK: - The sites they pay for

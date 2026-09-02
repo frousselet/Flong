@@ -55,6 +55,12 @@ The blocks are found by name rather than worked out. A record name is a digest a
 
 Nothing is queued back : the device that removed it has already deleted every record, and this end has only to catch up.
 
+## A removal that never arrived
+
+The deletion of the subscription record is what carries the removal, and for a long time it was the one change in the application that could be lost without trace. The intention lived nowhere but in the sync engine's pending changes : no engine at the moment of the removal, a reset, or one refusal from the server, and the source stayed on the reader's other device for good, with nothing anywhere that would ever try again. It is written down before it is queued now, and `docs/technical/sync.md` sets out the four ways it used to go missing.
+
+That fixes the next removal and not the last one, because a deletion that was lost is not a change the server will ever mention again. `Tidy the sources`, in the reader's own panel, is the repair for a device already wrong : it reads the zone as it stands and offers to remove every source here whose record is not in it. It removes nothing on its own, since a source going takes the whole of the table above with it, and the removal it then performs is this one.
+
 ## What is not touched
 
 **The session on the site.** A session is keyed by the site the cookies claim, which is usually broader than the group a source falls under : one sign-in covers every feed and every article of `lemonde.fr`, including sources under `abonnes.lemonde.fr`. It is also the reader's own relationship with a publisher rather than a property of a subscription, and it is listed in their panel with a way to sign out. Taking it away with a feed would sign them out of a site they may still be reading, in a place they were not looking, so it stays and stays visible.
@@ -67,4 +73,4 @@ Nothing is queued back : the device that removed it has already deleted every re
 
 That the articles go, that the filings go and the ones of another source stay, that the waiting marks go and the ones of another source stay, that a story left with one article goes, that the name over a publisher goes with the last of its sources and not before, and that removing a publisher removes every source under it and nothing else. At the window : that the removal empties the list and puts the reader back on the whole stream rather than on a heading with nothing under it, and that the secret leaves the keychain.
 
-The iCloud half is the part that cannot be tested from the outside, which is true of everything in `CloudSync` and is recorded in `docs/technical/sync.md`.
+The iCloud half is the part that cannot be tested from the outside, which is true of everything in `CloudSync` and is recorded in `docs/technical/sync.md`. What is testable of it is tested there : that an intention to delete outlives the moment it was decided, and that the tidying calls a source gone only when the server had confirmed the record it no longer holds.

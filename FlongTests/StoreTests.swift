@@ -38,7 +38,7 @@ struct StoreTests {
             "entry_author", "shared_collection", "shared_entry", "notified_author",
             "entry_newsmaker", "favourite_newsmaker", "notified_newsmaker",
             "pool_list", "pool_entry", "pool_trust",
-            "pool_vouch", "pool_authorised", "pool_ban", "pool_block",
+            "pool_vouch", "pool_authorised", "pool_ban", "pool_block", "pending_deletion",
         ]
         #expect(expected.isSubset(of: tables))
     }
@@ -61,7 +61,7 @@ struct StoreTests {
                 "v25.theWholeByline", "v26.everybodyWhoSigned", "v27.aCollectionShared",
                 "v28.whatSomebodyElseFiled", "v29.aSourceThatMoved", "v30.aSourceWorthInterrupting",
                 "v31.aWriterWorthInterrupting", "v32.whoTheArticlesAreAbout",
-                "v33.whatEverybodyElseFollows", "v34.whoLetThemIn",
+                "v33.whatEverybodyElseFollows", "v34.whoLetThemIn", "v35.aDeletionThatSurvives",
             ]
         )
     }

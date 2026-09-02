@@ -808,6 +808,28 @@ nonisolated extension AppDatabase {
             try db.create(index: "pool_entry_on_digest", on: "pool_entry", columns: ["digest"])
         }
 
+        migrator.registerMigration("v35.aDeletionThatSurvives") { db in
+            // Records this device has decided are to go from the reader's
+            // iCloud, and that the server has not confirmed gone yet.
+            //
+            // **A deletion is the one change nothing local can re-derive.** A
+            // save is recoverable from the row it is about : whatever the
+            // engine forgets, the row is still here and can be queued again,
+            // which is what a repair does. The row a deletion is about has
+            // just been removed, so the intention lived nowhere but in the
+            // engine's pending changes, and every way of losing those lost it
+            // silently and for ever : no engine yet at the moment of the
+            // removal, an account check that failed at launch, a reset, or a
+            // send the server refused once.
+            //
+            // So the intention is written down before it is queued, and it is
+            // forgotten only when the server says the record has gone.
+            try db.create(table: "pending_deletion") { table in
+                table.primaryKey("record_name", .text)
+                table.column("queued_at", .datetime).notNull()
+            }
+        }
+
         return migrator
     }
 

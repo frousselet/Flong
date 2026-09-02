@@ -120,6 +120,62 @@ nonisolated struct SyncState: Sendable {
         try await database.writer.write { db in try db.execute(sql: "DELETE FROM sync_record") }
     }
 
+    // MARK: - What has still to be deleted
+
+    /// Writes down that these records are to go from the reader's iCloud.
+    ///
+    /// **The one change nothing local can re-derive.** A save is recoverable
+    /// from the row it is about : whatever the engine forgets, the row is still
+    /// here to be queued again, which is what a repair does. The row a deletion
+    /// is about has just been removed, so the intention used to live nowhere
+    /// but in the engine's pending changes, and every way of losing those lost
+    /// it in silence and for good : no engine yet at the moment of the removal,
+    /// an account check that failed at launch, a reset, or one refusal from the
+    /// server.
+    ///
+    /// That is what left a source removed on one device still standing on the
+    /// other, with nothing anywhere that would ever try again.
+    func rememberDeletions(_ names: [String], at date: Date = Date()) async throws {
+        guard !names.isEmpty else { return }
+
+        try await database.writer.write { db in
+            for name in names {
+                try db.execute(
+                    sql: """
+                        INSERT INTO pending_deletion (record_name, queued_at) VALUES (?, ?)
+                        ON CONFLICT (record_name) DO NOTHING
+                        """,
+                    arguments: [name, date]
+                )
+            }
+        }
+    }
+
+    /// What this device still has to have deleted, the oldest intention first.
+    func outstandingDeletions() async throws -> [String] {
+        try await database.writer.read { db in
+            try String.fetchAll(db, sql: "SELECT record_name FROM pending_deletion ORDER BY queued_at")
+        }
+    }
+
+    /// Drops the intention, the record being gone from the server or never
+    /// having been there.
+    func forgetDeletions(_ names: [String]) async throws {
+        guard !names.isEmpty else { return }
+
+        try await database.writer.write { db in
+            try db.execute(
+                sql: "DELETE FROM pending_deletion WHERE record_name IN (\(placeholders(names.count)))",
+                arguments: StatementArguments(names)
+            )
+        }
+    }
+
+    /// Drops every intention, for a zone that is being taken down whole.
+    func forgetEveryDeletion() async throws {
+        try await database.writer.write { db in try db.execute(sql: "DELETE FROM pending_deletion") }
+    }
+
     private func placeholders(_ count: Int) -> String {
         Array(repeating: "?", count: count).joined(separator: ", ")
     }
