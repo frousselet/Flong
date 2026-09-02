@@ -177,20 +177,6 @@ nonisolated enum CatchUp: Hashable, Sendable {
 /// One object for one window : the three levels of section 16 of the
 /// specification move together, and splitting them would mean keeping three
 /// copies of the same selection in step.
-/// One thing the search field offers above the keyboard.
-///
-/// **Two strings and not one.** The pill says what is being added and the
-/// field takes the whole query ; a single string would have every pill
-/// reciting back at the reader what they have already typed.
-nonisolated struct SearchOffer: Identifiable, Hashable, Sendable {
-    /// What is written on the pill.
-    let fragment: String
-    /// What the field holds once the pill is taken.
-    let query: String
-
-    var id: String { query }
-}
-
 @Observable
 final class AppModel {
     private let database: AppDatabase
@@ -866,96 +852,39 @@ final class AppModel {
         return node == .all ? nil : node
     }
 
+    /// What is worth searching for, from what the feeds are full of.
+    ///
+    /// Read once, when the digest is, rather than worked out every time the
+    /// page draws itself : naming the people and places in twenty headlines is
+    /// a pass over twenty headlines, and a computed property would do it again
+    /// at every keystroke.
+    private(set) var searchSubjects: [String] = []
+
     /// What the field offers above the keyboard.
     ///
-    /// **Completions where there is a word to complete, the grammar
-    /// otherwise.** A reader who has typed `feed:` is asking which sources
-    /// there are and gets their names ; a reader who has typed nothing is
-    /// asking about no field in particular, and what helps them is the handful
-    /// of words the language is made of. Taking one of those puts it in the
-    /// field, which is what then produces the completions : the two halves are
-    /// one ladder rather than two lists.
+    /// **Subjects, not syntax.** A field that offered `is:unread` and `tag:`
+    /// was teaching its own grammar to somebody who came to look something up.
+    /// What is offered is what is happening : the subjects of the stories on
+    /// the page, and, once the reader has started typing, whichever of them
+    /// they are heading towards.
     ///
-    /// Every offer carries what is already in the field in front of it, so
-    /// taking one narrows the query rather than replacing it.
-    var searchOffers: [SearchOffer] {
-        let completions = searchCompletions
-        guard completions.isEmpty else { return completions }
-
+    /// What the reader has already searched for is left out of the empty-field
+    /// offer : it is on the page two rows above, and a suggestion that repeats
+    /// a row wastes its line.
+    var searchSuggestions: [String] {
         let text = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let prefix = text.isEmpty ? "" : text + " "
+        guard !text.isEmpty else {
+            let recent = Set(recentSearches.map { $0.localizedLowercase })
+            return Array(searchSubjects.filter { !recent.contains($0.localizedLowercase) }.prefix(SearchSubjects.limit))
+        }
 
-        var fragments = Self.states
-        if !feedTitles.isEmpty { fragments.append("feed:") }
-        if !tagPaths.isEmpty { fragments.append("tag:") }
-        fragments += ["author:", "title:"]
-
-        // A word already in the query is not worth offering again : a reader
-        // who asked for the unread ones does not need telling twice.
         return
-            fragments
-            .filter { !text.localizedCaseInsensitiveContains($0) }
-            .map { SearchOffer(fragment: $0, query: prefix + $0) }
-    }
-
-    /// The states a reader reaches for, in the order they reach for them.
-    ///
-    /// Three of the eight section 12 defines. This is what fits above a
-    /// keyboard, and the other five are reachable by typing them, which is the
-    /// point of having a grammar rather than a row of buttons.
-    private static let states = ["is:unread", "is:starred", "has:media"]
-
-    /// Completion of the feed or tag name being typed.
-    ///
-    /// Section 12 asks for it, and those are the two things nobody remembers
-    /// the exact spelling of.
-    private var searchCompletions: [SearchOffer] {
-        guard let last = searchText.split(separator: " ").last.map(String.init) else { return [] }
-
-        let names: [String]
-        let prefix = searchText.dropLast(last.count)
-
-        if last.lowercased().hasPrefix("feed:") {
-            names = completions(for: String(last.dropFirst(5)), in: feedTitles)
-        } else if last.lowercased().hasPrefix("tag:") {
-            names = completions(for: String(last.dropFirst(4)), in: tagPaths)
-        } else {
-            return []
-        }
-
-        let field = last.prefix(while: { $0 != ":" })
-        return names.map { name in
-            let value = name.contains(" ") ? "\"\(name)\"" : name
-            let fragment = field + ":" + value
-            return SearchOffer(fragment: String(fragment), query: prefix + fragment)
-        }
-    }
-
-    private func completions(for text: String, in names: [String]) -> [String] {
-        let text = text.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
-        guard !names.isEmpty else { return [] }
-        guard !text.isEmpty else { return Array(names.prefix(6)) }
-
-        return names.filter { $0.localizedCaseInsensitiveContains(text) }.prefix(6).map { $0 }
-    }
-
-    private var feedTitles: [String] {
-        sidebar.flatMap { [$0] + $0.children }.compactMap { item in
-            if case .feed = item.kind { item.title } else { nil }
-        }
-    }
-
-    /// The tags there are to complete, which are the collections the reader
-    /// filled article by article.
-    ///
-    /// It used to be the folder paths as well, since a folder was a view over a
-    /// root tag. The folders are gone, and a source belongs to its publisher
-    /// rather than to a filing : `feed:` and `site:` are what narrow a search to
-    /// where an article came from.
-    private var tagPaths: [String] {
-        collections.compactMap { collection in
-            if case .made(let name) = collection.kind { CollectionStore.path(of: name) } else { nil }
-        }
+            searchSubjects
+            .filter {
+                $0.localizedCaseInsensitiveContains(text) && $0.localizedCaseInsensitiveCompare(text) != .orderedSame
+            }
+            .prefix(SearchSubjects.limit)
+            .map { $0 }
     }
 
     init(
@@ -1195,6 +1124,10 @@ final class AppModel {
             // header rebuilt mid-gesture is a page that does not settle back
             // where it was.
             if fetched != digest { digest = fetched }
+
+            // What is worth searching for is what the page is full of, so it
+            // is worked out where the page is read and nowhere else.
+            searchSubjects = SearchSubjects.subjects(in: fetched.all.map(\.title))
 
             // **The front page, and only the front page.** What Spotlight holds
             // is what a reader would find on the digest, no more and no less,

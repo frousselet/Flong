@@ -2657,6 +2657,17 @@
         }
       }
     },
+    "Say what you are looking for, in your own words." : {
+      "comment" : "Under the empty search screen. The field takes a sentence, not a syntax.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dites ce que vous cherchez, avec vos mots."
+          }
+        }
+      }
+    },
     "Search" : {
       "comment" : "The name of the search section, as a heading. A noun, not the verb the field asks with.",
       "localizations" : {
@@ -3601,16 +3612,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’éditeur sous lequel elle est regroupée, et l’endroit où son icône est cherchée. Laissez le champ vide et elle est regroupée sous l’adresse du flux lui-même."
-          }
-        }
-      }
-    },
-    "Words, or a query : title:, author:, tag:, is:unread, after:2026-01." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Des mots, ou une requête : title:, author:, tag:, is:unread, after:2026-01."
           }
         }
       }

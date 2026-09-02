@@ -40,7 +40,9 @@ Words next to each other are joined by an implicit `AND`, which is what everyone
 
 ## What the field offers
 
-Completion of feed and tag names where there is a name being typed, and the grammar itself where there is not. `docs/technical/interface.md` sets out the screen : the pills above the keyboard, the searches the reader ran before, and why arriving in the section is what puts the cursor in the field.
+**Subjects, never syntax.** `SearchSubjects` reads the headlines of the stories on the digest and hands back what they are about : the longest run of distinctive words in each, where distinctive means the tagger called it somebody or somewhere, or the way it is written says it names something. A capital the sentence did not ask for, a capital inside the word, a digit beside letters, a year. Where that run is a single word the next one joins it, so `Trump donne dix jours à l'Iran` offers `Trump Iran` and `Apple présente l'iPhone 18 Pro` offers `iPhone 18 Pro` rather than `Apple`. French elides, so `l'` and `d'` come off the front of a word while `aujourd'hui` keeps its apostrophe.
+
+It runs on no model at all, which is the point : section 15 says the path without Apple Intelligence always exists and is always tested. `docs/technical/interface.md` sets out the screen : the pills above the keyboard, the searches the reader ran before, and why arriving in the section is what puts the cursor in the field.
 
 ## Compiling
 

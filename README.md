@@ -22,7 +22,7 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **What you mark stays.** Star an article, write on it, file it in a collection : the mark rides on the article itself, follows you to your other devices, and no purge ever touches it.
 
-**Search is genuinely indexed.** Full text over the whole local corpus, a query language with operators, and what you marked reaches Spotlight. The section opens with the cursor in the field, offers the operators and your own feed and tag names above the keyboard, and keeps the queries you worked out so you never have to work one out twice.
+**Search is genuinely indexed.** Full text over the whole local corpus, and what you marked reaches Spotlight. The section opens with the cursor in the field and suggests what is worth looking for this morning, read from what your feeds are full of, and it keeps what you searched for so you never have to type it twice.
 
 **Sources you pay for stay readable.** A per-subscriber address, HTTP Basic or a token, kept in the keychain and never in the database, an export or a log.
 

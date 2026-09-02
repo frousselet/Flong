@@ -281,54 +281,6 @@ struct AppModelTests {
         #expect(!model.isShowingResults)
     }
 
-    @Test("Feed and tag names complete themselves")
-    func suggestions() async throws {
-        try await subscriptions.subscribe(
-            to: Subscription(address: "https://a.example.com/f.xml", title: "Le Quotidien")
-        )
-        try await subscriptions.subscribe(
-            to: Subscription(address: "https://b.example.com/f.xml", title: "Swift")
-        )
-        await model.makeCollection(named: "Veille")
-        await model.load()
-
-        model.searchText = "feed:quot"
-        #expect(model.searchOffers.map(\.query) == ["feed:\"Le Quotidien\""])
-        // The pill says what is being added, not what has already been typed.
-        #expect(model.searchOffers.map(\.fragment) == ["feed:\"Le Quotidien\""])
-
-        // The tags there are to complete are the collections. A source is no
-        // longer filed under anything, so nothing about it answers to `tag:`.
-        model.searchText = "réforme tag:vei"
-        #expect(model.searchOffers.map(\.query) == ["réforme tag:collection/Veille"])
-        #expect(model.searchOffers.map(\.fragment) == ["tag:collection/Veille"])
-    }
-
-    @Test("With nothing to complete, the field offers the language itself")
-    func offeringTheGrammar() async throws {
-        try await subscriptions.subscribe(
-            to: Subscription(address: "https://a.example.com/f.xml", title: "Le Quotidien")
-        )
-        await model.load()
-
-        // Nothing typed : the states, then the fields there is anything to
-        // complete. No collection has been made, so `tag:` is not offered.
-        #expect(
-            model.searchOffers.map(\.fragment) == [
-                "is:unread", "is:starred", "has:media", "feed:", "author:", "title:",
-            ])
-        #expect(model.searchOffers.allSatisfy { $0.fragment == $0.query })
-
-        // A word that completes nothing still gets the grammar, and taking an
-        // offer narrows what was typed rather than replacing it.
-        model.searchText = "réforme"
-        #expect(model.searchOffers.first?.query == "réforme is:unread")
-
-        // What the query already says is not offered again.
-        model.searchText = "réforme is:unread"
-        #expect(!model.searchOffers.contains { $0.fragment == "is:unread" })
-    }
-
     @Test("A search that was run is remembered, newest first and only once")
     func rememberingSearches() async throws {
         let suite = "recent-searches-\(UUID().uuidString)"
