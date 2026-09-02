@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Somebody invited to a shared collection who has not accepted yet is named from the reader's own address book, where they let Flong look, rather than drawn as the bare telephone number the invitation went to with a digit for an initial : it is asked for at the moment a collection holds somebody who cannot be named, refusing it costs the name and nothing else, and nothing found there ever leaves the device or enters anybody's card.
+
 - The reader is themselves in their own shared collection : CloudKit does not name you to yourself and does not always call you by your own record, so the owner of a collection turned up in it as `Quelqu'un`, with the name and the face they wrote for themselves filed under a different key and dropped.
 - The author of the application is in their own pool without waiting to be sponsored : the sponsorship graph was only ever walked when a record arrived, so a pool on the day its anchor is set walked nothing, and being unauthorised is what stops a device publishing at all.
 - A source removed on one device is removed on the others : the intention to delete a record is written down before it is queued, so a removal decided while the sync engine was not there, dropped by a repair, or refused once by the server is carried out at the next exchange instead of being lost in silence, with a `Tidy the sources` command in the reader's own panel to put right the devices already wrong by offering, by name, every source their iCloud no longer holds.

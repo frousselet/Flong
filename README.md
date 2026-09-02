@@ -67,7 +67,7 @@ xcodebuild build -project Flong.xcodeproj -scheme Flong -destination 'platform=m
 
 ## Privacy
 
-Nothing leaves the device but your own private CloudKit database, a collection you chose to share, the requests to the feeds themselves, and the pictures those feeds point at. No telemetry, no tracker, no third-party service.
+Nothing leaves the device but your own private CloudKit database, a collection you chose to share, the requests to the feeds themselves, and the pictures those feeds point at. Flong asks for your contacts only to put a name on somebody you invited to a collection and who has not accepted yet, only when there is one, and what it finds never leaves the device. No telemetry, no tracker, no third-party service.
 
 The popular feeds are the one thing you may publish to other readers, and only after saying so : a list of the addresses you follow, never a name, an article or anything you wrote. Turning it off takes your list back out.
 

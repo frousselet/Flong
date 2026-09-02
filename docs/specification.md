@@ -262,6 +262,8 @@ A made collection may be shared with other iCloud users, who may file into it. A
 
 **A person takes back what they put in ; the owner may take down anything.** Their own filing is a rewrite of their own list, which is the shape that needs no conflict resolution. The owner needs more than that, and what keeps the property is a list of their own saying what is out, merged as a union like everything else : it is a filter and never a deletion, since the filer's list still carries the article and their next edit would send it again. What leaves is the filing and never the article, which stays in whosever stream it was in.
 
+**Somebody who has not accepted yet is named from the reader's own address book**, where they let Flong look. CloudKit has no identity to resolve for a pending invitation, so all the share carries is the address it went to : drawn as it comes, that is a bare telephone number against a person the reader knows. What the address book gives is a name and a face, it is asked for at the moment a collection actually holds somebody who cannot be named and never at launch, refusing it costs the name and nothing else, and none of it ever leaves the device or enters anybody's card.
+
 **The owner may take somebody out**, from the collection's own page. The share is theirs alone to change and the server refuses everybody else, so the button exists only for them ; leaving a collection stays where it has always been, in the system's own sheet. What the person filed stays in the collection : removal is about what they may see from now on, not about unsaying what they said.
 
 `docs/technical/collaboration.md` carries the design and the reasoning.

@@ -64,6 +64,7 @@ struct StoreTests {
                 "v31.aWriterWorthInterrupting", "v32.whoTheArticlesAreAbout",
                 "v33.whatEverybodyElseFollows", "v34.whoLetThemIn", "v35.aDeletionThatSurvives",
                 "v36.whoIsInIt", "v37.whatTheOwnerTookOut",
+                "v38.whatTheReaderCallsThem",
             ]
         )
     }

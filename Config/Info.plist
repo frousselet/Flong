@@ -15,6 +15,13 @@
 		<string>com.rslt.Flong.processing</string>
 		<string>com.rslt.Flong.continued</string>
 	</array>
+	<!-- Somebody invited to a shared collection who has not accepted yet has
+	     no identity for CloudKit to resolve : all the share carries is the
+	     address the invitation went to, which draws as a bare telephone
+	     number. The reader knows who that is, because it is in their address
+	     book. Nothing found there ever leaves the device. -->
+	<key>NSContactsUsageDescription</key>
+	<string>Flong looks up the people you invite to a shared collection, so they show under the name and the face you have for them rather than as a phone number. It stays on this device and is never shared.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Flong fills in the city and country of your profile from where you are. The town is kept, never the coordinate, and it goes nowhere but your own iCloud.</string>
 	<key>UIBackgroundModes</key>

@@ -58,6 +58,16 @@ nonisolated struct ShareMember: Identifiable, Hashable, Sendable {
     var shareName: String?
     /// Their face, off their own card, already at the size a face is drawn at.
     var picture: Data?
+    /// What the reader's own address book calls them, where the share would not
+    /// name them at all.
+    ///
+    /// **Theirs and only theirs.** It is looked up on this device, from the
+    /// address the invitation went to, and it never travels : it is not written
+    /// into anybody's card, and another reader of the same collection sees
+    /// their own address book or nothing. See ``AddressBook``.
+    var contactName: String?
+    /// Their face out of the same address book, on the same terms.
+    var contactPicture: Data?
     var isOwner = false
     /// Whether this is the reader, which is the one member they may not remove
     /// and the one whose name needs no explaining.
@@ -73,7 +83,27 @@ nonisolated struct ShareMember: Identifiable, Hashable, Sendable {
     /// application. Failing that whatever the share gives, which is their
     /// iCloud name or the address the invitation went to. Failing both,
     /// nothing.
-    var displayName: String? { name ?? shareName }
+    /// Their own card first, since that is the name they chose in this
+    /// application. Then the reader's own address book. Then whatever the share
+    /// gives, which for somebody who has not accepted yet is the address the
+    /// invitation went to. Then nothing.
+    ///
+    /// **The address book comes before the share and never overrides a name.**
+    /// It is only ever looked up for a participant the share would not name at
+    /// all, so what it stands in front of is a bare address rather than
+    /// somebody's own name for themselves : see
+    /// ``ShareParticipants/unnamed(in:me:isOwnShare:)``.
+    var displayName: String? { name ?? contactName ?? shareName }
+
+    /// The face to draw : their own card first, then the reader's address book.
+    var face: Data? { picture ?? contactPicture }
+
+    /// Whether this device has nothing to call them.
+    ///
+    /// What decides that a collection is worth asking the address book about :
+    /// somebody invited who has not accepted has no name anywhere, and the row
+    /// is the address the invitation went to.
+    var isUnnamed: Bool { !isMe && name == nil && contactName == nil }
 
     /// What stands in for a face when there is none.
     var initials: String? { displayName.flatMap(ProfilePicture.initials(of:)) }
@@ -265,6 +295,25 @@ nonisolated struct ShareMemberStore: Sendable {
         }
     }
 
+    /// Writes down what the reader's own address book calls somebody.
+    ///
+    /// **Its own column and its own write**, beside the share's half and the
+    /// card's half rather than inside either : it is what *this* reader has
+    /// filed the person under, it never travels, and neither of the other two
+    /// may be overwritten by it. Cleared as readily as it is set, so a contact
+    /// the reader deletes stops naming anybody.
+    func note(name: String?, picture: Data?, for memberKey: String, inZone zoneName: String) async throws {
+        try await database.writer.write { db in
+            try db.execute(
+                sql: """
+                    UPDATE share_member SET contact_name = ?, contact_picture = ?
+                    WHERE zone_name = ? AND member_key = ?
+                    """,
+                arguments: [name, picture, zoneName, memberKey]
+            )
+        }
+    }
+
     /// Everybody in a collection that has gone.
     func forget(zoneName: String) async throws {
         try await database.writer.write { db in
@@ -280,6 +329,8 @@ nonisolated struct ShareMemberStore: Sendable {
             name: row["name"],
             shareName: row["share_name"],
             picture: row["picture"],
+            contactName: row["contact_name"],
+            contactPicture: row["contact_picture"],
             isOwner: row["is_owner"],
             isMe: row["is_me"],
             mayWrite: row["may_write"],

@@ -905,6 +905,26 @@ nonisolated extension AppDatabase {
             }
         }
 
+        // What the reader's own address book calls somebody the share will not
+        // name.
+        //
+        // **A third source beside the other two, and kept apart like them.**
+        // The share says who is a participant, the card says what that person
+        // calls themselves in Flong, and this says what *this reader* has
+        // filed them under. It is theirs and only theirs : it never travels,
+        // it is never written into a card, and a second reader of the same
+        // collection sees their own address book or nothing.
+        //
+        // It is the answer for somebody who has not accepted yet, which is
+        // when CloudKit has no name to give and the row would otherwise be a
+        // bare phone number with a digit for an initial.
+        migrator.registerMigration("v38.whatTheReaderCallsThem") { db in
+            try db.alter(table: "share_member") { table in
+                table.add(column: "contact_name", .text)
+                table.add(column: "contact_picture", .blob)
+            }
+        }
+
         return migrator
     }
 
