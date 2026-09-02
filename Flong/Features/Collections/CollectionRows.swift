@@ -95,3 +95,95 @@ struct CollectionRows: View {
         }
     }
 }
+
+/// One excerpt, of a piece this device does not hold.
+///
+/// **Drawn exactly as the reader's own rows are**, because a collection is one
+/// list and a row that looked different would be saying the wrong thing : what
+/// separates these from the rest is not who filed them but that this device has
+/// no article behind them, and that is not something a reader acts on.
+///
+/// **Under the reader's own name for the publisher.** A source they renamed is
+/// that source everywhere, so a row is stamped from the publishers this device
+/// knows and falls back to what the sender called it only where they follow
+/// nobody at that address. See ``SourceStamp``.
+///
+/// The one thing it carries that a stream row does not is who put it here,
+/// which is the whole of what a collection several people fill has to say.
+struct SharedArticleRow: View {
+    let entry: SharedEntry
+    /// Whoever put it here, where they can be named.
+    ///
+    /// Nothing for the reader's own filings, and nothing for a participant
+    /// CloudKit will not name : an opaque identifier is worse than silence,
+    /// because it looks like information.
+    var by: String?
+    let open: () -> Void
+
+    @Environment(\.theme) private var theme
+
+    /// The publisher, worked out from the addresses the excerpt carries, so the
+    /// stamp can look them up among the ones this device follows.
+    private var domain: String? {
+        FeedURL.publisher(
+            site: entry.url.flatMap(URL.init(string:)),
+            feed: entry.feedURL.flatMap(URL.init(string:))
+        )
+    }
+
+    var body: some View {
+        Button(action: open) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(verbatim: entry.title)
+                        .font(theme.headline(.body))
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let excerpt = entry.excerpt, !excerpt.isEmpty {
+                        Text(verbatim: excerpt)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+
+                    HStack(spacing: 6) {
+                        SourceStamp(domain: domain, otherwise: entry.sourceTitle)
+                            .padding(.trailing, 2)
+                        ArticleMoment(sent: entry)
+                        if let by {
+                            Text(verbatim: "·")
+                            Label {
+                                Text("Filed by \(by)")
+                            } icon: {
+                                Image(systemName: "person.crop.circle")
+                            }
+                        }
+                    }
+                    .font(theme.metadata)
+                    .foregroundStyle(.tertiary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if entry.imageURL != nil {
+                    RemoteImage(
+                        url: entry.imageURL.flatMap(URL.init(string:)),
+                        width: Self.thumbnailWidth,
+                        corner: 6
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 12)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .top) { Divider() }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// The same width the stream gives a picture, since these are the same rows.
+    private static let thumbnailWidth: CGFloat = 78
+}

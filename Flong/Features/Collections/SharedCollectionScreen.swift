@@ -40,28 +40,32 @@ struct SharedCollectionScreen: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                // Who else is here, before what they put here. A collection
-                // somebody shared is a room as much as it is a list, and the
-                // reader is owed the people in it before the reading.
-                MembersStrip(members: model.members(of: kind), faces: model.memberFaces)
+            // The people stay at the head of the page as it scrolls, the way
+            // the subjects do on the front page and for the same reason : who
+            // is in a collection is what the page is about, and the one command
+            // about a person should not be somewhere a reader has to scroll
+            // back up to reach.
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                Section {
+                    // One run of rows, whoever filed each of them, and the
+                    // reader's own copy of a piece where they follow the same
+                    // source : see ``CollectionRows``.
+                    CollectionRows(model: model, kind: kind, zoom: zoom, open: open, read: read)
 
-                // One run of rows, whoever filed each of them, and the
-                // reader's own copy of a piece where they follow the same
-                // source : see ``CollectionRows``.
-                CollectionRows(model: model, kind: kind, zoom: zoom, open: open, read: read)
-
-                // Under the people rather than over them : a collection with
-                // nobody's filings in it yet still has its members, and an
-                // empty state laid over the page would hide the one thing
-                // there is to see.
-                if model.collectionItems.isEmpty {
-                    ContentUnavailableView {
-                        Label("Nothing in it yet", systemImage: "folder.badge.person.crop")
-                    } description: {
-                        Text("What anyone files into this collection shows up here.")
+                    // Under the people rather than over them : a collection
+                    // with nobody's filings in it yet still has its members,
+                    // and an empty state laid over the page would hide the one
+                    // thing there is to see.
+                    if model.collectionItems.isEmpty {
+                        ContentUnavailableView {
+                            Label("Nothing in it yet", systemImage: "folder.badge.person.crop")
+                        } description: {
+                            Text("What anyone files into this collection shows up here.")
+                        }
+                        .padding(.top, 40)
                     }
-                    .padding(.top, 40)
+                } header: {
+                    MembersStrip(members: model.members(of: kind), faces: model.memberFaces)
                 }
             }
             .editorialColumn()
@@ -98,85 +102,5 @@ struct SharedCollectionScreen: View {
         }
         .task { await model.loadCollection(kind) }
         .task { await model.loadShareMembers() }
-    }
-}
-
-/// One excerpt, in a collection somebody else shared.
-///
-/// The publisher and the byline as everywhere else, then the headline, then the
-/// excerpt. What it does not carry is what it does not have : no tick for read,
-/// no star, and no picture at the size the reader's own rows use, because an
-/// excerpt is a promise of an article rather than the article.
-struct SharedArticleRow: View {
-    let entry: SharedEntry
-    /// Whoever put it here, where they can be named.
-    ///
-    /// Nothing for the reader's own filings, and nothing for a participant
-    /// CloudKit will not name : an opaque identifier is worse than silence,
-    /// because it looks like information.
-    var by: String?
-    let open: () -> Void
-
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        Button(action: open) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    if let source = entry.sourceTitle {
-                        Text(verbatim: source)
-                            .font(theme.metadata)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Text(verbatim: entry.title)
-                        .font(.system(.headline))
-                        .foregroundStyle(.primary)
-                        .multilineTextAlignment(.leading)
-
-                    if let excerpt = entry.excerpt {
-                        Text(verbatim: excerpt)
-                            .font(.system(.subheadline))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(3)
-                            .multilineTextAlignment(.leading)
-                    }
-
-                    // The byline and whoever filed it are two different people
-                    // and the row says so : one wrote the piece, the other
-                    // thought it was worth passing on.
-                    HStack(spacing: 6) {
-                        if let author = entry.author {
-                            Text(verbatim: author)
-                        }
-                        if let by {
-                            if entry.author != nil { Text(verbatim: "·") }
-                            Label {
-                                Text("Filed by \(by)")
-                            } icon: {
-                                Image(systemName: "person.crop.circle")
-                            }
-                        }
-                    }
-                    .font(theme.metadata)
-                    .foregroundStyle(.tertiary)
-                }
-
-                Spacer(minLength: 0)
-
-                if entry.imageURL != nil {
-                    RemoteImage(url: entry.imageURL.flatMap(URL.init(string:)), aspect: 1, corner: 8)
-                        .frame(width: 64, height: 64)
-                }
-            }
-            .padding(.vertical, 14)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        // The excerpt first and the article behind it : the page it points at
-        // is fetched when the reader opens the row, so what they are promised
-        // is the piece and not a trip to a browser.
-        .accessibilityHint(Text("Opens the article"))
-        .overlay(alignment: .bottom) { Divider() }
     }
 }

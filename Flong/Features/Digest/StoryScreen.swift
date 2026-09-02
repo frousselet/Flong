@@ -514,17 +514,26 @@ struct ArticleScreen: View {
     private var filing: some View {
         Menu {
             ForEach(model.collectionNames, id: \.self) { name in
-                let isIn = model.articleCollections.contains(name)
+                let isMine = model.articleCollections.contains(name)
+                // **Somebody else's filing counts too.** A collection the
+                // reader shared holds what everybody in it put there, so a
+                // piece a participant filed is in it whether or not this
+                // device ever tagged it, and a row offering to file it again
+                // would be offering to say a thing already said. Taking it
+                // down is the owner's, which is what this reader is.
+                let byOthers = model.articleCollectionsFiledByOthers[name] != nil
                 Button {
                     Task {
-                        if isIn {
+                        if isMine {
                             await model.unfileArticle(from: name)
+                        } else if byOthers {
+                            await model.takeDownFromCollection(named: name)
                         } else {
                             await model.fileArticle(in: name)
                         }
                     }
                 } label: {
-                    Label(name, systemImage: isIn ? "checkmark" : "folder")
+                    Label(name, systemImage: isMine || byOthers ? "checkmark" : "folder")
                 }
             }
 
@@ -537,9 +546,10 @@ struct ArticleScreen: View {
                 Section("Shared with me") {
                     ForEach(model.invitedCollections) { shared in
                         let isIn = model.articleSharedCollections.contains(shared.zoneName)
+                        let isMine = model.articleSharedFilings[shared.zoneName] != nil
                         Button {
                             Task {
-                                if isIn {
+                                if isMine {
                                     await model.unfileArticle(fromShared: shared.zoneName)
                                 } else {
                                     await model.fileArticle(inShared: shared.zoneName)
@@ -551,6 +561,13 @@ struct ArticleScreen: View {
                                 systemImage: isIn ? "checkmark" : "folder.badge.person.crop"
                             )
                         }
+                        // **Ticked and not pressable**, for a piece somebody
+                        // else filed into a collection the reader was only
+                        // invited to. It is in there, which is what the tick
+                        // says ; taking it out is the owner's and this reader
+                        // is not the owner, so the row says so by not
+                        // pretending otherwise.
+                        .disabled(isIn && !isMine)
                     }
                 }
             }

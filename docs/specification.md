@@ -250,7 +250,13 @@ A made collection may be shared with other iCloud users, who may file into it. A
 
 **A collection is one list.** What the reader filed and what everybody else filed are one run of rows in date order, not two bands under two headings : who put a thing there is a line on the row. What differs between two rows is not who sent them but what this device holds, which is the same distinction as the paragraph above and the only one there is.
 
+**A row is drawn as any other row, under the reader's own name for the publisher.** A source they renamed is that source everywhere, so an excerpt from one they follow comes back under their name and their mark, and the sender's name for it stands in only where they follow nobody at that address.
+
 **An excerpt opens in the reader.** The page it points at is fetched when the reader opens the row, pulled out of the navigation around it and set in the same type as everything else, with the session for the site where the reader has signed in to it, so a publisher they subscribe to serves them the article rather than the teaser. Nothing of it is written down : it is fetched for the reading and kept for no longer, and going back to the publisher's own page stays one item in the menu.
+
+**A feed authenticated by a parameter is asked through the reader's own subscription first.** The sender took their own token off the link, rightly ; what is left is an address the publisher answers with a teaser. A recipient who follows the same feed has a token of their own in the address of their own subscription, and the parameters they designated are put back on the article's address before it is asked for. Nobody's token crosses, each end asks as itself, and the address as it arrived is what is left to try.
+
+**An article already in a collection says so, whoever filed it.** A third party filing a piece puts it in the collection for everybody, so the reader's own copy of it is shown as in that collection : their own filing is theirs to take back, and one of somebody else's is ticked and left alone unless they own the share.
 
 **Who is in a collection is shown, by face where there is one and by initials otherwise.** The share is the authority on the roster, on who owns the collection and on who may write in it, since CloudKit sets all of that and no client can forge it. It has no face to give and often no name, so each participant writes **one card of their own** into the zone, carrying the name and the picture from their own profile : one record per person, written by nobody else, so a face cannot be put against somebody who did not choose it. The two halves never overwrite each other, and what is known is written down so that a square draws its faces without waiting on the network.
 
