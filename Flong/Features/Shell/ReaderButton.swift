@@ -41,6 +41,11 @@ struct ReaderButton: View {
             ReaderMark(model: model)
         }
         .accessibilityLabel(Text("Settings"))
+        // An identifier beside the label, because the label is translated and
+        // a test that looked for `Settings` would pass in English and fail on
+        // the reader's own device. An identifier is not a string the reader
+        // ever sees and is not in the catalogue.
+        .accessibilityIdentifier("reader")
         .sheet(isPresented: $isOpen) {
             ReaderPanel(model: model)
         }

@@ -3898,6 +3898,89 @@ final class AppModel {
         }
     }
 
+    // MARK: - Sources another device stopped following
+
+    /// What asking iCloud which sources it still holds came back with.
+    ///
+    /// Three answers and not two, because `the zone could not be read` and
+    /// `the zone holds nothing of yours` look identical from here and mean
+    /// opposite things : one is a network that did not reply, the other would
+    /// be every source the reader has, gone. A repair that cannot read the zone
+    /// does nothing at all.
+    nonisolated enum SourceTidy: Hashable, Sendable {
+        /// No account, no zone yet, or a server that did not answer.
+        case unavailable
+        /// Every source here is one the reader's iCloud still holds.
+        case settled
+        /// Sources removed on another device, still standing on this one.
+        case stranded([Feed])
+    }
+
+    /// Whether the sources are being compared against iCloud right now.
+    private(set) var isTidyingSources = false
+
+    /// Asks iCloud which sources it still holds, and says which of the ones
+    /// here it does not.
+    ///
+    /// **The repair for a removal that never arrived.** A source removed on one
+    /// device is carried to the others as the deletion of its record ; a
+    /// deletion that was lost was lost for good, since the server never
+    /// mentions a record it no longer has and the row it was about is gone from
+    /// the device that removed it. `docs/technical/sync.md` sets out how that
+    /// happened and what stops it happening again. This is for the devices
+    /// already wrong, which nothing else can put right.
+    ///
+    /// **Only what the server has already confirmed it had.** A source followed
+    /// on this device a moment ago has no record up there yet : it is on its way
+    /// up, not gone, and a repair that could not tell the two apart would delete
+    /// whatever the last exchange had not reached. The ledger of what the server
+    /// said about each record is exactly that answer.
+    ///
+    /// It removes nothing. What it finds is put to the reader, who is the one
+    /// who decides : a source going takes its articles with it, the kept ones
+    /// included, and that is not a thing to do behind somebody's back.
+    func findSourcesRemovedElsewhere() async -> SourceTidy {
+        isTidyingSources = true
+        defer { isTidyingSources = false }
+
+        guard let cloud, let held = await cloud.recordNamesInCloud() else { return .unavailable }
+
+        let feeds = (try? await subscriptions.feeds()) ?? []
+        let names = Set(feeds.map { SyncRecords.name(forFeed: $0.url) })
+        let confirmed = (try? await SyncState(database).systemFields(for: names)) ?? [:]
+
+        let stranded = SourceReconciliation.stranded(
+            feeds: feeds,
+            confirmed: Set(confirmed.keys),
+            held: held
+        )
+        return stranded.isEmpty ? .settled : .stranded(stranded)
+    }
+
+    /// Removes sources the reader has just been shown and agreed to.
+    ///
+    /// Through the same path as a removal asked for in the sources panel, and
+    /// deliberately so : a source that goes has to go the same way whoever
+    /// noticed it should, or this device keeps the filings, the waiting marks,
+    /// the emptied stories and the secret in the keychain that the ordinary
+    /// removal takes away.
+    func removeSources(_ feeds: [Feed]) async {
+        var gone: [Unsubscription] = []
+
+        for feed in feeds {
+            do {
+                gone.append(try await subscriptions.unsubscribe(feed.id))
+            } catch {
+                failure = .notRemoved
+                Log.store.error("A stranded source could not be removed : \(error, privacy: .public)")
+            }
+        }
+
+        guard !gone.isEmpty else { return }
+        await forget(gone)
+        Log.sync.notice("Removed \(gone.count) sources the reader's iCloud no longer had")
+    }
+
     /// Takes away what sources that have gone left outside the store, and puts
     /// the window back where it can stand.
     ///

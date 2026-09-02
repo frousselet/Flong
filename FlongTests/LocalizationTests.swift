@@ -52,6 +52,23 @@ struct LocalizationTests {
         #expect(String(localized: "Vouched for", locale: french) == "Recommandé")
     }
 
+    @Test("The repair for a source removed elsewhere speaks French")
+    func tidyingTheSources() {
+        #expect(String(localized: "Tidy the sources", locale: french) == "Nettoyer les sources")
+        #expect(String(localized: "Sources removed elsewhere", locale: french) == "Sources retirées ailleurs")
+        #expect(String(localized: "Nothing to tidy", locale: french) == "Rien à nettoyer")
+        #expect(
+            String(localized: "Every source here is one your iCloud still has.", locale: french)
+                == "Chaque source d'ici est une source que votre iCloud détient toujours."
+        )
+        // The one that says nothing was changed, which is what a reader whose
+        // device could not reach iCloud has to be able to read.
+        #expect(
+            String(localized: "Your iCloud could not be asked", locale: french)
+                == "Votre iCloud n'a pas pu être interrogé"
+        )
+    }
+
     @Test("A count of readers is said in the singular and in the plural")
     func readerCounts() {
         // The empty page states how many readers the pool has heard from, and

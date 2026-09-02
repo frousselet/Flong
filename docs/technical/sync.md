@@ -73,9 +73,38 @@ A feed holds twenty articles ; a device left off for a week comes back to find h
 
 Treating only the documented name for rate limiting is how a client ends up hammering a service that already told it to stop.
 
+## A deletion is the one thing nothing can re-derive
+
+A save is recoverable from the row it is about. Whatever the engine forgets, the row is still here, and queueing every local record again is what a repair does. **A deletion is the opposite : the row it is about has just been removed.** So the intention lived nowhere but in the engine's pending changes, and every way of losing those lost it in silence and for good.
+
+There were four, and every one of them ended with a source removed on one device still standing on the other, with nothing anywhere that would ever try again :
+
+- **No engine yet.** `enqueue(deletions:)` began `guard let engine`, and returned quietly when there was none. A launch that cannot reach the network fails the account check and leaves the engine nil for the whole of a session in which the reader may perfectly well remove a source.
+- **A reset.** `resetFromScratch` drops the engine and its state, pending changes included.
+- **A refusal from the server.** `failedRecordDeletes` was never looked at. The failed *saves* have been sorted out since the beginning ; a failed delete was dropped where it fell, with no log line and nobody to try again, so one moment of no network was enough.
+- **The reverse of a save.** A source removed and then followed again at the same address writes the same record name, and an intention left standing would have taken it away again.
+
+**So the intention is written down before it is queued.** `pending_deletion` holds what this device has decided must go from the zone, and a name leaves it only when the server says the record has gone, or says it never had it, which is the same outcome reached another way. Every appearance of an engine queues what is outstanding : at `start`, and again at `enqueueEverything`, since what a device holds is not what it has removed and a repair that only queued the first would quietly cancel every removal waiting to be sent. Queueing a save of a name forgets any intention to delete it.
+
+A zone taken down whole is the one case where the intentions go with it : there is nothing left to delete out of it, and one left standing would be queued for ever against a zone answering `zoneNotFound`.
+
+## Tidying the sources
+
+The repair for the devices already wrong, which nothing above can reach : a deletion that was lost is not a change the server will ever mention again, because the server does not hold the record and has nothing to say about it.
+
+**So the question is asked the other way round.** `Tidy the sources`, under the reader's own face, reads the whole zone as it stands, and offers to remove every source here whose subscription record is not in it. It asks the database directly rather than through the engine : the engine answers what has changed since a token, which is the right question everywhere else and the wrong one here. Its tokens are left alone.
+
+**Absent is not enough ; it has to have been there.** A source followed on this device a minute ago is absent from the zone because it is still on its way up, and one followed while the device was offline may never have been sent at all. Only a record the server has already confirmed can be said to have gone, and `sync_record` is exactly that ledger. `SourceReconciliation` is the rule on its own, where a test can reach it, since what can be wrong here is not the reading but the answer given about a source the server has never heard of.
+
+**A zone that could not be read and a zone holding nothing look identical from here and mean opposite things.** One is a network that did not reply ; the other would be every source the reader has, gone. A repair that could not read the zone does nothing at all, and says so.
+
+It removes nothing on its own. What it finds is put back to the reader by name, because a source going takes its articles with it, the kept ones included, and `docs/technical/removing-a-source.md` is the list of everything else that goes with them. The removal itself is the ordinary one, so a device putting itself right ends up exactly where the device that was asked already is.
+
 ## What is tested, and what cannot be
 
 `CloudSync` is the one file of the project that cannot be tested from the outside : it needs an account, a container and a network, none of which a test may assume. Everything on either side of it is tested instead, with records carried between two stores by hand : setting up a second device from records alone, read states meeting in the middle, deletions travelling, the same records applied twice changing nothing, two devices keeping one article, and a device catching up on what it missed.
+
+The two halves of a removal that never arrived are tested the same way. That an intention to delete outlives the moment it was decided, survives a repair that forgets every tag, is one intention however often it is decided, and ends only when the server has spoken. And that the reconciliation calls a source gone when the zone no longer holds a record the server had confirmed, and leaves alone one it has never heard of, which is the mistake that would cost a reader the source they added a minute ago.
 
 The container is `iCloud.com.rslt.Flong`, and the entitlement is in `Config/Flong.entitlements`.
 

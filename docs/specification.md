@@ -230,6 +230,12 @@ Private database storage counts against the user's iCloud quota, whose free tier
 
 Rate limiting does not always come as `requestRateLimited` : `serviceUnavailable`, code 6, HTTP 503, is the frequent case in practice. Both are handled, honouring `CKErrorRetryAfterKey` and falling back to exponential backoff.
 
+### A deletion has to survive being decided
+
+A save is recoverable from the row it is about ; a deletion is not, the row having just gone. So an intention to delete a record is written to the store before it is queued, and forgotten only when the server says the record has gone or says it never had it. Every appearance of an engine queues what is still outstanding, a refused deletion is left standing rather than dropped, and queueing a save of a name cancels any intention to delete it.
+
+Without that a removal was lost in silence whenever the engine was not there to take it, which a launch with no network is enough to cause, and the source stayed on the reader's other devices for good. A deletion that was lost is not something the server will ever mention again, so the reader's own panel carries the repair for a device already wrong : it reads their zone as it stands and offers to remove every source whose record is no longer in it, naming them first, since a source going takes its articles with it.
+
 ### Sharing a collection
 
 A made collection may be shared with other iCloud users, who may file into it. Apple's own sharing carries it : a zone-wide `CKShare` on **one custom zone per shared collection**, never on the `Flong` zone, which holds everything and must never be handed over. The invitation goes through `ShareLink` and `CKShareTransferRepresentation` ; the participants are the system's to manage. A second `CKSyncEngine`, on the shared database, carries the collections the reader was invited to, and it sends as well as fetches.

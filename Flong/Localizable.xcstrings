@@ -1074,6 +1074,17 @@
         }
       }
     },
+    "Asks your iCloud which sources it still holds, and offers to remove the ones you stopped following on another device. Nothing goes until you have seen the list." : {
+      "comment" : "The footer under the command that compares the sources on this device against the ones iCloud still holds.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demande à votre iCloud quelles sources il détient encore, et propose de retirer celles que vous avez cessé de suivre sur un autre appareil. Rien n'est retiré avant que vous ayez vu la liste."
+          }
+        }
+      }
+    },
     "Authors" : {
       "comment" : "The collection that lists everybody who signed an article",
       "localizations" : {
@@ -1494,6 +1505,17 @@
         }
       }
     },
+    "Every source here is one your iCloud still has." : {
+      "comment" : "The message shown when the tidying found nothing to remove.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaque source d'ici est une source que votre iCloud détient toujours."
+          }
+        }
+      }
+    },
     "Favourite newsmakers" : {
       "comment" : "The collection of the articles about somebody the reader singled out",
       "localizations" : {
@@ -1666,6 +1688,28 @@
         }
       }
     },
+    "Nothing to tidy" : {
+      "comment" : "The title of the alert shown when every source on this device is one iCloud still holds.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien à nettoyer"
+          }
+        }
+      }
+    },
+    "Nothing was changed. Try again when this device is back on the network." : {
+      "comment" : "The message shown when iCloud could not be read, so nothing was removed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n'a été modifié. Réessayez quand cet appareil sera de nouveau en ligne."
+          }
+        }
+      }
+    },
     "Notify every article about them" : {
       "localizations" : {
         "fr" : {
@@ -1777,6 +1821,17 @@
         }
       }
     },
+    "Sources removed elsewhere" : {
+      "comment" : "The title of the alert listing the sources this device kept although another device stopped following them.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sources retirées ailleurs"
+          }
+        }
+      }
+    },
     "Sponsor" : {
       "comment" : "Brings one reader into the common pool.",
       "localizations" : {
@@ -1844,6 +1899,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cette source compte dans ce que Flong suggère aux autres lecteurs. Une adresse secrète et une source protégée par un mot de passe ne sont jamais partagées, quoi que dise cet interrupteur."
+          }
+        }
+      }
+    },
+    "Tidy the sources" : {
+      "comment" : "A command in the reader's own panel. It compares the sources on this device against the ones their iCloud still holds.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nettoyer les sources"
           }
         }
       }
@@ -1946,6 +2012,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Votre code de contributeur"
+          }
+        }
+      }
+    },
+    "Your iCloud could not be asked" : {
+      "comment" : "The title of the alert shown when the zone could not be read : no account, or no network.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre iCloud n'a pas pu être interrogé"
+          }
+        }
+      }
+    },
+    "Your iCloud no longer has these, so another device stopped following them. Removing one takes its articles with it, the ones you kept included, and cannot be undone.\n\n%@" : {
+      "comment" : "The message of the alert listing the sources removed on another device. The argument is the list of their names, one per line.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre iCloud ne les détient plus : un autre appareil a cessé de les suivre. Retirer une source emporte ses articles, y compris ceux que vous avez gardés, et c'est définitif.\n\n%@"
           }
         }
       }
