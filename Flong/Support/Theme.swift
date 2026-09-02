@@ -211,6 +211,16 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
         paints ? AnyShapeStyle(palette(in: scheme).surface.color) : AnyShapeStyle(.background.secondary)
     }
 
+    /// The page's own ground, which is what the reader is looking at behind
+    /// everything else.
+    ///
+    /// Asked for by whatever has to disappear into the page rather than stand
+    /// on it. The system's own where the theme does not paint, for the reason
+    /// ``paints`` gives, and the theme's paper otherwise.
+    func paper(in scheme: ColorScheme) -> AnyShapeStyle {
+        paints ? AnyShapeStyle(palette(in: scheme).paper.color) : AnyShapeStyle(.background)
+    }
+
     private var light: Palette {
         switch self {
         // The system's own, as the stylesheet has always stated them.
