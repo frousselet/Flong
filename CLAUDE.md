@@ -31,11 +31,13 @@ xcrun simctl list devices available                # Pick a simulator for -desti
 
 ### Testing
 
+**Always test on the latest Pro iPhone with the latest installed iOS runtime**, today `iPhone 17 Pro` on iOS 26.5. Ask `xcrun simctl list devices available` and `xcrun simctl list runtimes` rather than reusing a device left over from an earlier session, and name the runtime in the destination so a newer one being installed does not silently move the target.
+
 ```bash
 xcodebuild test -project Flong.xcodeproj -scheme Flong \
-  -destination 'platform=iOS Simulator,name=iPhone 17' -skip-testing:FlongUITests
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' -skip-testing:FlongUITests
 xcodebuild test -project Flong.xcodeproj -scheme Flong \
-  -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:FlongTests/MigrationTests
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' -only-testing:FlongTests/MigrationTests
 ```
 
 Unit tests use Swift Testing (`import Testing`, `@Test`, `#expect`), not XCTest. UI tests still use XCTest, which XCUITest requires.
