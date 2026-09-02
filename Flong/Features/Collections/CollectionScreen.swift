@@ -32,26 +32,30 @@ struct CollectionScreen: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                // Who the reader let in, above what is in it. Nothing at all
-                // for a collection that was never shared, which is most of
-                // them : see ``MembersStrip``.
-                MembersStrip(
-                    members: model.members(of: kind),
-                    faces: model.memberFaces,
-                    mayRemove: model.mayRemoveMembers(of: kind)
-                ) { member in
-                    guard case .made(let name) = kind else { return }
-                    Task { await model.removeMember(member, fromCollectionNamed: name) }
+            // The people the reader let in stay at the head of the page as it
+            // scrolls, the way the subjects do on the front page : the one
+            // command about a person should not be somewhere they have to
+            // scroll back up to reach. Nothing at all for a collection that was
+            // never shared, which is most of them.
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                Section {
+                    // **One run of rows, whoever filed each of them.** What the
+                    // reader filed and what the other people in the collection
+                    // filed were two bands under two headings, which said the
+                    // two were different kinds of thing. They are not : they
+                    // are what is in the collection, and who put a thing there
+                    // is a line on the row rather than a wall between them.
+                    CollectionRows(model: model, kind: kind, zoom: zoom, open: open, read: read)
+                } header: {
+                    MembersStrip(
+                        members: model.members(of: kind),
+                        faces: model.memberFaces,
+                        mayRemove: model.mayRemoveMembers(of: kind)
+                    ) { member in
+                        guard case .made(let name) = kind else { return }
+                        Task { await model.removeMember(member, fromCollectionNamed: name) }
+                    }
                 }
-
-                // **One run of rows, whoever filed each of them.** What the
-                // reader filed and what the other people in the collection
-                // filed were two bands under two headings, which said the two
-                // were different kinds of thing. They are not : they are what
-                // is in the collection, and who put a thing there is a line on
-                // the row rather than a wall between them.
-                CollectionRows(model: model, kind: kind, zoom: zoom, open: open, read: read)
             }
             .editorialColumn()
             .padding(.horizontal, 22)

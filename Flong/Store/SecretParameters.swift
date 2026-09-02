@@ -124,3 +124,46 @@ nonisolated enum PublicURL {
         return components.url ?? url
     }
 }
+
+/// An address asked for the way the reader's own subscription asks for one.
+///
+/// **The other half of ``PublicURL``, and the reason it needs one.** A feed
+/// that hands out a per-subscriber address usually puts the same token on the
+/// links inside it, and the sender's device took it off before the excerpt
+/// travelled : rightly, since it was theirs. What is left is an address the
+/// publisher will answer with a teaser, or with nothing.
+///
+/// The recipient who follows the same feed has a token of their own, sitting in
+/// the address of their own subscription. So the article is opened *through
+/// their feed* : the parameters they designated are taken from their own feed's
+/// address and put back on the article's. Nobody's token crosses anywhere, and
+/// each end asks its publisher as itself.
+///
+/// **Never over what the publisher already put there.** A parameter the
+/// article's own address carries is part of the address, whatever it is called ;
+/// this only fills in what the truncation took out.
+nonisolated enum SubscribedURL {
+    /// The article's address, with the reader's own designated parameters put
+    /// back on it, or `nil` where there is nothing to put back.
+    ///
+    /// - Parameter feed: the reader's own address for the feed, which is where
+    ///   the values come from. The real one and not the masked form : a digest
+    ///   carries no parameters and there would be nothing to read.
+    static func of(_ url: URL, likeFeedAt feed: URL, secret: SecretParameters) -> URL? {
+        guard !secret.isEmpty,
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else { return nil }
+
+        let mine = URLComponents(url: feed, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let existing = Set((components.queryItems ?? []).compactMap { SecretParameters.folded($0.name) })
+
+        let added = mine.filter { item in
+            guard let folded = SecretParameters.folded(item.name) else { return false }
+            return secret.names.contains(folded) && !existing.contains(folded)
+        }
+        guard !added.isEmpty else { return nil }
+
+        components.queryItems = (components.queryItems ?? []) + added
+        return components.url
+    }
+}

@@ -179,6 +179,14 @@ struct SourceStamp: View {
     let domain: String?
     var side: CGFloat = 13
     var showsName = true
+    /// What to call the publisher where this device does not follow them.
+    ///
+    /// **The reader's own name wins whenever there is one.** A publisher they
+    /// renamed is that publisher everywhere, and an excerpt somebody shared
+    /// from a source they follow must not come back under the sender's name for
+    /// it. This is only for the publishers they do not follow, where the sender
+    /// said what the source is called and the bare host says less.
+    var otherwise: String?
 
     @Environment(\.publishers) private var publishers
 
@@ -195,7 +203,7 @@ struct SourceStamp: View {
             // the reader wrote, and neither is translated. The address stands
             // in until the subscriptions are read back, and for an article
             // whose feed has gone.
-            if showsName, let name = identity?.name ?? domain {
+            if showsName, let name = identity?.name ?? otherwise ?? domain {
                 Text(verbatim: name).lineLimit(1)
             }
         }

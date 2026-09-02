@@ -96,12 +96,24 @@ struct MemberPile: View {
     }
 }
 
-/// Everybody in a shared collection, along the top of it.
+/// Everybody in a shared collection, along the top of it and staying there.
 ///
-/// **A list rather than a pile, because this is the page about the
-/// collection.** A square has room for a glance ; here there is room to say
-/// who each face is, which is the difference between knowing that a collection
-/// is shared and knowing who it is shared with.
+/// **The pills of the front page, for the people instead of the subjects.** The
+/// digest already draws a strip of glass capsules that pins itself to the head
+/// of the page as it scrolls, on the argument that a control a reader may want
+/// while they are reading should not be somewhere they have to scroll back up
+/// to. Who is in a collection is the same kind of thing : it is what the page
+/// is about, and it is where the one command about a person lives.
+///
+/// It is the second place in the application to draw glass of its own, and it
+/// is allowed for the same reason as the first : a pill is a control floating
+/// over the page, which is the layer Apple's material is for.
+///
+/// **A menu and never a context menu.** ``DigestScreen`` records the finding
+/// and it holds here : a context menu over glass never fires at all. The pill
+/// is a `Menu` for the people the reader may take out, and a plain capsule for
+/// everybody else, so a pill that opens nothing is a pill that says nothing
+/// will happen.
 ///
 /// **Taking somebody out is the owner's alone.** A share is theirs to change
 /// and the server refuses everybody else, so a participant is shown who is in
@@ -115,28 +127,24 @@ struct MembersStrip: View {
     var remove: (ShareMember) -> Void = { _ in }
 
     @State private var removing: ShareMember?
+    @Namespace private var pills
     @Environment(\.theme) private var theme
 
     var body: some View {
         if !members.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("In this collection")
-                    .font(.system(.footnote, weight: .semibold))
-                    .textCase(.uppercase)
-                    .kerning(0.6)
-                    .foregroundStyle(.secondary)
-
-                ScrollView(.horizontal) {
+            ScrollView(.horizontal) {
+                GlassEffectContainer(spacing: 8) {
                     HStack(spacing: 8) {
                         ForEach(members) { member in
-                            chip(for: member)
+                            pill(for: member)
                         }
                     }
+                    .padding(.vertical, 8)
                 }
-                .scrollIndicators(.hidden)
             }
-            .padding(.top, Editorial.rhythm)
-            .padding(.bottom, 4)
+            .scrollIndicators(.hidden)
+            .scrollClipDisabled()
+            .accessibilityLabel(Text("In this collection"))
             .confirmationDialog(
                 Text("Remove \(removing?.displayName ?? String(localized: "this person"))?"),
                 isPresented: .init(get: { removing != nil }, set: { if !$0 { removing = nil } }),
@@ -155,40 +163,52 @@ struct MembersStrip: View {
         }
     }
 
-    private func chip(for member: ShareMember) -> some View {
+    /// One person, as a capsule of glass.
+    ///
+    /// The owner is never one of the ones that open : a share cannot be without
+    /// them, and neither can the reader themselves be taken out by themselves.
+    @ViewBuilder
+    private func pill(for member: ShareMember) -> some View {
+        if mayRemove, !member.isOwner {
+            Menu {
+                Button(role: .destructive) {
+                    removing = member
+                } label: {
+                    Label("Remove from the collection", systemImage: "person.crop.circle.badge.minus")
+                }
+            } label: {
+                label(for: member)
+            }
+            .buttonStyle(.plain)
+            .modifier(MemberPill(id: member.id, namespace: pills))
+        } else {
+            label(for: member)
+                .modifier(MemberPill(id: member.id, namespace: pills))
+        }
+    }
+
+    private func label(for member: ShareMember) -> some View {
         HStack(spacing: 7) {
             MemberFace(member: member, face: faces[member.id])
 
             VStack(alignment: .leading, spacing: 0) {
                 name(of: member)
                     .font(.system(.subheadline))
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
                 if let note = note(about: member) {
                     note
                         .font(theme.metadata)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             }
         }
         .padding(.leading, 5)
-        .padding(.trailing, 12)
+        .padding(.trailing, 13)
         .padding(.vertical, 5)
-        .background(Capsule().fill(.quaternary))
-        .contextMenu {
-            if mayRemove, !member.isOwner {
-                Button(role: .destructive) {
-                    removing = member
-                } label: {
-                    Label("Remove from the collection", systemImage: "person.crop.circle.badge.minus")
-                }
-            }
-        }
+        .contentShape(.capsule)
         .accessibilityElement(children: .combine)
-        .accessibilityActions {
-            if mayRemove, !member.isOwner {
-                Button("Remove from the collection") { removing = member }
-            }
-        }
     }
 
     /// What to call somebody, when there is anything to call them.
@@ -208,5 +228,21 @@ struct MembersStrip: View {
         if member.isOwner { return Text("Shared this") }
         if !member.mayWrite { return Text("Reading only") }
         return nil
+    }
+}
+
+/// The glass one person's pill is drawn on.
+///
+/// Its own modifier so a menu and a plain capsule wear exactly the same one,
+/// which is what ``DigestScreen`` does for the subjects and for the same
+/// reason : what changes between two pills must not be their size.
+private struct MemberPill: ViewModifier {
+    let id: String
+    let namespace: Namespace.ID
+
+    func body(content: Content) -> some View {
+        content
+            .glassEffect(.regular.interactive(), in: .capsule)
+            .glassEffectID(id, in: namespace)
     }
 }

@@ -206,6 +206,95 @@ struct CollectionItemTests {
         #expect(try await entries.entries(inZone: "shared-other").count == 1)
     }
 
+    // MARK: - Already in it, whoever put it there
+
+    /// A third party filing a piece puts it in the collection for everybody :
+    /// the reader opening their own copy has to be told so, or the menu offers
+    /// to say a thing already said.
+    @Test("A piece somebody else filed is found by the reader's own copy of it")
+    func findsSomebodyElsesFiling() async throws {
+        let database = try AppDatabase.inMemory()
+        let entries = SharedEntryStore(database)
+
+        try await entries.replace([entry("theirs", at: noon)], inList: "list-them-", by: "_them", inZone: zone)
+
+        // The same page, under the name the reader's own feed gave it.
+        let found = try await entries.filings(ofGUID: "mine", orURL: "https://liberation.fr/theirs")
+        #expect(found.map(\.zone) == [zone])
+        // Taking it down means naming it as *they* filed it, not as this
+        // device knows it.
+        #expect(found.map(\.guid) == ["theirs"])
+        #expect(found.map(\.list) == ["list-them-"])
+    }
+
+    @Test("A piece nobody filed is found nowhere")
+    func findsNothingForAPieceNobodyFiled() async throws {
+        let database = try AppDatabase.inMemory()
+        let entries = SharedEntryStore(database)
+
+        try await entries.replace([entry("theirs", at: noon)], inList: "list-them-", by: "_them", inZone: zone)
+        #expect(try await entries.filings(ofGUID: "other", orURL: "https://liberation.fr/other").isEmpty)
+    }
+
+    @Test("What the owner took out is not still in it")
+    func doesNotFindWhatWasTakenOut() async throws {
+        let database = try AppDatabase.inMemory()
+        let entries = SharedEntryStore(database)
+        let removals = SharedRemovalStore(database)
+
+        try await entries.replace([entry("theirs", at: noon)], inList: "list-them-", by: "_them", inZone: zone)
+        try await removals.remove("theirs", inZone: zone)
+
+        #expect(try await entries.filings(ofGUID: "theirs", orURL: nil).isEmpty)
+    }
+
+    // MARK: - Opening a piece through the reader's own subscription
+
+    /// The sender took their own token off the link, rightly. The recipient who
+    /// follows the same feed has one of their own, sitting in the address of
+    /// their own subscription.
+    @Test("The reader's own parameters go back on the address")
+    func putsTheReadersOwnParametersBack() throws {
+        let article = try #require(URL(string: "https://paper.example.com/piece?page=2"))
+        let feed = try #require(URL(string: "https://paper.example.com/rss?token=mine&format=rss"))
+
+        let asked = SubscribedURL.of(article, likeFeedAt: feed, secret: SecretParameters(["token"]))
+        #expect(asked?.absoluteString == "https://paper.example.com/piece?page=2&token=mine")
+    }
+
+    /// A parameter the publisher already put on the address is part of the
+    /// address, whatever it is called.
+    @Test("Nothing is written over what the address already carries")
+    func doesNotOverwriteWhatIsThere() throws {
+        let article = try #require(URL(string: "https://paper.example.com/piece?token=theirs"))
+        let feed = try #require(URL(string: "https://paper.example.com/rss?token=mine"))
+
+        #expect(SubscribedURL.of(article, likeFeedAt: feed, secret: SecretParameters(["token"])) == nil)
+    }
+
+    @Test("A reader who designated nothing asks for the address as it arrived")
+    func addsNothingWithoutADesignation() throws {
+        let article = try #require(URL(string: "https://paper.example.com/piece"))
+        let feed = try #require(URL(string: "https://paper.example.com/rss?token=mine"))
+
+        #expect(SubscribedURL.of(article, likeFeedAt: feed, secret: SecretParameters()) == nil)
+        #expect(SubscribedURL.of(article, likeFeedAt: feed, secret: SecretParameters(["other"])) == nil)
+    }
+
+    /// What leaves is still stripped : this only puts back what the reader
+    /// themselves designated, on the way in.
+    @Test("What the sender took off is what the recipient puts back")
+    func isTheInverseOfWhatTravels() throws {
+        let mine = try #require(URL(string: "https://paper.example.com/piece?token=mine&utm_source=x"))
+        let secret = SecretParameters(["token"])
+
+        let sent = PublicURL.of(mine, without: secret)
+        #expect(sent.absoluteString == "https://paper.example.com/piece")
+
+        let asked = SubscribedURL.of(sent, likeFeedAt: mine, secret: secret)
+        #expect(asked?.absoluteString == "https://paper.example.com/piece?token=mine")
+    }
+
     /// It is never sent, and a record carrying it would be telling the recipient
     /// when the sender happened to be looking.
     @Test("When a device saw an excerpt never travels")

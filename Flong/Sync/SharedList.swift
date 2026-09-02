@@ -176,6 +176,39 @@ nonisolated struct SharedEntryStore: Sendable {
         }
     }
 
+    /// Where one piece has been filed, whoever filed it.
+    ///
+    /// **What lets an article of the reader's own say it is already in a
+    /// collection.** A third party filing a piece puts it in the collection for
+    /// everybody, and the reader opening their own copy of it should be told
+    /// so : a menu that offered to file it again would be offering to say a
+    /// thing that has already been said.
+    ///
+    /// Matched by the article's identity **or** by its address, because the two
+    /// ends may not agree on the first : a guid is whatever the feed each of
+    /// them follows chose to call the piece, and two feeds of one publisher
+    /// call it two things. The address is the same page either way.
+    ///
+    /// Each row says whose list it is in and under what identity, since taking
+    /// it down means naming the identity *that* person filed it under and not
+    /// the one this device knows it by.
+    func filings(ofGUID guid: String, orURL url: String?) async throws -> [(
+        zone: String, list: String, guid: String
+    )] {
+        try await database.writer.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT zone_name, list_key, guid FROM shared_entry
+                    WHERE (guid = ? OR (? IS NOT NULL AND url = ?))
+                    \(Self.notRemoved)
+                    """,
+                arguments: [guid, url, url]
+            )
+            .map { (zone: $0["zone_name"], list: $0["list_key"], guid: $0["guid"]) }
+        }
+    }
+
     /// Who filed each thing in one shared collection, by the article's identity.
     ///
     /// Kept apart from the entries themselves because it is about the filing

@@ -107,6 +107,8 @@ Attribution was settled above : `CKRecord.creatorUserRecordID` says which partic
 
 It arrives from another person's device, so it is treated as everything else that does : the name is bounded and stripped of the control characters and direction overrides, and the picture is put back through the same scaling a picture of the reader's own goes through, which refuses a megabyte of anything that is not an image rather than storing it and trying to draw it.
 
+**They are drawn as the pills of the front page.** `DigestScreen` already draws a strip of glass capsules that pins itself to the head of the page as it scrolls, on the argument that a control a reader may want while they are reading should not be somewhere they have to scroll back up to. Who is in a collection is the same kind of thing : it is what the page is about, and it is where the one command about a person lives. It is the second place in the application to draw glass of its own, allowed for the same reason as the first, and it carries over that file's own finding : **a context menu over glass never fires at all**, so a pill that opens anything is a `Menu` rather than a capsule with a context menu on it.
+
 **The two halves are written down side by side and never overwrite each other.** A roster that arrives leaves the face standing ; a card that arrives does not invent a role. It is written down rather than fetched because the grid draws a face against every square : a page that asked iCloud once per square before it could draw would show holes on every launch and every time the network was away. The share is read back at most once in a while per collection, and the store is corrected only when the fetch actually succeeded : an empty roster is a fetch that failed, never a collection nobody is in.
 
 Where both halves are missing, the person is drawn by their initials, and where there is not even a name, by nothing. An opaque identifier is worse than silence, because it looks like information.
@@ -137,7 +139,19 @@ The first version sent the reader to the publisher's own page, on the argument t
 
 **Nothing is written down.** The article is held for as long as the reading and then forgotten : it never enters `entry`, is never counted unread, never purged, never indexed and never re-shared. What is kept for the session is what has already been fetched, so a reader who closes an article and opens it again is not a second reason to ask its publisher for it.
 
+**A feed authenticated by a parameter needs its subscription put back.** `PublicURL` takes the sender's designated parameters off every address that leaves, which is right and is the whole of the credential rule. It also means the address that arrives is one the publisher will answer with a teaser, for exactly the feeds where the excerpt was worth passing on. The recipient who follows the same feed has a token of their own, sitting in the address of their own subscription, so `SubscribedURL` is the inverse of `PublicURL` on the way in : the parameters *they* designated, taken by value from *their* feed's address, put back on the article's. Nobody's token crosses anywhere and each end asks its publisher as itself. It is tried first, and the address as it arrived is what is left to try. Nothing is ever written over what the address already carries : a parameter the publisher put there is part of the address, whatever it is called.
+
 **And the excerpt is on screen first.** It is what the feed published and it is worth reading while the page is being fetched ; a publisher who cannot be reached leaves the reader with it rather than with a blank page. It is plain text and it is escaped on the way into the document, which is the second lock : a sender who put markup where text was expected has written characters and not tags.
+
+## What a row looks like, and what it says about the reader's own copy
+
+Two things that follow from a collection being one list rather than two.
+
+**A row is drawn as any other row.** What separates an excerpt from an article is that this device holds no article behind it, and that is not something a reader acts on : a row that looked different would be saying the wrong thing about a difference they cannot use. Same headline, same excerpt, same stamp, same picture at the same width. The one thing it carries that a stream row does not is who put it here, which is the whole of what a collection several people fill has to say.
+
+**Under the reader's own name for the publisher.** A source they renamed is that source everywhere in the application, and an excerpt from one they follow coming back under the sender's name for it would be the one place that is not true. So the stamp is looked up among the publishers this device follows, and what the sender called the source stands in only where they follow nobody at that address, which is better than a bare host.
+
+**And their own copy of a piece says it is already in the collection.** A third party filing something puts it in the collection for everybody ; the reader opening their own copy of it, from their own stream, is offered to file it again unless something says otherwise. What they may then do about it is the rule from further up : their own filing is theirs to take back, one of somebody else's is ticked and left alone, and in a collection they own it is theirs to take down. The identity matters here : a guid is whatever the feed each person follows chose to call the piece, so the two ends are matched by address as well, and a removal is written under the identity the *filer* used rather than the one this device knows it by.
 
 ## Addresses, and the parameters on them
 

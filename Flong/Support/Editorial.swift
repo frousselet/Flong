@@ -194,7 +194,26 @@ struct StoryMoment: View {
 /// days, and one carrying `2026` on every line of today's news is a column of
 /// noise.
 struct ArticleMoment: View {
-    let article: ArticleSummary
+    let date: Date
+    /// Whether that moment is the publisher's own, or only when the piece
+    /// reached whoever is showing it.
+    var isDated = true
+    var updatedAt: Date?
+
+    init(article: ArticleSummary) {
+        date = article.date
+        isDated = article.isDated
+        updatedAt = article.updatedAt
+    }
+
+    /// The same line for an excerpt somebody shared, which carries a
+    /// publication date where its feed stated one and the moment it arrived
+    /// where nobody did.
+    init(sent entry: SharedEntry) {
+        date = entry.date
+        isDated = entry.publishedAt != nil
+        updatedAt = nil
+    }
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
@@ -210,7 +229,7 @@ struct ArticleMoment: View {
         HStack(spacing: 4) {
             published
 
-            if let updated = article.updatedAt {
+            if let updated = updatedAt {
                 Text(verbatim: "·")
                 if sayingWhen {
                     Text("updated on \(updated, format: Self.stamp(updated))")
@@ -223,20 +242,20 @@ struct ArticleMoment: View {
 
     @ViewBuilder
     private var published: some View {
-        if article.isDated {
-            Text(article.date, format: Self.stamp(article.date))
+        if isDated {
+            Text(date, format: Self.stamp(date))
         } else {
-            Text("Received on \(article.date, format: Self.stamp(article.date))")
+            Text("Received on \(date, format: Self.stamp(date))")
         }
     }
 
     private var spoken: Text {
         let when =
-            article.isDated
-            ? Text("Published on \(article.date, format: Self.spelled)")
-            : Text("Received on \(article.date, format: Self.spelled)")
+            isDated
+            ? Text("Published on \(date, format: Self.spelled)")
+            : Text("Received on \(date, format: Self.spelled)")
 
-        guard let updated = article.updatedAt else { return when }
+        guard let updated = updatedAt else { return when }
         return when + Text(verbatim: ". ") + Text("updated on \(updated, format: Self.spelled)")
     }
 

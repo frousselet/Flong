@@ -2639,7 +2639,19 @@ final class AppModel {
         isFetchingSharedArticle = true
         defer { isFetchingSharedArticle = false }
 
-        let extracted = await FullText(database, sessions: sessions).article(at: address)
+        // **Through the reader's own subscription first.** The sender took
+        // their own token off the link before it travelled, so what arrived is
+        // an address the publisher answers with a teaser. A reader who follows
+        // the same feed has a token of their own, and the article is asked for
+        // with it : see ``SubscribedURL``. The public address is what is left
+        // to try when they have none, or when theirs did not work.
+        let text = FullText(database, sessions: sessions)
+        var extracted: String?
+
+        for candidate in await addresses(toRead: entry, publicly: address) {
+            extracted = await text.article(at: candidate)
+            if extracted != nil { break }
+        }
 
         guard let extracted else {
             sharedPageGaveNothing = true
@@ -2647,6 +2659,56 @@ final class AppModel {
         }
         fetchedSharedArticles[address.absoluteString] = extracted
         sharedArticleHTML = extracted
+    }
+
+    /// Where to ask for a shared article, in the order worth asking.
+    ///
+    /// The reader's own subscription first where they have one that carries a
+    /// parameter they designated, and the address as it arrived after that.
+    /// One address for everybody else, which is most of them.
+    private func addresses(toRead entry: SharedEntry, publicly address: URL) async -> [URL] {
+        guard let subscription = await subscription(covering: entry, at: address),
+            let mine = SubscribedURL.of(address, likeFeedAt: subscription.url, secret: subscription.secret)
+        else { return [address] }
+
+        return [mine, address]
+    }
+
+    /// The reader's own subscription an article belongs to, where it carries a
+    /// parameter they said is theirs.
+    ///
+    /// **The feed the sender named first, then the room.** A shared entry
+    /// carries the address of the feed it came from unless that address is
+    /// itself a secret, so the same subscription is usually named outright.
+    /// Failing that, a feed of the reader's serving the same room is the same
+    /// publisher, which is what the token is for.
+    ///
+    /// The address handed back is the real one and never the masked form : a
+    /// digest carries no parameters, so there would be nothing to read off it.
+    private func subscription(covering entry: SharedEntry, at address: URL) async
+        -> (url: URL, secret: SecretParameters)?
+    {
+        let designations = (try? credentials.everySecretParameter()) ?? [:]
+        guard !designations.isEmpty, let feeds = try? await subscriptions.feeds() else { return nil }
+
+        let sent = entry.feedURL.flatMap { try? FeedURL.canonical($0) }
+        let room = FeedURL.room(of: address)
+
+        let named = feeds.first { feed in
+            guard let sent, let secret = designations[feed.id], !secret.isEmpty else { return false }
+            return (try? FeedURL.canonical(feed.url)) == sent
+        }
+        let inTheRoom = feeds.first { feed in
+            guard let room, let secret = designations[feed.id], !secret.isEmpty else { return false }
+            return FeedURL.room(of: feed.url) == room
+        }
+
+        guard let feed = named ?? inTheRoom, let secret = designations[feed.id] else { return nil }
+
+        // The address behind a masked one, since the masked form is a digest
+        // and carries nothing a parameter could be read from.
+        let real = Self.secretAddress(of: keptCredential(of: feed.id)).flatMap(URL.init(string:)) ?? feed.url
+        return (url: real, secret: secret)
     }
 
     /// Asks the page again, as somebody who has just signed in to the site.
@@ -2853,12 +2915,29 @@ final class AppModel {
     /// The collections the reader was invited to, for the article's own menu.
     private(set) var invitedCollections: [SharedCollection] = []
 
-    /// Which of them the open article is already in, by this reader's own hand.
+    /// Which of them the open article is already in, whoever put it there.
     ///
-    /// Their own list alone : an article somebody else filed is in the
-    /// collection without being theirs, and a tick against it would offer to
-    /// remove something they cannot remove.
+    /// **Anybody's filing, because it is in the collection either way.** A
+    /// third party filing a piece puts it there for everybody, and a reader
+    /// opening their own copy and being offered to file it again is being
+    /// offered to say a thing already said. What they may then *do* about it is
+    /// a separate question, and ``articleSharedFilings`` is what answers it.
     private(set) var articleSharedCollections: Set<String> = []
+
+    /// Which of those are the reader's own filing, and under what identity.
+    ///
+    /// Their own is the one they may take back. Somebody else's is in the
+    /// collection without being theirs, and the menu says so by ticking the row
+    /// and leaving it alone.
+    private(set) var articleSharedFilings: [String: String] = [:]
+
+    /// The reader's own collections somebody else has filed this piece into, by
+    /// the identity that person filed it under.
+    ///
+    /// It is in the collection without being one of their filings, so no tag of
+    /// theirs says so. Taking it down is theirs to do, since they own the
+    /// share : see ``takeDownFromCollection(named:)``.
+    private(set) var articleCollectionsFiledByOthers: [String: String] = [:]
 
     func loadInvitedCollections() async {
         invitedCollections = (try? await sharedCollections.all().filter { !$0.isOwned }) ?? []
@@ -2931,6 +3010,8 @@ final class AppModel {
         guard let opened = article else {
             openSharedEntry = nil
             articleSharedCollections = []
+            articleSharedFilings = [:]
+            articleCollectionsFiledByOthers = [:]
             return
         }
 
@@ -2938,18 +3019,50 @@ final class AppModel {
             in: database, articleID: opened.id, credentials: credentials
         )
 
-        guard let guid = openSharedEntry?.guid, let sharedCloud else {
+        guard let entry = openSharedEntry,
+            let filings = try? await sharedEntries.filings(ofGUID: entry.guid, orURL: entry.url)
+        else {
             articleSharedCollections = []
+            articleSharedFilings = [:]
+            articleCollectionsFiledByOthers = [:]
             return
         }
 
-        var found: Set<String> = []
-        for shared in invitedCollections {
-            if await sharedCloud.filedGUIDs(inZone: shared.zoneName).contains(guid) {
-                found.insert(shared.zoneName)
-            }
+        // Whose list each of them is in, so that a tick can also say whether
+        // there is anything the reader may do about it.
+        let mine = await sharedCloud?.myListKey()
+        let zones = Set(invitedCollections.map(\.zoneName))
+
+        articleSharedCollections = Set(filings.map(\.zone)).intersection(zones)
+        articleSharedFilings = filings.reduce(into: [:]) { found, filing in
+            guard filing.list == mine, zones.contains(filing.zone) else { return }
+            found[filing.zone] = filing.guid
         }
-        articleSharedCollections = found
+
+        // The reader's own collections somebody else has filed this piece
+        // into. It is in the collection without being one of their filings, so
+        // the tag says nothing about it and the menu would otherwise offer to
+        // put it in a second time.
+        let byName = Dictionary(uniqueKeysWithValues: ownedShareZones.map { ($0.value, $0.key) })
+        articleCollectionsFiledByOthers = filings.reduce(into: [:]) { found, filing in
+            guard filing.list != mine, let name = byName[filing.zone] else { return }
+            found[name] = filing.guid
+        }
+    }
+
+    /// Takes this piece out of one of the reader's own shared collections, as
+    /// whoever filed it named it.
+    ///
+    /// **Under their identity and not this device's.** A guid is whatever the
+    /// feed each person follows chose to call the piece, so a removal written
+    /// against the reader's own name for it would match nothing in the list it
+    /// is meant to take out of.
+    func takeDownFromCollection(named name: String) async {
+        guard let guid = articleCollectionsFiledByOthers[name] else { return }
+
+        await sharing.takeDown(guid, fromCollectionNamed: name)
+        await loadArticleSharedCollections()
+        await loadCollections()
     }
 
     /// Makes a collection and shows it, empty, where the reader will look.
