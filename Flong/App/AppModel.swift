@@ -40,6 +40,9 @@ nonisolated struct SidebarItem: Identifiable, Hashable, Sendable {
     let articleCount: Int
     /// Whether the reader singled this source out, when it is a source.
     var isFavourite = false
+    /// Whether the reader asked to be told about every article it publishes,
+    /// when it is a source.
+    var notifies = false
     var children: [SidebarItem] = []
 
     var id: Kind { kind }
@@ -1075,6 +1078,90 @@ final class AppModel {
         notificationStatus = await announcer.status()
     }
 
+    /// Asks the system whether this device may interrupt the reader, and
+    /// records what it answered.
+    ///
+    /// Every switch that can lead to a notification goes through this, wherever
+    /// it is drawn : the panel's own, and the one on each source. A refusal is
+    /// final until the reader goes to the system settings, and asking again
+    /// after one does not prompt, it returns the refusal.
+    @discardableResult
+    func authorizeNotifications() async -> Bool {
+        let allowed = await announcer.authorize()
+        notificationStatus = await announcer.status()
+        return allowed
+    }
+
+    // MARK: - When one source publishes
+
+    /// The sources the reader asked to be told about, in the order a list shows
+    /// them.
+    ///
+    /// Read off the sidebar's own pass over the feeds rather than asked for
+    /// separately : the sources are read there already, and this is a handful
+    /// of them.
+    private(set) var announcingSources: [Feed] = []
+
+    /// Asks to be told about every article one source publishes, or stops
+    /// asking.
+    ///
+    /// **The switch is the request, exactly as it is in the panel.** Turning it
+    /// on is what asks the system, and a reader who has refused Flong at that
+    /// level cannot be talked round from here : nothing is written and the
+    /// screen says where the answer lives.
+    ///
+    /// The watermark is stamped now, so that what the source published before
+    /// the reader asked about it is not announced as though it had just
+    /// arrived.
+    func setNotifications(_ wanted: Bool, forSource id: UUID) async {
+        if wanted {
+            guard await authorizeNotifications() else { return }
+            preferences.articlesAnnouncedAt = Date()
+        }
+
+        do {
+            try await subscriptions.setNotifies(id, wanted)
+            // It is a decision about a publisher and it belongs on every device
+            // the reader owns, like the favourite beside it.
+            if let url = try await subscriptions.feed(id: id)?.url {
+                await cloud?.enqueue(recordNames: [SyncRecords.name(forFeed: url)])
+            }
+            await loadSidebar()
+        } catch {
+            failure = .notSaved
+            Log.store.error("The source could not be set to announce : \(error, privacy: .public)")
+        }
+    }
+
+    /// Tells the reader what the sources they asked about have just published.
+    ///
+    /// **The watermark moves whether anything was said or not**, exactly as it
+    /// does for the stories and for the collaborations : what it records is
+    /// that the articles reached this device, not that a notification was
+    /// posted.
+    ///
+    /// A reader who has asked about no source at all has no watermark either,
+    /// so that asking about their first one starts from that moment rather than
+    /// from whatever a silent pass had stamped.
+    func announceNewArticles() async {
+        let asked = (try? await subscriptions.announcing()) ?? []
+        guard !asked.isEmpty else { return }
+
+        guard let since = preferences.articlesAnnouncedAt else {
+            // A source asked about on another device, whose decision has just
+            // arrived here. What it published before this device heard about it
+            // is not news, so the clock starts now and this pass says nothing.
+            preferences.articlesAnnouncedAt = Date()
+            return
+        }
+
+        let arrived = (try? await articles.arrived(since: since)) ?? []
+        preferences.articlesAnnouncedAt = Date()
+
+        guard !isReading, let announcement = Announcement.newArticles(arrived) else { return }
+        await announcer.post(announcement)
+    }
+
     // MARK: - When somebody adds to a shared collection
 
     private(set) var wantsCollaborationNotices = false
@@ -1419,6 +1506,7 @@ final class AppModel {
                 Task { @MainActor [weak self] in self?.moveWork(to: phase) }
             }
         )
+        await announceNewArticles()
         await announceNewStories()
         await announceCollaborations()
 
@@ -1839,6 +1927,10 @@ final class AppModel {
                 uniquingKeysWith: { first, _ in first }
             )
             feedCount = feeds.count
+            // The panel that lists everything Flong may interrupt the reader
+            // for reads them here : they have just been fetched, and a handful
+            // of rows out of hundreds is not a second query.
+            announcingSources = feeds.filter(\.notifiesNewArticles)
         } catch {
             Log.store.error("The sidebar could not be built : \(error, privacy: .public)")
         }
@@ -1849,7 +1941,8 @@ final class AppModel {
             kind: .feed(feed.id),
             title: feed.title,
             articleCount: counts[feed.id] ?? 0,
-            isFavourite: feed.isFavourite
+            isFavourite: feed.isFavourite,
+            notifies: feed.notifiesNewArticles
         )
     }
 
@@ -2474,6 +2567,13 @@ final class AppModel {
         // identifiers rather than over the texts.
         if summary.newArticles > 0 { await synchronizeSpotlight() }
 
+        // Before the model and outside its guard : an article from a source the
+        // reader asked about is news the moment it lands, and nothing has to be
+        // written or grouped for it to be said. The twenty-five seconds of a
+        // background refresh are where this matters most, since they are the
+        // moments the reader is not looking.
+        await announceNewArticles()
+
         guard reason.mayRunTheModel else {
             endWork()
             return
@@ -2834,6 +2934,22 @@ final class AppModel {
         var edit = edit
         let wasSecret = MaskedURL.isMasked(feed.url)
         var clearsTheSecret = false
+
+        // Asking to be told about a source is asking the system too, and a
+        // refusal there cannot be talked round from here : the field goes back
+        // where it was and everything else the reader typed is saved all the
+        // same. The editor has already asked at the moment they touched the
+        // switch, so this prompts nobody twice ; it is what makes the refusal
+        // impossible to save around.
+        if edit.notifiesNewArticles, !feed.notifiesNewArticles {
+            if await authorizeNotifications() {
+                // From now : what the source published before the reader asked
+                // about it is not news.
+                preferences.articlesAnnouncedAt = Date()
+            } else {
+                edit.notifiesNewArticles = false
+            }
+        }
 
         switch address {
         case .open(let typed):

@@ -26,6 +26,11 @@ nonisolated struct Announcement: Hashable, Sendable {
     var thread: String
     /// The story a tap opens, when there is exactly one to open.
     var story: UUID?
+    /// The article a tap opens, when there is exactly one to open.
+    ///
+    /// Never set beside ``story`` : a notice is about one thing or about
+    /// several, and a tap has one place to land.
+    var article: UUID?
 
     /// Stories that have just been opened.
     ///
@@ -116,8 +121,65 @@ nonisolated struct Announcement: Hashable, Sendable {
         return Announcement(title: title, body: body, thread: Thread.filings)
     }
 
+    /// What the sources the reader asked about have just published.
+    ///
+    /// **Every article, which is what the reader asked for.** The stories are a
+    /// calculation : several newsrooms, one subject, and an opening worth
+    /// interrupting somebody for. This is the opposite question, asked source
+    /// by source : a reader who follows one newsletter, one blog or one
+    /// colleague wants to know when *they* publish, and a piece nobody else
+    /// covers never becomes a story and would never be announced.
+    ///
+    /// Nothing to say about none, which is the ordinary case : almost every
+    /// pass brings articles from sources the reader asked nothing about.
+    ///
+    /// **One article leads with its own headline**, for the same reason a lone
+    /// story does : the headline is the news, and the source it came from is
+    /// what the body is for. A tap opens it.
+    ///
+    /// **Several from one source are counted under its name**, since the source
+    /// is what the reader asked about and naming it once is shorter than
+    /// repeating it. **Several sources are counted and then listed**, the
+    /// headlines giving way to the names : a reader told `5 new articles` and
+    /// left to work out where from would have to open the application to learn
+    /// what they were just told.
+    static func newArticles(_ arrivals: [ArticleStore.Arrival]) -> Announcement? {
+        guard let first = arrivals.first else { return nil }
+
+        guard arrivals.count > 1 else {
+            return Announcement(
+                title: first.title,
+                body: first.source,
+                thread: Thread.newArticles,
+                article: first.id
+            )
+        }
+
+        // In the order they arrived, and deduplicated : a source that served
+        // four articles in one pass is one name.
+        var sources: [String] = []
+        for arrival in arrivals where !sources.contains(arrival.source) { sources.append(arrival.source) }
+
+        guard sources.count == 1, let source = sources.first else {
+            return Announcement(
+                title: String(localized: "\(arrivals.count) new articles"),
+                body: ListFormatter.localizedString(byJoining: sources),
+                thread: Thread.newArticles
+            )
+        }
+
+        return Announcement(
+            title: String(localized: "\(source) : \(arrivals.count) new articles"),
+            // A middle dot rather than commas, as the stories are joined : a
+            // headline may hold commas of its own.
+            body: arrivals.map(\.title).joined(separator: " · "),
+            thread: Thread.newArticles
+        )
+    }
+
     enum Thread {
         static let newStories = "new-stories"
+        static let newArticles = "new-articles"
         static let filings = "shared-filings"
     }
 }

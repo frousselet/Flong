@@ -469,6 +469,61 @@ struct SubscriptionStoreTests {
         #expect(stored?.isFavourite == true)
     }
 
+    @Test("What another device decided about being told outranks what is stored")
+    func adoptingWhatAnotherDeviceAskedToBeTold() async throws {
+        let feed = try await store.subscribe(
+            to: Subscription(address: "https://feeds.example.com/1.xml", title: "Example")
+        ).feed
+
+        let changed = try await store.adopt(
+            Subscription(address: "https://feeds.example.com/1.xml", title: "Example"),
+            isFavourite: nil,
+            notifies: true,
+            at: feed.id
+        )
+
+        #expect(changed)
+        #expect(try await store.feed(id: feed.id)?.notifiesNewArticles == true)
+    }
+
+    @Test("A record that says nothing about being told does not take it back")
+    func adoptingSaysNothingAboutBeingTold() async throws {
+        let feed = try await store.subscribe(
+            to: Subscription(address: "https://feeds.example.com/1.xml", title: "Example")
+        ).feed
+        try await store.setNotifies(feed.id, true)
+
+        // What an older record looks like, written before a source could be
+        // asked about at all. Nothing said is not the same as no, and reading
+        // it as no would silence every source the reader ever asked about.
+        let changed = try await store.adopt(
+            Subscription(address: "https://feeds.example.com/1.xml", title: "Example"),
+            isFavourite: nil,
+            at: feed.id
+        )
+
+        #expect(!changed)
+        #expect(try await store.feed(id: feed.id)?.notifiesNewArticles == true)
+    }
+
+    @Test("The editor writes whether the source announces, like every other field")
+    func editingWhatIsAnnounced() async throws {
+        let feed = try await store.subscribe(
+            to: Subscription(address: "https://feeds.example.com/1.xml", title: "Example")
+        ).feed
+
+        let asked = try await store.edit(
+            feed.id,
+            to: SourceEdit(title: "Example", notifiesNewArticles: true)
+        )
+        #expect(asked.feed.notifiesNewArticles)
+
+        // Every field is written, so a screen showing a state saves the whole
+        // of it rather than half remembering.
+        let quietened = try await store.edit(feed.id, to: SourceEdit(title: "Example"))
+        #expect(!quietened.feed.notifiesNewArticles)
+    }
+
     @Test("Unsubscribing takes the articles with it")
     func unsubscribingCascades() async throws {
         let feed = try await store.subscribe(to: Subscription(address: "https://feeds.example.com/1.xml")).feed

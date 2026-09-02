@@ -430,3 +430,379 @@ struct AnnouncingTests {
         #expect(announcer.posted.isEmpty)
     }
 }
+
+/// What a notice about one source's own articles says.
+///
+/// The stories are a calculation and this is the opposite question, asked
+/// source by source : the wording has to work for one article, for four from
+/// one place, and for four from four.
+@Suite("What Flong says about a source's own articles")
+struct SourceAnnouncementTests {
+    private func arrival(_ title: String, from source: String = "Le Monde") -> ArticleStore.Arrival {
+        ArticleStore.Arrival(id: .v7(), title: title, source: source)
+    }
+
+    @Test("A pass that brought nothing from those sources says nothing")
+    func silence() {
+        // The ordinary case : almost every pass brings articles from sources
+        // the reader asked nothing about.
+        #expect(Announcement.newArticles([]) == nil)
+    }
+
+    @Test("One article leads with its own headline, and a tap opens it")
+    func one() throws {
+        let article = arrival("Une réforme du calendrier scolaire")
+        let announcement = try #require(Announcement.newArticles([article]))
+
+        #expect(announcement.title == "Une réforme du calendrier scolaire")
+        #expect(announcement.body == "Le Monde")
+        #expect(announcement.article == article.id)
+        // An article is read over everything, and a story is a page in the
+        // digest : a tap has one place to land and this is not the other one.
+        #expect(announcement.story == nil)
+    }
+
+    @Test("Several from one source are counted under its name")
+    func severalFromOne() throws {
+        let articles = [arrival("Une réforme"), arrival("Les macros Swift"), arrival("Le procès")]
+        let announcement = try #require(Announcement.newArticles(articles))
+
+        #expect(announcement.title.contains("Le Monde"))
+        #expect(announcement.title.contains("3"))
+        for article in articles {
+            #expect(announcement.body.contains(article.title))
+        }
+        // Three articles are not a place to go.
+        #expect(announcement.article == nil)
+    }
+
+    @Test("Headlines are not run together as one sentence")
+    func headlinesAreSeparated() throws {
+        let announcement = try #require(
+            Announcement.newArticles([arrival("Réforme, acte II"), arrival("Procès, la suite")])
+        )
+
+        #expect(announcement.body == "Réforme, acte II · Procès, la suite")
+    }
+
+    @Test("Several sources are counted and then named")
+    func severalSources() throws {
+        let articles = [
+            arrival("Une réforme", from: "Le Monde"),
+            arrival("Les macros Swift", from: "Swift by Sundell"),
+            arrival("Le procès", from: "Le Monde"),
+        ]
+        let announcement = try #require(Announcement.newArticles(articles))
+
+        #expect(announcement.title.contains("3"))
+        // A reader told `3 new articles` and left to work out where from would
+        // have to open the application to learn what they were just told. Each
+        // source is named once, whatever it served.
+        #expect(announcement.body.contains("Le Monde"))
+        #expect(announcement.body.contains("Swift by Sundell"))
+        #expect(!announcement.body.contains("Une réforme"))
+    }
+
+    @Test("These notices are grouped under a thread of their own")
+    func grouped() throws {
+        let first = try #require(Announcement.newArticles([arrival("Une réforme")]))
+        let second = try #require(Announcement.newArticles([arrival("Un procès")]))
+
+        #expect(first.thread == second.thread)
+        #expect(first.thread == Announcement.Thread.newArticles)
+        // Not the stack the stories are in : one is a calculation about the
+        // press and the other is one source publishing.
+        #expect(first.thread != Announcement.Thread.newStories)
+    }
+}
+
+/// Which articles are worth telling the reader about, and which are not.
+@Suite("What a source the reader asked about has just published")
+struct ArrivedArticleTests {
+    private let database: AppDatabase
+    private let articles: ArticleStore
+    private let subscriptions: SubscriptionStore
+    private let now = Date(timeIntervalSince1970: 1_787_646_600)
+
+    init() throws {
+        database = try AppDatabase.inMemory()
+        articles = ArticleStore(database)
+        subscriptions = SubscriptionStore(database)
+    }
+
+    /// A source, asked about or not.
+    ///
+    /// The name and the address are given separately : what a source is called
+    /// is the reader's language, spaces and accents included, and what it is
+    /// served at is an address.
+    @discardableResult
+    private func source(_ name: String, at host: String, announcing: Bool) async throws -> Feed {
+        var feed = Feed(url: URL(string: "https://\(host)/atom.xml")!, title: name)
+        feed.siteURL = URL(string: "https://\(host)")
+        feed.notifiesNewArticles = announcing
+        try await database.writer.write { db in try feed.insert(db) }
+        return feed
+    }
+
+    /// An article that reached this device at a moment, whatever it is dated.
+    @discardableResult
+    private func article(
+        _ title: String,
+        of feed: Feed,
+        receivedAt: Date,
+        isRead: Bool = false,
+        isHidden: Bool = false,
+        duplicateOf: UUID? = nil
+    ) async throws -> UUID {
+        var entry = Entry(feedID: feed.id, guid: "urn:\(title)", title: title, receivedAt: receivedAt)
+        entry.hasMedia = false
+        entry.isRead = isRead
+        entry.isHidden = isHidden
+        entry.duplicateOf = duplicateOf
+        try await database.writer.write { db in try entry.insert(db) }
+        return entry.id
+    }
+
+    @Test("Only the sources the reader asked about")
+    func onlyThoseAskedAbout() async throws {
+        let asked = try await source("Le Monde", at: "lemonde.example.com", announcing: true)
+        let other = try await source("Libération", at: "liberation.example.com", announcing: false)
+        try await article("Une réforme", of: asked, receivedAt: now.addingTimeInterval(60))
+        try await article("Un procès", of: other, receivedAt: now.addingTimeInterval(60))
+
+        let arrived = try await articles.arrived(since: now)
+        #expect(arrived.map(\.title) == ["Une réforme"])
+        #expect(arrived.map(\.source) == ["Le Monde"])
+    }
+
+    @Test("When it arrived here, and not when it was published")
+    func whenItArrived() async throws {
+        let feed = try await source("Le Monde", at: "lemonde.example.com", announcing: true)
+        // A source backfilling a month of articles published them a month ago
+        // and served them tonight. A notice about what is dated today would be
+        // silent about everything the reader actually just received.
+        try await article("Ancien", of: feed, receivedAt: now.addingTimeInterval(-3600))
+        try await article("Nouveau", of: feed, receivedAt: now.addingTimeInterval(60))
+
+        #expect(try await articles.arrived(since: now).map(\.title) == ["Nouveau"])
+    }
+
+    @Test("They arrive in the order they landed")
+    func ordered() async throws {
+        let feed = try await source("Le Monde", at: "lemonde.example.com", announcing: true)
+        for (index, title) in ["Premier", "Deuxième", "Troisième"].enumerated() {
+            try await article(title, of: feed, receivedAt: now.addingTimeInterval(Double(index + 1) * 60))
+        }
+
+        #expect(try await articles.arrived(since: now).map(\.title) == ["Premier", "Deuxième", "Troisième"])
+    }
+
+    @Test("What is read, hidden or a second copy is left out")
+    func leftOut() async throws {
+        let feed = try await source("Le Monde", at: "lemonde.example.com", announcing: true)
+        let first = try await article("Une réforme", of: feed, receivedAt: now.addingTimeInterval(60))
+        // Read on another device an hour ago, hidden by a rule the reader
+        // wrote, and the same piece arriving through a second feed of one
+        // newsroom. None of the three is news.
+        try await article("Déjà lu", of: feed, receivedAt: now.addingTimeInterval(60), isRead: true)
+        try await article("Masqué", of: feed, receivedAt: now.addingTimeInterval(60), isHidden: true)
+        try await article("Copie", of: feed, receivedAt: now.addingTimeInterval(60), duplicateOf: first)
+
+        #expect(try await articles.arrived(since: now).map(\.title) == ["Une réforme"])
+    }
+
+    @Test("The sources that announce are the ones asked for, in the order a list shows them")
+    func announcingSources() async throws {
+        try await source("Zébu", at: "zebu.example.com", announcing: true)
+        try await source("Abeille", at: "abeille.example.com", announcing: true)
+        try await source("Chameau", at: "chameau.example.com", announcing: false)
+
+        #expect(try await subscriptions.announcing().map(\.title) == ["Abeille", "Zébu"])
+    }
+
+    @Test("Asking about a source, and stopping")
+    func askingAndStopping() async throws {
+        let feed = try await source("Le Monde", at: "lemonde.example.com", announcing: false)
+
+        try await subscriptions.setNotifies(feed.id, true)
+        #expect(try await subscriptions.feed(id: feed.id)?.notifiesNewArticles == true)
+        // It says nothing about the favourite beside it : the two are different
+        // judgements about the same publisher.
+        #expect(try await subscriptions.feed(id: feed.id)?.isFavourite == false)
+
+        try await subscriptions.setNotifies(feed.id, false)
+        #expect(try await subscriptions.feed(id: feed.id)?.notifiesNewArticles == false)
+    }
+}
+
+/// When the reader is actually told about a source's own articles.
+@Suite("Telling the reader about a source they asked about", .serialized)
+@MainActor
+struct AnnouncingSourceTests {
+    private let database: AppDatabase
+    private let preferences: Preferences
+    private let announcer = MemoryAnnouncer()
+    private let model: AppModel
+    private let now = Date().addingTimeInterval(-120)
+
+    init() throws {
+        database = try AppDatabase.inMemory()
+        preferences = Preferences(
+            cloud: nil,
+            local: UserDefaults(suiteName: "com.rslt.Flong.tests.\(UUID().uuidString)")!
+        )
+        model = AppModel(database: database, preferences: preferences, announcer: announcer)
+    }
+
+    @discardableResult
+    private func source(_ name: String = "Le Monde", at host: String = "lemonde.example.com") async throws -> Feed {
+        var feed = Feed(url: URL(string: "https://\(host)/atom.xml")!, title: name)
+        feed.siteURL = URL(string: "https://\(host)")
+        try await database.writer.write { db in try feed.insert(db) }
+        return feed
+    }
+
+    private func article(_ title: String, of feed: Feed, at moment: Date) async throws {
+        var entry = Entry(feedID: feed.id, guid: "urn:\(title)", title: title, receivedAt: moment)
+        entry.hasMedia = false
+        try await database.writer.write { db in try entry.insert(db) }
+    }
+
+    /// The reader has asked about the source, and the clock started then.
+    private func asked(about feed: Feed, from moment: Date) async {
+        await model.setNotifications(true, forSource: feed.id)
+        preferences.articlesAnnouncedAt = moment
+    }
+
+    @Test("An article published while the reader was away is announced")
+    func announced() async throws {
+        let feed = try await source()
+        await asked(about: feed, from: now)
+        model.isReading = false
+        try await article("Une réforme", of: feed, at: now.addingTimeInterval(60))
+
+        await model.announceNewArticles()
+
+        #expect(announcer.posted.count == 1)
+        #expect(announcer.posted.first?.title == "Une réforme")
+        #expect(announcer.posted.first?.article != nil)
+    }
+
+    @Test("Nothing is said twice")
+    func onlyOnce() async throws {
+        let feed = try await source()
+        await asked(about: feed, from: now)
+        model.isReading = false
+        try await article("Une réforme", of: feed, at: now.addingTimeInterval(60))
+
+        await model.announceNewArticles()
+        await model.announceNewArticles()
+
+        #expect(announcer.posted.count == 1)
+    }
+
+    @Test("Nothing interrupts a reader looking at the page it would be on")
+    func silentWhileReading() async throws {
+        let feed = try await source()
+        await asked(about: feed, from: now)
+        model.isReading = true
+        try await article("Une réforme", of: feed, at: now.addingTimeInterval(60))
+
+        await model.announceNewArticles()
+        #expect(announcer.posted.isEmpty)
+
+        // And it is not saved up for later : the article appeared in the list
+        // they had open.
+        model.isReading = false
+        await model.announceNewArticles()
+        #expect(announcer.posted.isEmpty)
+    }
+
+    @Test("A reader who asked about no source hears nothing, and the clock does not run")
+    func silentUntilAskedFor() async throws {
+        let feed = try await source()
+        model.isReading = false
+        try await article("Une réforme", of: feed, at: now.addingTimeInterval(60))
+
+        await model.announceNewArticles()
+
+        #expect(announcer.posted.isEmpty)
+        // Untouched, so that asking about a source later starts from that
+        // moment rather than from whatever a silent pass had stamped.
+        #expect(preferences.articlesAnnouncedAt == nil)
+    }
+
+    @Test("Asking about a source starts the clock, so its backlog is not news")
+    func startsFromNow() async throws {
+        let feed = try await source()
+        try await article("Ancien", of: feed, at: now.addingTimeInterval(-86400))
+
+        await model.setNotifications(true, forSource: feed.id)
+        model.isReading = false
+        await model.announceNewArticles()
+
+        #expect(announcer.posted.isEmpty)
+        #expect(preferences.articlesAnnouncedAt != nil)
+    }
+
+    @Test("A refusal leaves the source alone")
+    func refused() async throws {
+        let feed = try await source()
+        announcer.granted = false
+
+        await model.setNotifications(true, forSource: feed.id)
+
+        // The system said no, and nothing in an application may say otherwise :
+        // a source saved as announcing would be a switch that promises what it
+        // cannot deliver.
+        #expect(try await SubscriptionStore(database).feed(id: feed.id)?.notifiesNewArticles == false)
+        #expect(model.notificationStatus == .denied)
+        #expect(preferences.articlesAnnouncedAt == nil)
+    }
+
+    @Test("Nothing is said about a source that was not asked about")
+    func onlyTheOnesAskedAbout() async throws {
+        let asked = try await source("Le Monde")
+        let other = try await source("Libération", at: "liberation.example.com")
+        await self.asked(about: asked, from: now)
+        model.isReading = false
+        try await article("Un procès", of: other, at: now.addingTimeInterval(60))
+
+        await model.announceNewArticles()
+        #expect(announcer.posted.isEmpty)
+    }
+
+    @Test("Stopping stops it")
+    func stopped() async throws {
+        let feed = try await source()
+        await asked(about: feed, from: now)
+        await model.setNotifications(false, forSource: feed.id)
+
+        model.isReading = false
+        try await article("Une réforme", of: feed, at: now.addingTimeInterval(60))
+        await model.announceNewArticles()
+
+        #expect(announcer.posted.isEmpty)
+    }
+
+    @Test("A decision arriving from another device says nothing about the backlog")
+    func fromAnotherDevice() async throws {
+        let feed = try await source()
+        model.isReading = false
+        try await article("Ancien", of: feed, at: now.addingTimeInterval(-86400))
+        // The switch was thrown on the iPad : the row arrives here already on,
+        // and this device has never said anything about anything.
+        try await SubscriptionStore(database).setNotifies(feed.id, true)
+
+        await model.announceNewArticles()
+
+        #expect(announcer.posted.isEmpty)
+        // The clock starts now, so the next pass is the first that can say
+        // anything.
+        #expect(preferences.articlesAnnouncedAt != nil)
+
+        try await article("Nouveau", of: feed, at: Date().addingTimeInterval(1))
+        await model.announceNewArticles()
+        #expect(announcer.posted.map(\.title) == ["Nouveau"])
+    }
+}

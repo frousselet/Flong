@@ -10,6 +10,7 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 /// Changing what a source is : its name, where it is served, whether that
 /// address is a secret, which of its parameters are the reader's, and how it is
@@ -66,6 +67,10 @@ struct SourceEditor: View {
     @State private var isSecret: Bool
     @State private var interval: TimeInterval?
     @State private var isFavourite: Bool
+    @State private var notifies: Bool
+    /// Whether the system has refused Flong every notification, which is the
+    /// one answer the switch above cannot argue with.
+    @State private var isRefused = false
 
     /// The parameters this feed's addresses carry, and the ones the reader has
     /// said are theirs. The designations are folded, as the keychain holds
@@ -108,6 +113,7 @@ struct SourceEditor: View {
         _site = State(initialValue: feed.siteURL?.absoluteString ?? "")
         _interval = State(initialValue: feed.refreshInterval)
         _isFavourite = State(initialValue: feed.isFavourite)
+        _notifies = State(initialValue: feed.notifiesNewArticles)
     }
 
     /// Whether the address stored for this source is the masked one. It is not
@@ -123,6 +129,7 @@ struct SourceEditor: View {
                 belonging
                 designating
                 asking
+                telling
                 health
             }
             .formStyle(.grouped)
@@ -156,6 +163,9 @@ struct SourceEditor: View {
                 }
                 parameters = await model.addressParameters(of: feed.id, feedURL: feed.url)
                 designated = await model.secretParameters(of: feed.id)
+
+                await model.refreshNotificationStatus()
+                isRefused = model.notificationStatus == .denied
             }
         }
         #if os(macOS)
@@ -338,6 +348,77 @@ struct SourceEditor: View {
         }
     }
 
+    /// Whether this source is worth interrupting the reader for.
+    ///
+    /// **Not the favourite two lines above.** A favourite source is one the
+    /// reader wants near the top of their own lists ; this is one they want to
+    /// be told about, which is a great deal more to ask. A reader with forty
+    /// favourites who found they had signed up for forty notifications a day
+    /// would turn the lot off, and the two are deliberately separate switches.
+    ///
+    /// **The switch is the request.** Turning it on asks the system there and
+    /// then, which is the only honest moment to ask, and a refusal puts it back
+    /// where it was rather than saving something that can never happen.
+    @ViewBuilder
+    private var telling: some View {
+        Section {
+            Toggle(isOn: askingBinding) {
+                Text("Notify every new article")
+            }
+            .disabled(isWorking || isRefused)
+        } header: {
+            Text("Notifications")
+        } footer: {
+            if isRefused {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(
+                        "Notifications are turned off for Flong in the system settings, so nothing here can be switched on until they are allowed again."
+                    )
+
+                    Button {
+                        Notifier.openSystemSettings()
+                    } label: {
+                        Label("Open the system settings", systemImage: "gear")
+                            .font(.subheadline)
+                    }
+                    .buttonStyle(.borderless)
+                }
+            } else {
+                Text(
+                    "Every article this source publishes is announced as it arrives. What it published before you asked is not."
+                )
+            }
+        }
+    }
+
+    /// The switch, which asks the system the moment it is turned on.
+    ///
+    /// The question cannot wait for the save : a reader who ticks it, saves and
+    /// is then told nothing has to close the screen to find out that the system
+    /// had refused. The permission is asked here, and the save asks again for
+    /// nothing, which prompts nobody twice : an answer already given comes back
+    /// without a prompt.
+    private var askingBinding: Binding<Bool> {
+        Binding(
+            get: { notifies },
+            set: { wanted in
+                guard wanted else {
+                    notifies = false
+                    return
+                }
+                notifies = true
+                Task {
+                    guard await model.authorizeNotifications() else {
+                        notifies = false
+                        isRefused = true
+                        return
+                    }
+                    isRefused = false
+                }
+            }
+        )
+    }
+
     /// What the fetching has come to, which section 8 asks to be surfaced here.
     ///
     /// The 304 rate is the one number that says whether a source is being asked
@@ -410,7 +491,8 @@ struct SourceEditor: View {
             title: name,
             siteAddress: site,
             refreshInterval: interval,
-            isFavourite: isFavourite
+            isFavourite: isFavourite,
+            notifiesNewArticles: notifies
         )
         let address: SourceAddress = isSecret ? .secret(self.address) : .open(self.address)
         let designated = designated

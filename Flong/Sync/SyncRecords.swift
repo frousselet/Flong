@@ -227,6 +227,11 @@ nonisolated enum SyncRecords {
         record["url"] = feed.url.absoluteString
         record["title"] = feed.title
         record["isFavourite"] = feed.isFavourite ? 1 : 0
+        // What the reader asked to be told about, which is a decision about a
+        // publisher and not about the device they were holding when they made
+        // it. Whether a given device may then interrupt them is the system's
+        // answer on that device, and it never travels.
+        record["notifies"] = feed.notifiesNewArticles ? 1 : 0
         // Where it used to be served, so that a device holding it there moves
         // the row it already has. Without it the pair of a record under a new
         // name and a deletion under the old one is a removal followed by a
@@ -266,6 +271,16 @@ nonisolated enum SyncRecords {
     /// unstar every source on every other one.
     static func isFavourite(from record: CKRecord) -> Bool? {
         (record["isFavourite"] as? Int).map { $0 == 1 }
+    }
+
+    /// Whether the record says the reader asked to be told about that source.
+    ///
+    /// `nil` for a record written before they could ask, for the same reason
+    /// and with the same consequence as above : nothing said is not the same as
+    /// no, and reading it as no would have the first device to meet an old
+    /// record silence every source on every other one.
+    static func notifies(from record: CKRecord) -> Bool? {
+        (record["notifies"] as? Int).map { $0 == 1 }
     }
 
     // MARK: - The names of publishers

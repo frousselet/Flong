@@ -123,6 +123,7 @@ struct SourcesPanel: View {
                                 .swipeActions(edge: .trailing) { deleting(source) }
                                 .contextMenu {
                                     favouriting(source)
+                                    announcing(source)
                                     editing(source)
                                     deleting(source)
                                 }
@@ -412,6 +413,33 @@ struct SourcesPanel: View {
             )
         }
         .tint(.yellow)
+    }
+
+    /// Asking to be told about a source, or asking to stop.
+    ///
+    /// **In the menu and not in a swipe.** A swipe is for the two things a
+    /// reader does often and reverses instantly, and this is neither : it is a
+    /// standing request for a source to interrupt them, and one made by
+    /// accident is one they would have to work out the cause of.
+    ///
+    /// Beside the favourite, and never the same words as it. A favourite source
+    /// is one the reader wants near the top of their lists ; this is one they
+    /// want to hear from, and a reader who read the two as one thing would end
+    /// up with a notification for every source they like.
+    ///
+    /// The permission is asked by what this calls, at the moment it is called,
+    /// and a refusal writes nothing.
+    @ViewBuilder
+    private func announcing(_ source: SidebarItem) -> some View {
+        Button {
+            guard case .feed(let id) = source.kind else { return }
+            Task { await model.setNotifications(!source.notifies, forSource: id) }
+        } label: {
+            Label(
+                source.notifies ? "Stop notifying new articles" : "Notify every new article",
+                systemImage: source.notifies ? "bell.slash" : "bell"
+            )
+        }
     }
 
     /// Changing what a source is, which is the one thing in this panel that

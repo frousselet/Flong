@@ -38,6 +38,7 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
         case readerModeEnabled = "reader_mode_enabled"
         case loadsImages = "loads_images"
         case isFavourite = "is_favourite"
+        case notifiesNewArticles = "notifies_new_articles"
         case createdAt = "created_at"
     }
 
@@ -90,6 +91,22 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
     /// two are deliberately unconnected, and ``ArticleCollection`` keeps a
     /// square for each so neither is mistaken for the other.
     var isFavourite: Bool
+
+    /// Whether the reader asked to be told about every article this source
+    /// publishes.
+    ///
+    /// **A property of the source, and not of a device.** It is a decision
+    /// about a publisher, like the favourite above it, so it lives on the row
+    /// and travels with the record : a reader who asked to be told about one
+    /// paper on their phone did not mean only on their phone. Whether a given
+    /// device may interrupt them is the system's answer on that device, asked
+    /// for separately and never carried.
+    ///
+    /// It is not the favourite under another name. A favourite source is one
+    /// the reader wants near the top of their own lists ; this is one they want
+    /// to be interrupted for, which is a great deal more to ask, and a reader
+    /// with forty favourites would be a reader with forty notifications a day.
+    var notifiesNewArticles: Bool
     var createdAt: Date
 
     init(
@@ -114,6 +131,7 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
         readerModeEnabled: Bool = false,
         loadsImages: Bool = true,
         isFavourite: Bool = false,
+        notifiesNewArticles: Bool = false,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -137,6 +155,7 @@ nonisolated struct Feed: Identifiable, Hashable, StoredRecord {
         self.readerModeEnabled = readerModeEnabled
         self.loadsImages = loadsImages
         self.isFavourite = isFavourite
+        self.notifiesNewArticles = notifiesNewArticles
         self.createdAt = createdAt
     }
 
@@ -166,6 +185,7 @@ nonisolated extension Feed {
         static let url = Column(CodingKeys.url)
         static let title = Column(CodingKeys.title)
         static let isFavourite = Column(CodingKeys.isFavourite)
+        static let notifiesNewArticles = Column(CodingKeys.notifiesNewArticles)
     }
 }
 

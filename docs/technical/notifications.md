@@ -14,6 +14,8 @@ A panel from the bottom, opened by the bell beside the sources, in the leading c
 
 There is no master switch. A list of two switches with a third above them that overrules both is a list where nobody is sure what is on, and the system already has that switch, in the place a reader looks for it.
 
+The panel is not the only place a notice is asked for. A source announcing its own articles is switched on where the source is, since it is a decision about that publisher ; the panel lists the ones that are on, so that everything Flong may interrupt the reader for can still be seen, and quietened, in one place.
+
 ## Permission is asked when the reader asks
 
 Every switch starts off, and turning one on is what asks the system. A prompt at first launch is a prompt about something the reader has not seen yet, which is how an application gets refused permanently for a feature that would have been welcome later.
@@ -24,7 +26,7 @@ A refusal is final until the reader goes to the system settings : asking again d
 
 ## New stories
 
-The first, and so far the only one.
+The first of the three.
 
 A story is several articles, from several newsrooms, about one thing : the unit of the front page, and the whole difference between watching a field and watching a list of what arrived. A story opening is the moment the press starts covering something, which is the one thing in a feed reader worth interrupting somebody for.
 
@@ -45,6 +47,30 @@ Everything that was already open when the reader turned the notices on is not ne
 **Several are counted in the title and listed in the body**, so the two always agree, and the headlines are joined by a middle dot rather than by commas : a headline may hold commas of its own, and a comma list of them reads as one long broken sentence. A tap opens nothing, several stories not being a place to go.
 
 Announced after the model has written the headlines rather than before, so what the reader is shown is the written headline and not the title of whichever article happened to be nearest the middle of the group.
+
+## Every article of one source
+
+The question the stories cannot answer. A story is several newsrooms covering one thing, which is the right unit for the press and the wrong one for a reader who follows one newsletter, one blog or one colleague : a piece nobody else covers never becomes a story, so it would never be announced, and it is exactly the piece that reader is waiting for.
+
+**The switch is on the source and not in the panel.** It is a decision about a publisher, like the favourite beside it, so it lives on the feed's own row and travels in the feed's own record : a reader who asked to be told about one paper on their phone did not mean only on their phone. A list of identifiers in the key-value store would be a second place naming sources, going stale the moment one is unsubscribed from and needing a rule of its own for what happens when one moves.
+
+**It is not the favourite under another name.** A favourite source is one the reader wants near the top of their own lists ; this is one they want to be interrupted for, which is a great deal more to ask. A reader with forty favourites who found they had signed up for forty notifications a day would turn the lot off, and the two are deliberately separate switches, in separate lines of the same menu and separate sections of the same editor.
+
+**There is still no master switch**, which is why nothing was added to the panel to overrule these. What the panel gained is a list of the sources that are on, so that a reader who has asked about six of them can see all six in one place and quieten any of them there ; adding one is done where the source is.
+
+**Reached three ways, and asked for once.** The source's own editor holds it in a section of its own, the long press on a source in the sources panel toggles it, and the notifications panel takes it back off. All three go through the same call, which asks the system before writing anything : a source saved as announcing on a device that has refused Flong every notification would be a switch that promises what it cannot deliver.
+
+**What counts as new is what arrived here, not what is dated today.** A source that backfills a month of articles published them a month ago and served them tonight, and a notice about what carries today's date would be silent about everything the reader actually just received. The watermark is compared against `received_at`.
+
+**What is read, hidden or a second copy is left out.** A rule the reader wrote to never see something is not undone by a notification ; the same article arriving through two feeds of one newsroom is one piece of news ; and being told about what they read on the iPad an hour ago is worse than not being told.
+
+**The question is asked of the feeds and not of the articles.** A reader asks about a handful of sources out of hundreds, and a partial index covers exactly those, so a pass that brought nothing from any of them costs one look at almost nothing.
+
+**One article leads with its own headline**, for the same reason a lone story does, with the source underneath, and a tap opens the article over whatever the reader was on. **Several from one source are counted under its name**, since the source is what the reader asked about and naming it once is shorter than repeating it. **Several sources are counted and then listed by name**, the headlines giving way : a reader told `5 new articles` and left to work out where from would have to open the application to learn what they were just told.
+
+**Announced where the articles land, and not where the model runs.** The stories are announced after the headlines are written, since the written headline is what the notice says ; this needs nothing written and nothing grouped, so it is said at the end of every pass that fetched, the twenty-five seconds of a background refresh included. Those are the moments the reader is not looking, and they are what this exists for.
+
+**A decision arriving from another device says nothing about the backlog.** The switch travels ; the watermark does not. A device that has never said anything and meets a source already switched on stamps its watermark and stays silent for that pass, so the next one is the first that can speak.
 
 ## Somebody added to a shared collection
 
@@ -75,5 +101,7 @@ The delegate has to be in place before launching finishes, or a notification tap
 The delivery needs an authorization, a bundle and a device, none of which a test can rely on, and none of which is where the mistakes are. `Announcing` is the seam : `Notifier` is the system, `MemoryAnnouncer` is a list a test reads back.
 
 What that buys is coverage of everything that can actually be wrong : the wording and the plural, the headline leading rather than being buried, the written line taking the place of the newsrooms when there is one, the middle dot rather than commas, which stories count as new, that nothing is said twice, that nothing is said while the reader is reading and that it is not saved up for later either, that a refusal leaves the switch where it was, and that a reader who asked for nothing has their watermark left alone so that turning the notices on later starts from that moment.
+
+For a source's own articles it buys the same : the wording for one article, for several from one source and for several from several, which articles count as new, that what arrived here is what is asked about rather than what is dated today, that what is read, hidden or a second copy is left out, that a refusal leaves the source alone rather than saving a switch that can never fire, and that a decision arriving from another device does not announce that source's backlog.
 
 The prompt itself was checked by hand, on the simulator, outside XCUITest : XCUITest does not surface the notification permission alert at all, and a test that waits for it waits for ever.

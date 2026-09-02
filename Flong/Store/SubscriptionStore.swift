@@ -76,6 +76,9 @@ nonisolated struct SourceEdit: Hashable, Sendable {
     /// shows. Bounded by ``RefreshSchedule`` either way.
     var refreshInterval: TimeInterval?
     var isFavourite: Bool = false
+    /// Whether every article this source publishes is worth interrupting the
+    /// reader for.
+    var notifiesNewArticles: Bool = false
 }
 
 /// What editing one source came to, and what has to follow it outside the store.
@@ -255,6 +258,25 @@ nonisolated struct SubscriptionStore: Sendable {
         try await update(id) { feed in feed.isFavourite = isFavourite }
     }
 
+    /// Asks to be told about every article one source publishes, or stops
+    /// asking.
+    ///
+    /// It says nothing about the favourite beside it and nothing about the
+    /// articles : a source the reader wants near the top of their lists is not
+    /// the same as one they want to be interrupted for, and a reader with forty
+    /// favourites would otherwise have forty notifications a day.
+    func setNotifies(_ id: UUID, _ notifies: Bool) async throws {
+        try await update(id) { feed in feed.notifiesNewArticles = notifies }
+    }
+
+    /// The sources the reader asked to be told about, in the order a list shows
+    /// them.
+    func announcing() async throws -> [Feed] {
+        try await database.writer.read { db in
+            try Feed.filter(Feed.Columns.notifiesNewArticles == true).orderedByTitle().fetchAll(db)
+        }
+    }
+
     /// Edits one source : its name, its address, the site it belongs to, how
     /// often it is asked and whether it is one of the reader's own.
     ///
@@ -293,6 +315,7 @@ nonisolated struct SubscriptionStore: Sendable {
             feed.siteURL = siteURL
             feed.refreshInterval = edited.refreshInterval.map(Self.bounded)
             feed.isFavourite = edited.isFavourite
+            feed.notifiesNewArticles = edited.notifiesNewArticles
             try feed.update(db)
 
             return SourceChange(
@@ -347,12 +370,20 @@ nonisolated struct SubscriptionStore: Sendable {
     /// reader wrote on their iPad, a site they corrected and a source they
     /// singled out are decisions, and a decision that did not travel is one
     /// they made and then watched disappear on the next device they picked up.
+    /// Asking to be told about a source is the same kind of thing : the reader
+    /// asked about the publisher, not about the device they happened to be
+    /// holding.
     ///
     /// A field the record does not state is not a decision to unset it. An
-    /// older record carries no favourite and may carry no site, and nothing
-    /// said is not the same as `no`.
+    /// older record carries no favourite, no notification and may carry no
+    /// site, and nothing said is not the same as `no`.
     @discardableResult
-    func adopt(_ subscription: Subscription, isFavourite: Bool?, at id: UUID) async throws -> Bool {
+    func adopt(
+        _ subscription: Subscription,
+        isFavourite: Bool?,
+        notifies: Bool? = nil,
+        at id: UUID
+    ) async throws -> Bool {
         try await database.writer.write { db in
             guard var feed = try Feed.fetchOne(db, key: id) else { throw SubscriptionError.unknownFeed(id) }
             var changed = false
@@ -371,6 +402,10 @@ nonisolated struct SubscriptionStore: Sendable {
             }
             if let isFavourite, feed.isFavourite != isFavourite {
                 feed.isFavourite = isFavourite
+                changed = true
+            }
+            if let notifies, feed.notifiesNewArticles != notifies {
+                feed.notifiesNewArticles = notifies
                 changed = true
             }
 

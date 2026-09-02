@@ -55,6 +55,7 @@ nonisolated final class Preferences: @unchecked Sendable {
         static let device = "device.identifier"
         static let newStoryNotices = "notify.new-stories"
         static let storiesAnnouncedAt = "notify.stories-announced-at"
+        static let articlesAnnouncedAt = "notify.articles-announced-at"
         static let collaborationNotices = "notify.collaborations"
         static let mutedCollections = "notify.muted-collections"
         static let collaborationsAnnouncedAt = "notify.collaborations-announced-at"
@@ -62,8 +63,8 @@ nonisolated final class Preferences: @unchecked Sendable {
         /// Every key, for the one operation that has to name all of them.
         static let all = [
             articleBody, theme, firstName, lastName, picture, city, country, countryCode, device,
-            newStoryNotices, storiesAnnouncedAt, collaborationNotices, mutedCollections,
-            collaborationsAnnouncedAt,
+            newStoryNotices, storiesAnnouncedAt, articlesAnnouncedAt, collaborationNotices,
+            mutedCollections, collaborationsAnnouncedAt,
         ]
     }
 
@@ -284,6 +285,32 @@ nonisolated final class Preferences: @unchecked Sendable {
                 return
             }
             local.set(newValue, forKey: Key.storiesAnnouncedAt)
+        }
+    }
+
+    /// The last moment this device said anything about an article one of the
+    /// reader's own sources published.
+    ///
+    /// Local and never carried, like the other two watermarks and for the same
+    /// reason : each device tells its own reader, and one that travelled would
+    /// have the second device stay silent about what only the first announced.
+    ///
+    /// **Which sources those are is not here.** That is written on the sources
+    /// themselves, where a decision about a publisher belongs, and it travels
+    /// with them ; this is only how far this device has got through telling the
+    /// reader about them.
+    ///
+    /// Nothing at all means nothing to announce. It is stamped the moment the
+    /// reader asks about their first source, so what that source published
+    /// before they asked is not news.
+    var articlesAnnouncedAt: Date? {
+        get { local.object(forKey: Key.articlesAnnouncedAt) as? Date }
+        set {
+            guard let newValue else {
+                local.removeObject(forKey: Key.articlesAnnouncedAt)
+                return
+            }
+            local.set(newValue, forKey: Key.articlesAnnouncedAt)
         }
     }
 

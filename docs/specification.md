@@ -452,6 +452,8 @@ What the reader wants travels between their devices, through the key-value store
 
 **The first of them : a new story.** A story is several articles, from several newsrooms, about one thing, and one opening is the moment the press starts covering something. A cluster of one is not a story, so this is not a notice per article. Nothing that was already open when the switch was turned on is announced.
 
+**And the question a story cannot answer : one source publishing.** A piece nobody else covers never becomes a story, and it is exactly the piece a reader following one newsletter, one blog or one colleague is waiting for. That switch is on the source itself rather than in the panel, since it is a decision about a publisher like the favourite beside it, and it travels in the source's own record ; the panel lists the sources that are on, so everything Flong may interrupt the reader for can still be seen and quietened in one place. It is not the favourite under another name : a favourite is a source wanted near the top of a list, and this is one worth being interrupted for. What counts as new is what reached this device, not what carries today's date, and what the reader has already read, what a rule hides and a second copy of an article already here are all left out.
+
 **Nothing interrupts a reader who is looking at the page it would be about.** A story that opens appears on the front page, so a reader with Flong open has already seen it. The watermark moves anyway : what it records is that the story reached them, not that a notification was posted.
 
 `docs/technical/notifications.md` carries the rules and what each is for.
