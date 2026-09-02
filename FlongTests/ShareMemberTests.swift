@@ -224,6 +224,43 @@ struct ShareMemberTests {
         #expect([unnamed, named].sorted(by: ShareMember.before).map(\.key) == ["a", "b"])
     }
 
+    // MARK: - Recognizing the reader themselves
+
+    /// **CloudKit does not name you to yourself.** Failing to recognize the
+    /// reader is what puts them in their own collection as `Someone`, with no
+    /// name and no face, since their own card is then filed under a different
+    /// key from their roster row and the roster deletes it.
+    @Test("The reader is recognized by their own record in the container")
+    func recognizesTheReaderByTheirRecord() {
+        #expect(ShareParticipants.isTheReader(record: "_abc", isOwner: false, isOwnShare: false, me: "_abc"))
+        #expect(!ShareParticipants.isTheReader(record: "_def", isOwner: false, isOwnShare: false, me: "_abc"))
+    }
+
+    /// The name CloudKit uses for whoever is asking rather than for anybody in
+    /// particular, which is what it hands back in a share of the reader's own.
+    @Test("The reader is recognized under the name CloudKit gives the asker")
+    func recognizesTheDefaultOwner() {
+        #expect(
+            ShareParticipants.isTheReader(
+                record: CKCurrentUserDefaultName,
+                isOwner: true,
+                isOwnShare: true,
+                me: "_abc"
+            )
+        )
+    }
+
+    /// True whether or not the container answered who they are, which is what
+    /// makes it worth having as well as the other two.
+    @Test("The owner of a share in the reader's own database is the reader")
+    func recognizesTheOwnerOfTheirOwnShare() {
+        #expect(ShareParticipants.isTheReader(record: nil, isOwner: true, isOwnShare: true, me: nil))
+        // Somebody else's share : its owner is somebody else.
+        #expect(!ShareParticipants.isTheReader(record: "_owner", isOwner: true, isOwnShare: false, me: "_abc"))
+        // And a participant in a share of the reader's own is not the reader.
+        #expect(!ShareParticipants.isTheReader(record: "_them", isOwner: false, isOwnShare: true, me: "_abc"))
+    }
+
     // MARK: - What stands in for a face
 
     @Test("Initials are the first letter of the first name and of the last")

@@ -46,25 +46,59 @@ nonisolated enum ShareParticipants {
     /// touch them : see ``ShareMemberStore/reconcile(_:inZone:)``.
     ///
     /// `me` is the reader's own record in the container, which is what marks
-    /// the one member they may not remove.
-    static func roster(of share: CKShare, in zoneName: String, me: String?) -> [ShareMember] {
+    /// the one member they may not remove. `isOwnShare` says the share was read
+    /// out of their private database, which is the third way of recognizing
+    /// them : see ``isTheReader(record:isOwner:isOwnShare:me:)``.
+    static func roster(of share: CKShare, in zoneName: String, me: String?, isOwnShare: Bool) -> [ShareMember] {
         share.participants.compactMap { participant in
-            guard let key = key(of: participant) else { return nil }
-            let record = participant.userIdentity.userRecordID?.recordName
+            let stated = participant.userIdentity.userRecordID?.recordName
+            let isOwner = participant.role == .owner
+            let isMe = isTheReader(record: stated, isOwner: isOwner, isOwnShare: isOwnShare, me: me)
+
+            // **The reader is filed under the name they file themselves
+            // under.** CloudKit hands them `__defaultOwner__` in a share of
+            // their own, and their card is written under their real record in
+            // the container : left as it comes, the two halves of their own row
+            // are two rows, so the roster deletes their card and they appear
+            // with no name and no face in their own collection.
+            let record = isMe ? (me ?? stated) : stated
+            guard let key = key(of: participant, record: record) else { return nil }
 
             return ShareMember(
                 zoneName: zoneName,
                 key: key,
                 userRecord: record,
                 shareName: name(of: participant),
-                isOwner: participant.role == .owner,
-                isMe: record != nil && record == me,
+                isOwner: isOwner,
+                isMe: isMe,
                 // Read-only is a participation the owner chose in the system's
                 // own sheet, and a device holding one offers no way to file.
                 mayWrite: participant.permission != .readOnly,
                 standing: standing(of: participant)
             )
         }
+    }
+
+    /// Whether one participant is the reader themselves.
+    ///
+    /// **CloudKit does not name you to yourself, and does not always call you
+    /// by your own record either.** Three ways of telling, and any of them is
+    /// enough :
+    ///
+    /// - the record matches the reader's own in the container ;
+    /// - it is `__defaultOwner__`, which is the name CloudKit uses for whoever
+    ///   is asking rather than for anybody in particular ;
+    /// - the share was read out of the reader's own private database and this
+    ///   is its owner, which is the reader by construction and is true whether
+    ///   or not the container answered who they are.
+    ///
+    /// Getting this wrong is not cosmetic : it is what decides whether their
+    /// own row carries the name and the face they wrote for themselves, or
+    /// whether they turn up in their own collection as `Someone`.
+    static func isTheReader(record: String?, isOwner: Bool, isOwnShare: Bool, me: String?) -> Bool {
+        if let record, let me, record == me { return true }
+        if record == CKCurrentUserDefaultName { return true }
+        return isOwnShare && isOwner
     }
 
     /// The people in one shared collection, by the identifier their filings
@@ -93,16 +127,24 @@ nonisolated enum ShareParticipants {
         _ key: String,
         fromShareIn zoneID: CKRecordZone.ID,
         from database: CKDatabase,
-        me: String?
+        me: String?,
+        isOwnShare: Bool
     ) async throws -> [ShareMember] {
         guard let share = await share(inZone: zoneID, from: database) else {
             throw CKError(.unknownItem)
         }
-        guard let participant = share.participants.first(where: { self.key(of: $0) == key }),
+        // Never the reader themselves, so the record is the one the share
+        // states and there is nothing to resolve : the owner is refused just
+        // below, and taking anybody else out is about them and not about who
+        // is asking.
+        guard
+            let participant = share.participants.first(where: {
+                self.key(of: $0, record: $0.userIdentity.userRecordID?.recordName) == key
+            }),
             participant.role != .owner
         else {
             // Already gone, or the owner, whom the share cannot be without.
-            return roster(of: share, in: zoneID.zoneName, me: me)
+            return roster(of: share, in: zoneID.zoneName, me: me, isOwnShare: isOwnShare)
         }
 
         share.removeParticipant(participant)
@@ -112,7 +154,7 @@ nonisolated enum ShareParticipants {
         // only true once it has been saved, and the saved share is the thing
         // that says so.
         let confirmed = try saved.saveResults.values.compactMap { try $0.get() as? CKShare }.first
-        return roster(of: confirmed ?? share, in: zoneID.zoneName, me: me)
+        return roster(of: confirmed ?? share, in: zoneID.zoneName, me: me, isOwnShare: isOwnShare)
     }
 
     // MARK: - Naming one person
@@ -123,8 +165,8 @@ nonisolated enum ShareParticipants {
     /// roster and the card the person wrote themselves land on one row. Failing
     /// that the address the invitation went to, which is all there is to go on
     /// for somebody who has not accepted yet.
-    private static func key(of participant: CKShare.Participant) -> String? {
-        if let record = participant.userIdentity.userRecordID?.recordName {
+    private static func key(of participant: CKShare.Participant, record: String?) -> String? {
+        if let record {
             return SyncRecords.memberKey(forParticipantNamed: record)
         }
         if let address = participant.userIdentity.lookupInfo?.emailAddress

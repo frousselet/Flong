@@ -265,6 +265,28 @@ struct PoolTests {
         #expect(PoolAuthority.read(record, root: PoolTrust.root) == nil)
     }
 
+    /// **Nothing has to arrive for the root to be in.** The walk only ever ran
+    /// on the way in from an authority record or a vouch, and a pool on the day
+    /// its anchor is set has neither : the one person who is in without being
+    /// let in was told they were waiting for a sponsorship that cannot come,
+    /// and being unauthorised is what stops a device publishing at all.
+    @Test("The root is in without anybody having let them in")
+    func theRootIsInByConstruction() async throws {
+        #expect(!(try await store.isAuthorised(root)))
+
+        try await store.resolve()
+
+        #expect(try await store.isAuthorised(root))
+        #expect(!(try await store.isAuthorised("anybody else")))
+    }
+
+    @Test("Walking again when nothing changed changes nothing")
+    func resolvingIsIdempotent() async throws {
+        #expect(try await store.resolve())
+        #expect(!(try await store.resolve()))
+        #expect(try await store.isAuthorised(root))
+    }
+
     // MARK: - Who was let in
 
     @Test("The walk reaches whoever was brought in, however deep")
