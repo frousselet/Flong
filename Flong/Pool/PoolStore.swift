@@ -31,6 +31,18 @@ nonisolated struct PopularFeed: Hashable, Sendable, Identifiable {
     }
 }
 
+/// One address the author withholds.
+///
+/// The digest is what travels and what every device matches against ; the
+/// address is present only on the device that decided it, which is the only
+/// one that has anything to show its reader.
+nonisolated struct PoolBlock: Hashable, Sendable, Identifiable {
+    var digest: String
+    var url: String?
+
+    var id: String { digest }
+}
+
 /// The common pool, as this device holds its copy of it.
 ///
 /// **Counted here rather than asked for.** CloudKit answers questions about
@@ -65,8 +77,17 @@ nonisolated struct PoolStore: Sendable {
 
     private let database: AppDatabase
 
-    init(_ database: AppDatabase) {
+    /// Where the sponsorship graph is walked from.
+    ///
+    /// Handed in rather than read off ``PoolTrust/root`` at the point of use,
+    /// for the reason ``CloudSync`` takes its container the same way : the one
+    /// value that decides everything here is the one a test has to be able to
+    /// state. It defaults to the anchor, so nothing outside a test says it.
+    private let root: String?
+
+    init(_ database: AppDatabase, root: String? = PoolTrust.root) {
         self.database = database
+        self.root = root
     }
 
     // MARK: - What goes out
@@ -97,7 +118,13 @@ nonisolated struct PoolStore: Sendable {
         guard !lists.isEmpty else { return }
 
         try await database.writer.write { db in
+            let authorised = try Set(String.fetchAll(db, sql: "SELECT creator FROM pool_authorised"))
+
             for list in lists {
+                // A stranger's list is not stored and not counted. The pool is
+                // closed : see ``PoolTrust``.
+                guard authorised.contains(list.creator) else { continue }
+
                 try db.execute(
                     sql: """
                         INSERT INTO pool_list (record_name, creator, modified_at) VALUES (?, ?, ?)
@@ -113,10 +140,13 @@ nonisolated struct PoolStore: Sendable {
                 for feed in list.feeds {
                     try db.execute(
                         sql: """
-                            INSERT OR IGNORE INTO pool_entry (record_name, url, title, site_url)
-                            VALUES (?, ?, ?, ?)
+                            INSERT OR IGNORE INTO pool_entry (record_name, url, title, site_url, digest)
+                            VALUES (?, ?, ?, ?, ?)
                             """,
-                        arguments: [list.recordName, feed.url, feed.title, feed.siteURL]
+                        arguments: [
+                            list.recordName, feed.url, feed.title, feed.siteURL,
+                            PoolAuthority.digest(of: feed.url),
+                        ]
                     )
                 }
             }
@@ -134,23 +164,177 @@ nonisolated struct PoolStore: Sendable {
         }
     }
 
-    /// Writes the roster down, replacing whatever it held.
+    /// Writes down what the author decided, and works the graph out again.
     ///
-    /// Whole rather than merged, because a person taken off a roster has to
-    /// stop counting on the next pass and a merge would keep them for ever.
-    func setTrusted(_ creators: Set<String>) async throws {
+    /// Whole rather than merged, because a decision taken back has to stop
+    /// applying on the next pass and a merge would keep it for ever.
+    ///
+    /// **The address a block names is not stored here.** What arrives is a
+    /// digest, which is all that travels : see ``PoolAuthority/digest(of:)``.
+    /// The plain address is written only on the device that decided it, by
+    /// ``block(_:)``, so the author can read back their own list.
+    ///
+    /// Returns whether anybody new became authorised, which is the one change
+    /// that means this device has to go and fetch lists it declined before.
+    @discardableResult
+    func setAuthority(_ authority: PoolAuthority) async throws -> Bool {
         try await database.writer.write { db in
             try db.execute(sql: "DELETE FROM pool_trust")
-            for creator in creators {
+            for creator in authority.trusted {
                 try db.execute(sql: "INSERT OR IGNORE INTO pool_trust (creator) VALUES (?)", arguments: [creator])
             }
+
+            try db.execute(sql: "DELETE FROM pool_ban")
+            for creator in authority.banned {
+                try db.execute(sql: "INSERT OR IGNORE INTO pool_ban (creator) VALUES (?)", arguments: [creator])
+            }
+
+            // A digest that is already here keeps the address beside it, which
+            // only the author's own device ever wrote.
+            try db.execute(
+                sql:
+                    "DELETE FROM pool_block WHERE digest NOT IN (\(databaseQuestionMarks(count: max(authority.blocked.count, 1))))",
+                arguments: StatementArguments(authority.blocked.isEmpty ? [""] : Array(authority.blocked))
+            )
+            for digest in authority.blocked {
+                try db.execute(sql: "INSERT OR IGNORE INTO pool_block (digest) VALUES (?)", arguments: [digest])
+            }
+
+            return try Self.resolve(in: db, root: self.root)
         }
     }
 
-    /// Who the roster names, as this device last read it.
+    /// Folds in who each contributor brought into the pool.
+    ///
+    /// Returns whether the walk reaches anybody it did not reach before.
+    @discardableResult
+    func absorb(_ vouches: [PoolVouch.Received]) async throws -> Bool {
+        try await database.writer.write { db in
+            for vouch in vouches {
+                let payload = try JSONEncoder().encode(vouch.sponsored.sorted())
+                try db.execute(
+                    sql: """
+                        INSERT INTO pool_vouch (creator, sponsored, modified_at) VALUES (?, ?, ?)
+                        ON CONFLICT(creator) DO UPDATE SET sponsored = excluded.sponsored,
+                            modified_at = excluded.modified_at
+                        """,
+                    arguments: [vouch.creator, String(decoding: payload, as: UTF8.self), vouch.modifiedAt]
+                )
+            }
+            return try Self.resolve(in: db, root: self.root)
+        }
+    }
+
+    /// Walks the graph out from the root and writes down who it reaches.
+    ///
+    /// **A list whose writer is no longer reached goes with them**, in the same
+    /// breath : a ban that left the rows behind would leave the counting
+    /// unchanged until something else happened to remove them.
+    @discardableResult
+    private static func resolve(in db: Database, root: String?) throws -> Bool {
+        var vouches: [String: Set<String>] = [:]
+        for row in try Row.fetchAll(db, sql: "SELECT creator, sponsored FROM pool_vouch") {
+            guard let creator = row["creator"] as String?, let payload = row["sponsored"] as String?,
+                let names = try? JSONDecoder().decode([String].self, from: Data(payload.utf8))
+            else { continue }
+            vouches[creator] = Set(names)
+        }
+
+        let banned = try Set(String.fetchAll(db, sql: "SELECT creator FROM pool_ban"))
+        let reached = PoolTrust.authorised(from: root, vouches: vouches, banned: banned)
+        let before = try Set(String.fetchAll(db, sql: "SELECT creator FROM pool_authorised"))
+
+        guard reached != before else { return false }
+
+        try db.execute(sql: "DELETE FROM pool_authorised")
+        for creator in reached {
+            try db.execute(sql: "INSERT OR IGNORE INTO pool_authorised (creator) VALUES (?)", arguments: [creator])
+        }
+        try db.execute(sql: "DELETE FROM pool_list WHERE creator NOT IN (SELECT creator FROM pool_authorised)")
+
+        return !reached.subtracting(before).isEmpty
+    }
+
+    /// Who the author believes on their own, as this device last read it.
     func trusted() async throws -> Set<String> {
         try await database.writer.read { db in
             Set(try String.fetchAll(db, sql: "SELECT creator FROM pool_trust"))
+        }
+    }
+
+    /// Everybody the sponsorship graph reaches, as this device last walked it.
+    func authorised() async throws -> Set<String> {
+        try await database.writer.read { db in
+            Set(try String.fetchAll(db, sql: "SELECT creator FROM pool_authorised"))
+        }
+    }
+
+    /// Whether one identity may put anything into the pool.
+    func isAuthorised(_ identity: String?) async throws -> Bool {
+        guard let identity else { return false }
+        return try await database.writer.read { db in
+            try Bool.fetchOne(
+                db,
+                sql: "SELECT EXISTS (SELECT 1 FROM pool_authorised WHERE creator = ?)",
+                arguments: [identity]
+            ) ?? false
+        }
+    }
+
+    /// Who this reader brought in, as the graph last said.
+    func sponsored(by creator: String?) async throws -> Set<String> {
+        guard let creator else { return [] }
+        return try await database.writer.read { db in
+            guard
+                let payload = try String.fetchOne(
+                    db, sql: "SELECT sponsored FROM pool_vouch WHERE creator = ?", arguments: [creator])
+            else { return [] }
+            return Set((try? JSONDecoder().decode([String].self, from: Data(payload.utf8))) ?? [])
+        }
+    }
+
+    /// Who is cut out, and which addresses are withheld, for the one reader who
+    /// may say. The addresses come back in the plain where this device is the
+    /// one that decided them, and as a digest where it is not.
+    func banned() async throws -> Set<String> {
+        try await database.writer.read { db in
+            Set(try String.fetchAll(db, sql: "SELECT creator FROM pool_ban"))
+        }
+    }
+
+    func blocked() async throws -> [PoolBlock] {
+        try await database.writer.read { db in
+            try Row.fetchAll(db, sql: "SELECT digest, url FROM pool_block ORDER BY url IS NULL, url")
+                .compactMap { row in
+                    guard let digest = row["digest"] as String? else { return nil }
+                    return PoolBlock(digest: digest, url: row["url"])
+                }
+        }
+    }
+
+    /// Remembers the address behind a digest, on the device that blocked it.
+    func remember(_ address: String) async throws {
+        try await database.writer.write { db in
+            try db.execute(
+                sql:
+                    "INSERT INTO pool_block (digest, url) VALUES (?, ?) ON CONFLICT(digest) DO UPDATE SET url = excluded.url",
+                arguments: [PoolAuthority.digest(of: address), address]
+            )
+        }
+    }
+
+    /// Who offered one address, so that a ban can be aimed at somebody.
+    func offerers(of url: URL, limit: Int = 50) async throws -> [String] {
+        try await database.writer.read { db in
+            try String.fetchAll(
+                db,
+                sql: """
+                    SELECT DISTINCT l.creator FROM pool_entry e
+                    JOIN pool_list l ON l.record_name = e.record_name
+                    WHERE e.url = ? ORDER BY l.creator LIMIT ?
+                    """,
+                arguments: [url.absoluteString, limit]
+            )
         }
     }
 
@@ -174,6 +358,10 @@ nonisolated struct PoolStore: Sendable {
         try await database.writer.write { db in
             try db.execute(sql: "DELETE FROM pool_list")
             try db.execute(sql: "DELETE FROM pool_trust")
+            try db.execute(sql: "DELETE FROM pool_vouch")
+            try db.execute(sql: "DELETE FROM pool_authorised")
+            try db.execute(sql: "DELETE FROM pool_ban")
+            try db.execute(sql: "DELETE FROM pool_block")
         }
     }
 
@@ -200,8 +388,10 @@ nonisolated struct PoolStore: Sendable {
                            MAX(t.creator IS NOT NULL) AS endorsed
                     FROM pool_entry e
                     JOIN pool_list l ON l.record_name = e.record_name
+                    JOIN pool_authorised a ON a.creator = l.creator
                     LEFT JOIN pool_trust t ON t.creator = l.creator
                     WHERE NOT EXISTS (SELECT 1 FROM feed f WHERE f.url = e.url)
+                      AND NOT EXISTS (SELECT 1 FROM pool_block b WHERE b.digest = e.digest)
                     GROUP BY e.url
                     HAVING endorsed = 1 OR subscribers >= ?
                     ORDER BY endorsed DESC, subscribers DESC, url ASC

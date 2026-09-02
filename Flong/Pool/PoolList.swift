@@ -32,21 +32,31 @@ nonisolated enum PoolRecords {
     enum RecordType {
         /// One chunk of one reader's list of what they follow.
         static let list = "PoolList"
-        /// Who the author of the application says is worth believing alone.
-        static let roster = "PoolRoster"
+        /// What the author of the application decided : who is believed on
+        /// their own, who is cut out, and which addresses are never suggested.
+        static let authority = "PoolAuthority"
+        /// Who one contributor brought into the pool.
+        static let vouch = "PoolVouch"
     }
 
     enum Field {
         static let feeds = "feeds"
         static let trusted = "trusted"
+        static let banned = "banned"
+        static let blocked = "blocked"
+        static let sponsored = "sponsored"
     }
 
     static func name(forListBy contributor: UUID, chunk: Int = 0) -> String {
         "pool-" + contributor.uuidString.lowercased() + "-" + String(chunk)
     }
 
-    static func name(forRosterBy contributor: UUID) -> String {
-        "roster-" + contributor.uuidString.lowercased()
+    static func name(forAuthorityBy contributor: UUID) -> String {
+        "authority-" + contributor.uuidString.lowercased()
+    }
+
+    static func name(forVouchBy contributor: UUID) -> String {
+        "vouch-" + contributor.uuidString.lowercased()
     }
 }
 
@@ -135,75 +145,9 @@ nonisolated enum PoolList {
     /// the counting of section 8 means anything : a contributor who could write
     /// somebody else's name into a field of their own would be ten people by
     /// dinner time, and this cannot be written at all. It is also what makes
-    /// the roster below worth believing.
+    /// a sponsorship worth believing : ``PoolVouch`` says who somebody brought
+    /// in, and the sponsor is the record's creator rather than a field of it.
     static func creator(of record: CKRecord) -> String {
         record.creatorUserRecordID?.recordName ?? CKCurrentUserDefaultName
-    }
-}
-
-/// Who is believed on their own.
-///
-/// **A pool needs an answer for its first day.** Ten readers following the same
-/// source is a good signal and it is a signal that does not exist until there
-/// are readers, so a new installation would open ``PopularFeedsView`` on an
-/// empty page for as long as it took the pool to fill. The roster is the answer
-/// : a handful of people the author of the application has designated, whose
-/// offers count at once rather than counting for one.
-///
-/// **It is a record, not a constant in the source.** A list compiled into the
-/// application could only change by shipping a new one through review, which is
-/// weeks to add one person and weeks to remove one who turned out to be a bad
-/// idea. This is a record the author rewrites from the application itself.
-///
-/// **It is believed only from one writer.** The record type is readable and
-/// creatable by anybody, as everything in a public database is, so a roster is
-/// worth nothing for existing : what makes one authentic is that CloudKit says
-/// the author wrote it, and ``PoolTrust/root`` is the one identity that claim
-/// is checked against. Every other roster in the database is ignored, which is
-/// also what makes squatting the record name pointless.
-nonisolated enum PoolTrust {
-    /// The identity every roster is checked against.
-    ///
-    /// The author's own user record in the container : opaque, stable for them,
-    /// and the same value CloudKit stamps on anything they write. It is not a
-    /// secret and there is nothing to protect in it ; it is an anchor, and it
-    /// is written here rather than fetched because a fetched anchor is no
-    /// anchor at all.
-    ///
-    /// **`nil` until it is filled in**, and everything here does nothing while
-    /// it is. Nobody is trusted, no roster is believed, and the pool falls back
-    /// on the count alone, which is a pool that works and starts slowly rather
-    /// than one that is wrong. The value is the reader's own contributor
-    /// identity, which the reader's panel shows them once they contribute.
-    static let root: String? = nil
-
-    /// How many people a roster may name.
-    ///
-    /// Small on purpose. This is a handful of people the author vouches for,
-    /// and a roster of a thousand would be a directory rather than a warrant.
-    static let limit = 50
-
-    /// The roster as a record, for the one person who may write one.
-    static func record(naming creators: some Sequence<String>, by contributor: UUID) -> CKRecord {
-        let record = CKRecord(
-            recordType: PoolRecords.RecordType.roster,
-            recordID: CKRecord.ID(recordName: PoolRecords.name(forRosterBy: contributor))
-        )
-        record[PoolRecords.Field.trusted] = Array(Set(creators).sorted().prefix(limit))
-        return record
-    }
-
-    /// Who a record says is trusted, or nothing where it is not the author's.
-    static func trusted(in record: CKRecord) -> Set<String>? {
-        guard record.recordType == PoolRecords.RecordType.roster else { return nil }
-        guard let root, PoolList.creator(of: record) == root else { return nil }
-        guard let names = record[PoolRecords.Field.trusted] as? [String] else { return [] }
-        return Set(names.prefix(limit))
-    }
-
-    /// Whether this device is the one that may write a roster.
-    static func isRoot(_ identity: String?) -> Bool {
-        guard let root, let identity, !root.isEmpty else { return false }
-        return identity == root
     }
 }

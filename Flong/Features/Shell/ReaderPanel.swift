@@ -59,7 +59,9 @@ struct ReaderPanel: View {
     @State private var host = ""
     @State private var signingInTo: SigningIn?
     @State private var isAskingToDeleteEverything = false
-    @State private var trusting = ""
+    @State private var sponsoringCode = ""
+    @State private var trustingCode = ""
+    @State private var banningCode = ""
     @State private var isDeletingEverything = false
 
     #if os(iOS)
@@ -78,7 +80,8 @@ struct ReaderPanel: View {
                 whereabouts
                 appearance
                 sharing
-                if model.mayEditRoster { roster }
+                if model.isSponsoredIntoPool { sponsoring }
+                if model.mayDecideForThePool { deciding }
                 sites
 
                 #if DEBUG
@@ -373,65 +376,169 @@ struct ReaderPanel: View {
                         Label("Share", systemImage: "square.and.arrow.up")
                     }
                 }
+
+                if !model.isSponsoredIntoPool {
+                    Label {
+                        Text("Waiting for somebody to bring you in")
+                    } icon: {
+                        Image(systemName: "hourglass")
+                    }
+                    .font(theme.metadata)
+                    .foregroundStyle(.orange)
+                }
             }
         } header: {
             Text("Popular feeds")
         } footer: {
+            if model.contributesToPool == true, !model.isSponsoredIntoPool {
+                Text(
+                    "Only readers somebody has brought in can add to the list. Give your code to a reader who is already in. Nothing of yours is published until then."
+                )
+            } else {
+                Text(
+                    "Only the addresses of the sources you follow. Not your name, not an article, not a word you wrote. A secret address is never shared, nor a source behind a password. Turn this off and your list is taken back out."
+                )
+            }
+        }
+    }
+
+    /// Who this reader brought into the pool.
+    ///
+    /// **Shown to everybody who is in, and not only to the author.** The pool
+    /// grows by sponsorship rather than by one person handing out every
+    /// invitation, so this is an ordinary section of an ordinary panel for
+    /// anybody it applies to.
+    ///
+    /// The footer says what a sponsorship costs before one is made, because
+    /// cutting somebody out cuts everybody who came in through them, and
+    /// somebody vouching for a stranger should know that first.
+    private var sponsoring: some View {
+        Section {
+            ForEach(Array(model.sponsoredContributors).sorted(), id: \.self) { code in
+                contributorRow(code) {
+                    Task { await model.stopSponsoring(code) }
+                }
+            }
+
+            field($sponsoringCode, prompt: Text("Contributor code"), add: Text("Sponsor")) { code in
+                Task { await model.sponsor(code) }
+            }
+        } header: {
+            Text("Readers you brought in")
+        } footer: {
             Text(
-                "Only the addresses of the sources you follow. Not your name, not an article, not a word you wrote. A secret address is never shared, nor a source behind a password. Turn this off and your list is taken back out."
+                "They can add to the popular feeds, and bring in others themselves. If one of them is cut out, everybody they brought in goes too."
             )
         }
     }
 
-    /// Who is believed on their own, for the one reader who may say.
-    ///
-    /// **It is a section of this panel rather than a screen of its own**, and
-    /// it appears for exactly one person : the roster is only ever believed
-    /// from the author's own identity, so for everybody else this is not a
-    /// control that is disabled, it is a control that is not there.
-    private var roster: some View {
-        Section {
-            ForEach(Array(model.trustedContributors).sorted(), id: \.self) { creator in
-                Text(verbatim: creator)
-                    .font(theme.metadata)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .swipeActions {
-                        Button(role: .destructive) {
-                            Task {
-                                await model.setTrustedContributors(model.trustedContributors.subtracting([creator]))
-                            }
-                        } label: {
-                            Label("Remove", systemImage: "trash")
-                        }
+    /// What the author decided, on the one device that may decide it.
+    private var deciding: some View {
+        Group {
+            Section {
+                ForEach(Array(model.trustedContributors).sorted(), id: \.self) { creator in
+                    contributorRow(creator) {
+                        Task { await model.setTrustedContributors(model.trustedContributors.subtracting([creator])) }
                     }
+                }
+
+                field($trustingCode, prompt: Text("Contributor code"), add: Text("Trust")) { code in
+                    Task { await model.setTrustedContributors(model.trustedContributors.union([code])) }
+                }
+            } header: {
+                Text("Vouched for")
+            } footer: {
+                Text("What these readers follow is suggested straight away, without waiting for ten people.")
             }
 
-            HStack {
-                TextField(text: $trusting) {
-                    Text("Contributor code")
+            Section {
+                ForEach(Array(model.bannedContributors).sorted(), id: \.self) { creator in
+                    contributorRow(creator) {
+                        Task { await model.lift(creator) }
+                    }
                 }
+
+                field($banningCode, prompt: Text("Contributor code"), add: Text("Ban")) { code in
+                    Task { await model.ban(code) }
+                }
+            } header: {
+                Text("Cut out")
+            } footer: {
+                Text(
+                    "They can still read and use Flong. What they offer counts for nobody, and so does what everybody they brought in offers."
+                )
+            }
+
+            if !model.blockedAddresses.isEmpty {
+                Section {
+                    ForEach(model.blockedAddresses) { blocked in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: blocked.url ?? blocked.digest)
+                                .font(theme.metadata)
+                                .lineLimit(2)
+                                .truncationMode(.middle)
+                            if blocked.url == nil {
+                                Text("Withheld from another device")
+                                    .font(theme.metadata)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .swipeActions {
+                            Button(role: .destructive) {
+                                Task { await model.unblock(blocked) }
+                            } label: {
+                                Label("Allow again", systemImage: "arrow.uturn.backward")
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Withheld addresses")
+                } footer: {
+                    Text(
+                        "Never suggested, whoever follows them. Only a fingerprint of the address is published, so a private address stays private."
+                    )
+                }
+            }
+        }
+    }
+
+    /// One contributor code, and the way to take it off the list it is on.
+    private func contributorRow(_ value: String, remove: @escaping () -> Void) -> some View {
+        Text(verbatim: value)
+            .font(theme.metadata)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .swipeActions {
+                Button(role: .destructive, action: remove) {
+                    Label("Remove", systemImage: "trash")
+                }
+            }
+    }
+
+    /// A field that takes a contributor code and a button that acts on it.
+    private func field(
+        _ text: Binding<String>,
+        prompt: Text,
+        add: Text,
+        action: @escaping (String) -> Void
+    ) -> some View {
+        HStack {
+            TextField(text: text) { prompt }
                 .autocorrectionDisabled()
                 #if os(iOS)
                     .textInputAutocapitalization(.never)
                 #endif
 
-                Button {
-                    let code = trusting.trimmingCharacters(in: .whitespacesAndNewlines)
-                    trusting = ""
-                    guard !code.isEmpty else { return }
-                    Task { await model.setTrustedContributors(model.trustedContributors.union([code])) }
-                } label: {
-                    Label("Trust", systemImage: "plus")
-                        .labelStyle(.iconOnly)
-                }
-                .buttonStyle(.borderless)
-                .disabled(trusting.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            Button {
+                let code = text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                text.wrappedValue = ""
+                guard !code.isEmpty else { return }
+                action(code)
+            } label: {
+                add.font(.subheadline)
             }
-        } header: {
-            Text("Vouched for")
-        } footer: {
-            Text("What these readers follow is suggested straight away, without waiting for ten people.")
+            .buttonStyle(.borderless)
+            .disabled(text.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
     }
 

@@ -763,6 +763,51 @@ nonisolated extension AppDatabase {
             }
         }
 
+        migrator.registerMigration("v34.whoLetThemIn") { db in
+            // Who each contributor brought into the pool. One row per person,
+            // holding the codes they sponsor : the graph is small, it is read
+            // whole on every pass, and resolving it is a walk from the root.
+            try db.create(table: "pool_vouch") { table in
+                table.primaryKey("creator", .text)
+                table.column("sponsored", .jsonText).notNull()
+                table.column("modified_at", .datetime).notNull()
+            }
+
+            // Who the walk reaches, worked out after every pass and written
+            // down so the counting query can join against it rather than
+            // carrying a set of identities into SQL.
+            try db.create(table: "pool_authorised") { table in
+                table.primaryKey("creator", .text)
+            }
+
+            // Who the author cut out. Banning takes the branch with it, so
+            // this is consulted while the walk runs rather than after it.
+            try db.create(table: "pool_ban") { table in
+                table.primaryKey("creator", .text)
+            }
+
+            // Addresses that are never suggested, whoever follows them.
+            //
+            // **Kept as a digest, and the address itself only where it was
+            // decided.** One reason to block an address is that it should not
+            // have been public in the first place, and a list of forbidden
+            // addresses published in the open would broadcast exactly the
+            // thing it exists to withhold. Every device compares digests ; the
+            // author's own device keeps the plain address so they can read
+            // back what they blocked.
+            try db.create(table: "pool_block") { table in
+                table.primaryKey("digest", .text)
+                table.column("url", .text)
+            }
+
+            // What the block list is matched against, computed once on the way
+            // in rather than on every query.
+            try db.alter(table: "pool_entry") { table in
+                table.add(column: "digest", .text)
+            }
+            try db.create(index: "pool_entry_on_digest", on: "pool_entry", columns: ["digest"])
+        }
+
         return migrator
     }
 

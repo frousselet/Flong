@@ -28,6 +28,9 @@ struct PopularFeedsView: View {
     @Bindable var model: AppModel
 
     @State private var followed: Set<URL> = []
+    /// The suggestion the author is looking behind, and who offered it.
+    @State private var inspecting: PopularFeed?
+    @State private var offerers: [String] = []
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
 
@@ -36,6 +39,8 @@ struct PopularFeedsView: View {
             Form {
                 if model.contributesToPool == nil {
                     question
+                } else if model.contributesToPool == true, !model.isSponsoredIntoPool {
+                    waiting
                 }
 
                 if model.popularFeeds.isEmpty {
@@ -54,6 +59,10 @@ struct PopularFeedsView: View {
             }
         }
         .task { await model.openPopularFeeds() }
+        .sheet(item: $inspecting) { feed in
+            whoOffered(feed)
+                .themed()
+        }
         #if os(macOS)
             .frame(minWidth: 460, minHeight: 460)
         #endif
@@ -99,6 +108,36 @@ struct PopularFeedsView: View {
         } footer: {
             Text(
                 "Flong publishes the addresses of the sources you follow. Nothing else : not your name, not an article, not a word you wrote. A secret address is never shared, nor a source behind a password. You can stop whenever you like, and your list is taken back out."
+            )
+        }
+    }
+
+    /// Said here as well as in the panel, because this is where a reader is
+    /// standing when they say yes and nothing appears to happen.
+    @ViewBuilder
+    private var waiting: some View {
+        Section {
+            Label {
+                Text("Waiting for somebody to bring you in")
+            } icon: {
+                Image(systemName: "hourglass")
+            }
+            .foregroundStyle(.orange)
+
+            if let identity = model.poolIdentity {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Your contributor code")
+                    Text(verbatim: identity)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                }
+            }
+        } footer: {
+            Text(
+                "Only readers somebody has brought in can add to the list. Give your code to a reader who is already in. Nothing of yours is published until then."
             )
         }
     }
@@ -196,6 +235,74 @@ struct PopularFeedsView: View {
             .disabled(followed.contains(feed.url))
         }
         .padding(.vertical, 2)
+        .swipeActions {
+            // **Only on the author's own device.** Withholding an address and
+            // cutting somebody out are the two things nobody else may do, so
+            // for everybody else these are not disabled controls, they are
+            // controls that are not there.
+            if model.mayDecideForThePool {
+                Button(role: .destructive) {
+                    Task { await model.block(feed.url) }
+                } label: {
+                    Label("Withhold", systemImage: "eye.slash")
+                }
+
+                Button {
+                    inspecting = feed
+                } label: {
+                    Label("Who offered it", systemImage: "person.2")
+                }
+            }
+        }
+    }
+
+    /// Who offered one address, and the way to cut one of them out.
+    ///
+    /// **What makes a ban aimable.** A bad suggestion is visible ; the accounts
+    /// behind it are not, and an author who could see the one without the other
+    /// would be reduced to withholding addresses one at a time for ever.
+    private func whoOffered(_ feed: PopularFeed) -> some View {
+        NavigationStack {
+            Form {
+                Section {
+                    ForEach(offerers, id: \.self) { code in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(verbatim: code)
+                                .font(.footnote)
+                                .lineLimit(2)
+                                .truncationMode(.middle)
+                                .textSelection(.enabled)
+                        }
+                        .swipeActions {
+                            Button(role: .destructive) {
+                                Task {
+                                    await model.ban(code)
+                                    inspecting = nil
+                                }
+                            } label: {
+                                Label("Ban", systemImage: "nosign")
+                            }
+                        }
+                    }
+                } header: {
+                    Text(verbatim: feed.title)
+                } footer: {
+                    Text("Cutting one of them out also cuts everybody they brought in.")
+                }
+            }
+            .formStyle(.grouped)
+            .themedRows()
+            .navigationTitle(Text("Who offered it"))
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { inspecting = nil }
+                }
+            }
+        }
+        .task { offerers = await model.offerers(of: feed) }
+        #if os(macOS)
+            .frame(minWidth: 420, minHeight: 320)
+        #endif
     }
 
     /// What the icon loader needs, built from the row rather than from a store.

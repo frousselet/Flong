@@ -12,6 +12,8 @@ Section 1 says *there is no server, no account to create, no hosting*, and secti
 
 **What changes** is one sentence and it is a real change : a reader who says yes publishes the addresses of the sources they follow into a database that every copy of Flong can read.
 
+**The pool is closed, and reading it is not.** Anybody may see what it holds ; only somebody another member brought in may add to it. That is the answer to the question a public database always raises, which is who is accountable for what appears on the page.
+
 **What is asked before it does.** Nothing of a reader's is published until they have answered the question, and the question is asked once, on the page itself. Reading the pool never requires contributing to it : conditioning the one on the other would be extorting the consent rather than asking for it, and an extorted consent is not one section 20 could stand behind.
 
 ## What travels, and what never does
@@ -37,8 +39,9 @@ An address, a name and the site behind it. There is nowhere in the record to put
 
 | Record type | Written by | Contents |
 | ----------- | ---------- | -------- |
-| `PoolList` | every contributor | one chunk of their list of addresses, compressed |
-| `PoolRoster` | the author alone | who is believed on their own |
+| `PoolList` | every member | one chunk of their list of addresses, compressed |
+| `PoolVouch` | every member | who they brought into the pool |
+| `PoolAuthority` | the author alone | who counts alone, who is cut out, which addresses are withheld |
 
 **Named after an identifier of the reader's own making**, kept in their key-value store and therefore the same on their iPad as on their phone. Deliberately not derived from their iCloud identity : a record name in a database the whole world reads should say nothing about who wrote it, and a name nobody can work out in advance is also a name nobody can take first to stop somebody publishing.
 
@@ -56,6 +59,8 @@ WHERE NOT EXISTS (SELECT 1 FROM feed f WHERE f.url = e.url)
 GROUP BY e.url HAVING endorsed = 1 OR subscribers >= 10
 ```
 
+**Only a member counts.** The counting query joins `pool_authorised`, which is the walk written down after every pass, so a list from somebody the graph does not reach contributes nothing even in the case where it was stored before they were cut out.
+
 **A person is counted once.** The count is over `creator`, which is the `creatorUserRecordID` CloudKit stamps on every record : the server sets it and a client cannot, which is the whole reason the count means anything. A contributor able to write somebody else's name into a field of their own would be ten people by dinner time. It also means a reader with a phone and an iPad is one reader, and a list long enough to need three records is one offer.
 
 **Ten is ten Apple accounts**, not ten taps. It is not proof against somebody determined to make accounts, and it does not need to be : what is being decided is whether to show a feed address in a list of suggestions.
@@ -68,21 +73,45 @@ GROUP BY e.url HAVING endorsed = 1 OR subscribers >= 10
 
 **Bounded on the device.** Past two thousand contributors the least recently changed lists are dropped, which is the right ones to drop : a list nobody has touched in a year belongs to somebody who has stopped reading.
 
+## Who may put anything in
+
+**Sponsorship, walked on the device.** The author is in by construction. Everybody in may bring somebody else in. Each member publishes a record naming who they sponsor, CloudKit stamps that record with its writer, and every device walks out from `PoolTrust.root` and keeps whoever it reaches. A sponsorship therefore cannot be claimed on somebody else's behalf : you cannot write a record whose creator is not you.
+
+**Banning takes the branch with it.** A ban that left the banned person's own invitations standing would be no ban at all, since anybody about to be cut out would sponsor ten accounts first. Being reached means being reached through people who are all still in, so cutting one person cuts everybody who came in through them and nobody else. That is what makes a sponsorship an undertaking rather than a favour, and the interface says so under the field before anybody uses it.
+
+**Twenty each.** One member may bring in twenty people. It bounds how fast the pool can grow, keeps a sponsorship a personal act rather than a broadcast, and keeps a single careless member from opening the pool to a crowd. The cap is applied against a sorted list when a record is read, so every device agrees on which twenty.
+
+**Nothing here stops a write.** A public database takes a record from any iCloud account, and no CloudKit role can be denied to one person, so what the author holds is not the power to silence a device but the power to make what it says count for nothing, everywhere, from the next pass. Two things follow. The application declines to publish at all until it has seen itself reached, so an unsponsored reader writes nothing in the ordinary case. And a list whose writer is not reached is never stored, so a client written to misbehave costs every other reader's device nothing.
+
+**If it ever got bad enough**, the escape hatch is a console action and not a new build : move the create permission on `PoolList` from `_icloud` to a custom role. Nothing in the application changes, and the pool stops accepting writes from anybody not in that role.
+
 ## Who is believed on their own
 
-A pool needs an answer for its first day. Ten readers following the same source is a good signal and it does not exist until there are readers, so a new installation would open on an empty page for as long as it took the pool to fill. The roster is the answer : a handful of people whose offers count at once rather than counting for one.
+A closed pool starts with one member, so nothing would ever reach ten. The author's own list, and a handful of members they name, count at once rather than counting for one. It is the same record as the ban list and the withheld addresses, because they are one decision made in one place : see below.
 
-**It is a record, not a constant in the source.** A list compiled into the application could only change by shipping a new one through review, which is weeks to add one person and weeks to remove one who turned out to be a bad idea.
+## What the author decides, in one record
 
-**It is believed from exactly one writer.** Anybody may create a record of that type, as anybody may create anything in a public database, so a roster is worth nothing for existing. What makes one authentic is that CloudKit says the author wrote it : `PoolTrust.root` holds the author's own user record name, every roster in the database is checked against it, and every other one is ignored. That is also what makes squatting the record name pointless, since the roster is found by type and filtered by creator rather than fetched by name.
+`PoolAuthority` carries three lists and is believed only from `PoolTrust.root`. A device that read two of the three would be acting on half an instruction, so it is one record and one fetch.
 
-**`PoolTrust.root` ships empty**, and everything to do with the roster does nothing while it is : nobody is trusted, no roster is believed, and the pool falls back on the count alone. That is a pool that works and starts slowly rather than one that is wrong. Filling it in takes one value, obtained once :
+| Field | What it holds | What it does |
+| ----- | ------------- | ------------ |
+| `trusted` | contributor codes | their offers count at once rather than counting for one |
+| `banned` | contributor codes | cut out, along with everybody they brought in |
+| `blocked` | digests | addresses never suggested, whoever follows them |
+
+**A withheld address travels as a digest and never in the plain.** One reason to withhold an address is that it should never have been public in the first place, and a list of forbidden addresses published in the open would broadcast exactly the thing it exists to hold back. Half a SHA-256 tells addresses apart and says nothing about any of them. The consequence is that only the device that made the decision can show its reader what it withheld : the plain address is written to `pool_block` there and nowhere else, and every other device shows a digest and says so.
+
+**Aiming a ban needs a name.** A bad suggestion is visible on the page ; the accounts behind it are not. The author's own device, and no other, can open a suggestion on the list of contributor codes that offered it, and cut one of them out from there. Without that the only available repair would be withholding addresses one at a time for ever.
+
+## The anchor, and what it costs to leave it empty
+
+`PoolTrust.root` ships empty. **In a closed pool that means nobody is in at all**, so the page shows nothing until it is filled : the safe way round, and a stronger reason to fill it than when the pool was open and merely started slowly. It takes one value, obtained once :
 
 1. Turn the switch on in the reader's panel, on a device signed into the author's iCloud account.
 2. The row underneath shows the contributor code, which is that account's user record name in this container. It is opaque, it is not an Apple account identifier, and there is nothing in it to protect.
 3. Write it into `PoolTrust.root`, and ship.
 
-From then on the panel shows a roster section on that device and no other, and anybody who wants to be on it hands over their own contributor code, which their own panel shows them for the same reason.
+From then on the author's device shows the sections nobody else's does, and anybody who wants in hands their own code to a member.
 
 ## What the container needs
 
@@ -92,12 +121,14 @@ The public schema is not created by the code and has to be deployed. In the Clou
 | ----------- | ----- | ---- | ----- |
 | `PoolList` | `feeds` | Bytes | none |
 | `PoolList` | `modifiedTimestamp` | system | **queryable, sortable** |
-| `PoolRoster` | `trusted` | List of Strings | none |
-| `PoolRoster` | `recordName` | system | queryable |
+| `PoolVouch` | `sponsored` | List of Strings | none |
+| `PoolVouch` | `recordName` | system | queryable |
+| `PoolAuthority` | `trusted`, `banned`, `blocked` | List of Strings | none |
+| `PoolAuthority` | `recordName` | system | queryable |
 
 Security roles stay as CloudKit creates them : `_world` may read, `_icloud` may create, `_creator` may write and delete. World read is what lets a reader with no iCloud account see the suggestions ; creator-only write is what stops anybody from touching somebody else's list. Nothing else is granted, and in particular no role may write another's record.
 
-Both record types have to be deployed from development to production before a shipped build can see anything.
+All three record types have to be deployed from development to production before a shipped build can see anything.
 
 ## What must not go wrong
 
@@ -107,4 +138,6 @@ Both record types have to be deployed from development to production before a sh
 
 **A list that becomes a fingerprint.** It cannot be avoided and it is stated rather than tidied away : every record carries the opaque identity CloudKit stamps on it, so one reader's addresses are one list, and a list of three hundred addresses is particular to a person even when nothing in it is a name. That is what the footer under the switch says, and it is why the switch is off until somebody says otherwise. A reader who wants a source kept out of it takes that source out, one at a time, in its own editor.
 
-**A pool full of rubbish.** The threshold is the answer for the ordinary case and the majority name is the answer for a title written to be read by somebody else. Neither is proof against a determined nuisance, and the roster is what makes the page useful while the pool is small enough for one to matter.
+**A pool full of rubbish.** Four answers, in the order they apply. Nobody writes who was not brought in by somebody. Ten members still have to agree, and the majority name answers a title written to be read by somebody else. A member who abuses it is cut out along with everybody they brought in. And an address that should never be suggested is withheld whoever follows it. None of it is proof against somebody determined, and none of it needs to be : what is being decided is whether an address appears in a list of suggestions.
+
+**A sponsorship chain nobody is watching.** The cap of twenty and the branch-cutting ban bound the damage, but they do not remove the fact that a member three hops from the author can bring in somebody nobody else has heard of. That is the price of not having a server to hold a queue of approvals, and it is a deliberate trade : the pool grows without the author being a bottleneck, and the repair when it goes wrong is one ban rather than a purge.

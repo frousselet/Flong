@@ -28,7 +28,7 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **Sources you pay for stay readable.** A per-subscriber address, HTTP Basic or a token, kept in the keychain and never in the database, an export or a log.
 
-**The readers suggest sources to each other.** Beside an address and an OPML file there is a third way in : the feeds enough other readers follow. A source is suggested once ten people follow it, or once somebody vouched for does. You are asked once before anything of yours goes in, only addresses ever travel, and a source whose address is a secret, one behind a password and one carrying a parameter you marked as yours are never shared.
+**The readers suggest sources to each other.** Beside an address and an OPML file there is a third way in : the feeds enough other readers follow. Anybody can see the list ; adding to it takes an invitation, since every member can bring in twenty people and each of them answers for who they brought. A source is suggested once ten members follow it. You are asked once before anything of yours goes in, only addresses ever travel, and a source whose address is a secret, one behind a password and one carrying a parameter you marked as yours are never shared.
 
 **A collection can be shared**, through the system's own share sheet. What travels is the excerpt the feed published, never the article, because the article is not yours to hand anybody.
 

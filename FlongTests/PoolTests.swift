@@ -28,9 +28,16 @@ struct PoolTests {
     private let database: AppDatabase
     private let store: PoolStore
 
+    /// The anchor this suite walks from.
+    ///
+    /// Handed to the store rather than read off ``PoolTrust/root``, which ships
+    /// empty : a closed pool with no anchor has no members, so a suite that
+    /// could not state one could not test the counting at all.
+    private let root = "the-author"
+
     init() throws {
         database = try AppDatabase.inMemory()
-        store = PoolStore(database)
+        store = PoolStore(database, root: root)
     }
 
     // MARK: - What may be offered
@@ -210,24 +217,109 @@ struct PoolTests {
         #expect(phone == pad)
     }
 
-    @Test("Nobody is believed on their own while the anchor is unset")
-    func believesNoRosterWithoutAnAnchor() {
-        // ``PoolTrust/root`` ships empty until the author's own identity is
-        // filled in, and an unanchored roster is not a roster : anybody may
-        // write one into a public database.
-        let record = CKRecord(recordType: PoolRecords.RecordType.roster)
-        record[PoolRecords.Field.trusted] = ["_somebody"]
+    @Test("Nothing the author did not write is believed")
+    func believesNoAuthorityWithoutTheAnchor() {
+        // Anybody may create a record of that type in a public database, so an
+        // authority record is worth nothing for existing.
+        let record = CKRecord(recordType: PoolRecords.RecordType.authority)
+        record[PoolRecords.Field.trusted] = ["someone"]
 
+        #expect(PoolAuthority.read(record, root: root) == nil)
+        #expect(PoolAuthority.read(record, root: nil) == nil)
+        #expect(!PoolTrust.isRoot("someone"))
+    }
+
+    @Test("With no anchor, nobody is in at all")
+    func aClosedPoolWithNoAnchorIsEmpty() {
+        // The shipped value until the author's identity is filled in. A closed
+        // pool with no root has no members, which is the safe way round : the
+        // page shows nothing rather than showing what nobody vouched for.
         #expect(PoolTrust.root == nil)
-        #expect(PoolTrust.trusted(in: record) == nil)
-        #expect(!PoolTrust.isRoot("_somebody"))
+        #expect(PoolTrust.authorised(from: nil, vouches: ["a": ["b"]], banned: []).isEmpty)
+    }
+
+    // MARK: - Who was let in
+
+    @Test("The walk reaches whoever was brought in, however deep")
+    func sponsorshipIsTransitive() {
+        let reached = PoolTrust.authorised(
+            from: root,
+            vouches: [root: ["anne"], "anne": ["bo"], "bo": ["cy"], "nobody": ["dee"]],
+            banned: []
+        )
+        #expect(reached == [root, "anne", "bo", "cy"])
+    }
+
+    @Test("Cutting somebody out cuts everybody they brought in")
+    func banTakesTheBranch() {
+        let vouches: [String: Set<String>] = [root: ["anne", "zoe"], "anne": ["bo"], "bo": ["cy"]]
+
+        #expect(PoolTrust.authorised(from: root, vouches: vouches, banned: []).count == 5)
+
+        // The whole point : a person about to be cut out would otherwise
+        // sponsor ten accounts first and lose nothing.
+        let after = PoolTrust.authorised(from: root, vouches: vouches, banned: ["anne"])
+        #expect(after == [root, "zoe"])
+    }
+
+    @Test("Somebody reachable another way survives the ban of one sponsor")
+    func keepsASecondPath() {
+        let vouches: [String: Set<String>] = [root: ["anne", "zoe"], "anne": ["bo"], "zoe": ["bo"]]
+        let after = PoolTrust.authorised(from: root, vouches: vouches, banned: ["anne"])
+        #expect(after == [root, "zoe", "bo"])
+    }
+
+    @Test("A ring of sponsorships that never reaches the root lets nobody in")
+    func ignoresAnUnreachableRing() {
+        let reached = PoolTrust.authorised(from: root, vouches: ["a": ["b"], "b": ["a"]], banned: [])
+        #expect(reached == [root])
+    }
+
+    @Test("A cycle inside the pool is walked once and does not hang")
+    func walksACycle() {
+        let reached = PoolTrust.authorised(
+            from: root,
+            vouches: [root: ["anne"], "anne": ["bo"], "bo": ["anne", "cy"]],
+            banned: []
+        )
+        #expect(reached == [root, "anne", "bo", "cy"])
+    }
+
+    @Test("One person may only bring in so many")
+    func capsASponsorship() throws {
+        let record = PoolVouch.record(
+            sponsoring: (0..<(PoolTrust.sponsorLimit + 10)).map { "reader-\($0)" },
+            by: UUID()
+        )
+        let received = try #require(PoolVouch.received(record))
+        #expect(received.sponsored.count == PoolTrust.sponsorLimit)
+    }
+
+    @Test("The author cannot be cut out by anybody, including a stray ban")
+    func theRootStands() {
+        #expect(PoolTrust.authorised(from: root, vouches: [:], banned: [root]).isEmpty)
+        #expect(PoolTrust.authorised(from: root, vouches: [:], banned: []) == [root])
     }
 
     // MARK: - What it adds up to
 
+    /// Brings people into the pool, the shortest way : the author sponsors
+    /// them directly. Everything under this depends on it, because a closed
+    /// pool stores nothing from anybody it has not been told about.
+    ///
+    /// Additive, since one vouch record holds everybody one person brought in
+    /// and rewriting it with a single name would un-sponsor the rest.
+    private func letIn(_ creators: [String]) async throws {
+        let already = try await store.sponsored(by: root)
+        try await store.absorb([
+            PoolVouch.Received(creator: root, sponsored: already.union(creators), modifiedAt: Date())
+        ])
+    }
+
     private func offer(_ creator: String, _ urls: [String], title: String = "Example", at date: Date = Date())
         async throws
     {
+        try await letIn([creator])
         try await store.absorb([
             PoolList.Received(
                 recordName: "pool-\(creator)-0",
@@ -259,6 +351,7 @@ struct PoolTests {
     @Test("One reader with several records is one reader")
     func countsPeopleAndNotRecords() async throws {
         let url = "https://feeds.example.com/atom.xml"
+        try await letIn(["the-same-reader"])
 
         for chunk in 0..<PoolStore.threshold {
             try await store.absorb([
@@ -282,13 +375,13 @@ struct PoolTests {
         try await offer("the-author", [url])
         #expect(try await store.popular().isEmpty)
 
-        try await store.setTrusted(["the-author"])
+        try await store.setAuthority(PoolAuthority(trusted: ["the-author"]))
         let popular = try await store.popular()
         #expect(popular.count == 1)
         #expect(popular[0].isEndorsed)
 
         // Taken off the roster, and it stops counting at once.
-        try await store.setTrusted([])
+        try await store.setAuthority(PoolAuthority())
         #expect(try await store.popular().isEmpty)
     }
 
@@ -331,7 +424,7 @@ struct PoolTests {
         try await offer("reader", ["https://feeds.example.com/atom.xml", "https://feeds.example.org/rss"])
         try await offer("reader", ["https://feeds.example.org/rss"])
 
-        try await store.setTrusted(["reader"])
+        try await store.setAuthority(PoolAuthority(trusted: ["reader"]))
         let popular = try await store.popular()
         #expect(popular.map(\.url.absoluteString) == ["https://feeds.example.org/rss"])
     }
@@ -344,7 +437,7 @@ struct PoolTests {
 
         try await store.prune(to: 1)
 
-        try await store.setTrusted(["stopped-reading", "still-reading"])
+        try await store.setAuthority(PoolAuthority(trusted: ["stopped-reading", "still-reading"]))
         let popular = try await store.popular()
         #expect(popular.map(\.url.absoluteString) == ["https://feeds.example.com/atom.xml"])
     }
@@ -352,13 +445,118 @@ struct PoolTests {
     @Test("Everything the pool left here goes when everything goes")
     func forgetsEverything() async throws {
         try await offered(by: PoolStore.threshold, of: "https://feeds.example.com/atom.xml")
-        try await store.setTrusted(["somebody"])
+        try await store.setAuthority(PoolAuthority(trusted: ["somebody"]))
 
         try await store.forgetEverything()
 
         #expect(try await store.contributors() == 0)
         #expect(try await store.trusted().isEmpty)
         #expect(try await store.popular().isEmpty)
+    }
+
+    @Test("A stranger's list is not even stored")
+    func refusesAStrangersList() async throws {
+        try await store.absorb([
+            PoolList.Received(
+                recordName: "pool-stranger-0",
+                creator: "stranger",
+                modifiedAt: Date(),
+                feeds: [PooledFeed(url: "https://feeds.example.com/atom.xml", title: "Example", siteURL: nil)]
+            )
+        ])
+
+        // Not merely uncounted : absent, so an unsponsored writer costs every
+        // other reader's device nothing at all.
+        let rows = try await database.writer.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM pool_entry") ?? 0
+        }
+        #expect(rows == 0)
+        #expect(try await store.contributors() == 0)
+    }
+
+    @Test("Cutting somebody out takes their rows with it")
+    func banRemovesWhatTheyOffered() async throws {
+        let url = "https://feeds.example.com/atom.xml"
+        try await offered(by: PoolStore.threshold, of: url)
+        #expect(try await store.popular().count == 1)
+
+        try await store.setAuthority(PoolAuthority(banned: ["reader-0"]))
+
+        #expect(try await store.popular().isEmpty)
+        let contributors = try await store.contributors()
+        #expect(contributors == PoolStore.threshold - 1)
+    }
+
+    @Test("Somebody being let in is reported, so the lists can be asked for again")
+    func reportsThatTheGraphGrew() async throws {
+        let grew = try await store.absorb([
+            PoolVouch.Received(creator: root, sponsored: ["anne"], modifiedAt: Date())
+        ])
+        #expect(grew)
+
+        // The same sponsorship again reaches nobody new, so nothing has to be
+        // fetched a second time.
+        let again = try await store.absorb([
+            PoolVouch.Received(creator: root, sponsored: ["anne"], modifiedAt: Date())
+        ])
+        #expect(!again)
+    }
+
+    @Test("A withheld address is never suggested, whoever follows it")
+    func withholdsAnAddress() async throws {
+        let url = "https://feeds.example.com/atom.xml"
+        try await offered(by: PoolStore.threshold, of: url)
+        #expect(try await store.popular().count == 1)
+
+        try await store.setAuthority(PoolAuthority(blocked: [PoolAuthority.digest(of: url)]))
+        #expect(try await store.popular().isEmpty)
+
+        // And it comes back when the decision is taken back.
+        try await store.setAuthority(PoolAuthority())
+        #expect(try await store.popular().count == 1)
+    }
+
+    @Test("What travels about a withheld address says nothing about it")
+    func withholdsWithoutPublishing() throws {
+        let secret = "https://feeds.example.com/private/2f8a9c/atom.xml"
+        let authority = PoolAuthority(blocked: [PoolAuthority.digest(of: secret)])
+        let record = PoolAuthority.record(authority, by: UUID())
+
+        // The reason it is a digest : one reason to withhold an address is
+        // that it should never have been public, and a list of forbidden
+        // addresses would publish it to everybody.
+        let published = (record[PoolRecords.Field.blocked] as? [String] ?? []).joined()
+        #expect(!published.contains("example.com"))
+        #expect(!published.contains("2f8a9c"))
+        #expect(published == PoolAuthority.digest(of: secret))
+    }
+
+    @Test("The author's own device remembers what it withheld")
+    func remembersTheAddressItWithheld() async throws {
+        let address = "https://feeds.example.com/atom.xml"
+        try await store.remember(address)
+        try await store.setAuthority(PoolAuthority(blocked: [PoolAuthority.digest(of: address)]))
+
+        let blocked = try await store.blocked()
+        #expect(blocked.count == 1)
+        #expect(blocked[0].url == address)
+
+        // A device that only heard the digest has nothing to show but the
+        // digest, which is the whole point.
+        let other = PoolStore(try AppDatabase.inMemory(), root: root)
+        try await other.setAuthority(PoolAuthority(blocked: [PoolAuthority.digest(of: address)]))
+        let elsewhere = try await other.blocked()
+        #expect(elsewhere.count == 1)
+        #expect(elsewhere[0].url == nil)
+    }
+
+    @Test("Who offered an address is answerable, so a ban can be aimed")
+    func saysWhoOfferedIt() async throws {
+        let url = "https://feeds.example.com/atom.xml"
+        try await offered(by: 3, of: url)
+
+        let offerers = try await store.offerers(of: URL(string: url)!)
+        #expect(offerers.sorted() == ["reader-0", "reader-1", "reader-2"])
     }
 
     // MARK: - What this device offers
