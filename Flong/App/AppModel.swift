@@ -177,6 +177,20 @@ nonisolated enum CatchUp: Hashable, Sendable {
 /// One object for one window : the three levels of section 16 of the
 /// specification move together, and splitting them would mean keeping three
 /// copies of the same selection in step.
+/// One thing the search field offers above the keyboard.
+///
+/// **Two strings and not one.** The pill says what is being added and the
+/// field takes the whole query ; a single string would have every pill
+/// reciting back at the reader what they have already typed.
+nonisolated struct SearchOffer: Identifiable, Hashable, Sendable {
+    /// What is written on the pill.
+    let fragment: String
+    /// What the field holds once the pill is taken.
+    let query: String
+
+    var id: String { query }
+}
+
 @Observable
 final class AppModel {
     private let database: AppDatabase
@@ -801,6 +815,48 @@ final class AppModel {
 
     private var search: Task<Void, Never>?
 
+    /// What the reader has looked for before, newest first.
+    ///
+    /// **Kept because a query is worth keeping.** A word typed into a box is
+    /// not worth a list ; a sentence with a field, a state and a date in it is
+    /// something the reader worked out, and a search screen that opened on
+    /// nothing would make them work it out again. Written through
+    /// ``Preferences``, so it is the same list on their other devices.
+    private(set) var recentSearches: [String] = []
+
+    /// Keeps what the reader just searched for.
+    ///
+    /// Newest first, and without repeats : a query run again moves to the top
+    /// rather than appearing twice. Matched without regard to case or to the
+    /// spaces around it, since `is:unread` and `IS:UNREAD ` are one search and
+    /// the reader would rightly call two rows a bug.
+    ///
+    /// A query that says nothing is not one : an empty field, or a field
+    /// holding only whitespace, is not a search that was made.
+    func remember(_ query: String) {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return }
+
+        var kept = recentSearches.filter { $0.compare(query, options: .caseInsensitive) != .orderedSame }
+        kept.insert(query, at: 0)
+        recentSearches = Array(kept.prefix(Preferences.recentSearchLimit))
+        preferences.recentSearches = recentSearches
+    }
+
+    /// Drops one search from the list, because the reader said so.
+    func forget(search query: String) {
+        recentSearches.removeAll { $0 == query }
+        preferences.recentSearches = recentSearches
+    }
+
+    /// Drops the lot, which is the one control a list of past searches owes
+    /// the person whose searches they were.
+    func forgetSearches() {
+        guard !recentSearches.isEmpty else { return }
+        recentSearches = []
+        preferences.recentSearches = []
+    }
+
     /// The query as it is understood, or `nil` when the field is empty.
     var query: QueryNode? {
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -810,11 +866,50 @@ final class AppModel {
         return node == .all ? nil : node
     }
 
-    /// What to offer while a query is being typed.
+    /// What the field offers above the keyboard.
     ///
-    /// Section 12 asks for completion of feed and tag names, which are the two
-    /// things nobody remembers the exact spelling of.
-    var searchSuggestions: [String] {
+    /// **Completions where there is a word to complete, the grammar
+    /// otherwise.** A reader who has typed `feed:` is asking which sources
+    /// there are and gets their names ; a reader who has typed nothing is
+    /// asking about no field in particular, and what helps them is the handful
+    /// of words the language is made of. Taking one of those puts it in the
+    /// field, which is what then produces the completions : the two halves are
+    /// one ladder rather than two lists.
+    ///
+    /// Every offer carries what is already in the field in front of it, so
+    /// taking one narrows the query rather than replacing it.
+    var searchOffers: [SearchOffer] {
+        let completions = searchCompletions
+        guard completions.isEmpty else { return completions }
+
+        let text = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let prefix = text.isEmpty ? "" : text + " "
+
+        var fragments = Self.states
+        if !feedTitles.isEmpty { fragments.append("feed:") }
+        if !tagPaths.isEmpty { fragments.append("tag:") }
+        fragments += ["author:", "title:"]
+
+        // A word already in the query is not worth offering again : a reader
+        // who asked for the unread ones does not need telling twice.
+        return
+            fragments
+            .filter { !text.localizedCaseInsensitiveContains($0) }
+            .map { SearchOffer(fragment: $0, query: prefix + $0) }
+    }
+
+    /// The states a reader reaches for, in the order they reach for them.
+    ///
+    /// Three of the eight section 12 defines. This is what fits above a
+    /// keyboard, and the other five are reachable by typing them, which is the
+    /// point of having a grammar rather than a row of buttons.
+    private static let states = ["is:unread", "is:starred", "has:media"]
+
+    /// Completion of the feed or tag name being typed.
+    ///
+    /// Section 12 asks for it, and those are the two things nobody remembers
+    /// the exact spelling of.
+    private var searchCompletions: [SearchOffer] {
         guard let last = searchText.split(separator: " ").last.map(String.init) else { return [] }
 
         let names: [String]
@@ -831,7 +926,8 @@ final class AppModel {
         let field = last.prefix(while: { $0 != ":" })
         return names.map { name in
             let value = name.contains(" ") ? "\"\(name)\"" : name
-            return prefix + field + ":" + value
+            let fragment = field + ":" + value
+            return SearchOffer(fragment: String(fragment), query: prefix + fragment)
         }
     }
 
@@ -888,6 +984,7 @@ final class AppModel {
         self.lastName = preferences.lastName
         self.picture = preferences.picture.flatMap(ProfilePicture.image)
         self.place = preferences.place
+        self.recentSearches = preferences.recentSearches
         let subscriptions = SubscriptionStore(database)
         self.subscriptions = subscriptions
         let articles = ArticleStore(database)
@@ -1059,6 +1156,7 @@ final class AppModel {
         preferences.synchronize()
         articleBody = preferences.articleBody
         theme = preferences.theme
+        recentSearches = preferences.recentSearches
         loadProfile()
         await countOutstandingWork()
     }
@@ -1932,6 +2030,7 @@ final class AppModel {
         articleBody = .feed
         theme = .standard
         wantsNewStoryNotices = false
+        forgetSearches()
         preferences.forgetEverything()
 
         forgetWhatIsShown()

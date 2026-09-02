@@ -38,6 +38,10 @@ Words next to each other are joined by an implicit `AND`, which is what everyone
 
 **The syntax of FreshRSS keeps working.** `intitle:`, `intext:`, `inurl:`, `label:` and `is:favorite` are translated before parsing, so a search carried over from another reader does not quietly return nothing. A word that merely looks like an operator, `intitles`, is left alone.
 
+## What the field offers
+
+Completion of feed and tag names where there is a name being typed, and the grammar itself where there is not. `docs/technical/interface.md` sets out the screen : the pills above the keyboard, the searches the reader ran before, and why arriving in the section is what puts the cursor in the field.
+
 ## Compiling
 
 The tree becomes one SQL condition over the article and its feed.

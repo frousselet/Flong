@@ -266,6 +266,24 @@ Notes and the months are in neither menu. An article joins notes by being writte
 
 **A heading takes the colour of the mark beside it.** The live band is the one place on the page with a colour of its own, and the dot and the word are one mark : the word is set in the dot's colour at the quiet end of its pulse, so the dot stays the loud half and the pair reads as one thing. Both come from `LiveDot`, named rather than written twice, since two literals that happen to agree today are two literals that stop agreeing the first time one of them is changed.
 
+## Searching, and what was searched before
+
+The section is built the way Photos builds its own, because the shape is right and because the system already draws half of it. The reader arrives, the cursor is already in the field, the keyboard is up, and the page under it is about searching rather than about articles : what they looked for before, and above the keyboard the words the language is made of. Nothing there lists the whole stream, which the two sections beside it already do and which nobody opened the search tab to read.
+
+**Arriving is not appearing.** A tab is built once and kept, so `onAppear` fires on the first visit and on no other, while a reader enters this section every time they tap the magnifying glass. The screen is told whether it is the current one and puts the cursor in the field whenever that becomes true, after a pause long enough for the system to have installed the field : focus asked for in the same turn lands on a field that is not on screen yet and is quietly dropped.
+
+**The section says its own name.** The system hides the navigation bar for as long as a search field is presented, and this field is presented from the moment the reader arrives, so `navigationTitle` alone would leave the top of the page empty. The name is drawn in the content on iOS and left to the toolbar on the Mac, where the field lives in the toolbar and the window says its own name. It is the noun in French, `Recherche`, where the field asks with the verb : English has one word for both and the catalog carries two.
+
+**What is offered above the keyboard is one ladder, not two lists.** A reader who has typed `feed:` is asking which sources there are and gets their names ; a reader who has typed nothing is asking about no field in particular and gets the handful of words the language is made of, `is:unread`, `is:starred`, `has:media`, then the fields there is anything to complete. Taking one of those puts it in the field, which is what then produces the completions. Every offer carries what is already typed in front of it, so taking one narrows the query rather than replacing it, and a word the query already holds is not offered again.
+
+The pills wear the ground a card takes rather than glass. They sit directly under the search field, which is glass, and glass under glass is the stacking the guidance forbids outright. The result count wears the same ground, in a capsule of its own : the page scrolls under the bottom safe area, and a count with headlines passing sharply through it is not a count anybody can read.
+
+**A query is worth remembering, a word is not.** A word typed into a box needs no list ; a sentence with a field, a state and a date in it is something the reader worked out, and a search screen that opened on nothing would make them work it out again. Ten are kept, newest first, matched without regard to case or to the spaces around them so that one search is one row. The whole row runs it again and the cross at the end drops it, two controls rather than a swipe, since this is a stack of rows in a scroll view and a gesture nothing announces is a gesture nobody finds. `Effacer` drops the lot, which is the one control a list of somebody's past searches owes them.
+
+They travel with the other preferences, in the iCloud key-value store rather than in the record budget : a reader who worked a query out on the Mac should not have to work it out again on the phone. `docs/technical/erasure.md` covers what a reset does to them, which is the same thing it does to every other choice.
+
+**Remembered on submit and on opening a result.** Results follow what is typed, so a reader who finds what they wanted never presses return, and a list fed by the return key alone would stay empty for exactly the readers it is for.
+
 ## The sources, grouped by publisher
 
 **There is nothing to make, and that is the whole change.** The sources list was a folder tree, and no screen in Flong ever let a reader plant one : the only folders that existed came out of an imported OPML file, so the organization on the page was somebody else's, inherited and untendable. A group is every feed served from one address, worked out from the addresses themselves. It is right the moment a subscription lands, it cannot go stale, and it does not survive the last of its feeds.

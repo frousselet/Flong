@@ -132,7 +132,12 @@ struct AppShell: View {
 
             Tab(value: AppSection.search, role: .search) {
                 stack($searchPath) {
-                    SearchScreen(model: model, zoom: zoom, menu: opening($searchPath)) {
+                    SearchScreen(
+                        model: model,
+                        zoom: zoom,
+                        isCurrent: section == .search,
+                        menu: opening($searchPath)
+                    ) {
                         reading = Reading(id: $0)
                     }
                 }
