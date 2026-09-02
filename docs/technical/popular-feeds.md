@@ -103,15 +103,19 @@ A closed pool starts with one member, so nothing would ever reach ten. The autho
 
 **Aiming a ban needs a name.** A bad suggestion is visible on the page ; the accounts behind it are not. The author's own device, and no other, can open a suggestion on the list of contributor codes that offered it, and cut one of them out from there. Without that the only available repair would be withholding addresses one at a time for ever.
 
-## The anchor, and what it costs to leave it empty
+## The anchor, and why it is written in the open
 
-`PoolTrust.root` ships empty. **In a closed pool that means nobody is in at all**, so the page shows nothing until it is filled : the safe way round, and a stronger reason to fill it than when the pool was open and merely started slowly. It takes one value, obtained once :
+`PoolTrust.root` is set. It is the author's own contributor code : that account's user record name in this container, which is what CloudKit stamps on anything they write. It was obtained once, the way anybody obtains theirs : turn the switch on in the reader's panel on a device signed into that account, and read the row underneath.
 
-1. Turn the switch on in the reader's panel, on a device signed into the author's iCloud account.
-2. The row underneath shows the contributor code, which is that account's user record name in this container. It is opaque, it is not an Apple account identifier, and there is nothing in it to protect.
-3. Write it into `PoolTrust.root`, and ship.
+**It ships in the binary and that is not a leak.** It is compiled into every copy of the application, so it is on every device that installs one and can be read out of the binary by anybody who cares to. An anchor that were secret would be no anchor : every device has to know where the walk starts, or the walk cannot happen on the device, which is the whole shape of this.
 
-From then on the author's device shows the sections nobody else's does, and anybody who wants in hands their own code to a member.
+**Nothing authorises anybody for presenting it.** Every trust decision here reads `CKRecord.creatorUserRecordID`, which the server stamps and no client can write : `PoolAuthority.read` refuses a record whose creator is not the root, and `PoolVouch` takes the sponsor from the creator and never from a field. So knowing the string lets nobody sponsor, ban, block or vouch for anything, and a record claiming to be the author's is worth nothing for saying so. It is also not an Apple account identifier : it is opaque, it is scoped to this container alone, and it carries no name, no address and nothing about the same account anywhere else.
+
+**What it does cost** is that it is fixed for every copy already shipped. Moving the anchor is a new version, and the copies out there keep walking from the old one, which for a closed pool means their page empties rather than fills with the wrong thing. That is the safe way round, and it is the reason to set it once and leave it.
+
+**`nil` is still what safety looks like.** In a closed pool it means nobody is in at all, so a build with no anchor shows nothing rather than showing what nobody vouched for.
+
+From here on the author's device shows the sections nobody else's does, and anybody who wants in hands their own code to a member.
 
 ## What the container needs
 

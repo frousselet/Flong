@@ -231,11 +231,38 @@ struct PoolTests {
 
     @Test("With no anchor, nobody is in at all")
     func aClosedPoolWithNoAnchorIsEmpty() {
-        // The shipped value until the author's identity is filled in. A closed
-        // pool with no root has no members, which is the safe way round : the
-        // page shows nothing rather than showing what nobody vouched for.
-        #expect(PoolTrust.root == nil)
+        // The safe way round, and what shipped until the anchor was filled in :
+        // a closed pool with no root has no members, so the page shows nothing
+        // rather than showing what nobody vouched for.
         #expect(PoolTrust.authorised(from: nil, vouches: ["a": ["b"]], banned: []).isEmpty)
+        #expect(PoolTrust.authorised(from: "", vouches: ["a": ["b"]], banned: []).isEmpty)
+    }
+
+    /// It is compiled into every copy of the application and can be read out of
+    /// the binary, which is why nothing may authorise anybody for presenting
+    /// it : see the record's creator, below.
+    @Test("The anchor is set, and it is one account in the container")
+    func theAnchorIsSet() {
+        #expect(PoolTrust.root?.hasPrefix("_") == true)
+        #expect(PoolTrust.isRoot(PoolTrust.root))
+        #expect(!PoolTrust.isRoot("someone else"))
+        #expect(!PoolTrust.isRoot(nil))
+    }
+
+    /// **The whole of why the anchor may be public.** A record claiming to be
+    /// the author's is worth nothing for saying so : what makes one authentic
+    /// is that CloudKit says who wrote it, and a client cannot write that.
+    @Test("Knowing the anchor does not let anybody write as it")
+    func theAnchorIsNotACredential() {
+        let record = CKRecord(
+            recordType: PoolRecords.RecordType.authority,
+            recordID: CKRecord.ID(recordName: "authority-" + UUID().uuidString.lowercased())
+        )
+        record[PoolRecords.Field.banned] = [root]
+
+        // Made here, so it carries no creator the server set. Against the real
+        // anchor it is not the author's, and it says nothing to anybody.
+        #expect(PoolAuthority.read(record, root: PoolTrust.root) == nil)
     }
 
     // MARK: - Who was let in
