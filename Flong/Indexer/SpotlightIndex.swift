@@ -171,7 +171,10 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
     /// back afterwards by whoever is holding it.
     func rebuild() async throws {
         guard Self.isAvailable else { return }
-        try await rebuild(against: articles.choices())
+
+        try await IndexBatches.shared.alone {
+            try await rebuild(against: articles.choices())
+        }
     }
 
     /// Rebuilds only when Spotlight and the store disagree about what it holds.
@@ -188,11 +191,18 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
     func rebuildIfNeeded() async throws -> Bool {
         guard Self.isAvailable else { return false }
 
-        let choices = try await articles.choices()
-        guard try await lastState() != Self.state(of: choices) else { return false }
+        // **The decision is taken inside the gate and not before it.** Two
+        // callers deciding at once would both decide yes, and the second would
+        // then write the whole index again over an index that had just been
+        // written. Inside, the second reads the state the first left and says
+        // no, which is the answer it should have given.
+        return try await IndexBatches.shared.alone {
+            let choices = try await articles.choices()
+            guard try await lastState() != Self.state(of: choices) else { return false }
 
-        try await rebuild(against: choices)
-        return true
+            try await rebuild(against: choices)
+            return true
+        }
     }
 
     /// Empties the index and writes the chosen articles back into it.
@@ -341,5 +351,46 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
                 }
             }
         }
+    }
+}
+
+/// One rebuild of the index at a time, whoever asked for it.
+///
+/// **`beginBatch()` on an index that already has one open throws an
+/// Objective-C exception, and an Objective-C exception is not a Swift error :
+/// it terminates the process.** The same reason a named index is used rather
+/// than the shared one, one paragraph up, and the same lack of a `catch` to put
+/// round it. What is left is not letting it happen.
+///
+/// **Two rebuilds overlap easily.** The window asks for one when it opens, a
+/// catch-up that brought articles asks for another, and singling out a source,
+/// a writer or a newsmaker asks for one apiece. Every one of those is an
+/// `await` on the main actor, and awaits interleave : `SpotlightIndex` is a
+/// value, `CSSearchableIndex` behind it is not, and nothing in between was
+/// holding anybody back. It was caught by a test run dying rather than by a
+/// reader, which is luck rather than design.
+///
+/// The queue is a chain of tasks rather than a lock : each caller waits on
+/// whatever was queued before it, and the tail forgets both the result and the
+/// failure, since what the next caller is waiting for is the index being free
+/// and not what the last one made of it.
+///
+/// Not private, so the one property that matters can be tested without going
+/// anywhere near a real `CSSearchableIndex` : a test that reproduced the crash
+/// would be a test that terminates the process it runs in.
+actor IndexBatches {
+    static let shared = IndexBatches()
+
+    private var tail: Task<Void, Never>?
+
+    func alone<Answer: Sendable>(_ work: @Sendable @escaping () async throws -> Answer) async throws -> Answer {
+        let queued = tail
+        let mine = Task {
+            await queued?.value
+            return try await work()
+        }
+        tail = Task { _ = try? await mine.value }
+
+        return try await mine.value
     }
 }
