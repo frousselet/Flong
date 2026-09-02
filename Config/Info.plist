@@ -2,6 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Without this, the system cannot route a CloudKit share link to Flong :
+	     it looks the application up in the App Store instead, and a recipient
+	     tapping an invitation is told they need a newer version that does not
+	     exist. It is what declares that this application accepts a share at
+	     all, and `ShareAcceptance` is what it hands the share to. -->
+	<key>CKSharingSupported</key>
+	<true/>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>com.rslt.Flong.refresh</string>

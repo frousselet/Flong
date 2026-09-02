@@ -1495,6 +1495,16 @@
         }
       }
     },
+    "This site left no session. Sign in on its page, then say so. A sign-in with a passkey cannot finish here : choose another method on the site." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce site n'a laissé aucune session. Connectez-vous sur sa page, puis dites-le. Une connexion par clé d'accès ne peut pas aboutir ici : choisissez une autre méthode sur le site."
+          }
+        }
+      }
+    },
     "What named them has been purged, or has not arrived yet." : {
       "localizations" : {
         "fr" : {
@@ -3580,16 +3590,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce mois-ci"
-          }
-        }
-      }
-    },
-    "This site left no session. Sign in on its page, then say so." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce site n'a laissé aucune session. Connectez-vous sur sa page, puis dites-le."
           }
         }
       }
