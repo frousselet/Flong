@@ -297,6 +297,26 @@ nonisolated struct DigestStore: Sendable {
         let summary: String?
         /// The newsrooms covering it, in the order they picked it up.
         let rooms: [String]
+        /// The picture of the latest article in it to carry one, which is the
+        /// picture the front page puts the story under.
+        ///
+        /// The same rule as ``DigestStory/imageURL`` and for the same reason :
+        /// a story is shown for where it has got to rather than for where it
+        /// started, and a notice that showed a different picture from the page
+        /// it opens would be about a different story as far as the reader can
+        /// tell.
+        let picture: URL?
+
+        /// Written out rather than left to the memberwise one, so that the
+        /// picture is optional at the call site : most stories are announced
+        /// before any newsroom has put a photograph on one.
+        init(id: UUID, title: String, summary: String?, rooms: [String], picture: URL? = nil) {
+            self.id = id
+            self.title = title
+            self.summary = summary
+            self.rooms = rooms
+            self.picture = picture
+        }
     }
 
     /// The stories opened since a moment, oldest first.
@@ -336,6 +356,7 @@ nonisolated struct DigestStore: Sendable {
                 sql: """
                     SELECT m.story_id AS story_id, f.title AS feed_title,
                            f.site_url AS site_url, f.url AS feed_url,
+                           e.image_url AS image_url,
                            COALESCE(e.published_at, e.received_at) AS date
                     FROM story_member m
                     JOIN entry e ON e.id = m.entry_id
@@ -350,6 +371,7 @@ nonisolated struct DigestStore: Sendable {
 
             var rooms: [UUID: [String]] = [:]
             var counts: [UUID: Int] = [:]
+            var pictures: [UUID: URL] = [:]
             for row in members {
                 let room =
                     FeedURL.publisher(
@@ -358,6 +380,14 @@ nonisolated struct DigestStore: Sendable {
                     ) ?? (row["feed_title"] as String)
                 let id = row["story_id"] as UUID
                 counts[id, default: 0] += 1
+
+                // The rows arrive oldest first, so the last one to state a
+                // picture is the newest that has one : the same article the
+                // front page takes the story's photograph from.
+                if let picture = (row["image_url"] as String?).flatMap(URL.init(string:)) {
+                    pictures[id] = picture
+                }
+
                 guard !(rooms[id] ?? []).contains(room) else { continue }
                 rooms[id, default: []].append(room)
             }
@@ -368,7 +398,13 @@ nonisolated struct DigestStore: Sendable {
                 stories
                 .filter { (counts[$0.id] ?? 0) > 1 }
                 .map {
-                    Opened(id: $0.id, title: $0.title, summary: $0.summary, rooms: rooms[$0.id] ?? [])
+                    Opened(
+                        id: $0.id,
+                        title: $0.title,
+                        summary: $0.summary,
+                        rooms: rooms[$0.id] ?? [],
+                        picture: pictures[$0.id]
+                    )
                 }
         }
     }

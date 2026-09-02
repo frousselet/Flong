@@ -756,13 +756,21 @@ nonisolated struct ArticleStore: Sendable {
     /// source or of whoever signed it.
     ///
     /// What a notice needs and nothing else : what to say, what to say it came
-    /// from, and where a tap lands. A summary would carry an excerpt, a picture
-    /// and a read state, none of which a notification has anywhere to put.
+    /// from, the picture to say it beside, and where a tap lands. A summary
+    /// would carry an excerpt and a read state on top of that, neither of which
+    /// a notification has anywhere to put.
     nonisolated struct Arrival: Identifiable, Hashable, Sendable {
         let id: UUID
         let title: String
         /// What the source is called.
         let source: String
+        /// The picture that stands for the article, when it has one.
+        ///
+        /// The address the feed stated or the one read out of the body, which
+        /// is the same picture the row in the list carries : a notice showing
+        /// one thing and the article it opens showing another would be two
+        /// articles as far as the reader can tell.
+        let picture: URL?
         /// The writer the reader asked about who signed it, when that is why it
         /// is here at all.
         ///
@@ -793,10 +801,18 @@ nonisolated struct ArticleStore: Sendable {
         /// Written out rather than left to the memberwise one, so that the two
         /// people are optional at the call site : an arrival brought in by its
         /// source names neither, which is the ordinary case.
-        init(id: UUID, title: String, source: String, author: String? = nil, newsmaker: String? = nil) {
+        init(
+            id: UUID,
+            title: String,
+            source: String,
+            picture: URL? = nil,
+            author: String? = nil,
+            newsmaker: String? = nil
+        ) {
             self.id = id
             self.title = title
             self.source = source
+            self.picture = picture
             self.author = author
             self.newsmaker = newsmaker
         }
@@ -831,6 +847,7 @@ nonisolated struct ArticleStore: Sendable {
                 db,
                 sql: """
                     SELECT e.id AS id, e.title AS title, f.title AS source,
+                           e.image_url AS image_url,
                            (SELECT a.name FROM entry_author a
                             JOIN notified_author n ON n.name = a.name
                             WHERE a.entry_id = e.id
@@ -869,6 +886,7 @@ nonisolated struct ArticleStore: Sendable {
                     id: row["id"],
                     title: row["title"],
                     source: row["source"] ?? "",
+                    picture: (row["image_url"] as String?).flatMap(URL.init(string:)),
                     author: row["author"],
                     newsmaker: row["newsmaker"]
                 )

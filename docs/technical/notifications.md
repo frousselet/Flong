@@ -116,6 +116,24 @@ The notifications panel lists the writers beside the sources, in one list and no
 
 **When a thing arrived is not changed by somebody editing their list.** A participant's list is rewritten whole every time any of it changes, so the moment a row turned up here has to survive that rewrite : without it, an article that had been here a week would be stamped as new the moment its filer added something else, and announced all over again. `SharedEntryStore.replace` reads the existing arrival times and keeps them.
 
+## The picture
+
+A notice carrying the article's own photograph is the article ; the same notice without it is a line of text. The system draws the attachment as a thumbnail beside the two lines and full width when the notice is pulled open, and the reader recognizes the piece before they have read the headline.
+
+**Only where the notice is about one thing.** The picture sits beside `story` and `article` in `Announcement` and follows the same rule they do : the cover of the first of five articles is a claim about the other four, and a notice counting several has nothing it could show. A story takes the picture of the latest article in it to carry one, which is exactly what the front page puts the story under ; a notice showing a different picture from the page it opens would be about a different story as far as the reader can tell.
+
+**An address here, bytes over there.** `Announcement` is a sentence written from names and stays testable without a network, so it carries the address and nothing else. `NotificationPicture` is the step to something the system will take : the attachment wants a file, so the picture has to be fetched, decoded and written to disk before a notification can hold it.
+
+**Fetched at the moment of posting, and not before.** `Notifier.post` is the one place that knows a notice is really going out : everything upstream stops for a reader who is looking at the page it would be about, and asking a publisher for a photograph nobody will be shown is a request for nothing.
+
+**One request per notice, and usually none.** It goes through `ImageStore`, so a picture the article list has already shown costs nothing, and the one fetched here is in hand by the time the reader taps through. The politeness of `docs/technical/fetching.md` applies unchanged : the same identifying user agent, the same body cap, the same cache.
+
+**Re-encoded rather than passed through.** Publishers serve WebP and AVIF now, and a notification attachment is one of the handful of types the system will draw. The bytes are decoded by the time they get here, so writing them back out costs one encode and removes the question : JPEG for a photograph, PNG for anything carrying transparency, since a logo on nothing written as JPEG comes out on a black square.
+
+**The file is put away after the request is added.** The system takes its own copy of an attachment and leaves the one it was given exactly where it found it, so a notice an hour would be a photograph left in `tmp` an hour. `Notifier.post` holds the address it was written to and throws the file out once the notification has been handed over, which is right whether the system copied it or moved it.
+
+**A picture that fails is a notice without one.** Every step answers `nil` rather than throwing, and none of it is worth telling the reader about : a notice missing its photograph is still the notice, and one held back because a publisher's server was slow is nothing at all.
+
 ## Where it happens
 
 The digest is rebuilt wherever articles arrive : at launch, on the clock, on returning to the foreground, on the reader's own command, in the opportunistic background refresh and in the full pass. Only the background ones are moments the reader is not looking, and they are what this exists for.
@@ -135,5 +153,7 @@ What that buys is coverage of everything that can actually be wrong : the wordin
 For a writer it buys the guarantee that matters most : that an article from a source that announces, signed by a writer who is asked about, is announced once and not twice, which is a property of the query rather than of the wording. And that a byline naming several people answers for the one the reader asked about.
 
 For a source's own articles it buys the same : the wording for one article, for several from one source and for several from several, which articles count as new, that what arrived here is what is asked about rather than what is dated today, that what is read, hidden or a second copy is left out, that a refusal leaves the source alone rather than saving a switch that can never fire, and that a decision arriving from another device does not announce that source's backlog.
+
+For the picture it buys the part that is not the network : that the notice about one thing carries an address and the notice about several carries none, that a story takes the latest photograph in it rather than the first, that an arrival carries the same address the row in the list does, which type the bytes are written as, and that an address that is not the web never becomes a request. What is left is the fetch and the system's own drawing, which is the same seam as everywhere else here.
 
 The prompt itself was checked by hand, on the simulator, outside XCUITest : XCUITest does not surface the notification permission alert at all, and a test that waits for it waits for ever.

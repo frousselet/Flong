@@ -63,11 +63,31 @@ struct Notifier: Announcing {
     }
 
     /// Says one thing, now.
+    ///
+    /// The picture is fetched here rather than earlier because this is the one
+    /// place that knows a notice is really going to be posted : everything
+    /// upstream stops for a reader who is looking at the page, and asking a
+    /// publisher for a photograph nobody will be shown is a request for
+    /// nothing. See ``NotificationPicture``.
     func post(_ announcement: Announcement) async {
         let content = UNMutableNotificationContent()
         content.title = announcement.title
         content.body = announcement.body
         content.threadIdentifier = announcement.thread
+        // Held until the request has been added, and thrown out after : the
+        // system copies an attachment into its own store rather than taking
+        // the file, so a notice an hour would otherwise be a photograph left
+        // in `tmp` an hour.
+        var written: URL?
+        if let picture = announcement.picture,
+            let made = await NotificationPicture.attachment(for: picture)
+        {
+            content.attachments = [made.attachment]
+            written = made.file
+        }
+        defer {
+            if let written { try? FileManager.default.removeItem(at: written) }
+        }
         if let story = announcement.story {
             content.userInfo = [Key.story: story.uuidString]
         } else if let article = announcement.article {

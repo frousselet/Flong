@@ -1642,7 +1642,11 @@ final class AppModel {
             (
                 collection: titles[filed.zone] ?? String(localized: "Shared collection"),
                 by: names[filed.zone]?[filed.entry.guid],
-                title: filed.entry.title
+                title: filed.entry.title,
+                // What the filer's own device stated, which has already been
+                // held to being a plain web address on the way in : see
+                // ``SharedEntry/received``.
+                picture: filed.entry.imageURL.flatMap(URL.init(string:))
             )
         }
 

@@ -494,6 +494,8 @@ What the reader wants travels between their devices, through the key-value store
 
 **Nothing interrupts a reader who is looking at the page it would be about.** A story that opens appears on the front page, so a reader with Flong open has already seen it. The watermark moves anyway : what it records is that the story reached them, not that a notification was posted.
 
+**A notice about one thing carries that thing's picture.** A headline with its photograph is the article ; the same headline alone is a line of text. It is only ever set where the notice is about one thing, exactly as the tap target is : the cover of the first of five articles is a claim about the other four. A story wears the picture of the latest article in it to carry one, which is the picture the front page puts it under. It is fetched at the moment of posting and through the picture cache of section 5, so the request is one a reader tapping through would have made anyway, and a photograph that does not arrive is a notice without one rather than a notice held back.
+
 `docs/technical/notifications.md` carries the rules and what each is for.
 
 ### Retention

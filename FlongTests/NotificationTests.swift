@@ -25,11 +25,13 @@ import UserNotifications
 /// and where a tap lands.
 @Suite("What Flong tells the reader")
 struct AnnouncementTests {
-    private func opened(_ title: String, summary: String? = nil, rooms: [String] = ["lemonde.fr"])
-        -> DigestStore
-        .Opened
-    {
-        DigestStore.Opened(id: .v7(), title: title, summary: summary, rooms: rooms)
+    private func opened(
+        _ title: String,
+        summary: String? = nil,
+        rooms: [String] = ["lemonde.fr"],
+        picture: URL? = nil
+    ) -> DigestStore.Opened {
+        DigestStore.Opened(id: .v7(), title: title, summary: summary, rooms: rooms, picture: picture)
     }
 
     @Test("A pass that opened no story says nothing")
@@ -98,6 +100,29 @@ struct AnnouncementTests {
 
         #expect(announcement.title.contains("12"))
         #expect(stories.allSatisfy { announcement.body.contains($0.title) })
+    }
+
+    /// A picture where there is one story to show a picture of, and none where
+    /// there are several : the photograph of the first of three is a claim
+    /// about the other two.
+    @Test("One story carries its picture, and several carry none")
+    func picture() throws {
+        let cover = URL(string: "https://feeds.example.com/reforme.jpg")!
+        let one = try #require(Announcement.newStories([opened("Une réforme", picture: cover)]))
+        #expect(one.picture == cover)
+
+        let several = try #require(
+            Announcement.newStories([opened("Une réforme", picture: cover), opened("Un procès")])
+        )
+        #expect(several.picture == nil)
+    }
+
+    @Test("A story nobody has photographed is announced all the same")
+    func pictureless() throws {
+        // The ordinary case at the moment a story opens : the notice is the
+        // headline, and the photograph is what it gains when a newsroom puts
+        // one on it.
+        #expect(try #require(Announcement.newStories([opened("Une réforme")])).picture == nil)
     }
 
     @Test("Notifications of one kind are grouped under one thread")
@@ -227,6 +252,53 @@ struct OpenedStoryTests {
         // to return.
         #expect(Set(opened.rooms) == ["lemonde.fr", "liberation.fr"])
         #expect(opened.rooms.count == 2)
+    }
+
+    /// The same rule the front page follows : a story is shown for where it has
+    /// got to, so the photograph is the latest one there is. A notice carrying
+    /// a different picture from the page it opens would be about a different
+    /// story as far as the reader can tell.
+    @Test("A story wears the picture of the latest article to carry one")
+    func picture() async throws {
+        let moment = now.addingTimeInterval(60)
+        let old = URL(string: "https://a.example.com/premier.jpg")!
+        let new = URL(string: "https://b.example.com/dernier.jpg")!
+
+        let story = Story(id: .v7(at: moment), title: "Une réforme", firstAt: moment, lastAt: moment, updatedAt: moment)
+        try await database.writer.write { db in
+            try story.insert(db)
+
+            // Three rooms, oldest first : one with a photograph, then the
+            // newest with one of its own, then a room that published none.
+            let members: [(room: String, minutes: Double, picture: URL?)] = [
+                ("a.example.com", 0, old),
+                ("b.example.com", 1, new),
+                ("c.example.com", 2, nil),
+            ]
+            for (index, member) in members.enumerated() {
+                var feed = Feed(url: URL(string: "https://\(member.room)/atom.xml")!, title: member.room)
+                feed.siteURL = URL(string: "https://\(member.room)")
+                try feed.insert(db)
+
+                var entry = Entry(
+                    feedID: feed.id,
+                    guid: "urn:réforme:\(index)",
+                    title: "Une réforme",
+                    publishedAt: moment.addingTimeInterval(member.minutes * 60),
+                    receivedAt: moment
+                )
+                entry.hasMedia = false
+                entry.imageURL = member.picture
+                try entry.insert(db)
+                try StoryMember(storyID: story.id, entryID: entry.id, similarity: 1).insert(db)
+            }
+        }
+
+        // Not the picture of the newest article, which has none : the newest
+        // that has one. A story whose last room ran no photograph is not a
+        // story that loses its photograph.
+        #expect(try await digest.opened(since: now, now: now).first?.picture == new)
+        #expect(old != new)
     }
 }
 
@@ -438,8 +510,12 @@ struct AnnouncingTests {
 /// one place, and for four from four.
 @Suite("What Flong says about a source's own articles")
 struct SourceAnnouncementTests {
-    private func arrival(_ title: String, from source: String = "Le Monde") -> ArticleStore.Arrival {
-        ArticleStore.Arrival(id: .v7(), title: title, source: source, author: nil)
+    private func arrival(
+        _ title: String,
+        from source: String = "Le Monde",
+        picture: URL? = nil
+    ) -> ArticleStore.Arrival {
+        ArticleStore.Arrival(id: .v7(), title: title, source: source, picture: picture, author: nil)
     }
 
     @Test("A pass that brought nothing from those sources says nothing")
@@ -460,6 +536,25 @@ struct SourceAnnouncementTests {
         // An article is read over everything, and a story is a page in the
         // digest : a tap has one place to land and this is not the other one.
         #expect(announcement.story == nil)
+    }
+
+    /// A picture where there is one article to show a picture of, and none
+    /// where there are several.
+    @Test("One article carries its picture, and several carry none")
+    func picture() throws {
+        let cover = URL(string: "https://feeds.example.com/reforme.jpg")!
+        let one = try #require(Announcement.newArticles([arrival("Une réforme", picture: cover)]))
+        #expect(one.picture == cover)
+
+        let several = try #require(
+            Announcement.newArticles([arrival("Une réforme", picture: cover), arrival("Un procès")])
+        )
+        #expect(several.picture == nil)
+    }
+
+    @Test("An article nobody illustrated is announced all the same")
+    func pictureless() throws {
+        #expect(try #require(Announcement.newArticles([arrival("Une réforme")])).picture == nil)
     }
 
     @Test("Several from one source are counted under its name")
@@ -600,15 +695,31 @@ struct ArrivedArticleTests {
         receivedAt: Date,
         isRead: Bool = false,
         isHidden: Bool = false,
-        duplicateOf: UUID? = nil
+        duplicateOf: UUID? = nil,
+        picture: URL? = nil
     ) async throws -> UUID {
         var entry = Entry(feedID: feed.id, guid: "urn:\(title)", title: title, receivedAt: receivedAt)
         entry.hasMedia = false
         entry.isRead = isRead
         entry.isHidden = isHidden
         entry.duplicateOf = duplicateOf
+        entry.imageURL = picture
         try await database.writer.write { db in try entry.insert(db) }
         return entry.id
+    }
+
+    @Test("An arrival carries the picture that stands for it")
+    func carriesThePicture() async throws {
+        let feed = try await source("Le Monde", at: "lemonde.example.com", announcing: true)
+        let cover = URL(string: "https://lemonde.example.com/reforme.jpg")!
+        try await article("Une réforme", of: feed, receivedAt: now.addingTimeInterval(60), picture: cover)
+        try await article("Un procès", of: feed, receivedAt: now.addingTimeInterval(120))
+
+        let arrived = try await articles.arrived(since: now)
+        // The same address the row in the list carries : a notice showing one
+        // picture and the article it opens showing another would be two
+        // articles as far as the reader can tell.
+        #expect(arrived.map(\.picture) == [cover, nil])
     }
 
     @Test("Only the sources the reader asked about")

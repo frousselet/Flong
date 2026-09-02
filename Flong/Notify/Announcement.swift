@@ -24,6 +24,18 @@ nonisolated struct Announcement: Hashable, Sendable {
     /// What the notifications of one kind are grouped under in Notification
     /// Centre, so a week of them is one stack and not a week of rows.
     var thread: String
+    /// The picture standing beside what is said, when the thing said carries
+    /// one.
+    ///
+    /// **Only where the notice is about one thing**, exactly as ``story`` and
+    /// ``article`` are : a picture is a picture of something, and the cover of
+    /// the first of five articles is a claim about the other four.
+    ///
+    /// An address and not a file. What is decided here is which picture belongs
+    /// to which sentence ; fetching it is the delivery's problem, and a
+    /// notification that had to be built by something holding bytes could not
+    /// be written by a function a test calls.
+    var picture: URL?
     /// The story a tap opens, when there is exactly one to open.
     var story: UUID?
     /// The article a tap opens, when there is exactly one to open.
@@ -67,6 +79,9 @@ nonisolated struct Announcement: Hashable, Sendable {
             title: first.title,
             body: first.summary?.isEmpty == false ? first.summary! : rooms,
             thread: Thread.newStories,
+            // The picture of the latest article in it to carry one, which is
+            // the picture the front page puts the story under.
+            picture: first.picture,
             story: first.id
         )
     }
@@ -87,7 +102,7 @@ nonisolated struct Announcement: Hashable, Sendable {
     /// A collection with nothing new in it says nothing, which is the ordinary
     /// case for a pass that fetched somebody's unchanged list.
     static func filings(
-        _ filings: [(collection: String, by: String?, title: String)]
+        _ filings: [(collection: String, by: String?, title: String, picture: URL?)]
     ) -> Announcement? {
         guard let first = filings.first else { return nil }
 
@@ -101,7 +116,8 @@ nonisolated struct Announcement: Hashable, Sendable {
                 title: first.by.map { String(localized: "\($0) added to \(first.collection)") }
                     ?? String(localized: "Added to \(first.collection)"),
                 body: first.title,
-                thread: Thread.filings
+                thread: Thread.filings,
+                picture: first.picture
             )
         }
 
@@ -169,6 +185,7 @@ nonisolated struct Announcement: Hashable, Sendable {
                 // several agree.
                 body: first.subject == first.source ? first.source : "\(first.subject) · \(first.source)",
                 thread: Thread.newArticles,
+                picture: first.picture,
                 article: first.id
             )
         }
