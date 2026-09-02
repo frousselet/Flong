@@ -169,4 +169,59 @@ struct SpotlightIndexTests {
         #expect(SpotlightResult("story/pas-un-identifiant") == nil)
         #expect(SpotlightResult("pas un identifiant du tout") == nil)
     }
+
+    // MARK: - One batch at a time
+
+    /// How many callers were inside the gate at once, which must never be two.
+    private actor Occupancy {
+        private var inside = 0
+        private(set) var mostAtOnce = 0
+
+        func enter() {
+            inside += 1
+            mostAtOnce = max(mostAtOnce, inside)
+        }
+
+        func leave() { inside -= 1 }
+    }
+
+    @Test("Two rebuilds of the index never run at once, whoever asked for them")
+    func batchesAreSerialized() async throws {
+        // `beginBatch()` on an index that already has one open throws an
+        // Objective-C exception, which no Swift `catch` can stop and which
+        // takes the process with it. The window asks for a rebuild when it
+        // opens, a catch-up that brought articles asks for another, and
+        // singling out a source, a writer or a newsmaker asks for one apiece :
+        // every one of those is an await on the main actor, and awaits
+        // interleave.
+        //
+        // Asked of the gate rather than of Spotlight : a test that reproduced
+        // the crash would be a test that terminates the process it runs in.
+        let occupancy = Occupancy()
+
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<20 {
+                group.addTask {
+                    try? await IndexBatches.shared.alone {
+                        await occupancy.enter()
+                        try await Task.sleep(for: .milliseconds(1))
+                        await occupancy.leave()
+                    }
+                }
+            }
+        }
+
+        #expect(await occupancy.mostAtOnce == 1)
+    }
+
+    @Test("What a rebuild answered is what its own caller gets back")
+    func batchesAnswerTheirCaller() async throws {
+        async let first = IndexBatches.shared.alone { 1 }
+        async let second = IndexBatches.shared.alone { 2 }
+
+        // Queued one behind the other, and neither hands the other's answer
+        // back : the tail forgets the result on purpose, and what a caller
+        // waits on is its own work.
+        #expect(try await [first, second] == [1, 2])
+    }
 }

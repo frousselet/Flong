@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Fixed
 
 - A collection shared with somebody can be opened : `CKSharingSupported` was missing from the `Info.plist`, so the system looked Flong up in the App Store rather than handing it the share, and a recipient tapping an invitation was told they needed a newer version that does not exist.
+- Flong no longer terminates when two rebuilds of the Spotlight index overlap : `beginBatch()` on an index that already has one open throws an Objective-C exception no Swift `catch` can stop, and the window opening, a catch-up bringing articles and singling somebody out could all ask for one at once.
 - A sign-in that leaves no session now says why : a passkey is Safari's and cannot be used in a web view inside an application, so the site has to be asked for another method.
 - The ring in the reader's corner no longer stays turning after the work is over : a pass is named so only the thing that began it can end it, an inner step can no longer close the pass it is part of, every pass ends by a `defer` so no way out leaks one, and an exchange with iCloud that never reports back stops standing for work after a minute instead of turning for the rest of the session.
 
