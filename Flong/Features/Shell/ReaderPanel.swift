@@ -59,6 +59,7 @@ struct ReaderPanel: View {
     @State private var host = ""
     @State private var signingInTo: SigningIn?
     @State private var isAskingToDeleteEverything = false
+    @State private var trusting = ""
     @State private var isDeletingEverything = false
 
     #if os(iOS)
@@ -76,6 +77,8 @@ struct ReaderPanel: View {
                 name
                 whereabouts
                 appearance
+                sharing
+                if model.mayEditRoster { roster }
                 sites
 
                 #if DEBUG
@@ -332,6 +335,111 @@ struct ReaderPanel: View {
         } footer: {
             Text("Carried to your other devices, like everything else you choose here.")
         }
+    }
+
+    // MARK: - What they offer the other readers
+
+    /// Whether the reader offers what they follow to everybody else.
+    ///
+    /// **The one switch in this panel that sends something outside the
+    /// reader's own account.** Everything else here is theirs and stays theirs
+    /// : a name, a face, a town, a theme. This publishes a list of addresses
+    /// into the database every copy of Flong reads, so what it publishes and
+    /// what it never publishes are both written under it rather than left for
+    /// the reader to guess.
+    ///
+    /// **Their identity in the pool is shown, and is meant to be handed over.**
+    /// It is opaque, it says nothing about them, and it is the only thing a
+    /// roster can name : a reader asking to be believed on their own has to be
+    /// able to say who they are, and this is the whole of how.
+    private var sharing: some View {
+        Section {
+            Toggle(isOn: contributes) {
+                Text("Share the sources I follow")
+            }
+
+            if model.contributesToPool == true, let identity = model.poolIdentity {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Your contributor code")
+                    Text(verbatim: identity)
+                        .font(theme.metadata)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                }
+                .swipeActions {
+                    ShareLink(item: identity) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                }
+            }
+        } header: {
+            Text("Popular feeds")
+        } footer: {
+            Text(
+                "Only the addresses of the sources you follow, and never a name, an article or anything you wrote. An address that is itself a secret, one carrying a parameter you marked as yours, and one behind a password are never shared. Turning this off takes your list back out."
+            )
+        }
+    }
+
+    /// Who is believed on their own, for the one reader who may say.
+    ///
+    /// **It is a section of this panel rather than a screen of its own**, and
+    /// it appears for exactly one person : the roster is only ever believed
+    /// from the author's own identity, so for everybody else this is not a
+    /// control that is disabled, it is a control that is not there.
+    private var roster: some View {
+        Section {
+            ForEach(Array(model.trustedContributors).sorted(), id: \.self) { creator in
+                Text(verbatim: creator)
+                    .font(theme.metadata)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .swipeActions {
+                        Button(role: .destructive) {
+                            Task {
+                                await model.setTrustedContributors(model.trustedContributors.subtracting([creator]))
+                            }
+                        } label: {
+                            Label("Remove", systemImage: "trash")
+                        }
+                    }
+            }
+
+            HStack {
+                TextField(text: $trusting) {
+                    Text("Contributor code")
+                }
+                .autocorrectionDisabled()
+                #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                #endif
+
+                Button {
+                    let code = trusting.trimmingCharacters(in: .whitespacesAndNewlines)
+                    trusting = ""
+                    guard !code.isEmpty else { return }
+                    Task { await model.setTrustedContributors(model.trustedContributors.union([code])) }
+                } label: {
+                    Label("Trust", systemImage: "plus")
+                        .labelStyle(.iconOnly)
+                }
+                .buttonStyle(.borderless)
+                .disabled(trusting.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        } header: {
+            Text("Vouched for")
+        } footer: {
+            Text("What these readers follow is suggested at once, without waiting for ten people to follow it.")
+        }
+    }
+
+    private var contributes: Binding<Bool> {
+        Binding(
+            get: { model.contributesToPool == true },
+            set: { wanted in Task { await model.setContributingToPool(wanted) } }
+        )
     }
 
     // MARK: - The sites they pay for

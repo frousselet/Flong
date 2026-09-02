@@ -68,6 +68,7 @@ struct SourceEditor: View {
     @State private var interval: TimeInterval?
     @State private var isFavourite: Bool
     @State private var notifies: Bool
+    @State private var isShared: Bool
     /// Whether the system has refused Flong every notification, which is the
     /// one answer the switch above cannot argue with.
     @State private var isRefused = false
@@ -114,6 +115,7 @@ struct SourceEditor: View {
         _interval = State(initialValue: feed.refreshInterval)
         _isFavourite = State(initialValue: feed.isFavourite)
         _notifies = State(initialValue: feed.notifiesNewArticles)
+        _isShared = State(initialValue: feed.isShared)
     }
 
     /// Whether the address stored for this source is the masked one. It is not
@@ -130,6 +132,7 @@ struct SourceEditor: View {
                 designating
                 asking
                 telling
+                offering
                 health
             }
             .formStyle(.grouped)
@@ -391,6 +394,40 @@ struct SourceEditor: View {
         }
     }
 
+    /// Whether this one source goes into what the reader offers the others.
+    ///
+    /// **Shown only to a reader who offers anything at all.** For everybody
+    /// else it is a switch about a thing that is not happening, which is a
+    /// question nobody asked and an invitation to wonder what it does.
+    ///
+    /// **It only ever holds a source back.** A great many people follow one
+    /// paper and would rather not say so, and the alternative to a switch here
+    /// is a reader who has to choose between contributing nothing and
+    /// contributing everything. It says nothing about the source and nothing
+    /// about the reader : it is one address kept out of one list.
+    ///
+    /// A source whose address is a secret, one with a credential and one
+    /// carrying a parameter the reader designated are held back whatever this
+    /// says, which the footer states rather than leaving the switch looking
+    /// like the only thing standing between them and a leak.
+    @ViewBuilder
+    private var offering: some View {
+        if model.contributesToPool == true {
+            Section {
+                Toggle(isOn: $isShared) {
+                    Text("Include in popular feeds")
+                }
+                .disabled(isWorking)
+            } header: {
+                Text("Popular feeds")
+            } footer: {
+                Text(
+                    "Its address counts towards what Flong suggests to other readers. A secret address, one with a password and one carrying a parameter you marked as yours are never shared, whatever this says."
+                )
+            }
+        }
+    }
+
     /// The switch, which asks the system the moment it is turned on.
     ///
     /// The question cannot wait for the save : a reader who ticks it, saves and
@@ -492,7 +529,8 @@ struct SourceEditor: View {
             siteAddress: site,
             refreshInterval: interval,
             isFavourite: isFavourite,
-            notifiesNewArticles: notifies
+            notifiesNewArticles: notifies,
+            isShared: isShared
         )
         let address: SourceAddress = isSecret ? .secret(self.address) : .open(self.address)
         let designated = designated

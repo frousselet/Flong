@@ -212,6 +212,10 @@ final class AppModel {
     private let sharing: CollectionSharing
     private let sharedCollections: SharedCollectionStore
     private let sharedEntries: SharedEntryStore
+    /// The common pool of section 8, as this device holds its copy.
+    private let pool: PoolStore
+    /// The public side of the container, made on the first page that needs it.
+    private var poolExchange: PoolExchange?
 
     /// The whole stream, as files in the reader's own iCloud.
     ///
@@ -316,6 +320,30 @@ final class AppModel {
     /// What the system last said about this device, for the screen to explain
     /// a switch that will not stay on.
     private(set) var notificationStatus = UNAuthorizationStatus.notDetermined
+
+    /// What enough other readers follow to be worth offering, best first.
+    private(set) var popularFeeds: [PopularFeed] = []
+    /// How many readers this device has heard from, which is what the page says
+    /// while the pool is still too small to say anything else.
+    private(set) var poolContributors = 0
+    /// Whether a pass over the pool is running, for the page to say so.
+    private(set) var isReadingPool = false
+
+    /// Whether the reader offers what they follow to the other readers.
+    ///
+    /// `nil` until somebody has asked, which is what makes the question of
+    /// section 8 askable once : see ``Preferences/contributesToPool``.
+    private(set) var contributesToPool: Bool?
+
+    /// This reader's identity in the pool, which is what a roster names.
+    ///
+    /// Shown to them so they can hand it over when they ask to be believed on
+    /// their own, and `nil` for a device with no iCloud account, which is a
+    /// device that reads the pool and never writes to it.
+    private(set) var poolIdentity: String?
+
+    /// Who the roster names, for the one reader who may rewrite it.
+    private(set) var trustedContributors: Set<String> = []
 
     /// What is following the store, and the periodic refresh, for as long as
     /// there is a window.
@@ -1006,6 +1034,8 @@ final class AppModel {
         self.picture = preferences.picture.flatMap(ProfilePicture.image)
         self.place = preferences.place
         self.recentSearches = preferences.recentSearches
+        self.contributesToPool = preferences.contributesToPool
+        self.pool = PoolStore(database)
         let subscriptions = SubscriptionStore(database)
         self.subscriptions = subscriptions
         let articles = ArticleStore(database)
@@ -1915,6 +1945,11 @@ final class AppModel {
         self.sharedCloud = sharedCloud
         await sharedCloud.start()
 
+        // What this reader offers the others, when they offer anything. Free
+        // for a session that changed nothing, since the offer is compared
+        // against a digest of the one already published before it is written.
+        await offerToPool()
+
         // An invitation accepted before there was a window says so now.
         await ShareAcceptance.pending.onArrival { [weak self] _ in
             await self?.sharedCloud?.synchronize()
@@ -2055,11 +2090,14 @@ final class AppModel {
 
     /// Deletes everything Flong holds, on this device and in the reader's iCloud.
     ///
-    /// **The whole of it, or the reset would undo itself.** Six places hold
+    /// **The whole of it, or the reset would undo itself.** Seven places hold
     /// something : the database, the keychain, the key-value store, Spotlight,
-    /// the record zone and the archive in iCloud Drive. Leaving any of the last
-    /// three would have the first three fill back up at the next exchange,
-    /// which is not a reset but a pause.
+    /// the record zone, the archive in iCloud Drive and the offer in the public
+    /// database. Leaving any of the middle three would have the first three
+    /// fill back up at the next exchange, which is not a reset but a pause ;
+    /// leaving the last would leave a list of this reader's addresses in a
+    /// database everybody else reads, which is the only one of the seven that
+    /// is not about this device at all.
     ///
     /// The order is what makes it safe. Nothing that writes may be running when
     /// the tables go, so the enrichment is stopped and the window stops
@@ -2091,8 +2129,16 @@ final class AppModel {
         await watching?.value
         watching = nil
 
-        // iCloud first, while what addresses it is still here.
+        // iCloud first, while what addresses it is still here. The offer in
+        // the public database goes with it : a reader who deleted everything
+        // did not mean everything except the list the whole world reads. It is
+        // the one of these that reaches beyond their own account, and it is
+        // withdrawn before the identifier it is named after is forgotten.
         await cloud?.eraseEverything()
+        if contributesToPool == true {
+            await startPool()
+            await poolExchange?.withdraw(as: preferences.poolIdentifier)
+        }
         await eraseArchives()
 
         var failed = false
@@ -2133,6 +2179,10 @@ final class AppModel {
         theme = .standard
         wantsNewStoryNotices = false
         forgetSearches()
+        contributesToPool = nil
+        popularFeeds = []
+        poolContributors = 0
+        trustedContributors = []
         preferences.forgetEverything()
 
         forgetWhatIsShown()
@@ -3361,6 +3411,7 @@ final class AppModel {
             _ = await refresher.refresh(result.feed)
             selection = .feed(result.feed.id)
             await load()
+            await offerToPool()
         } catch let error as FeedFinderError {
             switch error {
             case .invalidAddress: failure = .invalidAddress
@@ -3368,6 +3419,108 @@ final class AppModel {
             case .noFeedFound: failure = .noFeedFound
             }
         } catch {
+            failure = .notSaved
+        }
+    }
+
+    // MARK: - The common pool
+
+    /// Opens the page of what the other readers follow.
+    ///
+    /// **A pass is run when the page opens and not on a timer.** The pool moves
+    /// in weeks : a source that ten people follow today is a source ten people
+    /// follow next month, and there is nothing here worth waking a device up
+    /// for. What is already stored is shown first, so the page is never empty
+    /// while the network is asked.
+    func openPopularFeeds() async {
+        await startPool()
+        await loadPopularFeeds()
+
+        guard !isReadingPool else { return }
+        isReadingPool = true
+        let changed = await poolExchange?.refresh() == true
+        isReadingPool = false
+        if changed { await loadPopularFeeds() }
+    }
+
+    /// Builds the public side of the container, once for the window.
+    private func startPool() async {
+        guard poolExchange == nil else { return }
+
+        let exchange = PoolExchange(database: database)
+        poolExchange = exchange
+        poolIdentity = await exchange.identity()
+        trustedContributors = (try? await pool.trusted()) ?? []
+    }
+
+    func loadPopularFeeds() async {
+        popularFeeds = (try? await pool.popular()) ?? []
+        poolContributors = (try? await pool.contributors()) ?? 0
+    }
+
+    /// Answers the question the page asks once.
+    ///
+    /// **Both answers are answers**, and a no is written down as firmly as a
+    /// yes : the point of asking once is that a reader who declined is never
+    /// asked again, and that only works if the no is stored.
+    func setContributingToPool(_ contributes: Bool) async {
+        preferences.contributesToPool = contributes
+        contributesToPool = contributes
+
+        if contributes {
+            await offerToPool()
+        } else {
+            await startPool()
+            await poolExchange?.withdraw(as: preferences.poolIdentifier)
+        }
+    }
+
+    /// Publishes what this reader offers, when they have said they offer it.
+    ///
+    /// Called from everything that changes the set : following a source,
+    /// leaving one, editing one, importing a file, and the start of a session.
+    /// It is nearly always free, since ``PoolExchange/offerIfChanged(_:as:)``
+    /// compares a digest before it writes anything.
+    ///
+    /// **The keychain is read here and handed down.** Which parameters are the
+    /// reader's own, and which sources have a credential, are questions only
+    /// this device can answer, and ``PoolStore`` has no business opening a
+    /// keychain to ask them.
+    private func offerToPool() async {
+        guard contributesToPool == true else { return }
+        await startPool()
+        guard let poolExchange else { return }
+
+        let secrets = (try? credentials.everySecretParameter()) ?? [:]
+        let credentialed = (try? credentials.identifiers()) ?? []
+        guard let feeds = try? await pool.offering(secrets: secrets, credentialed: credentialed) else { return }
+
+        await poolExchange.offerIfChanged(feeds, as: preferences.poolIdentifier)
+    }
+
+    /// Follows a source somebody else's list suggested.
+    ///
+    /// Through ``addFeed(at:)`` like any other address, and deliberately not
+    /// through a shortcut : an address out of the pool is an address a stranger
+    /// wrote, so it is discovered, fetched and canonicalized exactly as one the
+    /// reader typed would be.
+    func followPopular(_ feed: PopularFeed) async {
+        await addFeed(at: feed.url.absoluteString)
+        await loadPopularFeeds()
+    }
+
+    /// Whether this device is the one that may rewrite the roster.
+    var mayEditRoster: Bool { PoolTrust.isRoot(poolIdentity) }
+
+    /// Rewrites who is believed on their own.
+    func setTrustedContributors(_ creators: Set<String>) async {
+        await startPool()
+        guard let poolExchange, mayEditRoster else { return }
+
+        if await poolExchange.publishRoster(naming: creators, as: preferences.poolIdentifier) {
+            trustedContributors = (try? await pool.trusted()) ?? []
+            await loadPopularFeeds()
+        } else {
             failure = .notSaved
         }
     }
@@ -3550,6 +3703,11 @@ final class AppModel {
             _ = await refresher.refresh(change.feed)
             await load()
         }
+
+        // The address may have moved, and the reader may have taken this
+        // source out of what they offer, which are the two things an edit can
+        // change about the pool.
+        await offerToPool()
     }
 
     /// Singles a source out, or stops.
@@ -3691,6 +3849,9 @@ final class AppModel {
             selectedArticle = nil
             article = nil
         }
+
+        // A source the reader left is a source they stop offering.
+        await offerToPool()
     }
 
     func importOPML(from url: URL) async {
@@ -3698,6 +3859,7 @@ final class AppModel {
             report = try await opml(contentsOf: url)
             await cloud?.enqueueEverything()
             await load()
+            await offerToPool()
             await refreshAll()
         } catch let error as OPMLError {
             failure = .notOPML

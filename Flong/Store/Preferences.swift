@@ -60,12 +60,15 @@ nonisolated final class Preferences: @unchecked Sendable {
         static let mutedCollections = "notify.muted-collections"
         static let collaborationsAnnouncedAt = "notify.collaborations-announced-at"
         static let recentSearches = "search.recent"
+        static let poolContributes = "pool.contributes"
+        static let poolIdentifier = "pool.identifier"
 
         /// Every key, for the one operation that has to name all of them.
         static let all = [
             articleBody, theme, firstName, lastName, picture, city, country, countryCode, device,
             newStoryNotices, storiesAnnouncedAt, articlesAnnouncedAt, collaborationNotices,
             mutedCollections, collaborationsAnnouncedAt, recentSearches,
+            poolContributes, poolIdentifier,
         ]
     }
 
@@ -333,6 +336,60 @@ nonisolated final class Preferences: @unchecked Sendable {
 
         let made = UUID().uuidString
         local.set(made, forKey: Key.device)
+        return made
+    }
+
+    // MARK: - The common pool
+
+    /// Whether the reader offers what they follow to the other readers.
+    ///
+    /// **Three answers and not two.** `nil` is *nobody has asked yet*, and it
+    /// is what makes the question of section 8 askable once rather than every
+    /// time : a reader who said no is not asked again, and a reader who has
+    /// never seen the page has not said no. Reading a plain flag would make
+    /// those two the same answer and would turn the question into a nag.
+    ///
+    /// Carried between the reader's devices, like every other decision about
+    /// themselves : somebody who said yes on their phone did not mean only on
+    /// their phone.
+    var contributesToPool: Bool? {
+        get {
+            if let cloud, cloud.object(forKey: Key.poolContributes) != nil {
+                return cloud.bool(forKey: Key.poolContributes)
+            }
+            guard local.object(forKey: Key.poolContributes) != nil else { return nil }
+            return local.bool(forKey: Key.poolContributes)
+        }
+        set {
+            guard let newValue else { return remove(Key.poolContributes) }
+            set(newValue, for: Key.poolContributes)
+        }
+    }
+
+    /// What this reader's records in the pool are named after.
+    ///
+    /// **Made here and never derived from their iCloud identity.** A record
+    /// name in a database the whole world reads should say nothing about who
+    /// wrote it, and a name nobody can work out in advance is also a name
+    /// nobody can take first to stop somebody publishing.
+    ///
+    /// Carried between the reader's devices, so that their iPad rewrites the
+    /// list their phone published rather than opening a second one, which would
+    /// be one person counted twice by nobody, since the counting is by iCloud
+    /// identity, and two records where one would do.
+    var poolIdentifier: UUID {
+        if let existing = cloud?.string(forKey: Key.poolIdentifier).flatMap(UUID.init(uuidString:)) {
+            local.set(existing.uuidString, forKey: Key.poolIdentifier)
+            return existing
+        }
+        if let existing = local.string(forKey: Key.poolIdentifier).flatMap(UUID.init(uuidString:)) {
+            cloud?.set(existing.uuidString, forKey: Key.poolIdentifier)
+            cloud?.synchronize()
+            return existing
+        }
+
+        let made = UUID()
+        set(made.uuidString, for: Key.poolIdentifier)
         return made
     }
 

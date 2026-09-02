@@ -40,6 +40,8 @@ The product rests on three commitments.
 - Receiving e-mail, full read-it-later of the Wallabag kind.
 - Remote access by an agent from another machine.
 
+**Amended : the readers may suggest sources to each other.** The list above rules out *server, account, multi-user*, and the pool of section 8 brushes against the third of those. What holds is what held for a shared collection : there is still no server, no account of ours and no backend service, the addresses travel through the public database Apple already gives the container, and none of it reaches us. What changes is one sentence : a reader who says yes publishes the addresses of the sources they follow, and nobody publishes anything before saying yes. `docs/technical/popular-feeds.md` says how.
+
 **Amended : a collection may be shared.** This list ruled out social sharing and collaborative annotation, and both are now in scope for collections, through Apple's own sharing rather than through anything of ours. The rest of the line holds and is what makes it possible : there is still no server, no account of ours and no backend service, the data moves between iCloud accounts and none of it reaches us, and section 20 stays true because we still collect nothing. What travels is the excerpt the feed published and never the article. Section 7 says how, and `docs/technical/collaboration.md` says why.
 
 ---
@@ -121,6 +123,7 @@ A single application, shared code, distinct interface layers per platform.
 | `Place` | Where the reader says they read from : suggestions from MapKit, one fix from the device. `docs/technical/place.md` |
 | `Automation` | App Intents, widgets, local MCP server on macOS |
 | `Import` | OPML and service imports, exports |
+| `Pool` | What the other readers follow : the public database, and the counting. `docs/technical/popular-feeds.md` |
 
 SQLite is driven directly through GRDB. SwiftData is ruled out : the volume is large, the concurrency needs fine control, and FTS5 virtual tables need direct access.
 
@@ -152,7 +155,9 @@ Database data protection in the "after first unlock" class, which is what makes 
 
 ## 7. Synchronization
 
-The private CloudKit database only, through `CKSyncEngine`. No hand-written synchronization : the engine takes care of ordering, notification subscriptions, batching, errors and resumption.
+The private CloudKit database, through `CKSyncEngine`. No hand-written synchronization : the engine takes care of ordering, notification subscriptions, batching, errors and resumption.
+
+**Two other databases of the same container are reached.** A shared collection lives in a zone of its own and is carried by a second engine on the shared database, below. The addresses offered under section 8 sit in the public database, which has no zone to hold a change token against and therefore nothing an engine could do : that exchange is written by hand, is a query out and a save in, and is described in `docs/technical/popular-feeds.md`. Everything in this section is about the private database unless it says otherwise.
 
 ### Record budget
 
@@ -213,7 +218,7 @@ Which archives a device has already read is kept locally, in `archive_ingest`. A
 
 ### What never transits
 
-Indexes, vectors of articles that were not retained, secrets, any log. Nor the ledger of which archives a device has read, which is about the device and not about the reading.
+Indexes, vectors of articles that were not retained, secrets, any log. Nor the ledger of which archives a device has read, which is about the device and not about the reading. Nor, into the public database of section 8, anything but an address : no name, no article, no mark, nothing the reader wrote.
 
 ### What it takes to work
 
@@ -247,7 +252,17 @@ Every device collects on its own behalf.
 
 **Accepted formats** : RSS 0.9x, 1.0 and 2.0, Atom 1.0, JSON Feed 1.1, h-feed microformats2. Automatic discovery through `<link rel="alternate">`, with a fallback on the usual locations.
 
-**Adding a feed** : by URL, by pasting a page address, through the Share extension, by OPML import, by drag and drop on macOS.
+**Adding a feed** : by URL, by pasting a page address, through the Share extension, by OPML import, by drag and drop on macOS, and from the popular feeds below.
+
+**Popular feeds**, which is the third way in beside an address and a file. A reader arriving with nothing has to know what to type, and this is what answers that : the addresses enough other readers follow, counted rather than editorialized.
+
+- **A source is offered once ten readers follow it**, or once somebody on the roster does. Ten is ten iCloud identities, counted on the `creatorUserRecordID` the server stamps and a client cannot write.
+- **The roster is a handful of people the author vouches for**, published as a record and believed only from the author's own identity. It exists because ten readers is a signal that does not exist on a pool's first day.
+- **Only addresses travel.** No name, no article, nothing anybody wrote. A source whose address is itself the subscription, one with a credential, and one carrying a parameter the reader designated are never published : trimming the parameter and publishing the remainder is not done either, since what is left is a different address.
+- **The question is asked once**, on the page itself, and nothing of a reader's is published before they answer it. Reading the pool never requires contributing to it. A reader who contributes may still keep one source out, in that source's own editor.
+- **One record per contributor**, chunked when it needs to be, and never one per source, which is the record shape of section 7 for the same reason. The counting is done on the device, since a public database has no aggregate to ask for and there is no server to keep a tally.
+
+`docs/technical/popular-feeds.md` carries the design, the reasoning and what the container has to be set up with.
 
 **HTTP conditionality**, always :
 
@@ -599,6 +614,8 @@ An **author** can be made a favourite the same way, from the authors page or fro
 
 A source can be **edited**, from its own menu : what it is called, the address it is served at and whether that address is a secret, which of its parameters are the reader's own, the site it belongs to, how often it is asked, and whether it is one of their favourites. The address is the one that matters. A publisher who moves their feed used to cost the reader everything under it, since the only repair was to stop following the source and follow it again ; editing the address moves the row and leaves the articles, the stars, the notes and the filings exactly where they are, here and on the reader's other devices, which are told where the source came from rather than that one went and another arrived. The health this section asks to be surfaced in the feed settings is on the same screen, and so is the way through to the address parameters. A source whose address is itself a secret is offered a new secret address rather than shown the one it has, and whether it is a secret at all is a switch beside the address, since a reader who pasted a per-subscriber address without saying so had otherwise no way of taking it back out of their own iCloud. `docs/technical/editing-a-source.md` sets out what a change of address drags along, and what it deliberately leaves alone.
 
+The panel's own menu holds the three ways in : an address, an OPML file, and **the popular feeds**, which is the page of what other readers follow. It is where the question of section 8 is asked, once, and where a reader who has said yes finds the switch again, in their own panel, beside the code they hand over if they want their offers believed on their own. A source kept out of what they offer is kept out from that source's own editor, on a switch that appears only for a reader who offers anything at all.
+
 A source can also be **removed**, from a swipe on its trailing edge or from its long press, and a whole publisher from its heading's menu, which is the second thing that menu does. It is the one thing in this panel that cannot be undone, so it asks first, and the sentence it asks with names what goes rather than warning in the abstract : the articles go with the source, the ones the reader starred, wrote on or filed included. What goes with them is everything that was only there because of that source, here and in the reader's iCloud, which is what carries the removal to their other devices. `docs/technical/removing-a-source.md` sets out what is reached, what is deliberately not, and why.
 
 The digest, a story and an article are set as a page rather than as a control panel : one column held to a readable measure, serif headlines, hairline rules, no cards and no boxes. Liquid Glass belongs to the navigation layer, which is the system's own bar. The application draws it of its own in two places and both are that same rule : the subject pills, which are controls floating over the page, and the credit in the corner of a picture, which has to stay legible over an image nobody chose. `docs/technical/interface.md` records the design and what was rejected.
@@ -637,7 +654,7 @@ Unread, collection and saved-query widgets. A Share extension for subscribing an
 
 ### First launch
 
-An OPML import or an import from an existing service offered right away, an optional starter set of feeds, a one-sentence explanation of what a mark is and why it never disappears, and no account creation.
+An OPML import or an import from an existing service offered right away, the popular feeds of section 8 as the third way in for a reader who has nothing to import, a one-sentence explanation of what a mark is and why it never disappears, and no account creation.
 
 ### Where the reader is
 
@@ -698,7 +715,8 @@ The initial import runs in a resumable task with system progress.
 
 ## 20. Security and privacy
 
-- No data leaves the device, apart from the private CloudKit database and the requests to the feeds themselves.
+- No data leaves the device, apart from the private CloudKit database, a shared collection the reader created or accepted, the addresses they chose to offer the other readers under section 8, and the requests to the feeds themselves.
+- Nothing is offered to the other readers before the reader has been asked and has said yes, and turning it off takes their list back out. What is offered is an address and never a name, an article or anything they wrote.
 - No telemetry, no tracker, no third-party service active by default.
 - Secrets in the keychain exclusively.
 - The local database under data protection, "after first unlock" class.
@@ -711,7 +729,7 @@ The initial import runs in a resumable task with system progress.
 
 ### Deleting everything
 
-There is no account to close, so there is a command that deletes everything instead. It sits at the foot of the reader's panel in a card of red glass rather than in the grouped form the settings sit in, it names what it will delete before it does it, and it reaches all six places that hold something : the database, the keychain, the key-value store, the Spotlight index, the record zone and the archive in iCloud Drive. Fewer than all six is a pause rather than a reset, since the last three would fill the first three back up at the next exchange.
+There is no account to close, so there is a command that deletes everything instead. It sits at the foot of the reader's panel in a card of red glass rather than in the grouped form the settings sit in, it names what it will delete before it does it, and it reaches all seven places that hold something : the database, the keychain, the key-value store, the Spotlight index, the record zone, the archive in iCloud Drive and the offer in the public database, which is the one of them that sits outside the reader's own account. Fewer than all seven is a pause rather than a reset, since three of them would fill the first three back up at the next exchange, and the seventh would leave a list of the reader's addresses where everybody else can read it.
 
 It is not the purge of section 13, which frees space and spares everything marked. This deletes what that one exists to protect.
 

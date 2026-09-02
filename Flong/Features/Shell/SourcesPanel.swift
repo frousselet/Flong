@@ -78,11 +78,13 @@ struct SourcesPanel: View {
     /// opens is the source rather than a blank that fills in a moment later.
     private enum Presentation: Identifiable, Hashable {
         case addingFeed
+        case popularFeeds
         case editing(Feed)
 
         var id: String {
             switch self {
             case .addingFeed: "adding"
+            case .popularFeeds: "popular"
             case .editing(let feed): "editing-\(feed.id)"
             }
         }
@@ -136,10 +138,11 @@ struct SourcesPanel: View {
                     ContentUnavailableView {
                         Label("No feed yet", systemImage: "dot.radiowaves.up.forward")
                     } description: {
-                        Text("Add a feed, or import an OPML file to bring your subscriptions over.")
+                        Text("Add a feed, import an OPML file, or see what other readers follow.")
                     } actions: {
                         Button("Add a feed") { presented = .addingFeed }
                         Button("Import an OPML file") { isChoosingFile = true }
+                        Button("Popular feeds") { presented = .popularFeeds }
                     }
                 }
             }
@@ -201,6 +204,9 @@ struct SourcesPanel: View {
                     addPrivate: { address in await model.addPrivateFeed(at: address) }
                 )
                 .themed()
+            case .popularFeeds:
+                PopularFeedsView(model: model)
+                    .themed()
             case .editing(let source):
                 SourceEditor(model: model, feed: source)
                     .themed()
@@ -232,6 +238,11 @@ struct SourcesPanel: View {
                     isChoosingFile = true
                 } label: {
                     Label("Import an OPML file", systemImage: "square.and.arrow.down")
+                }
+                Button {
+                    presented = .popularFeeds
+                } label: {
+                    Label("Popular feeds", systemImage: "person.2")
                 }
             } label: {
                 Label("Add a feed", systemImage: "plus")

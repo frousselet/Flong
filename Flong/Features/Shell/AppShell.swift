@@ -72,6 +72,7 @@ struct AppShell: View {
     @State private var reading: Reading?
     @State private var isAddingFeed = false
     @State private var isChoosingFile = false
+    @State private var isSeeingPopular = false
     @Namespace private var zoom
 
     @Environment(\.scenePhase) private var scenePhase
@@ -91,6 +92,7 @@ struct AppShell: View {
                         zoom: zoom,
                         isAddingFeed: $isAddingFeed,
                         isChoosingFile: $isChoosingFile,
+                        isSeeingPopular: $isSeeingPopular,
                         open: open
                     )
                 }
@@ -173,6 +175,10 @@ struct AppShell: View {
                 addPrivate: { address in await model.addPrivateFeed(at: address) }
             )
             .themed()
+        }
+        .sheet(isPresented: $isSeeingPopular) {
+            PopularFeedsView(model: model)
+                .themed()
         }
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: OPMLDocument.types) { result in
             guard case .success(let url) = result else { return }

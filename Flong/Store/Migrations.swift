@@ -721,6 +721,48 @@ nonisolated extension AppDatabase {
             }
         }
 
+        migrator.registerMigration("v33.whatEverybodyElseFollows") { db in
+            // What one person published into the common pool, one row per
+            // record : a list too long for a single record arrives in several,
+            // and a chunk is what is written and what is replaced. The person
+            // is on the row rather than being the key, because two chunks of
+            // one list are two rows by one creator and the count of section 7
+            // is a count of people.
+            try db.create(table: "pool_list") { table in
+                table.primaryKey("record_name", .text)
+                table.column("creator", .text).notNull().indexed()
+                table.column("modified_at", .datetime).notNull()
+            }
+
+            try db.create(table: "pool_entry") { table in
+                table.column("record_name", .text).notNull()
+                    .references("pool_list", onDelete: .cascade)
+                table.column("url", .text).notNull()
+                table.column("title", .text)
+                table.column("site_url", .text)
+                table.primaryKey(["record_name", "url"])
+            }
+
+            // What the popularity query groups by.
+            try db.create(index: "pool_entry_on_url", on: "pool_entry", columns: ["url"])
+
+            // Who the author of the application said is worth believing on
+            // their own. One row per person, rewritten whole every time the
+            // roster is read : a name taken off the roster has to stop
+            // counting, and a table replaced wholesale is how it does.
+            try db.create(table: "pool_trust") { table in
+                table.primaryKey("creator", .text)
+            }
+
+            // Whether a source is one of those this reader offers the others.
+            // On by default : a reader who has said yes to contributing said
+            // yes to what they follow, and the exceptions are the point of the
+            // switch rather than the rule.
+            try db.alter(table: "feed") { table in
+                table.add(column: "is_shared", .boolean).notNull().defaults(to: true)
+            }
+        }
+
         return migrator
     }
 

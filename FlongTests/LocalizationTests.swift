@@ -42,6 +42,33 @@ struct LocalizationTests {
         #expect(String(localized: "Subscribed sites", locale: french) == "Sites abonnés")
     }
 
+    @Test("The third way to find a source speaks French")
+    func popularFeeds() {
+        #expect(String(localized: "Popular feeds", locale: french) == "Flux populaires")
+        #expect(String(localized: "Share my sources", locale: french) == "Partager mes sources")
+        #expect(String(localized: "Share the sources I follow", locale: french) == "Partager les sources que je suis")
+        #expect(String(localized: "Your contributor code", locale: french) == "Votre code de contributeur")
+        #expect(String(localized: "Include in popular feeds", locale: french) == "Inclure dans les flux populaires")
+        #expect(String(localized: "Vouched for", locale: french) == "Recommandé")
+    }
+
+    @Test("A count of readers is said in the singular and in the plural")
+    func readerCounts() {
+        // The empty page states how many readers the pool has heard from, and
+        // one reader is not `1 lecteurs`. French counts zero in the singular
+        // too, which is the whole reason the variation exists rather than an
+        // `s` appended to a number.
+        #expect(
+            inFrench("\(0) readers have shared their sources so far.") == "0 lecteur a partagé ses sources jusqu'ici.")
+        #expect(
+            inFrench("\(1) readers have shared their sources so far.") == "1 lecteur a partagé ses sources jusqu'ici.")
+        #expect(
+            inFrench("\(12) readers have shared their sources so far.")
+                == "12 lecteurs ont partagé leurs sources jusqu'ici."
+        )
+        #expect(inFrench("Followed by \(12) readers") == "Suivi par 12 lecteurs")
+    }
+
     @Test("The two kinds of favourite are told apart in French too")
     func favourites() {
         // `Favoris` was enough while the star was the only one of them. Beside
