@@ -44,6 +44,22 @@ Words next to each other are joined by an implicit `AND`, which is what everyone
 
 It runs on no model at all, which is the point : section 15 says the path without Apple Intelligence always exists and is always tested. `docs/technical/interface.md` sets out the screen : the pills above the keyboard, the searches the reader ran before, and why arriving in the section is what puts the cursor in the field.
 
+## Reading a sentence
+
+`tag:`, `is:unread` and `after:` are what a dynamic collection is described with and what the FreshRSS import understands. They are not what a reader types. `QuestionReader` is what turns one into the other.
+
+**The model says what the sentence names, never what to run.** It answers with five pieces : the words, the publication, the writer, the state and the moment. `QuestionReader` builds the tree from those, so the compiler stays the only thing that ever turns anything into SQL, and a model that emitted `site:lemonde.fr` would be a model writing the thing that compiles.
+
+Three guards, and they matter more than the prompt :
+
+1. **Every word it hands back has to have been typed.** A sentence about Iran comes back as `Iran conflict` about as often as not, and the added word narrows a search the reader never narrowed. Compared term by term, folded, so `l'Iran` still yields `Iran`.
+2. **A publication and a writer are matched against what the reader has** : the sources actually followed, by name or by host, and the bylines the feeds actually carried. A name matching nothing goes back into the words, where it is at worst a word they typed, so a model inventing a newspaper costs nothing.
+3. **A sentence of fewer than three words is never sent.** `iran` means look for `iran`, and a round trip to a language model to be told so is a second of waiting bought for nothing.
+
+`QuestionReader.plainly(_:in:)` is the path without a model, and it is a good one rather than a fallback. The words that say nothing go, including the handful that are the reader talking about their feed reader rather than about the news : `les articles du Monde sur la rentrée scolaire` is four words of scaffolding and one subject. And a publication is looked up against the sources the reader follows, which is a lookup and not a model : `Monde` becomes `site:lemonde.fr` on any device, which is most of what reading the sentence was for. What is left is joined by `AND`, as words in a search field always have been.
+
+Whatever was understood beyond the words is handed back with the tree, and the interface writes it above the results. A search that narrows itself has to say so, or a reader who sees a third of the articles they expected concludes the search is broken.
+
 ## Compiling
 
 The tree becomes one SQL condition over the article and its feed.

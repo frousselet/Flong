@@ -284,6 +284,12 @@ They travel with the other preferences, in the iCloud key-value store rather tha
 
 **Remembered on submit and on opening a result.** Results follow what is typed, so a reader who finds what they wanted never presses return, and a list fed by the return key alone would stay empty for exactly the readers it is for.
 
+**What the sentence was read as is written above the results.** `LEMONDE.FR · 3 RÉSULTATS`, at the head of the list rather than pinned over it : it is a fact about the search, read once, and the foot of this page belongs to the field. A search that narrows itself has to say so, or a reader who sees a third of the articles they expected concludes it is broken. `docs/technical/search.md` sets out what does the reading.
+
+**Two pages, not one page with two states.** A page of results is a list that scrolls. A page with no query has its furniture at the two ends of what is on screen, the searches at the top and the subjects at the foot, directly above the field. One layout doing both was a layout doing neither.
+
+**And the subjects are content, not a bar.** Every bar this page could hang them from is the bar the system draws the search field in once the keyboard is up : `safeAreaInset`, `safeAreaBar` and a keyboard `ToolbarItemGroup` were each tried, and the first two draw behind the field while the third never attaches to a field a tab presents. What works is what Photos does : the page is as tall as what is on screen less the strip the field floats over, the searches sit at its head and the subjects at its foot. That strip is a measured constant, and it is one because there is nothing to ask : the field is in no safe area on this page.
+
 ## The sources, grouped by publisher
 
 **There is nothing to make, and that is the whole change.** The sources list was a folder tree, and no screen in Flong ever let a reader plant one : the only folders that existed came out of an imported OPML file, so the organization on the page was somebody else's, inherited and untendable. A group is every feed served from one address, worked out from the addresses themselves. It is right the moment a subscription lands, it cannot go stale, and it does not survive the last of its feeds.
