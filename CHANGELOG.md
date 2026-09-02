@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- The ring in the reader's corner no longer stays turning after the work is over : a pass is named so only the thing that began it can end it, an inner step can no longer close the pass it is part of, every pass ends by a `defer` so no way out leaks one, and an exchange with iCloud that never reports back stops standing for work after a minute instead of turning for the rest of the session.
+
 ### Added
 
 - Xcode project targeting iOS, iPadOS and macOS 26.0, from the multiplatform SwiftUI template.

@@ -695,8 +695,8 @@ struct ActivityTimingTests {
 
     @Test("Work that is over before it could be read is never shown at all")
     func tooShortToShow() async throws {
-        await model.beginWork([.fetching])
-        model.endWork()
+        let pass = await model.beginWork([.fetching])
+        model.endWork(pass)
 
         // A catch-up that finds nothing due returns in a few milliseconds, and
         // a line that appeared and left inside one frame is a flicker rather
@@ -707,7 +707,7 @@ struct ActivityTimingTests {
 
     @Test("Work that lasts is shown, and shown long enough to read")
     func longEnoughToRead() async throws {
-        await model.beginWork([.grouping])
+        let pass = await model.beginWork([.grouping])
         // Not yet : nothing shorter than the first floor is seen at all.
         #expect(model.work == nil)
 
@@ -716,7 +716,7 @@ struct ActivityTimingTests {
 
         // The same fault the other way : a line that appeared for good reason
         // and left before it could be read told the reader nothing.
-        model.endWork()
+        model.endWork(pass)
         #expect(model.work?.phase == .grouping)
 
         try await Task.sleep(for: AppModel.workStaysFor * 2)
@@ -744,5 +744,99 @@ struct ActivityTimingTests {
 
         try await Task.sleep(for: AppModel.workAppearsAfter * 3)
         #expect(model.work?.phase == .writing)
+    }
+
+    @Test("A step of a bigger pass cannot end the pass it is part of")
+    func innerStepsDoNotEnd() async throws {
+        let pass = await model.beginWork([.fetching, .grouping, .writing])
+        model.moveWork(to: .writing)
+
+        // The step is handed no name, so what it ends is nothing. This is the
+        // fault that left a ring turning : the setup, the enrichment and the
+        // steps inside a full pass all called the same end, and whichever
+        // arrived first closed a pass it had never opened, leaving the real one
+        // with nothing to close it.
+        let step = await model.beginWork([.fetching, .indexing])
+        #expect(step == nil)
+        model.endWork(step)
+
+        try await Task.sleep(for: AppModel.workAppearsAfter * 3)
+        #expect(model.work?.phase == .writing)
+
+        // And the pass that opened it still closes it.
+        model.endWork(pass)
+        try await Task.sleep(for: AppModel.workStaysFor * 2)
+        #expect(model.work == nil)
+    }
+
+    @Test("An end that arrives late leaves the pass running in its place alone")
+    func aLateEndEndsNothing() async throws {
+        let first = await model.beginWork([.fetching])
+        model.endWork(first)
+
+        let second = await model.beginWork([.grouping])
+        // The catch-up hands its pass to the model's own work, which runs
+        // behind it and may end long after ; by then another pass may be under
+        // way, and it is not this one's to close.
+        model.endWork(first)
+
+        try await Task.sleep(for: AppModel.workAppearsAfter * 3)
+        #expect(model.work?.phase == .grouping)
+
+        model.endWork(second)
+        try await Task.sleep(for: AppModel.workStaysFor * 2)
+        #expect(model.work == nil)
+    }
+}
+
+/// The other half of the ring : the exchange iCloud runs on its own.
+@Suite("When an exchange stops standing for work", .serialized)
+@MainActor
+struct ExchangeTimingTests {
+    private let model: AppModel
+
+    init() throws {
+        model = AppModel(database: try AppDatabase.inMemory(), exchangeStandsFor: .milliseconds(200))
+    }
+
+    @Test("An exchange under way is work, and shows as such")
+    func working() {
+        model.report(.working)
+        #expect(model.currentWork?.phase == .synchronizing)
+    }
+
+    @Test("An exchange that never says it finished stops standing for work")
+    func neverReportsBack() async throws {
+        model.report(.idle(lastSynchronized: Date(timeIntervalSince1970: 1_787_646_600)))
+        model.report(.working)
+        #expect(model.currentWork != nil)
+
+        // `willSendChanges` opens an exchange and `didSendChanges` closes it,
+        // and the second is not guaranteed to arrive : an engine interrupted, a
+        // process suspended between the two. Nothing ended it, so the ring
+        // turned until the application was restarted.
+        try await Task.sleep(for: .milliseconds(600))
+        #expect(model.currentWork == nil)
+
+        // And what it falls back on is true : the moment iCloud last actually
+        // finished, which is what the sidebar shows.
+        guard case .idle(let moment) = model.syncStatus else {
+            Issue.record("An exchange that gave up should be idle, not \(model.syncStatus)")
+            return
+        }
+        #expect(moment == Date(timeIntervalSince1970: 1_787_646_600))
+    }
+
+    @Test("An exchange that does say it finished is not given up on twice")
+    func reportsBack() async throws {
+        model.report(.working)
+        model.report(.idle(lastSynchronized: Date()))
+        #expect(model.currentWork == nil)
+
+        // The bound is dropped with the exchange it was watching : one left
+        // running would rewrite a status that has moved on since.
+        model.report(.waiting(until: nil))
+        try await Task.sleep(for: .milliseconds(600))
+        #expect(model.syncStatus == .waiting(until: nil))
     }
 }

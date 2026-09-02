@@ -63,6 +63,15 @@ nonisolated struct SidebarItem: Identifiable, Hashable, Sendable {
     }
 }
 
+/// One pass of the machinery, named.
+///
+/// It carries nothing : what it is for is being different from every other
+/// pass, so that the thing which began one is the only thing that can end it.
+/// See ``AppModel/current``.
+nonisolated struct Work: Hashable, Sendable {
+    fileprivate let id: Int
+}
+
 /// Why something the reader asked for did not happen.
 nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
     case unreadableFile
@@ -480,17 +489,60 @@ final class AppModel {
     /// The pass as it actually stands, whether or not it is on screen yet.
     private var plan: WorkPlan?
 
+    /// Which pass that is.
+    ///
+    /// **The ring used to be ended by whoever happened to call ``endWork()``**,
+    /// and a pass is not always ended by the thing that began it : the steps
+    /// inside a bigger one declare passes of their own, the enrichment ends the
+    /// catch-up that started it from a task of its own, and the setup ended one
+    /// from outside the call that opened it. Any of those ending somebody
+    /// else's pass leaves that pass with nothing left to close it, and the ring
+    /// turns until the application is restarted, which is what a reader sees as
+    /// it being stuck.
+    ///
+    /// A pass is named now, and only its own name closes it. An inner step is
+    /// handed nothing, so it cannot end the pass it is a part of ; a hand-off
+    /// carries the name with it ; and an end that arrives late, for a pass that
+    /// is already over, does nothing to the one running in its place.
+    private var current: Work?
+    /// How many passes there have been, which is where a name comes from.
+    private var passes = 0
+
     /// What the page shows, which folds in the work iCloud does on its own.
     ///
     /// `CKSyncEngine` decides for itself when to send and when to fetch, so an
     /// exchange nothing here asked for still moves ``syncStatus`` and is still
     /// worth saying : a reader watching their page change wants to know it is
     /// their iPad talking and not a publisher.
+    ///
+    /// **This is the other half of the ring, and it used to have no way back.**
+    /// An exchange begins on `willSendChanges` and is over on `didSendChanges`,
+    /// and the second of those is not guaranteed to arrive : an engine
+    /// interrupted, a process suspended between the two, a batch that comes to
+    /// nothing. Nothing here ever ended it, so a status left at `working` was a
+    /// ring that turned until the application was restarted. It is bounded now,
+    /// by ``exchangeStandsFor``.
     var currentWork: WorkPlan? {
         if let work { return work }
         if case .working = syncStatus { return WorkPlan([.synchronizing]) }
         return nil
     }
+
+    /// How long an exchange may say nothing before it stops standing for work.
+    ///
+    /// Long enough for a real one : a zone of three thousand records is sent in
+    /// batches and a slow network makes a minute of it. Short enough that a
+    /// reader is not left watching a ring for an exchange that ended without
+    /// saying so.
+    ///
+    /// It ends what the ring shows and never what iCloud is doing. The engine
+    /// carries on exactly as it was ; what stops is the claim, on the reader's
+    /// page, that something is happening.
+    static let exchangeStandsFor = Duration.seconds(60)
+
+    /// The bound this window actually uses, so a test does not have to wait a
+    /// minute to watch a ring give up.
+    private let exchangeStandsFor: Duration
 
     /// Nothing shorter than this is seen at all.
     ///
@@ -526,18 +578,32 @@ final class AppModel {
     ///   that keeps an automatic pass from flickering. A reader who pulled or
     ///   pressed is watching for an answer, and a beat of nothing between the
     ///   gesture and the line is the line arriving from nowhere.
-    func beginWork(_ stages: [WorkPhase], atOnce: Bool = false) async {
+    /// - Returns: the name of the pass this began, which is what ends it, or
+    ///   `nil` where a pass was already running and this is one of its steps.
+    ///   Passing that `nil` back to ``endWork(_:)`` is what keeps a step from
+    ///   ending the pass it belongs to.
+    @discardableResult
+    func beginWork(_ stages: [WorkPhase], atOnce: Bool = false) async -> Work? {
         // A pass already under way has already declared what it is made of, and
         // the inner steps of one are not passes of their own : the repair
         // declares the whole of itself and the ordinary pass inside it adds
         // nothing.
-        guard plan == nil else { return }
+        guard plan == nil else { return nil }
 
         // Nothing is guessed for the feeds : `FeedRefresh` says how many it is
         // about to ask for before it asks for any of them, which lands well
         // inside the quarter second before the line appears at all.
         let onThePage = (try? await DigestStore(database).storyCount()) ?? 0
+
+        // Asked again, since the questions above are awaited and a pass may
+        // have begun while they were being answered.
+        guard plan == nil else { return nil }
+
+        passes += 1
+        let pass = Work(id: passes)
+        current = pass
         show(WorkPlan(stages, costing: await costsOfTheModelsWork(stages, floor: onThePage)), atOnce: atOnce)
+        return pass
     }
 
     /// What the model's own work is likely to cost, asked of the store, which
@@ -571,8 +637,14 @@ final class AppModel {
         mirror()
     }
 
-    /// Says the pass is over, once it has been on screen long enough to read.
-    func endWork() {
+    /// Says a pass is over, once it has been on screen long enough to read.
+    ///
+    /// Only the pass named by ``beginWork(_:atOnce:)`` is ended. Anything else,
+    /// `nil` included, is a step of a bigger pass or an end arriving after its
+    /// own pass is over, and neither may close the one that is running.
+    func endWork(_ pass: Work?) {
+        guard let pass, pass == current else { return }
+        current = nil
         plan = nil
         showingWork?.cancel()
         showingWork = nil
@@ -658,6 +730,38 @@ final class AppModel {
 
     /// What synchronization is doing, in terms the sidebar can show.
     private(set) var syncStatus = SyncStatus.idle(lastSynchronized: nil)
+
+    /// When iCloud last said it had finished, kept so that an exchange which
+    /// stops saying anything can fall back on something true rather than on
+    /// nothing.
+    private var lastSynchronized: Date?
+    private var settlingExchange: Task<Void, Never>?
+
+    /// Takes what the engine says, and refuses to let `working` stand for ever.
+    ///
+    /// Every other status is an end : idle, waiting, refused, unavailable. Only
+    /// `working` is a beginning, and only `working` needs somebody to notice
+    /// that its end never came.
+    func report(_ status: SyncStatus) {
+        syncStatus = status
+        settlingExchange?.cancel()
+        settlingExchange = nil
+
+        if case .idle(let moment) = status, let moment { lastSynchronized = moment }
+        guard case .working = status else { return }
+
+        settlingExchange = Task { [weak self] in
+            try? await Task.sleep(for: self?.exchangeStandsFor ?? AppModel.exchangeStandsFor)
+            guard !Task.isCancelled, let self, case .working = syncStatus else { return }
+
+            // Not a failure, and not said as one : the exchange stopped
+            // reporting, which the reader can do nothing about and does not
+            // need telling. What it stops being is a reason to show a ring.
+            Log.sync.notice("An exchange said nothing for a minute : the ring stops standing for it")
+            syncStatus = .idle(lastSynchronized: lastSynchronized)
+            settlingExchange = nil
+        }
+    }
 
     /// What is left of the long work : feeds never fetched, articles with no
     /// vector. Both are questions the store answers, which is what makes the
@@ -765,8 +869,10 @@ final class AppModel {
         sessions: SessionStoring = KeychainSessions(),
         preferences: Preferences = Preferences(),
         announcer: Announcing = Notifier(),
-        locator: Locating = DeviceLocator()
+        locator: Locating = DeviceLocator(),
+        exchangeStandsFor: Duration = AppModel.exchangeStandsFor
     ) {
+        self.exchangeStandsFor = exchangeStandsFor
         self.database = database
         self.credentials = credentials
         self.sessions = sessions
@@ -1395,7 +1501,13 @@ final class AppModel {
         isWorking = true
         defer { isWorking = false }
 
-        await beginWork([.fetching, .indexing])
+        // **Ended by a `defer`, and ended by name.** Run on its own this is the
+        // whole of the work and owns the ring ; run inside a full pass it is
+        // one step of one, is handed no name, and ends nothing. Either way it
+        // cannot leave a ring behind, whichever way it returns.
+        let pass = await beginWork([.fetching, .indexing])
+        defer { endWork(pass) }
+
         moveWork(to: .fetching)
         await JobRunner(FirstFetchJob(database))
             .run(until: deadline, onProgress: progress(of: .fetching))
@@ -1423,8 +1535,8 @@ final class AppModel {
         )
         guard !accepted else { return }
 
+        // Nothing to end here : the work opened the pass and closes its own.
         await exclusively("Finishing the setup") { await self.doOutstandingWork() }
-        endWork()
     }
 
     private func enqueueVectors(for entries: [Entry]) async {
@@ -1482,9 +1594,11 @@ final class AppModel {
     /// Every feed, then everything that is derived from what they brought, then
     /// iCloud. Named step by step, since this is the pass a reader watches.
     private func fullPass() async {
-        await beginWork([
+        let pass = await beginWork([
             .fetching, .indexing, .grouping, .writing, .filing, .tidying, .synchronizing, .exchanging,
         ])
+        defer { endWork(pass) }
+
         moveWork(to: .fetching)
         let summary = await refresher.refreshAll(onProgress: progress(of: .fetching))
         Log.fetch.notice("Full pass : \(summary.newArticles) new articles from \(summary.refreshed) feeds")
@@ -1526,7 +1640,6 @@ final class AppModel {
         // reader opens in the morning is that one rather than last night's.
         await reloadWhatIsShown()
         await countOutstandingWork()
-        endWork()
     }
 
     /// Starts synchronizing with the reader's own iCloud.
@@ -1537,7 +1650,7 @@ final class AppModel {
         guard cloud == nil else { return }
 
         let cloud = CloudSync(database: database) { [weak self] status in
-            Task { @MainActor [weak self] in self?.syncStatus = status }
+            Task { @MainActor [weak self] in self?.report(status) }
         }
         self.cloud = cloud
         await cloud.start()
@@ -1594,9 +1707,11 @@ final class AppModel {
         // asking for a repair is looking at.
         OnDeviceModel.reconsider()
 
-        await beginWork([
+        let pass = await beginWork([
             .synchronizing, .fetching, .indexing, .grouping, .writing, .filing, .tidying, .exchanging,
         ])
+        defer { endWork(pass) }
+
         moveWork(to: .synchronizing)
         await cloud.resetFromScratch()
         await cloud.enqueueEverything()
@@ -2533,7 +2648,17 @@ final class AppModel {
     }
 
     private func catchingUp(_ reason: CatchUp, until deadline: Date?) async {
-        await beginWork([.fetching, .grouping, .writing, .filing], atOnce: reason.isAskedFor)
+        let pass = await beginWork([.fetching, .grouping, .writing, .filing], atOnce: reason.isAskedFor)
+
+        // **The pass outlives this function, and is ended all the same.** The
+        // model's work is the last two stages of it and runs behind the
+        // gesture, in a task of its own, so the pass is handed to it rather
+        // than closed here. Everything else, including a way out added later,
+        // closes it on the way out : a pass that leaves by a door nobody
+        // thought about is a ring that turns for good.
+        var handedOn = false
+        defer { if !handedOn { endWork(pass) } }
+
         moveWork(to: .fetching)
         let fetching = progress(of: .fetching)
         let summary =
@@ -2574,11 +2699,10 @@ final class AppModel {
         // moments the reader is not looking.
         await announceNewArticles()
 
-        guard reason.mayRunTheModel else {
-            endWork()
-            return
-        }
-        enrich(until: deadline)
+        guard reason.mayRunTheModel else { return }
+
+        handedOn = true
+        enrich(until: deadline, pass: pass)
     }
 
     /// What a pull on the front page asks for.
@@ -2635,11 +2759,23 @@ final class AppModel {
     /// first subject was ever asked for, and the reader woke to a page of
     /// written headlines under no subjects at all. Half the time each, and the
     /// subjects get their half whatever the headlines did with theirs.
-    private func enrich(until deadline: Date? = nil) {
-        guard enriching?.isCancelled ?? true else { return }
+    /// - Parameter pass: the pass whose last two stages this is, when it was
+    ///   started by one. It is ended here, on every path : a run standing aside
+    ///   for one already going used to end nothing at all, and the pass that
+    ///   had handed itself over was left with nothing to close it.
+    private func enrich(until deadline: Date? = nil, pass: Work? = nil) {
+        guard enriching?.isCancelled ?? true else {
+            endWork(pass)
+            return
+        }
 
         enriching = Task { [weak self] in
             guard let self else { return }
+            defer {
+                endWork(pass)
+                enriching = nil
+            }
+
             await digestService.enrich(
                 until: deadline,
                 onWriting: progress(of: .writing),
@@ -2651,8 +2787,6 @@ final class AppModel {
             await loadDigest()
             await announceNewStories()
             await announceCollaborations()
-            endWork()
-            enriching = nil
         }
     }
 
