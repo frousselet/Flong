@@ -61,8 +61,8 @@ struct SearchScreen: View {
         .scrollEdgeEffectStyle(.soft, for: .top)
         // And at the foot as well, which no other section needs : this is the
         // one page whose own content sits in the bottom safe area, and a count
-        // or a row of pills with the page passing sharply through it is not a
-        // count anybody can read.
+        // with the page passing sharply through it is not a count anybody can
+        // read.
         .scrollEdgeEffectStyle(.soft, for: .bottom)
         .scrollDismissesKeyboard(.interactively)
         .navigationTitle(Text("Search"))
@@ -85,7 +85,7 @@ struct SearchScreen: View {
                 ContentUnavailableView {
                     Label("Search", systemImage: "magnifyingglass")
                 } description: {
-                    Text("Words, or a query : title:, author:, tag:, is:unread, after:2026-01.")
+                    Text("Say what you are looking for, in your own words.")
                 }
             } else if model.isShowingResults, model.summaries.isEmpty {
                 ContentUnavailableView.search
@@ -162,17 +162,18 @@ struct SearchScreen: View {
 
     // MARK: - What is offered above the keyboard
 
-    /// The row that sits between the page and the search field.
+    /// What sits between the page and the search field.
     ///
     /// Two things, never both : what the query is answering, once there is a
-    /// query, and what the field offers before there is one. A count and a row
-    /// of pills stacked on each other would push the page a further line up
-    /// every time the reader typed a character.
+    /// query, and what is worth searching for before there is one. A count and
+    /// a stack of pills on top of each other would push the page a further line
+    /// up every time the reader typed a character.
     ///
-    /// **No glass.** It sits directly under the search field, which is glass,
-    /// and glass under glass is the one stacking the guidance forbids outright.
-    /// The pills take the ground a card takes, in whichever theme the reader
-    /// chose.
+    /// **Stacked rather than in a row.** A subject is a phrase and phrases are
+    /// not the same length ; a row of them is a row that scrolls sideways, and
+    /// a suggestion the reader has to go looking for is a suggestion that did
+    /// not suggest anything. Three, on their own lines, left where the eye
+    /// already is.
     @ViewBuilder
     private var above: some View {
         if model.isShowingResults, !model.summaries.isEmpty {
@@ -181,33 +182,30 @@ struct SearchScreen: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
-                .background(theme.surface(in: scheme), in: .capsule)
-                .overlay(Capsule().strokeBorder(theme.palette(in: scheme).edge.color))
+                .glassEffect(.regular, in: .capsule)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
-        } else if !model.isShowingResults, !model.searchOffers.isEmpty {
-            ScrollView(.horizontal) {
-                HStack(spacing: 8) {
-                    ForEach(model.searchOffers) { offer in
+        } else if !model.searchSuggestions.isEmpty {
+            GlassEffectContainer(spacing: 8) {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(model.searchSuggestions, id: \.self) { subject in
                         Button {
-                            take(offer)
+                            take(subject)
                         } label: {
-                            Text(verbatim: offer.fragment)
-                                .font(.system(.subheadline, design: .monospaced))
+                            Text(verbatim: subject)
+                                .font(.system(.body, weight: .medium))
                                 .lineLimit(1)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 11)
                         }
                         .buttonStyle(.plain)
-                        .background(theme.surface(in: scheme), in: .capsule)
-                        .overlay(Capsule().strokeBorder(theme.palette(in: scheme).edge.color))
+                        .glassEffect(.regular.interactive(), in: .capsule)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 22)
                 .padding(.vertical, 8)
             }
-            .scrollIndicators(.hidden)
-            .scrollClipDisabled()
         }
     }
 
@@ -220,12 +218,15 @@ struct SearchScreen: View {
         isTyping = false
     }
 
-    /// Takes an offer into the field, and leaves the reader typing.
+    /// Searches for a subject the reader was offered.
     ///
-    /// The keyboard stays up : an offer is half a query, and a reader who has
-    /// just asked for `feed:` is about to be shown which feeds there are.
-    private func take(_ offer: SearchOffer) {
-        model.searchText = offer.query
+    /// A whole search rather than half of one : a subject is what somebody
+    /// would have typed, so taking it is the same as having typed it, keyboard
+    /// down and results up.
+    private func take(_ subject: String) {
+        model.searchText = subject
+        model.remember(subject)
+        isTyping = false
     }
 
     /// Opens an article a search found.
@@ -255,7 +256,7 @@ private struct RecentSearchRow: View {
             Button(action: run) {
                 Label {
                     Text(verbatim: query)
-                        .font(.system(.body, design: .monospaced))
+                        .font(.system(.body))
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } icon: {
