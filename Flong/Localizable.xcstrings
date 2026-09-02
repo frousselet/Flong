@@ -498,7 +498,7 @@
         }
       }
     },
-    "%lld readers have shared their sources so far." : {
+    "%lld readers have shared their sources." : {
       "localizations" : {
         "en" : {
           "variations" : {
@@ -506,13 +506,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld reader has shared their sources so far."
+                  "value" : "%lld reader has shared their sources."
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld readers have shared their sources so far."
+                  "value" : "%lld readers have shared their sources."
                 }
               }
             }
@@ -524,13 +524,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld lecteur a partagé ses sources jusqu'ici."
+                  "value" : "%lld lecteur a partagé ses sources."
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld lecteurs ont partagé leurs sources jusqu'ici."
+                  "value" : "%lld lecteurs ont partagé leurs sources."
                 }
               }
             }
@@ -658,12 +658,12 @@
         }
       }
     },
-    "A source is suggested once ten readers follow it, or once somebody vouched for does." : {
+    "A source is suggested once ten readers follow it, or once a trusted reader does." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Une source est suggérée dès que dix lecteurs la suivent, ou dès qu'une personne de confiance la suit."
+            "value" : "Une source est suggérée dès que dix lecteurs la suivent, ou dès qu'un lecteur de confiance la suit."
           }
         }
       }
@@ -1464,12 +1464,22 @@
         }
       }
     },
-    "Flong asks the address for itself before following it, exactly as it would one you typed." : {
+    "Flong checks the address before following it, as it does one you type." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Flong interroge l'adresse lui-même avant de la suivre, exactement comme une adresse que vous auriez saisie."
+            "value" : "Flong vérifie l'adresse avant de suivre la source, comme pour une adresse que vous saisissez."
+          }
+        }
+      }
+    },
+    "Flong publishes the addresses of the sources you follow. Nothing else : not your name, not an article, not a word you wrote. A secret address is never shared, nor a source behind a password. You can stop whenever you like, and your list is taken back out." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flong publie les adresses des sources que vous suivez. Rien d'autre : ni votre nom, ni un article, ni un mot que vous avez écrit. Une adresse secrète n'est jamais partagée, ni une source protégée par un mot de passe. Vous pouvez arrêter quand vous voulez, et votre liste est retirée."
           }
         }
       }
@@ -1554,16 +1564,6 @@
         }
       }
     },
-    "Its address counts towards what Flong suggests to other readers. A secret address, one with a password and one carrying a parameter you marked as yours are never shared, whatever this says." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Son adresse compte dans ce que Flong suggère aux autres lecteurs. Une adresse secrète, une adresse avec un mot de passe et une adresse portant un paramètre que vous avez désigné comme vôtre ne sont jamais partagées, quoi que dise ce réglage."
-          }
-        }
-      }
-    },
     "Newsmakers" : {
       "comment" : "The collection that lists everybody the articles are about",
       "localizations" : {
@@ -1625,12 +1625,12 @@
         }
       }
     },
-    "Only the addresses of the sources you follow, and never a name, an article or anything you wrote. An address that is itself a secret, one carrying a parameter you marked as yours, and one behind a password are never shared. Turning this off takes your list back out." : {
+    "Only the addresses of the sources you follow. Not your name, not an article, not a word you wrote. A secret address is never shared, nor a source behind a password. Turn this off and your list is taken back out." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Uniquement les adresses des sources que vous suivez, et jamais un nom, un article ou quoi que ce soit que vous ayez écrit. Une adresse qui est elle-même un secret, une adresse portant un paramètre que vous avez désigné comme vôtre et une adresse protégée par un mot de passe ne sont jamais partagées. Désactiver ceci retire votre liste."
+            "value" : "Seulement les adresses des sources que vous suivez. Ni votre nom, ni un article, ni un mot que vous avez écrit. Une adresse secrète n'est jamais partagée, ni une source protégée par un mot de passe. Désactivez, et votre liste est retirée."
           }
         }
       }
@@ -1706,16 +1706,6 @@
         }
       }
     },
-    "Sharing publishes the addresses of the sources you follow, and nothing else : no name, no article, nothing you wrote. The addresses that are secrets, and those carrying a parameter you marked as yours, are never published. You can stop at any time, and your list is taken back out." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le partage publie les adresses des sources que vous suivez, et rien d'autre : pas de nom, pas d'article, rien de ce que vous avez écrit. Les adresses qui sont elles-mêmes des secrets, et celles portant un paramètre que vous avez désigné comme vôtre, ne sont jamais publiées. Vous pouvez arrêter à tout moment, et votre liste est alors retirée."
-          }
-        }
-      }
-    },
     "Stop notifying articles about them" : {
       "localizations" : {
         "fr" : {
@@ -1742,6 +1732,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce site n'a laissé aucune session. Connectez-vous sur sa page, puis dites-le. Une connexion par clé d'accès ne peut pas aboutir ici : choisissez une autre méthode sur le site."
+          }
+        }
+      }
+    },
+    "This source counts towards what Flong suggests to other readers. A secret address and a source behind a password are never shared, whatever this switch says." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette source compte dans ce que Flong suggère aux autres lecteurs. Une adresse secrète et une source protégée par un mot de passe ne sont jamais partagées, quoi que dise cet interrupteur."
           }
         }
       }
@@ -1778,12 +1778,12 @@
         }
       }
     },
-    "What these readers follow is suggested at once, without waiting for ten people to follow it." : {
+    "What these readers follow is suggested straight away, without waiting for ten people." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce que ces lecteurs suivent est suggéré immédiatement, sans attendre que dix personnes le suivent."
+            "value" : "Ce que suivent ces lecteurs est suggéré tout de suite, sans attendre dix personnes."
           }
         }
       }

@@ -422,7 +422,7 @@ struct SourceEditor: View {
                 Text("Popular feeds")
             } footer: {
                 Text(
-                    "Its address counts towards what Flong suggests to other readers. A secret address, one with a password and one carrying a parameter you marked as yours are never shared, whatever this says."
+                    "This source counts towards what Flong suggests to other readers. A secret address and a source behind a password are never shared, whatever this switch says."
                 )
             }
         }

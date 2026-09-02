@@ -58,14 +58,9 @@ struct LocalizationTests {
         // one reader is not `1 lecteurs`. French counts zero in the singular
         // too, which is the whole reason the variation exists rather than an
         // `s` appended to a number.
-        #expect(
-            inFrench("\(0) readers have shared their sources so far.") == "0 lecteur a partagé ses sources jusqu'ici.")
-        #expect(
-            inFrench("\(1) readers have shared their sources so far.") == "1 lecteur a partagé ses sources jusqu'ici.")
-        #expect(
-            inFrench("\(12) readers have shared their sources so far.")
-                == "12 lecteurs ont partagé leurs sources jusqu'ici."
-        )
+        #expect(inFrench("\(0) readers have shared their sources.") == "0 lecteur a partagé ses sources.")
+        #expect(inFrench("\(1) readers have shared their sources.") == "1 lecteur a partagé ses sources.")
+        #expect(inFrench("\(12) readers have shared their sources.") == "12 lecteurs ont partagé leurs sources.")
         #expect(inFrench("Followed by \(12) readers") == "Suivi par 12 lecteurs")
     }
 
