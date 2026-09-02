@@ -98,7 +98,7 @@ struct PopularFeedsView: View {
             Text("This list is made by its readers")
         } footer: {
             Text(
-                "Sharing publishes the addresses of the sources you follow, and nothing else : no name, no article, nothing you wrote. The addresses that are secrets, and those carrying a parameter you marked as yours, are never published. You can stop at any time, and your list is taken back out."
+                "Flong publishes the addresses of the sources you follow. Nothing else : not your name, not an article, not a word you wrote. A secret address is never shared, nor a source behind a password. You can stop whenever you like, and your list is taken back out."
             )
         }
     }
@@ -120,12 +120,12 @@ struct PopularFeedsView: View {
                 Text("Nothing to suggest yet")
                     .font(theme.headline(.headline))
 
-                Text("A source is suggested once ten readers follow it, or once somebody vouched for does.")
+                Text("A source is suggested once ten readers follow it, or once a trusted reader does.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
 
-                Text("\(model.poolContributors) readers have shared their sources so far.")
+                Text("\(model.poolContributors) readers have shared their sources.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -143,7 +143,7 @@ struct PopularFeedsView: View {
         } header: {
             Text("Followed by other readers")
         } footer: {
-            Text("Flong asks the address for itself before following it, exactly as it would one you typed.")
+            Text("Flong checks the address before following it, as it does one you type.")
         }
     }
 

@@ -378,7 +378,7 @@ struct ReaderPanel: View {
             Text("Popular feeds")
         } footer: {
             Text(
-                "Only the addresses of the sources you follow, and never a name, an article or anything you wrote. An address that is itself a secret, one carrying a parameter you marked as yours, and one behind a password are never shared. Turning this off takes your list back out."
+                "Only the addresses of the sources you follow. Not your name, not an article, not a word you wrote. A secret address is never shared, nor a source behind a password. Turn this off and your list is taken back out."
             )
         }
     }
@@ -431,7 +431,7 @@ struct ReaderPanel: View {
         } header: {
             Text("Vouched for")
         } footer: {
-            Text("What these readers follow is suggested at once, without waiting for ten people to follow it.")
+            Text("What these readers follow is suggested straight away, without waiting for ten people.")
         }
     }
 
