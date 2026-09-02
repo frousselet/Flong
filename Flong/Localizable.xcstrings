@@ -1568,6 +1568,17 @@
         }
       }
     },
+    "Fetching the article" : {
+      "comment" : "Said while the page behind a shared excerpt is being fetched.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récupération de l'article"
+          }
+        }
+      }
+    },
     "Flong checks the address before following it, as it does one you type." : {
       "localizations" : {
         "fr" : {
@@ -1690,6 +1701,16 @@
         }
       }
     },
+    "It leaves the collection for everyone. The article itself is untouched." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'article quitte la collection pour tout le monde. L'article lui-même n'est pas touché."
+          }
+        }
+      }
+    },
     "Never suggested, whoever follows them. Only a fingerprint of the address is published, so a private address stays private." : {
       "localizations" : {
         "fr" : {
@@ -1803,6 +1824,27 @@
         }
       }
     },
+    "Open on its own site" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir sur le site"
+          }
+        }
+      }
+    },
+    "Opens the article" : {
+      "comment" : "The hint on a row of a shared collection.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre l'article"
+          }
+        }
+      }
+    },
     "Popular feeds" : {
       "comment" : "The third way to find a source, beside an address and an OPML file : what other readers follow.",
       "localizations" : {
@@ -1882,6 +1924,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Retirer de la collection"
+          }
+        }
+      }
+    },
+    "Remove from the collection?" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer de la collection ?"
           }
         }
       }

@@ -877,6 +877,34 @@ nonisolated extension AppDatabase {
             }
         }
 
+        // What the owner of a shared collection has taken out of it.
+        //
+        // **A list of its own, because one writer per record is what makes the
+        // whole design need no conflict resolution.** A participant's list is
+        // theirs and nobody else may rewrite it, so the owner cannot reach
+        // into somebody's filings and delete one : what they can do is say, in
+        // a record only they write, that a thing is out. Every device applies
+        // it the same way and the answer does not depend on the order the two
+        // records arrive in, which is the property the rest of section 7 is
+        // built on.
+        //
+        // **It is a filter and not a deletion.** The filer's list still holds
+        // the article, and their next edit sends it again : a removal that
+        // deleted rows would be undone by the very next thing they filed. So
+        // nothing is deleted, the row is simply never shown, and applying the
+        // same removal twice does nothing the first did not.
+        migrator.registerMigration("v37.whatTheOwnerTookOut") { db in
+            try db.create(table: "shared_removal") { table in
+                table.column("zone_name", .text).notNull()
+                // The article as everybody's copy of it is identified, which is
+                // what a filer's list carries and what a row is keyed by.
+                table.column("guid", .text).notNull()
+                table.column("removed_at", .datetime).notNull()
+
+                table.primaryKey(["zone_name", "guid"])
+            }
+        }
+
         return migrator
     }
 

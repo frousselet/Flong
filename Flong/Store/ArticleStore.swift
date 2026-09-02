@@ -276,6 +276,37 @@ nonisolated struct ArticleStore: Sendable {
         }
     }
 
+    /// The reader's own copies of pieces somebody shared, by the key that says
+    /// two articles are the same article.
+    ///
+    /// **What a shared collection shows instead of the excerpt.** A recipient
+    /// who follows the same source already holds the article, with its body,
+    /// its read state and whatever they have said about it ; showing them the
+    /// sender's three hundred characters of it would be showing them less than
+    /// they have. ``ArticleKey`` is what answers whether the two are one piece,
+    /// and it is already computed on every row at ingestion.
+    func summaries(matchingKeys keys: [String]) async throws -> [String: ArticleSummary] {
+        guard !keys.isEmpty else { return [:] }
+
+        return try await database.writer.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    \(Self.columns), e.canonical_key AS canonical_key
+                    FROM entry e
+                    JOIN feed f ON f.id = e.feed_id
+                    WHERE e.is_hidden = 0 AND e.duplicate_of IS NULL
+                      AND e.canonical_key IN (\(databaseQuestionMarks(count: keys.count)))
+                    """,
+                arguments: StatementArguments(keys)
+            )
+            .reduce(into: [:]) { found, row in
+                guard let key = row["canonical_key"] as String? else { return }
+                found[key] = ArticleSummary(row: row)
+            }
+        }
+    }
+
     /// The view and the query, as one condition.
     private func condition(
         _ filter: ArticleFilter,

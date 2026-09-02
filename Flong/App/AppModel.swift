@@ -261,6 +261,22 @@ final class AppModel {
     /// reader's own is telling them what they already know.
     private(set) var filedBy: [String: String] = [:]
 
+    /// The opened collection as one run of rows, in date order.
+    ///
+    /// **What the reader filed and what somebody else filed, together.** They
+    /// were two bands under two headings, which said the two were different
+    /// kinds of thing ; they are not, they are what is in the collection. See
+    /// ``CollectionItem``, which also says why an excerpt gives way to the
+    /// reader's own copy of the piece where they hold one.
+    private(set) var collectionItems: [CollectionItem] = []
+
+    /// Which of the excerpts in the open collection this reader filed.
+    ///
+    /// Their own is the one they may always take back. Somebody else's is the
+    /// owner's to take down and nobody else's, which is what
+    /// ``mayTakeDown(_:in:)`` decides.
+    private(set) var myFilings: Set<String> = []
+
     /// Who is in each shared collection, by the zone standing for it.
     ///
     /// Every collection at once rather than the open one, because the grid
@@ -2569,6 +2585,177 @@ final class AppModel {
         decodedPictures = pictures
     }
 
+    // MARK: - Reading an excerpt somebody sent
+
+    /// The article behind the excerpt the reader opened, once the page has been
+    /// asked for it.
+    ///
+    /// **It is never written down.** A shared entry came from a feed this
+    /// device does not follow, and the specification is plain that it must not
+    /// enter `entry` : not counted unread, not purged, not indexed, not
+    /// re-shared. So the page is fetched for the reading and the article is
+    /// held here for as long as the reader is looking at it.
+    private(set) var sharedArticleHTML: String?
+    private(set) var isFetchingSharedArticle = false
+    /// Whether the page was asked for and had nothing to give, which is when
+    /// signing in to the site is worth offering.
+    private(set) var sharedPageGaveNothing = false
+
+    /// The articles fetched for the excerpts read in this session.
+    ///
+    /// **Politeness, and nothing else.** Section 20 asks that a publisher is
+    /// asked for a page because somebody is reading it ; a reader who goes back
+    /// to an article they closed a minute ago is not a second reason to ask.
+    /// Kept in memory alone, since a shared article is not this device's to
+    /// store.
+    private var fetchedSharedArticles: [String: String] = [:]
+
+    /// Opens an excerpt somebody sent, in the reader rather than in a browser.
+    ///
+    /// The excerpt is on screen at once, and the page is asked for behind it :
+    /// what the feed published is worth reading while the article arrives, and
+    /// a publisher who cannot be reached leaves the reader with the excerpt
+    /// rather than with a blank page.
+    ///
+    /// **Asked as the reader where the reader has signed in.** A site they
+    /// subscribe to serves them the article rather than the teaser, in a shared
+    /// collection exactly as in their own stream : ``FullText`` carries the
+    /// session for the site, which is the same session the rest of the
+    /// application uses and is never sent anywhere else.
+    func readShared(_ entry: SharedEntry) async {
+        sharedPageGaveNothing = false
+
+        guard let address = entry.url.flatMap(URL.init(string:)) else {
+            sharedArticleHTML = nil
+            return
+        }
+
+        if let already = fetchedSharedArticles[address.absoluteString] {
+            sharedArticleHTML = already
+            return
+        }
+
+        sharedArticleHTML = nil
+        isFetchingSharedArticle = true
+        defer { isFetchingSharedArticle = false }
+
+        let extracted = await FullText(database, sessions: sessions).article(at: address)
+
+        guard let extracted else {
+            sharedPageGaveNothing = true
+            return
+        }
+        fetchedSharedArticles[address.absoluteString] = extracted
+        sharedArticleHTML = extracted
+    }
+
+    /// Asks the page again, as somebody who has just signed in to the site.
+    func readSharedAgain(_ entry: SharedEntry) async {
+        if let address = entry.url { fetchedSharedArticles[address] = nil }
+        await readShared(entry)
+    }
+
+    /// Forgets what is on screen, when the reader puts the article down.
+    func closeShared() {
+        sharedArticleHTML = nil
+        sharedPageGaveNothing = false
+    }
+
+    // MARK: - Taking something out of a collection
+
+    /// Whether the reader may take one row out of the collection it is in.
+    ///
+    /// Three cases, and the rule behind them is one sentence : **you take back
+    /// what you put in, and the owner may take down anything.**
+    ///
+    /// - An article of their own in a collection of their own : it is their
+    ///   filing, and taking it out is untagging it.
+    /// - An excerpt they filed into somebody else's collection : it is their
+    ///   own list, which they rewrite.
+    /// - An excerpt somebody else filed : only the owner of the collection,
+    ///   through a list of their own saying what is out. See
+    ///   ``SharedRemovals``.
+    func mayTakeDown(_ item: CollectionItem, in kind: ArticleCollection.Kind) -> Bool {
+        switch item {
+        case .held:
+            // An article this device holds is a row of the reader's own
+            // collection ; in one somebody shared, it stands for an excerpt
+            // and taking it out is still about the excerpt.
+            if case .shared(let zone, _) = kind { return isMine(item, inZone: zone) }
+            // A dynamic collection is a description and holds nothing : there
+            // is no filing there to undo.
+            if case .made = kind { return true }
+            return false
+        case .excerpt(let entry):
+            // In somebody else's collection, their own filing and no other.
+            if case .shared = kind { return myFilings.contains(entry.guid) }
+            return ownsShare(of: kind)
+        }
+    }
+
+    /// Takes one row out of the collection it is in.
+    ///
+    /// The three cases of ``mayTakeDown(_:in:)``, each doing the only thing it
+    /// can : untagging the article, rewriting the reader's own list, or writing
+    /// a removal the other devices merge.
+    func takeDown(_ item: CollectionItem, from kind: ArticleCollection.Kind) async {
+        switch (item, kind) {
+        case (.held(let article), .shared(let zone, _)):
+            // Their own copy of a piece they filed into somebody's collection.
+            // What comes out is the filing and never the article, which is
+            // theirs and stays in their stream.
+            guard let guid = guid(ofHeld: article, inZone: zone) else { return }
+            await unfile(guid, fromShared: zone)
+
+        case (.held(let article), _):
+            guard case .made(let name) = kind else { return }
+            try? await collectionStore.remove([article.id], from: name)
+            await apply(marks: [article.id])
+            await pushIfShared(name)
+
+        case (.excerpt(let entry), .shared(let zone, _)):
+            await unfile(entry.guid, fromShared: zone)
+
+        case (.excerpt(let entry), .made(let name)):
+            await sharing.takeDown(entry.guid, fromCollectionNamed: name)
+
+        default:
+            return
+        }
+
+        await loadCollection(kind)
+        await loadCollections()
+    }
+
+    /// Takes one thing out of the reader's own list in somebody's collection.
+    private func unfile(_ guid: String, fromShared zone: String) async {
+        guard let shared = try? await sharedCollections.all().first(where: { $0.zoneName == zone }) else { return }
+        await sharedCloud?.file(nil, removing: guid, inZone: zone, ownedBy: shared.ownerName)
+    }
+
+    /// Whether a row of a collection somebody shared is one the reader filed.
+    private func isMine(_ item: CollectionItem, inZone zone: String) -> Bool {
+        switch item {
+        case .excerpt(let entry): myFilings.contains(entry.guid)
+        case .held(let article): guid(ofHeld: article, inZone: zone).map(myFilings.contains) ?? false
+        }
+    }
+
+    /// The excerpt a shown article stands for, where it stands for one.
+    ///
+    /// A row of a shared collection may be the reader's own copy of the piece,
+    /// shown instead of the excerpt : what comes out of the collection is still
+    /// the excerpt, so the filing has to be found again from the article.
+    private func guid(ofHeld article: ArticleSummary, inZone zone: String) -> String? {
+        let key = ArticleKey.of(
+            url: article.url,
+            title: article.title,
+            publishedAt: article.isDated ? article.date : nil,
+            room: article.url.flatMap(FeedURL.room(of:)) ?? article.domain
+        )
+        return sharedArticles.first { Self.key(of: $0) == key }?.guid
+    }
+
     /// Everybody in one collection, for the page showing it.
     func members(of kind: ArticleCollection.Kind) -> [ShareMember] {
         switch kind {
@@ -2585,7 +2772,13 @@ final class AppModel {
     /// collection without being offered a button that could not work. Leaving
     /// one is a different act and lives where it always has, in the system's
     /// own sheet.
-    func mayRemoveMembers(of kind: ArticleCollection.Kind) -> Bool {
+    func mayRemoveMembers(of kind: ArticleCollection.Kind) -> Bool { ownsShare(of: kind) }
+
+    /// Whether this collection is one of the reader's own that they shared.
+    ///
+    /// The one thing that decides what only an owner may do : invite, take
+    /// somebody out, and take down what somebody else filed.
+    func ownsShare(of kind: ArticleCollection.Kind) -> Bool {
         guard case .made(let name) = kind else { return false }
         return ownedShareZones[name] != nil
     }
@@ -3029,6 +3222,8 @@ final class AppModel {
                 sharedArticles = try await sharedEntries.entries(inZone: zone)
                 filedBy = await namesFiling(inZone: zone, isOwned: false)
                 collectionArticles = []
+                myFilings = await sharedCloud?.filedGUIDs(inZone: zone) ?? []
+                collectionItems = try await merged(held: [], sent: sharedArticles)
                 return
             }
 
@@ -3053,9 +3248,40 @@ final class AppModel {
             } else {
                 filedBy = [:]
             }
+            // The reader's own filings and everybody else's are one list, in
+            // date order. Their own are the articles above ; nothing here is
+            // theirs, since `contributions(to:)` leaves their own list out.
+            myFilings = []
+            collectionItems = try await merged(held: collectionArticles, sent: sharedArticles)
         } catch {
             Log.store.error("A collection could not be read : \(error, privacy: .public)")
         }
+    }
+
+    /// The two halves of a collection as one run of rows.
+    ///
+    /// The excerpts are matched against what this device holds first, so a
+    /// piece the reader follows the source of is shown as their own article
+    /// rather than as three hundred characters of it.
+    private func merged(held: [ArticleSummary], sent: [SharedEntry]) async throws -> [CollectionItem] {
+        let keys = sent.compactMap(Self.key(of:))
+        let local = try await articles.summaries(matchingKeys: keys)
+
+        return CollectionItem.merge(held: held, sent: sent, localCopies: local, key: Self.key(of:))
+    }
+
+    /// What makes an excerpt and an article the same article.
+    ///
+    /// The address where there is one, and the room, the day and the headline
+    /// where there is not : exactly what the ingestion writes against every row
+    /// it stores, so the two are comparable at all.
+    private nonisolated static func key(of entry: SharedEntry) -> String? {
+        let url = entry.url.flatMap(URL.init(string:))
+        let room =
+            url.flatMap(FeedURL.room(of:))
+            ?? entry.feedURL.flatMap(URL.init(string:)).flatMap(FeedURL.room(of:))
+
+        return ArticleKey.of(url: url, title: entry.title, publishedAt: entry.publishedAt, room: room)
     }
 
     /// Opens an article, wherever it was tapped.

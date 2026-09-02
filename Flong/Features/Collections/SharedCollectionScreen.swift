@@ -26,12 +26,17 @@ struct SharedCollectionScreen: View {
     let model: AppModel
     let zone: String
     let title: String
+    /// The window's own : see ``ArticleFeedScreen`` for why it cannot be one
+    /// of this screen's making.
+    let zoom: Namespace.ID
+    /// A piece the reader already holds, which is opened as theirs.
+    let open: (UUID) -> Void
+    /// An excerpt of a piece they do not, which is read here all the same.
+    let read: (SharedEntry) -> Void
 
     /// The collection as the rest of the application names one, which is what
     /// the members of it are asked for by.
     private var kind: ArticleCollection.Kind { .shared(zone: zone, title: title) }
-
-    @Environment(\.openURL) private var openURL
 
     var body: some View {
         ScrollView {
@@ -41,18 +46,16 @@ struct SharedCollectionScreen: View {
                 // reader is owed the people in it before the reading.
                 MembersStrip(members: model.members(of: kind), faces: model.memberFaces)
 
-                ForEach(model.sharedArticles, id: \.guid) { entry in
-                    SharedArticleRow(entry: entry, by: model.filedBy[entry.guid]) {
-                        guard let address = entry.url.flatMap(URL.init(string:)) else { return }
-                        openURL(address)
-                    }
-                }
+                // One run of rows, whoever filed each of them, and the
+                // reader's own copy of a piece where they follow the same
+                // source : see ``CollectionRows``.
+                CollectionRows(model: model, kind: kind, zoom: zoom, open: open, read: read)
 
                 // Under the people rather than over them : a collection with
                 // nobody's filings in it yet still has its members, and an
                 // empty state laid over the page would hide the one thing
                 // there is to see.
-                if model.sharedArticles.isEmpty {
+                if model.collectionItems.isEmpty {
                     ContentUnavailableView {
                         Label("Nothing in it yet", systemImage: "folder.badge.person.crop")
                     } description: {
@@ -170,9 +173,10 @@ struct SharedArticleRow: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        // It leaves the application, and a reader is owed that before they tap
-        // rather than after.
-        .accessibilityHint(Text("Opens the article on its own site"))
+        // The excerpt first and the article behind it : the page it points at
+        // is fetched when the reader opens the row, so what they are promised
+        // is the piece and not a trip to a browser.
+        .accessibilityHint(Text("Opens the article"))
         .overlay(alignment: .bottom) { Divider() }
     }
 }
