@@ -69,6 +69,15 @@ struct SearchScreen: View {
     /// its foot clear, and only then.
     private static let fieldClearance: CGFloat = 56
 
+    /// How far the search field stands from the edge of the window.
+    ///
+    /// **Measured, like the clearance, and for the same reason.** The subjects
+    /// are the field's own furniture and have to start where it starts ; they
+    /// stood in the column the rest of the application is set in, which is
+    /// fourteen points further in, and a stack of pills indented from the field
+    /// it belongs to reads as belonging to the page instead.
+    private static let fieldInset: CGFloat = 8
+
     /// The air between the last subject and the field.
     ///
     /// Small on purpose : the subjects are what the field is about to be filled
@@ -194,13 +203,17 @@ struct SearchScreen: View {
         GeometryReader { page in
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    recents
+                    // The searches stand in the column the rest of the
+                    // application is set in ; the subjects stand under the
+                    // field, which is not in that column.
+                    VStack(alignment: .leading, spacing: 0) { recents }
+                        .padding(.horizontal, 22)
                     Spacer(minLength: Editorial.rhythm)
                     subjects
+                        .padding(.horizontal, Self.fieldInset)
                 }
                 .frame(minHeight: max(0, page.size.height - clearance), alignment: .top)
                 .editorialColumn()
-                .padding(.horizontal, 22)
             }
         }
         .overlay {

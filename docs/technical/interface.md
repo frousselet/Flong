@@ -294,7 +294,9 @@ They travel with the other preferences, in the iCloud key-value store rather tha
 
 **And the subjects are content, not a bar.** Every bar this page could hang them from is the bar the system draws the search field in once the keyboard is up : `safeAreaInset`, `safeAreaBar` and a keyboard `ToolbarItemGroup` were each tried, and the first two draw behind the field while the third never attaches to a field a tab presents. What works is what Photos does : the page is as tall as what is on screen less the strip the field floats over, the searches sit at its head and the subjects at its foot.
 
-How much of that foot to keep clear is the one measured constant here, and it differs by keyboard. With the keyboard down the field sits inside the bottom safe area and the page already stops above it ; with the keyboard up it floats over the content, in no safe area at all, and nothing the page can ask says how tall it is. So the clearance is added in that state and only in that one, which is why the page listens for the keyboard at all.
+**The subjects stand under the field, not in the column.** Everything else on the page is set in the measure the rest of the application is set in, and the field is not : it is the system's, and it stands closer to the edge of the window. Pills indented from the field they belong to read as furniture belonging to the page, so they take the field's own inset instead. That inset is measured, like the clearance below.
+
+How much of that foot to keep clear is the other measured constant here, and it differs by keyboard. With the keyboard down the field sits inside the bottom safe area and the page already stops above it ; with the keyboard up it floats over the content, in no safe area at all, and nothing the page can ask says how tall it is. So the clearance is added in that state and only in that one, which is why the page listens for the keyboard at all.
 
 ## The sources, grouped by publisher
 
