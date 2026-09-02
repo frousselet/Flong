@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The reader is themselves in their own shared collection : CloudKit does not name you to yourself and does not always call you by your own record, so the owner of a collection turned up in it as `Quelqu'un`, with the name and the face they wrote for themselves filed under a different key and dropped.
+- The author of the application is in their own pool without waiting to be sponsored : the sponsorship graph was only ever walked when a record arrived, so a pool on the day its anchor is set walked nothing, and being unauthorised is what stops a device publishing at all.
 - A source removed on one device is removed on the others : the intention to delete a record is written down before it is queued, so a removal decided while the sync engine was not there, dropped by a repair, or refused once by the server is carried out at the next exchange instead of being lost in silence, with a `Tidy the sources` command in the reader's own panel to put right the devices already wrong by offering, by name, every source their iCloud no longer holds.
 - A collection shared with somebody can be opened : `CKSharingSupported` was missing from the `Info.plist`, so the system looked Flong up in the App Store rather than handing it the share, and a recipient tapping an invitation was told they needed a newer version that does not exist.
 - Flong no longer terminates when two rebuilds of the Spotlight index overlap : `beginBatch()` on an index that already has one open throws an Objective-C exception no Swift `catch` can stop, and the window opening, a catch-up bringing articles and singling somebody out could all ask for one at once.

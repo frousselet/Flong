@@ -333,6 +333,9 @@ struct LocalizationTests {
         #expect(String(localized: "Someone", locale: french) == "Quelqu'un")
         #expect(String(localized: "Invited", locale: french) == "Invitation envoyée")
         #expect(String(localized: "Shared this", locale: french) == "A partagé")
+        // It reads on from the name above it, so it agrees with it : `Vous`
+        // takes `Avez partagé` where a third person takes `A partagé`.
+        #expect(String(localized: "You shared this", locale: french) == "Avez partagé")
         #expect(String(localized: "Reading only", locale: french) == "Lecture seule")
         #expect(String(localized: "Remove from the collection", locale: french) == "Retirer de la collection")
         #expect(String(localized: "\("Ada")", locale: french) == "Ada")

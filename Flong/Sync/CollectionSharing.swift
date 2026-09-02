@@ -101,8 +101,16 @@ actor CollectionSharing {
 
         guard let share = await ShareParticipants.share(inZone: zoneID, from: database) else { return [] }
 
-        let me = try? await container.userRecordID().recordName
-        let roster = ShareParticipants.roster(of: share, in: zone, me: me)
+        // **Nothing is written down until the container says who the reader
+        // is.** A roster that could not recognize them files their own row
+        // under a key that is not the one their card is under, so writing it
+        // would take their name and their face off their own row rather than
+        // leaving what was already there.
+        guard let me = try? await container.userRecordID().recordName else {
+            return (try? await members.members(inZone: zone)) ?? []
+        }
+
+        let roster = ShareParticipants.roster(of: share, in: zone, me: me, isOwnShare: owner == nil)
         try? await members.reconcile(roster, inZone: zone)
 
         return (try? await members.members(inZone: zone)) ?? []
@@ -128,7 +136,8 @@ actor CollectionSharing {
             member,
             fromShareIn: zoneID,
             from: container.privateCloudDatabase,
-            me: me
+            me: me,
+            isOwnShare: true
         )
 
         try? await members.reconcile(roster, inZone: existing.zoneName)

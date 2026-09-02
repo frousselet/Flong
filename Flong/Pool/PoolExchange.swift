@@ -256,6 +256,13 @@ actor PoolExchange {
             grew = ((try? await store.absorb(vouches)) ?? false) || grew
         }
 
+        // **And the walk runs whether anything arrived or not.** A pool whose
+        // anchor has just been set has neither an authority record nor a
+        // vouch, so neither of the two above absorbs anything and neither
+        // walks : the root would be left out of its own pool. See
+        // ``PoolStore/resolve()``.
+        grew = ((try? await store.resolve()) ?? false) || grew
+
         // Somebody who was let in since the last pass has a list this device
         // declined to store. The cursor goes back to the beginning so it is
         // asked for again ; a ban needs nothing of the sort, since the rows go

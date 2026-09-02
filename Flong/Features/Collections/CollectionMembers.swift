@@ -223,9 +223,15 @@ struct MembersStrip: View {
     }
 
     /// The one line under a name, where there is anything worth saying.
+    ///
+    /// **It reads on from the name above it, so the verb agrees with it.**
+    /// `Vous / A partagé` is not a sentence anybody would write : it is
+    /// `Vous / Avez partagé` and `Elise / A partagé`. English has no agreement
+    /// to make and says the same thing both ways, which is why the two are two
+    /// strings rather than one with a person in it.
     private func note(about member: ShareMember) -> Text? {
         if member.standing == .invited { return Text("Invited") }
-        if member.isOwner { return Text("Shared this") }
+        if member.isOwner { return member.isMe ? Text("You shared this") : Text("Shared this") }
         if !member.mayWrite { return Text("Reading only") }
         return nil
     }

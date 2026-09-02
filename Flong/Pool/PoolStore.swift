@@ -225,6 +225,24 @@ nonisolated struct PoolStore: Sendable {
         }
     }
 
+    /// Walks the graph and writes down who it reaches, whatever has arrived.
+    ///
+    /// **The root is in by construction, and nothing has to arrive for that to
+    /// be true.** A pool whose anchor has just been set has no authority
+    /// record and no vouches : nobody has banned anybody and nobody has
+    /// sponsored anybody yet. The walk only ever ran on the way in from one of
+    /// those two, so nothing walked, `pool_authorised` stayed empty, and the
+    /// one person who is in without being let in was told they were waiting
+    /// for a sponsorship that cannot come. Worse than the label : being
+    /// unauthorised is what stops a device publishing at all, so the author
+    /// could not contribute to their own pool.
+    @discardableResult
+    func resolve() async throws -> Bool {
+        try await database.writer.write { db in
+            try Self.resolve(in: db, root: self.root)
+        }
+    }
+
     /// Walks the graph out from the root and writes down who it reaches.
     ///
     /// **A list whose writer is no longer reached goes with them**, in the same

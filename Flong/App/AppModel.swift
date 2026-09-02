@@ -2566,7 +2566,24 @@ final class AppModel {
     private static let rosterInterval: TimeInterval = 10 * 60
 
     private func readShareMembers() async {
-        shareMembers = (try? await sharedMembers.all()) ?? [:]
+        // **The reader's own row is drawn from their own profile.** The card
+        // they write is for everybody else to read : showing it back to them
+        // costs a round trip through iCloud and can only ever say what this
+        // device already knows. So their name and their face are filled in
+        // here, and a collection they shared before any of this existed still
+        // shows them as themselves rather than as somebody nobody can name.
+        let mine = name
+        let picture = preferences.picture
+
+        shareMembers = ((try? await sharedMembers.all()) ?? [:]).mapValues { members in
+            members.map { member in
+                guard member.isMe else { return member }
+                var filled = member
+                filled.name = filled.name ?? mine
+                filled.picture = filled.picture ?? picture
+                return filled
+            }
+        }
 
         // The faces of the people who are still here, decoding only the ones
         // whose bytes are not the ones already decoded.
@@ -4014,6 +4031,11 @@ final class AppModel {
         let exchange = PoolExchange(database: database)
         poolExchange = exchange
         poolIdentity = await exchange.identity()
+        // The graph as it stands, before anything is asked of the network. The
+        // root is in without anybody having let them in, and a device that
+        // waited for a record to arrive before working that out would tell the
+        // author they were waiting for a sponsorship that cannot come.
+        try? await pool.resolve()
         await loadPoolStanding()
     }
 
