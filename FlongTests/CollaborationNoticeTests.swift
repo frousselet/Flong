@@ -31,7 +31,7 @@ struct CollaborationNoticeTests {
     @Test("One filing names the person, the collection, and the headline")
     func namesOneFiling() throws {
         let announcement = try #require(
-            Announcement.filings([(collection: "Typographie", by: "Marie", title: "Une réforme")])
+            Announcement.filings([(collection: "Typographie", by: "Marie", title: "Une réforme", picture: nil)])
         )
 
         #expect(announcement.title.contains("Marie"))
@@ -43,7 +43,7 @@ struct CollaborationNoticeTests {
     @Test("A filing by somebody who cannot be named still names the collection")
     func namesTheCollectionAlone() throws {
         let announcement = try #require(
-            Announcement.filings([(collection: "Typographie", by: nil, title: "Une réforme")])
+            Announcement.filings([(collection: "Typographie", by: nil, title: "Une réforme", picture: nil)])
         )
 
         #expect(announcement.title.contains("Typographie"))
@@ -56,8 +56,8 @@ struct CollaborationNoticeTests {
     func countsPeopleAndNotFilings() throws {
         let announcement = try #require(
             Announcement.filings([
-                (collection: "Typographie", by: "Marie", title: "Une réforme"),
-                (collection: "Typographie", by: "Marie", title: "Un rapport"),
+                (collection: "Typographie", by: "Marie", title: "Une réforme", picture: nil),
+                (collection: "Typographie", by: "Marie", title: "Un rapport", picture: nil),
             ])
         )
 
@@ -69,8 +69,8 @@ struct CollaborationNoticeTests {
     func doesNotNameOneOfSeveral() throws {
         let announcement = try #require(
             Announcement.filings([
-                (collection: "Typographie", by: "Marie", title: "Une réforme"),
-                (collection: "Urbanisme", by: "Paul", title: "Un rapport"),
+                (collection: "Typographie", by: "Marie", title: "Une réforme", picture: nil),
+                (collection: "Urbanisme", by: "Paul", title: "Un rapport", picture: nil),
             ])
         )
 
@@ -79,12 +79,32 @@ struct CollaborationNoticeTests {
         #expect(announcement.body.contains("Paul"))
     }
 
+    /// A picture where there is one thing to show a picture of, and none where
+    /// there are several : the cover of the first of four is a claim about the
+    /// other three.
+    @Test("One filing carries its picture, and several carry none")
+    func picturesOnlyOne() throws {
+        let cover = URL(string: "https://feeds.example.com/reforme.jpg")!
+        let one = try #require(
+            Announcement.filings([(collection: "Typographie", by: "Marie", title: "Une réforme", picture: cover)])
+        )
+        #expect(one.picture == cover)
+
+        let several = try #require(
+            Announcement.filings([
+                (collection: "Typographie", by: "Marie", title: "Une réforme", picture: cover),
+                (collection: "Typographie", by: "Marie", title: "Un rapport", picture: nil),
+            ])
+        )
+        #expect(several.picture == nil)
+    }
+
     @Test("Several filings by nobody nameable fall back to the headlines")
     func fallsBackToHeadlines() throws {
         let announcement = try #require(
             Announcement.filings([
-                (collection: "Typographie", by: nil, title: "Une réforme"),
-                (collection: "Typographie", by: nil, title: "Un rapport"),
+                (collection: "Typographie", by: nil, title: "Une réforme", picture: nil),
+                (collection: "Typographie", by: nil, title: "Un rapport", picture: nil),
             ])
         )
 
