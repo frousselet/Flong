@@ -183,14 +183,18 @@ struct SearchScreen: View {
                 subjects
                     .editorialColumn()
                     .padding(.horizontal, Self.fieldInset)
+                    .padding(.top, Self.fieldAir)
                     .padding(.bottom, Self.fieldClearance + Self.fieldAir)
+                    .background(scrim)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         #else
             subjects
                 .editorialColumn()
                 .padding(.horizontal, Self.fieldInset)
+                .padding(.top, Self.fieldAir)
                 .padding(.bottom, Self.fieldAir)
+                .background(scrim)
         #endif
     }
 
@@ -292,6 +296,40 @@ struct SearchScreen: View {
     }
 
     // MARK: - What is worth searching for
+
+    /// What the subjects stand on.
+    ///
+    /// **A page passing sharply behind a pill is a pill you have to look
+    /// twice at.** The subjects are held over a page that scrolls under them,
+    /// and glass takes what is behind it : a headline running under a stack of
+    /// them made three shapes hard to tell from the words they were sitting
+    /// on. What is behind them fades into the page instead, over the top of
+    /// the stack, so there is no edge anywhere.
+    ///
+    /// **The page's own colour, and nothing else.** A material was tried and
+    /// is wrong : `.ultraThinMaterial` has a lightness of its own, so on a dark
+    /// page it laid a pale film exactly where the page should have been
+    /// darkest. A blur is only ever the right answer where what is behind it
+    /// is worth a glimpse ; here what is behind it is a headline the reader is
+    /// not reading, and the honest thing is for it to be gone.
+    ///
+    /// Edge to edge rather than under the pills alone : a wash that stopped
+    /// where the widest pill stops would be a shape of its own, and one more
+    /// thing on the page to explain.
+    private var scrim: some View {
+        Rectangle()
+            .fill(theme.paper(in: scheme))
+            .mask {
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .black, location: 0.35),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            }
+    }
 
     /// The subjects, stacked at the foot of the page.
     ///
