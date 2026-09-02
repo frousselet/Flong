@@ -35,11 +35,13 @@ nonisolated struct CollectionStore: Sendable {
     private let database: AppDatabase
     private let articles: ArticleStore
     private let authors: AuthorStore
+    private let newsmakers: NewsmakerStore
 
     init(_ database: AppDatabase) {
         self.database = database
         self.articles = ArticleStore(database)
         self.authors = AuthorStore(database)
+        self.newsmakers = NewsmakerStore(database)
     }
 
     // MARK: - Names
@@ -76,14 +78,17 @@ nonisolated struct CollectionStore: Sendable {
 
     /// The ones every reader has, which are the state of their own articles.
     ///
-    /// Two of them are about the writers rather than about the articles, and
-    /// they are asked of ``AuthorStore`` : one is a directory of every byline
-    /// there is, the other holds what the writers the reader singled out have
-    /// written. The lot is put back in the order of ``ArticleCollection/BuiltIn``,
-    /// which is the order of the page, so that where a square sits does not
-    /// depend on which store happened to answer it.
+    /// Four of them are about people rather than about articles, and they are
+    /// asked of the two stores that know about people. ``AuthorStore`` answers
+    /// for who signed a piece : a directory of every byline there is, and what
+    /// the writers the reader singled out have written. ``NewsmakerStore``
+    /// answers the same two questions about who a piece is *about*. The lot is
+    /// put back in the order of ``ArticleCollection/BuiltIn``, which is the
+    /// order of the page, so that where a square sits does not depend on which
+    /// store happened to answer it.
     func builtIn() async throws -> [ArticleCollection] {
-        let found = try await articles.builtInCollections() + authors.collections()
+        let found =
+            try await articles.builtInCollections() + authors.collections() + newsmakers.collections()
         return found.sorted { first, second in
             guard case .builtIn(let one) = first.kind, case .builtIn(let other) = second.kind else { return false }
             return one.rank < other.rank

@@ -667,6 +667,60 @@ nonisolated extension AppDatabase {
             }
         }
 
+        // **Who an article is about, which no feed ever says.** A byline is a
+        // field, and the people in the prose are not : they are read out of the
+        // headline, the standfirst and the text, by `NLTagger` and by rules
+        // that are mechanical the whole way down. `Newsmaker` is what reads
+        // them and `docs/technical/newsmakers.md` is why it reads them that way.
+        //
+        // **The column is the resume point, and no rows is not the same
+        // answer.** Reading a person out of an article costs a model pass over
+        // the whole of its text, which is far too much to do inside the write
+        // that stores the article : it is the resumable job of section 15
+        // instead. `newsmakers_at` is what says an article has been read, since
+        // an article that names nobody is a real answer and one told apart from
+        // it only by having no rows would be read again at every pass, for ever.
+        //
+        // **Nothing is filled in here.** v26 could put the writers beside a
+        // hundred thousand articles inside its own migration, because splitting
+        // a byline is a handful of string operations over a few thousand
+        // distinct spellings. This is a model over every article there is, and
+        // a migration is the one place it may not run : it would hold the
+        // launch. The job fills the corpus in afterwards, a batch at a time.
+        migrator.registerMigration("v32.whoTheArticlesAreAbout") { db in
+            try db.create(table: "entry_newsmaker") { table in
+                table.column("entry_id", .blob).notNull().references("entry", onDelete: .cascade)
+                table.column("name", .text).notNull().indexed()
+                // How many times the article named them, which is what orders
+                // the people of one piece : whoever it is about is named all
+                // the way through it, and the expert quoted in the eleventh
+                // paragraph is named once.
+                table.column("mentions", .integer).notNull()
+                table.primaryKey(["entry_id", "name"])
+            }
+
+            try db.alter(table: "entry") { table in
+                table.add(column: "newsmakers_at", .datetime)
+            }
+            // What the job asks for on every batch, which is the articles that
+            // have not been read yet.
+            try db.create(index: "entry_on_newsmakers_at", on: "entry", columns: ["newsmakers_at"])
+
+            // The two decisions, one table apiece and for the same reasons as
+            // the writers' : a favourite gathers a page and an alert interrupts,
+            // and the presence of the row is the whole of what it says.
+            try db.create(table: "favourite_newsmaker") { table in
+                table.primaryKey("id", .blob)
+                table.column("name", .text).notNull().unique()
+                table.column("created_at", .datetime).notNull()
+            }
+            try db.create(table: "notified_newsmaker") { table in
+                table.primaryKey("id", .blob)
+                table.column("name", .text).notNull().unique()
+                table.column("created_at", .datetime).notNull()
+            }
+        }
+
         return migrator
     }
 

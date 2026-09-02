@@ -27,16 +27,15 @@ import SwiftUI
 /// Then the months, which fall out of when a copy was kept and cost the reader
 /// nothing to maintain.
 ///
-/// **The three favourites stand next to each other on purpose.** A star on an
-/// article, a favourite source and a favourite author are three different
-/// judgements - about the piece, about who printed it, about who wrote it - and
-/// a reader who found them at opposite ends of the page would have to work out
-/// that they are not the same thing. Side by side, one holding a morning's
-/// arrivals and the others holding four pieces each, they say it themselves.
+/// **The four favourites stand together for the same reason.** A star on an
+/// article, a favourite source, a favourite author and a favourite newsmaker
+/// are four judgements about four different things : the piece, who printed it,
+/// who wrote it, who it is about. The last of them is the one no feed states
+/// and the one a subscription cannot express.
 ///
-/// **The authors square is the odd one and is last for that reason.** Every
-/// other square opens on a list of articles ; that one opens on a list of
-/// people, and the number under it counts names rather than pieces.
+/// **The two directories are the odd ones and are last for that reason.** Every
+/// other square opens on a list of articles ; those two open on lists of
+/// people, and the number under each counts names rather than pieces.
 ///
 /// **A band with nothing in it is not drawn at all**, its heading included. A
 /// reader who has made no collections is not shown an empty shelf with a label
@@ -257,8 +256,10 @@ struct CollectionSquare: View {
         case .builtIn(.starred): Text("Starred articles")
         case .builtIn(.favouriteSources): Text("Favourite sources")
         case .builtIn(.favouriteAuthors): Text("Favourite authors")
+        case .builtIn(.favouriteNewsmakers): Text("Favourite newsmakers")
         case .builtIn(.annotated): Text("Notes")
         case .builtIn(.authors): Text("Authors")
+        case .builtIn(.newsmakers): Text("Newsmakers")
         case .made(let name), .dynamic(let name): Text(verbatim: name)
         // Named by whoever shared it, so it is their words and not ours.
         case .shared(_, let title): Text(verbatim: title)
@@ -267,13 +268,14 @@ struct CollectionSquare: View {
 
     /// What the number under the name counts.
     ///
-    /// Articles, for every square but one. The authors square opens on a list
-    /// of people, so the number under it has to be the number of rows the
+    /// Articles, for every square but the two directories. Those open on a list
+    /// of people, so the number under them has to be the number of rows the
     /// reader will find there : a square saying `1 240 articles` that opens on
     /// eighty names has told them the wrong thing before they touched it.
     private static func count(of collection: ArticleCollection) -> Text {
         switch collection.kind {
         case .builtIn(.authors): Text("\(collection.count) authors")
+        case .builtIn(.newsmakers): Text("\(collection.count) newsmakers")
         default: Text("\(collection.count) articles")
         }
     }
@@ -288,9 +290,14 @@ struct CollectionSquare: View {
         // not about who printed it : the mark beside the aerial says the two
         // are different judgements before the name under it does.
         case .builtIn(.favouriteAuthors): "signature"
+        // A person in a frame rather than a pen : the favourite writers wear
+        // the signature because what they did is sign, and these are the people
+        // the pieces are pointed at.
+        case .builtIn(.favouriteNewsmakers): "person.crop.rectangle.stack"
         case .builtIn(.annotated): "text.quote"
-        // People rather than articles, which is what this one square holds.
+        // People rather than articles, which is what these two squares hold.
         case .builtIn(.authors): "person.2"
+        case .builtIn(.newsmakers): "person.crop.rectangle.stack"
         case .made: "folder"
         // Described rather than filled, and the mark says which : a reader who
         // wonders why articles appear in one they never touched has been told.

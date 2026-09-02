@@ -184,6 +184,7 @@ final class AppModel {
     private let articles: ArticleStore
     private let collectionStore: CollectionStore
     private let authorStore: AuthorStore
+    private let newsmakerStore: NewsmakerStore
     private let marks: MarkStore
     private let spotlight: SpotlightIndex
     private let digestService: DigestService
@@ -251,6 +252,17 @@ final class AppModel {
     /// to say so and to undo the favourite.
     private(set) var openedAuthor: Author?
     private(set) var authorArticles: [ArticleSummary] = []
+
+    /// Everybody the articles are about, for the newsmakers page.
+    private(set) var newsmakers: [Newsmaker] = []
+    /// The person whose page is open, and what is written about them.
+    ///
+    /// Read from the store rather than picked out of ``newsmakers``, for the
+    /// same reason the writer is : the page can be opened on a favourite no
+    /// article here names yet, and it has to be able to say so and to undo the
+    /// favourite.
+    private(set) var openedNewsmaker: Newsmaker?
+    private(set) var newsmakerArticles: [ArticleSummary] = []
 
     private(set) var article: Article?
     /// Whether the page an article lives at is being fetched, so the reader is
@@ -627,6 +639,9 @@ final class AppModel {
         if stages.contains(.indexing) {
             costs[.indexing] = (try? await VectorStore(database).outstandingCount()) ?? 0
         }
+        if stages.contains(.reading) {
+            costs[.reading] = (try? await NewsmakerStore(database).outstandingCount()) ?? 0
+        }
         return costs
     }
 
@@ -764,13 +779,15 @@ final class AppModel {
     }
 
     /// What is left of the long work : feeds never fetched, articles with no
-    /// vector. Both are questions the store answers, which is what makes the
-    /// work resumable without a checkpoint to keep in step.
+    /// vector, articles nobody has been read out of. All three are questions
+    /// the store answers, which is what makes the work resumable without a
+    /// checkpoint to keep in step.
     private(set) var outstandingFeeds = 0
     private(set) var outstandingVectors = 0
+    private(set) var outstandingNewsmakers = 0
     private(set) var isWorking = false
 
-    var hasOutstandingWork: Bool { outstandingFeeds + outstandingVectors > 0 }
+    var hasOutstandingWork: Bool { outstandingFeeds + outstandingVectors + outstandingNewsmakers > 0 }
 
     /// Whether the list is showing the answer to a query rather than a view.
     var isShowingResults: Bool { query != nil }
@@ -989,6 +1006,7 @@ final class AppModel {
         self.sharedCollections = SharedCollectionStore(database)
         self.sharedEntries = SharedEntryStore(database)
         self.authorStore = AuthorStore(database)
+        self.newsmakerStore = NewsmakerStore(database)
         self.marks = MarkStore(database)
         self.spotlight = SpotlightIndex(articles, subscriptions)
         self.digestService = DigestService(database)
@@ -1385,6 +1403,64 @@ final class AppModel {
         }
     }
 
+    /// The people the reader asked to be told about, in the order a list shows
+    /// them.
+    private(set) var notifiedNewsmakers: [String] = []
+
+    func loadNotifiedNewsmakers() async {
+        notifiedNewsmakers = (try? await newsmakerStore.notified()) ?? []
+    }
+
+    /// Asks to be told when an article names somebody, or stops asking.
+    ///
+    /// **The same switch as the one on a writer, asked of the subject rather
+    /// than of the signature.** A reader who follows Emmanuel Macron wants what
+    /// every paper writes about him, whoever signed it : the piece turns up
+    /// whichever feed carried it and whoever wrote it, which is the whole point
+    /// of asking of the person the article is about.
+    ///
+    /// It singles nobody out : the favourite beside it gathers a page, and this
+    /// interrupts. A reader may well want one without the other.
+    func setNotifications(_ wanted: Bool, forNewsmaker name: String) async {
+        if wanted {
+            guard await authorizeNotifications() else { return }
+            preferences.articlesAnnouncedAt = Date()
+        }
+
+        do {
+            try await newsmakerStore.setNotifies(name, wanted)
+
+            let record = SyncRecords.name(forNotifiedNewsmaker: name)
+            if wanted {
+                await cloud?.enqueue(recordNames: [record])
+            } else {
+                await cloud?.enqueue(deletions: [record])
+            }
+
+            if !newsmakers.isEmpty { await loadNewsmakers() }
+            if openedNewsmaker?.name == name { openedNewsmaker?.notifies = wanted }
+            await loadNotifiedNewsmakers()
+        } catch {
+            failure = .notSaved
+            Log.store.error("The newsmaker could not be set to announce : \(error, privacy: .public)")
+        }
+    }
+
+    /// Reads the people out of what a pass has just brought in.
+    ///
+    /// Bounded twice over : by what arrived, and by
+    /// ``NewsmakerStore/mostBeforeAnnouncing``. This runs inside a pass the
+    /// reader may be watching, so it may take milliseconds and not minutes ;
+    /// everything it does not reach is still in the queue, and the job behind
+    /// the page picks it up.
+    private func readWhoArrived(_ count: Int) async {
+        let store = NewsmakerStore(database)
+        let wanted = min(count, NewsmakerStore.mostBeforeAnnouncing)
+
+        guard let arrived = try? await store.unread(limit: wanted), !arrived.isEmpty else { return }
+        _ = try? await store.read(arrived)
+    }
+
     /// Tells the reader what the sources and the writers they asked about have
     /// just published.
     ///
@@ -1399,13 +1475,14 @@ final class AppModel {
     func announceNewArticles() async {
         let sources = (try? await subscriptions.announcing()) ?? []
         let writers = (try? await authorStore.notified()) ?? []
-        guard !sources.isEmpty || !writers.isEmpty else { return }
+        let people = (try? await newsmakerStore.notified()) ?? []
+        guard !sources.isEmpty || !writers.isEmpty || !people.isEmpty else { return }
 
         guard let since = preferences.articlesAnnouncedAt else {
-            // A source or a writer asked about on another device, whose
-            // decision has just arrived here. What they published before this
-            // device heard about it is not news, so the clock starts now and
-            // this pass says nothing.
+            // A source, a writer or a person asked about on another device,
+            // whose decision has just arrived here. What was published before
+            // this device heard about it is not news, so the clock starts now
+            // and this pass says nothing.
             preferences.articlesAnnouncedAt = Date()
             return
         }
@@ -1637,6 +1714,7 @@ final class AppModel {
     func countOutstandingWork() async {
         outstandingFeeds = (try? await FirstFetchJob(database).remaining()) ?? 0
         outstandingVectors = (try? await VectorStore(database).outstandingCount()) ?? 0
+        outstandingNewsmakers = (try? await NewsmakerStore(database).outstandingCount()) ?? 0
     }
 
     /// Fetches the feeds that have never been fetched, then vectorizes what has
@@ -1654,7 +1732,7 @@ final class AppModel {
         // whole of the work and owns the ring ; run inside a full pass it is
         // one step of one, is handed no name, and ends nothing. Either way it
         // cannot leave a ring behind, whichever way it returns.
-        let pass = await beginWork([.fetching, .indexing])
+        let pass = await beginWork([.fetching, .indexing, .reading])
         defer { endWork(pass) }
 
         moveWork(to: .fetching)
@@ -1667,6 +1745,17 @@ final class AppModel {
         }
         moveWork(to: .indexing)
         await JobRunner(vectorize).run(until: deadline, onProgress: progress(of: .indexing))
+
+        // **Last of the three, and it is the longest.** Reading who an article
+        // is about is a model over the whole of its text, and a corpus that has
+        // just been imported is hours of it. It goes at the end so that a pass
+        // cut short by its deadline has done the fetching and the vectors
+        // first, and so that what it does get through is never lost : the
+        // resume point is written article by article. Nothing travels : each
+        // device reads its own stream, and the names are worked out from the
+        // same rules everywhere.
+        moveWork(to: .reading)
+        await JobRunner(NewsmakersJob(database)).run(until: deadline, onProgress: progress(of: .reading))
 
         await countOutstandingWork()
         await load()
@@ -1744,7 +1833,7 @@ final class AppModel {
     /// iCloud. Named step by step, since this is the pass a reader watches.
     private func fullPass() async {
         let pass = await beginWork([
-            .fetching, .indexing, .grouping, .writing, .filing, .tidying, .synchronizing, .exchanging,
+            .fetching, .indexing, .reading, .grouping, .writing, .filing, .tidying, .synchronizing, .exchanging,
         ])
         defer { endWork(pass) }
 
@@ -1857,7 +1946,7 @@ final class AppModel {
         OnDeviceModel.reconsider()
 
         let pass = await beginWork([
-            .synchronizing, .fetching, .indexing, .grouping, .writing, .filing, .tidying, .exchanging,
+            .synchronizing, .fetching, .indexing, .reading, .grouping, .writing, .filing, .tidying, .exchanging,
         ])
         defer { endWork(pass) }
 
@@ -2085,6 +2174,9 @@ final class AppModel {
         authors = []
         openedAuthor = nil
         authorArticles = []
+        newsmakers = []
+        openedNewsmaker = nil
+        newsmakerArticles = []
         digestTopic = .frontPage
         indexedStories = nil
         searchText = ""
@@ -2578,6 +2670,68 @@ final class AppModel {
         }
     }
 
+    // MARK: - Newsmakers
+
+    /// Everybody the articles on this device are about.
+    ///
+    /// Asked of the articles rather than of a table of people, exactly as the
+    /// writers are : there is no row for a person and there could not be one,
+    /// since what comes out of an article is a piece of text. See
+    /// ``NewsmakerStore``.
+    func loadNewsmakers() async {
+        do {
+            newsmakers = try await newsmakerStore.all()
+        } catch {
+            Log.store.error("The newsmakers could not be read : \(error, privacy: .public)")
+        }
+    }
+
+    /// Singles somebody out, or stops.
+    ///
+    /// The fourth of the judgements, and the only one about what an article is
+    /// *about* : the star is about the piece, the favourite source about who
+    /// printed it, the favourite author about who wrote it. It stars nothing
+    /// and changes nothing about the articles.
+    ///
+    /// **The `no` travels**, like the writers' : one record named after the
+    /// person, deleted when the favourite is taken back, so a decision the
+    /// reader undid is not handed back to them by iCloud.
+    func setFavouriteNewsmaker(_ name: String, _ isFavourite: Bool) async {
+        do {
+            try await newsmakerStore.setFavourite(name, isFavourite)
+
+            let record = SyncRecords.name(forFavouriteNewsmaker: name)
+            if isFavourite {
+                await cloud?.enqueue(recordNames: [record])
+            } else {
+                await cloud?.enqueue(deletions: [record])
+            }
+
+            // Only where there is a list to put right : grouping every name in
+            // the store to update a page nobody has opened is a scan of the
+            // whole corpus for nothing.
+            if !newsmakers.isEmpty { await loadNewsmakers() }
+            if openedNewsmaker?.name == name { openedNewsmaker?.isFavourite = isFavourite }
+            await loadCollections()
+            // Everything written about them, as a favourite writer does for
+            // everything they signed.
+            await synchronizeSpotlight()
+        } catch {
+            failure = .notSaved
+            Log.store.error("The newsmaker could not be marked : \(error, privacy: .public)")
+        }
+    }
+
+    /// Opens one person's page : who they are, and what is written about them.
+    func loadNewsmaker(_ name: String) async {
+        do {
+            openedNewsmaker = try await newsmakerStore.newsmaker(named: name)
+            newsmakerArticles = try await articles.summaries(.newsmaker(name))
+        } catch {
+            Log.store.error("A newsmaker could not be read : \(error, privacy: .public)")
+        }
+    }
+
     func loadCollection(_ kind: ArticleCollection.Kind) async {
         do {
             // A shared one holds nothing of this device's : what is in it came
@@ -2798,7 +2952,8 @@ final class AppModel {
     }
 
     private func catchingUp(_ reason: CatchUp, until deadline: Date?) async {
-        let pass = await beginWork([.fetching, .grouping, .writing, .filing], atOnce: reason.isAskedFor)
+        let pass = await beginWork(
+            [.fetching, .grouping, .writing, .filing, .reading], atOnce: reason.isAskedFor)
 
         // **The pass outlives this function, and is ended all the same.** The
         // model's work is the last two stages of it and runs behind the
@@ -2841,6 +2996,14 @@ final class AppModel {
         // arrived means nothing to tell it, and the check costs a pass over the
         // identifiers rather than over the texts.
         if summary.newArticles > 0 { await synchronizeSpotlight() }
+
+        // **Who this pass brought is read before anything is announced.** The
+        // watermark moves whether a notice was posted or not, so a person read
+        // out of an article a moment after it went by would be a notice the
+        // reader never gets, for ever. What a refresh brings is tens of
+        // articles and the queue hands over the newest first, so this is
+        // milliseconds ; the backlog behind them belongs to the job below.
+        if summary.newArticles > 0 { await readWhoArrived(summary.newArticles) }
 
         // Before the model and outside its guard : an article from a source the
         // reader asked about is news the moment it lands, and nothing has to be
@@ -2937,6 +3100,18 @@ final class AppModel {
             await loadDigest()
             await announceNewStories()
             await announceCollaborations()
+
+            // **After the model and not before it, though it is not the
+            // model.** Reading who an article is about asks `NLTagger` and runs
+            // on every device, where the headlines and the subjects ask a model
+            // that may not be there at all ; but the headlines are what the
+            // reader is looking at while this runs, and a backlog of a hundred
+            // thousand articles put first would hold them behind it. What this
+            // pass brought has already been read, above.
+            moveWork(to: .reading)
+            await JobRunner(NewsmakersJob(database)).run(until: deadline, onProgress: progress(of: .reading))
+            await loadCollections()
+            await countOutstandingWork()
         }
     }
 

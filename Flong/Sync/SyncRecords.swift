@@ -34,6 +34,8 @@ nonisolated enum SyncRecords {
         static let collections = "Collections"
         static let favouriteAuthor = "FavouriteAuthor"
         static let notifiedAuthor = "NotifiedAuthor"
+        static let favouriteNewsmaker = "FavouriteNewsmaker"
+        static let notifiedNewsmaker = "NotifiedNewsmaker"
         /// What a shared collection is called, in the zone standing for it.
         static let sharedCollection = "SharedCollection"
         /// What one participant filed into a shared collection.
@@ -110,6 +112,16 @@ nonisolated enum SyncRecords {
     /// write one record between them, and nothing has to be reconciled.
     static func name(forFavouriteAuthor author: String) -> String { "author-" + digest(author) }
     static func name(forNotifiedAuthor author: String) -> String { "told-" + digest(author) }
+
+    /// One person the reader singled out, named after the person.
+    ///
+    /// A prefix of its own rather than the writers' : the same name may
+    /// perfectly well be a writer the reader follows and somebody they read
+    /// about, and the two decisions are different ones. Sharing a prefix would
+    /// make one record of them, so singling out the writer would silently
+    /// single out the subject.
+    static func name(forFavouriteNewsmaker person: String) -> String { "newsmaker-" + digest(person) }
+    static func name(forNotifiedNewsmaker person: String) -> String { "about-" + digest(person) }
 
     /// One marked article, named after the article and not after the device.
     ///
@@ -365,6 +377,55 @@ nonisolated enum SyncRecords {
 
     static func favouriteAuthor(from record: CKRecord) -> String? {
         guard record.recordType == RecordType.favouriteAuthor,
+            let name = record["name"] as? String,
+            !name.isEmpty
+        else { return nil }
+
+        return name
+    }
+
+    // MARK: - The people the reader singled out
+
+    /// One favourite newsmaker.
+    ///
+    /// **The same shape as a favourite author, and a record of its own.** The
+    /// people themselves are worked out from the articles, so there is nothing
+    /// to send about the thousands nobody has an opinion on ; the record is the
+    /// favourite, and its deletion is the `no`.
+    ///
+    /// The name is what travels and never the articles : who this device has
+    /// read about them is this device's business, and the other one works out
+    /// its own answer from its own stream.
+    static func record(forFavouriteNewsmaker person: String, in zone: CKRecordZone.ID) -> CKRecord {
+        let record = CKRecord(
+            recordType: RecordType.favouriteNewsmaker,
+            recordID: CKRecord.ID(recordName: name(forFavouriteNewsmaker: person), zoneID: zone)
+        )
+        record["name"] = person
+        return record
+    }
+
+    /// One person the reader asked to be told about.
+    static func record(forNotifiedNewsmaker person: String, in zone: CKRecordZone.ID) -> CKRecord {
+        let record = CKRecord(
+            recordType: RecordType.notifiedNewsmaker,
+            recordID: CKRecord.ID(recordName: name(forNotifiedNewsmaker: person), zoneID: zone)
+        )
+        record["name"] = person
+        return record
+    }
+
+    static func favouriteNewsmaker(from record: CKRecord) -> String? {
+        guard record.recordType == RecordType.favouriteNewsmaker,
+            let name = record["name"] as? String,
+            !name.isEmpty
+        else { return nil }
+
+        return name
+    }
+
+    static func notifiedNewsmaker(from record: CKRecord) -> String? {
+        guard record.recordType == RecordType.notifiedNewsmaker,
             let name = record["name"] as? String,
             !name.isEmpty
         else { return nil }

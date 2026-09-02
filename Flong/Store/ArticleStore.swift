@@ -175,6 +175,11 @@ nonisolated enum ArticleFilter: Hashable, Sendable {
     /// of the people beside an article rather than of its byline, since one
     /// byline names two of them as often as not. See ``Author``.
     case author(String)
+    /// Everything written about one person, matched on the name exactly and for
+    /// the same reason. Who an article is about is no field a feed carries : it
+    /// is read out of the prose, and the rows it is asked of are what
+    /// ``NewsmakerStore`` writes. See ``Newsmaker``.
+    case newsmaker(String)
 
     /// The condition and its arguments, as SQL.
     fileprivate func condition(now: Date) -> (String, StatementArguments) {
@@ -191,6 +196,7 @@ nonisolated enum ArticleFilter: Hashable, Sendable {
                 ? ("0", [])
                 : ("e.feed_id IN (\(databaseQuestionMarks(count: ids.count)))", StatementArguments(ids))
         case .author(let name): (AuthorStore.signedBy("e"), [name])
+        case .newsmaker(let name): (NewsmakerStore.about("e"), [name])
         }
     }
 }
@@ -545,6 +551,15 @@ nonisolated struct ArticleStore: Sendable {
                 FROM entry_author a JOIN entry e ON e.id = a.entry_id
                 WHERE \(shown("e")) AND a.name IN (SELECT name FROM favourite_author)
             ) WHERE place <= \(perFavourite)
+            UNION
+            SELECT id FROM (
+                SELECT m.entry_id AS id, ROW_NUMBER() OVER (
+                    PARTITION BY m.name
+                    ORDER BY COALESCE(e.published_at, e.received_at) DESC, e.id DESC
+                ) AS place
+                FROM entry_newsmaker m JOIN entry e ON e.id = m.entry_id
+                WHERE \(shown("e")) AND m.name IN (SELECT name FROM favourite_newsmaker)
+            ) WHERE place <= \(perFavourite)
         )
         """
     }
@@ -683,11 +698,15 @@ nonisolated struct ArticleStore: Sendable {
         case .builtIn(.annotated): ("COALESCE(e.annotation, '') <> ''", [])
         case .builtIn(.favouriteSources): (Self.fromAFavouriteSource("e"), [])
         case .builtIn(.favouriteAuthors): (AuthorStore.byAFavouriteAuthor("e"), [])
+        case .builtIn(.favouriteNewsmakers): (NewsmakerStore.aboutAFavourite("e"), [])
         // A directory of people rather than a set of articles : the square
         // opens on ``AuthorsScreen``, and there is no list of articles for it
         // to answer. Nothing asks this, and it says nothing rather than
         // quietly answering the whole stream.
         case .builtIn(.authors): ("0", [])
+        // The other directory, and the same answer for the same reason : it
+        // opens on ``NewsmakersScreen``, which is a list of names.
+        case .builtIn(.newsmakers): ("0", [])
         case .made(let name):
             (
                 """
@@ -753,25 +772,47 @@ nonisolated struct ArticleStore: Sendable {
         /// about one is news about that one.
         let author: String?
 
+        /// The person the reader asked about whom the article names, when that
+        /// is why it is here at all.
+        ///
+        /// `nil` for an article that arrived because of its source or its
+        /// byline. A piece naming four people where the reader asked about one
+        /// is news about that one. See ``Newsmaker``.
+        let newsmaker: String?
+
         /// What the reader asked about, which is what a notice about several of
         /// these counts them under.
         ///
-        /// The person where there is one, since a person is the more precise
-        /// of the two answers and the one the reader chose to follow wherever
-        /// they write.
-        var subject: String { author ?? source }
+        /// A person where there is one, since a person is the more precise of
+        /// the answers and the one the reader chose to follow across every
+        /// paper. The writer before the subject where an article is somehow
+        /// both : a byline is what the feed itself stated, and who a piece is
+        /// about is what Flong read out of it.
+        var subject: String { author ?? newsmaker ?? source }
+
+        /// Written out rather than left to the memberwise one, so that the two
+        /// people are optional at the call site : an arrival brought in by its
+        /// source names neither, which is the ordinary case.
+        init(id: UUID, title: String, source: String, author: String? = nil, newsmaker: String? = nil) {
+            self.id = id
+            self.title = title
+            self.source = source
+            self.author = author
+            self.newsmaker = newsmaker
+        }
     }
 
     /// What the reader asked to be told about has published since a moment,
     /// oldest first.
     ///
-    /// **One question and not two, which is what keeps an article from being
+    /// **One question and not three, which is what keeps an article from being
     /// announced twice.** A writer the reader follows very often writes for a
-    /// source they follow as well, and asking the two questions separately
-    /// would put that article in both answers : one notice about the source and
-    /// a second, moments later, about the person. It is one row here whichever
-    /// of the two brought it, and the person leads the wording since asking
-    /// about somebody is the more particular of the two requests.
+    /// source they follow as well, and writes about somebody they follow on top
+    /// of that ; asking the questions separately would put that article in
+    /// every answer, and the reader would be told about one piece three times
+    /// over. It is one row here whichever of the three brought it, and a person
+    /// leads the wording since asking about somebody is the most particular of
+    /// the requests.
     ///
     /// **When it arrived here, and not when it was published.** A source that
     /// backfills a month of articles published them a month ago and served them
@@ -793,7 +834,14 @@ nonisolated struct ArticleStore: Sendable {
                            (SELECT a.name FROM entry_author a
                             JOIN notified_author n ON n.name = a.name
                             WHERE a.entry_id = e.id
-                            ORDER BY a.position LIMIT 1) AS author
+                            ORDER BY a.position LIMIT 1) AS author,
+                           -- Most named first : an article about two people the
+                           -- reader follows is announced under the one it is
+                           -- really about.
+                           (SELECT m.name FROM entry_newsmaker m
+                            JOIN notified_newsmaker w ON w.name = m.name
+                            WHERE m.entry_id = e.id
+                            ORDER BY m.mentions DESC, m.name LIMIT 1) AS newsmaker
                     FROM entry e
                     JOIN feed f ON f.id = e.feed_id
                     WHERE e.received_at > ?
@@ -804,6 +852,11 @@ nonisolated struct ArticleStore: Sendable {
                                 SELECT 1 FROM entry_author a
                                 JOIN notified_author n ON n.name = a.name
                                 WHERE a.entry_id = e.id
+                            )
+                            OR EXISTS (
+                                SELECT 1 FROM entry_newsmaker m
+                                JOIN notified_newsmaker w ON w.name = m.name
+                                WHERE m.entry_id = e.id
                             )
                           )
                     ORDER BY e.received_at
@@ -816,7 +869,8 @@ nonisolated struct ArticleStore: Sendable {
                     id: row["id"],
                     title: row["title"],
                     source: row["source"] ?? "",
-                    author: row["author"]
+                    author: row["author"],
+                    newsmaker: row["newsmaker"]
                 )
             }
         }

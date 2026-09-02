@@ -61,6 +61,36 @@ nonisolated struct VectorizeJob: ResumableJob {
     }
 }
 
+/// Reads who the articles are about, a batch at a time.
+///
+/// **The long job this feature could not do without.** Splitting a byline is
+/// string work and happens in the write that stores the article ; reading the
+/// people out of a whole text is a model, and a corpus of a hundred thousand
+/// articles is hours of it. So it is section 15's resumable work : idempotent
+/// batches, a resume point that is the data itself, and automatic resumption at
+/// the next launch.
+///
+/// The resume point is `entry.newsmakers_at`, which is why it exists : an
+/// article that names nobody is a real answer, and one told apart from it only
+/// by having no rows would be read again at every pass, for ever.
+nonisolated struct NewsmakersJob: ResumableJob {
+    let name = "newsmakers"
+    private let newsmakers: NewsmakerStore
+
+    init(_ database: AppDatabase) {
+        self.newsmakers = NewsmakerStore(database)
+    }
+
+    func remaining() async throws -> Int { try await newsmakers.outstandingCount() }
+
+    func step() async throws -> Int {
+        let items = try await newsmakers.unread()
+        guard !items.isEmpty else { return 0 }
+
+        return try await newsmakers.read(items)
+    }
+}
+
 /// Fetches the feeds that have never been fetched.
 ///
 /// This is what an import leaves behind : a thousand subscriptions and nothing

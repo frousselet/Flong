@@ -158,11 +158,16 @@ nonisolated struct Announcement: Hashable, Sendable {
         guard arrivals.count > 1 else {
             return Announcement(
                 title: first.title,
-                // The person and where they wrote it, joined the way the
+                // The person and where it was written, joined the way the
                 // application's own bylines are. Not `X in Y` : a preposition
                 // between two names is a sentence to translate, and it reads
                 // worse than the two names do.
-                body: first.author.map { "\($0) · \(first.source)" } ?? first.source,
+                //
+                // Whoever the reader asked about, be that the writer who signed
+                // it or the person it is about : ``Arrival/subject`` is the one
+                // place that decides which, so the single notice and the
+                // several agree.
+                body: first.subject == first.source ? first.source : "\(first.subject) · \(first.source)",
                 thread: Thread.newArticles,
                 article: first.id
             )

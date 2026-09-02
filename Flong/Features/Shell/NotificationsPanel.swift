@@ -49,10 +49,15 @@ struct NotificationsPanel: View {
         model.notificationStatus == .denied
     }
 
-    /// The sources and the writers the reader asked to be told about, which are
-    /// switches like any other and belong in the one panel that holds them all.
+    /// The sources, the writers and the people the reader asked to be told
+    /// about, which are switches like any other and belong in the one panel
+    /// that holds them all.
     private var sources: [Feed] { model.announcingSources }
     private var writers: [String] { model.notifiedAuthors }
+    private var people: [String] { model.notifiedNewsmakers }
+
+    /// How many rows the announcing list holds, whatever kind each of them is.
+    private var announcing: Int { sources.count + writers.count + people.count }
 
     /// How many rows the panel stands tall enough to show before the rest is
     /// scrolled to.
@@ -73,7 +78,7 @@ struct NotificationsPanel: View {
         // The sources the reader asked about, up to the point where the panel
         // would be the whole page. Past that they scroll, and the reader can
         // pull the panel up to see the rest at once.
-        let rows = min(sources.count + writers.count, Self.shownSources)
+        let rows = min(announcing, Self.shownSources)
         let announced: CGFloat = rows == 0 ? 0 : 40 + CGFloat(rows) * 62
         return (isRefused ? 250 : 132) + switches + announced
     }
@@ -81,7 +86,7 @@ struct NotificationsPanel: View {
     /// What the panel may be pulled to, which is the whole page only when there
     /// is more in it than a panel can hold.
     private var detents: Set<PresentationDetent> {
-        sources.count + writers.count > Self.shownSources ? [.height(height), .large] : [.height(height)]
+        announcing > Self.shownSources ? [.height(height), .large] : [.height(height)]
     }
 
     var body: some View {
@@ -139,9 +144,10 @@ struct NotificationsPanel: View {
         .task {
             await model.refreshNotificationStatus()
             // The sources come with the sidebar, which is always in step ; the
-            // writers are a question nothing else in the window asks, so the
-            // panel asks it when it opens.
+            // writers and the people are questions nothing else in the window
+            // asks, so the panel asks them when it opens.
             await model.loadNotifiedAuthors()
+            await model.loadNotifiedNewsmakers()
         }
     }
 
@@ -153,19 +159,21 @@ struct NotificationsPanel: View {
     /// the decision belongs, and a heading over an empty list would be the
     /// panel asking a question with nowhere to answer it.
     ///
-    /// **One list and not two.** They are two kinds of thing to the machinery
-    /// and one thing to the reader, who is looking at what may interrupt them ;
-    /// a heading apiece over two rows each would be filing where there is
-    /// nothing to file. The glyph says which is which : a publisher wears the
-    /// aerial the sources list gives it, a person wears a signature.
+    /// **One list and not three.** They are three kinds of thing to the
+    /// machinery and one thing to the reader, who is looking at what may
+    /// interrupt them ; a heading apiece over two rows each would be filing
+    /// where there is nothing to file. The glyph says which is which : a
+    /// publisher wears the aerial the sources list gives it, a writer wears a
+    /// signature, and somebody the articles are about wears the mark their own
+    /// square wears.
     ///
     /// A row is one that is on, so switching it off takes it out of the list.
     /// This is where they are all seen at once and quietened, which is what a
     /// reader wants when several turn out to be louder than they expected ;
-    /// adding one is done where the source or the writer is.
+    /// adding one is done where the source, the writer or the person is.
     @ViewBuilder
     private var announcingSources: some View {
-        if !sources.isEmpty || !writers.isEmpty {
+        if announcing > 0 {
             VStack(alignment: .leading, spacing: 8) {
                 Text("New articles")
                     .font(.footnote)
@@ -185,6 +193,12 @@ struct NotificationsPanel: View {
                         ForEach(writers, id: \.self) { writer in
                             announcing(writer, icon: "signature") { wanted in
                                 await model.setNotifications(wanted, forAuthor: writer)
+                            }
+                        }
+                        // Verbatim too, and for the same reason.
+                        ForEach(people, id: \.self) { person in
+                            announcing(person, icon: "person.crop.rectangle.stack") { wanted in
+                                await model.setNotifications(wanted, forNewsmaker: person)
                             }
                         }
                     }

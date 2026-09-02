@@ -20,6 +20,7 @@ nonisolated enum WorkPhase: String, Hashable, Sendable, CaseIterable {
     case fetching
     case grouping
     case indexing
+    case reading
     case writing
     case filing
     case tidying
@@ -33,6 +34,7 @@ nonisolated enum WorkPhase: String, Hashable, Sendable, CaseIterable {
         case .fetching: "Fetching the feeds"
         case .grouping: "Grouping what arrived"
         case .indexing: "Indexing what you kept"
+        case .reading: "Reading who is in the news"
         case .writing: "Writing the headlines"
         case .filing: "Filing the subjects"
         case .tidying: "Tidying up"
@@ -43,12 +45,12 @@ nonisolated enum WorkPhase: String, Hashable, Sendable, CaseIterable {
 
     /// Whether the stage can say how much of itself it has done.
     ///
-    /// Four can, and they are the four that matter : each is a queue the store
+    /// Five can, and they are the five that matter : each is a queue the store
     /// can count, of feeds, of stories or of articles. The others are a single
     /// query, a purge, or an exchange the system runs at its own pace.
     var isCountable: Bool {
         switch self {
-        case .fetching, .writing, .filing, .indexing: true
+        case .fetching, .writing, .filing, .indexing, .reading: true
         case .grouping, .tidying, .synchronizing, .exchanging: false
         }
     }
