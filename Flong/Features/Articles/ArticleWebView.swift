@@ -26,17 +26,13 @@ import WebKit
 struct ArticleWebView {
     let html: String
 
-    /// Whether the page runs under the bar rather than beginning below it.
+    /// Said once the page has finished, with the document that finished.
     ///
-    /// **It decides who owns the inset at the top, and only one of the two may
-    /// own it.** A scroll view adjusting itself for the safe area gives itself
-    /// a top inset, which is a region above the document that can be scrolled
-    /// into and stays there : not a rubber band that springs back, but real
-    /// empty space above the page, white under the controls. That is right
-    /// when the page begins below the bar, and it is exactly wrong when the
-    /// page is meant to run under it, where the view has already been extended
-    /// to the top of the screen and the inset is counted a second time.
-    var runsUnderTheBar = false
+    /// A web view is done when its main frame is, which is after the pictures
+    /// in it have arrived : it is the moment a page stops moving under the
+    /// reader, and therefore the moment there is something worth showing them.
+    /// See ``ArticlePage``, which is what waits for it.
+    var onLoad: ((String) -> Void)?
 
     fileprivate func makeWebView(coordinator: Coordinator) -> WKWebView {
         let configuration = WKWebViewConfiguration()
@@ -49,19 +45,24 @@ struct ArticleWebView {
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = coordinator
         webView.isInspectable = false
+        // **Nothing of its own behind the page.** A web view paints white
+        // under whatever it is showing, which is a white flash before the
+        // article on a dark page and a white band past the end of it when the
+        // reader pulls. What shows through instead is the paper the screen is
+        // already painted in, which is the paper the document states.
+        webView.underPageBackgroundColor = .clear
         #if os(iOS)
-            adjust(webView)
+            webView.isOpaque = false
+            webView.backgroundColor = .clear
+            webView.scrollView.backgroundColor = .clear
         #endif
         return webView
     }
 
     fileprivate func update(_ webView: WKWebView, coordinator: Coordinator) {
-        #if os(iOS)
-            // Asked again on every update : whether there is a picture to run
-            // under the bar is known once the article has been read out of the
-            // store, which is after the view was made.
-            adjust(webView)
-        #endif
+        // Kept up to date rather than handed over once : the closure is a new
+        // one on every pass of the body it was written in.
+        coordinator.onLoad = onLoad
 
         guard coordinator.html != html else { return }
         coordinator.html = html
@@ -69,14 +70,6 @@ struct ArticleWebView {
         // sanitizer must not resolve to anything.
         webView.loadHTMLString(html, baseURL: nil)
     }
-
-    #if os(iOS)
-        private func adjust(_ webView: WKWebView) {
-            let behaviour: UIScrollView.ContentInsetAdjustmentBehavior = runsUnderTheBar ? .never : .always
-            guard webView.scrollView.contentInsetAdjustmentBehavior != behaviour else { return }
-            webView.scrollView.contentInsetAdjustmentBehavior = behaviour
-        }
-    #endif
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -86,6 +79,33 @@ struct ArticleWebView {
     /// reader expects the rest of the web to happen.
     final class Coordinator: NSObject, WKNavigationDelegate {
         var html: String?
+        var onLoad: ((String) -> Void)?
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            finished()
+        }
+
+        /// A load that failed is a load that is over.
+        ///
+        /// Nothing here is fetched from a network, so this is all but
+        /// unreachable ; unreachable and silent is a page that never appears,
+        /// which is worse than a page that appears wrong.
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            finished()
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFailProvisionalNavigation navigation: WKNavigation!,
+            withError error: Error
+        ) {
+            finished()
+        }
+
+        private func finished() {
+            guard let html else { return }
+            onLoad?(html)
+        }
 
         func webView(
             _ webView: WKWebView,

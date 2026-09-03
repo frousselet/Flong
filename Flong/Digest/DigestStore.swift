@@ -63,6 +63,9 @@ nonisolated struct DigestStory: Identifiable, Hashable, Sendable {
     let summary: String?
     /// Whether a model wrote the title or the summary, which the card says.
     let isGenerated: Bool
+    /// And whether what it did was carry them across from the language their
+    /// publisher wrote them in, which the card says differently.
+    let isTranslated: Bool
 
     let articleCount: Int
     /// The rooms talking about it, a few of them shown.
@@ -482,6 +485,7 @@ nonisolated struct DigestStore: Sendable {
             title: story.title,
             summary: story.summary,
             isGenerated: story.isGenerated,
+            isTranslated: story.isTranslated,
             articleCount: members.count,
             feedMarks: Array(marks.prefix(namedFeeds)),
             feedCount: marks.count,

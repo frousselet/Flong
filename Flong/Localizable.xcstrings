@@ -1861,6 +1861,27 @@
         }
       }
     },
+    "The headline and the line above are the publisher's own, translated on this device. Nothing was sent anywhere." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le titre et la ligne ci-dessus sont ceux de l'éditeur, traduits sur cet appareil. Rien n'a été envoyé nulle part."
+          }
+        }
+      }
+    },
+    "Translated by the model. %@" : {
+      "comment" : "Read out where the mark cannot be seen, in front of a line the model carried across.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Traduit par le modèle. %@"
+          }
+        }
+      }
+    },
     "Écologie" : {
       "comment" : "The former name of the Environment section, kept so a rename can find it",
       "localizations" : {
@@ -2787,6 +2808,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Actualités en cours"
+          }
+        }
+      }
+    },
+    "Loading" : {
+      "comment" : "Said by the ring on an article that is being laid out.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement"
           }
         }
       }

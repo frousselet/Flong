@@ -963,6 +963,46 @@ nonisolated extension AppDatabase {
             )
         }
 
+        /// The stories the old rule left with a headline and no line.
+        ///
+        /// A standfirst that repeated the headline or ran to a paragraph was
+        /// dropped, twice, and the story was stamped as asked : it wore a
+        /// written headline over nothing for the rest of its life, and the lead
+        /// of the page was one of them often enough for a reader to notice. The
+        /// line is asked for on its own now, once more, so what is left with
+        /// none has been refused three times rather than two.
+        ///
+        /// Clearing the language they were asked in is what puts them back in
+        /// the question, exactly once : the next pass asks, writes the language
+        /// down again, and they settle wherever the third answer leaves them.
+        migrator.registerMigration("v41.aHeadlineWithNoLineUnderIt") { db in
+            try db.execute(
+                sql: """
+                    UPDATE story SET brief_locale = NULL
+                    WHERE is_generated = 1 AND (summary IS NULL OR summary = '')
+                    """
+            )
+        }
+
+        /// Whether the words on a story are the model's own or an editor's,
+        /// carried across.
+        ///
+        /// A story neither voice will write about is shown as one of its own
+        /// articles, and where no article in it is written in the language the
+        /// reader reads in, that article's headline and line are translated. It
+        /// is still a machine's text and still says so, but it says a different
+        /// thing : these are somebody else's words in your language, not a
+        /// summary written here. The page draws a different mark for it, so the
+        /// two cannot be read as one.
+        ///
+        /// Nothing existing is one : every brief already written was written
+        /// rather than carried across.
+        migrator.registerMigration("v42.carriedAcrossRatherThanWritten") { db in
+            try db.alter(table: "story") { table in
+                table.add(column: "is_translated", .boolean).notNull().defaults(to: false)
+            }
+        }
+
         return migrator
     }
 

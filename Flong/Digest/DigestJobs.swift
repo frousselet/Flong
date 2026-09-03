@@ -341,6 +341,7 @@ nonisolated struct BriefStoriesJob: ResumableJob {
             story.title = brief.title.isEmpty ? story.title : brief.title
             story.summary = brief.summary
             story.isGenerated = brief.isGenerated
+            story.isTranslated = brief.isTranslated
             story.briefLocale = brief.askedIn?.identifier
             story.updatedAt = Date()
             try story.update(db)
@@ -474,7 +475,8 @@ nonisolated struct DigestService: Sendable {
             try db.execute(
                 sql: """
                     UPDATE story
-                    SET summary = NULL, is_generated = 0, brief_locale = NULL, brief_members = NULL
+                    SET summary = NULL, is_generated = 0, is_translated = 0,
+                        brief_locale = NULL, brief_members = NULL
                     WHERE brief_locked = 0
                     """
             )
@@ -503,13 +505,14 @@ nonisolated struct DigestService: Sendable {
             .map { (title: $0["title"] as String, excerpt: $0["excerpt"] as String?) }
         }
 
-        let brief = StorySummarizer.fallback(for: articles ?? [])
+        let brief = StorySummarizer.fallback(for: articles ?? [], readIn: locale)
         try? await database.writer.write { db in
             guard var story = try Story.fetchOne(db, key: storyID) else { return }
             story.title = brief.title.isEmpty ? story.title : brief.title
             story.summary = brief.summary
             // Marked as the reader's choice, so the job does not write over it.
             story.isGenerated = false
+            story.isTranslated = false
             story.briefLocked = true
             story.updatedAt = Date()
             try story.update(db)

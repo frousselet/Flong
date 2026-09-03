@@ -115,7 +115,7 @@ struct StoryScreen: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if let summary = story.summary, !summary.isEmpty {
-                standfirst(summary, isGenerated: story.isGenerated)
+                standfirst(summary, story: story)
             }
 
             facts(story)
@@ -137,17 +137,24 @@ struct StoryScreen: View {
     /// A reader asking who wrote this presses this, which is where they were
     /// already looking.
     @ViewBuilder
-    private func standfirst(_ summary: String, isGenerated: Bool) -> some View {
-        let line = StorySummary(summary: summary, isGenerated: isGenerated, style: .body)
+    private func standfirst(_ summary: String, story: DigestStory) -> some View {
+        let line = StorySummary(
+            summary: summary,
+            isGenerated: story.isGenerated,
+            isTranslated: story.isTranslated,
+            style: .body
+        )
 
-        if isGenerated {
+        if story.isGenerated {
             Button {
                 isExplaining = true
             } label: {
                 line.contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .popover(isPresented: $isExplaining, arrowEdge: .bottom) { explanation }
+            .popover(isPresented: $isExplaining, arrowEdge: .bottom) {
+                explanation(carriedAcross: story.isTranslated)
+            }
         } else {
             line
         }
@@ -160,10 +167,16 @@ struct StoryScreen: View {
     /// written headline gets the article's own, in one tap, and the application
     /// does not argue. It is said here, where it was asked for, rather than
     /// printed on the page whether anybody wondered or not.
-    private var explanation: some View {
+    private func explanation(carriedAcross: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
+            // Two marks, two answers : a line written here out of the articles
+            // below is not the same claim as an editor's own line said in
+            // another language, and a reader pressing the mark is asking which
+            // of the two this is.
             Text(
-                "The headline and the line above were written on this device, from the articles below. Nothing was sent anywhere."
+                carriedAcross
+                    ? "The headline and the line above are the publisher's own, translated on this device. Nothing was sent anywhere."
+                    : "The headline and the line above were written on this device, from the articles below. Nothing was sent anywhere."
             )
             .font(.callout)
 
@@ -236,19 +249,9 @@ struct ArticleScreen: View {
     /// Who published it, as every list that led here already said.
     ///
     /// The publisher rather than the feed : `Le Monde` and not
-    /// `Le Monde - Sport`. The address stands in while the subscriptions are
-    /// being read, and the feed's own title only for an article whose feed has
-    /// gone from under it.
-    /// Whether the article this is about has a picture to run across its head.
-    ///
-    /// Read from the model rather than from the article in hand, so the answer
-    /// exists before the article does and the bar is laid out once.
-    private var hasHeadPicture: Bool {
-        model.article?.id == articleID && model.article?.imageURL != nil
-    }
-
-    /// The group the article came from, which is what names it and what wears
-    /// the mark. Nil where the reader is not subscribed to it any more.
+    /// `Le Monde - Sport`. It is what the bar is titled with and what wears the
+    /// mark in the byline. Nil where the reader is not subscribed to the group
+    /// any more, and the address or the feed's own title stands in then.
     private func publisher(of article: Article) -> SourceIdentity? {
         model.publisher(of: article.domain)
     }
@@ -289,15 +292,14 @@ struct ArticleScreen: View {
         NavigationStack {
             Group {
                 if let article = model.article, article.id == articleID {
-                    ArticleWebView(
+                    ArticlePage(
                         html: ArticleDocument.html(
                             for: article,
                             publisher: publisher(of: article)?.name ?? article.domain ?? article.feedTitle,
                             mark: mark(of: publisher(of: article)),
                             showing: showing,
                             theme: theme
-                        ),
-                        runsUnderTheBar: hasHeadPicture
+                        )
                     )
                     .toolbar { toolbar(for: article) }
                     .overlay(alignment: .bottom) {
@@ -318,39 +320,17 @@ struct ArticleScreen: View {
                     ProgressView()
                 }
             }
-            // **The bar is settled before the article arrives, not after.**
-            // These were inside the branch that draws the article, which is
-            // the branch that appears once it has been read out of the store :
-            // a navigation bar told what to look like after it has already
-            // laid itself out keeps the look it had, which is a band of paper
-            // across the top and the page beginning underneath it. Out here
-            // they are what the bar is from the first frame.
-            //
-            // **The picture at the head runs under the controls**, so the page
-            // starts at the top of the screen. An article with none has
-            // nothing to run under it and its words start where they always
-            // did, below the bar.
-            .ignoresSafeArea(edges: hasHeadPicture ? [.top, .bottom] : .bottom)
-            // **And the theme's colour stops at the edge of that picture.**
-            // Glass decides what to draw from what is behind it, which is the
-            // whole reason these controls may float over a photograph nobody
-            // chose. A tint is an instruction and it overrides that : the
-            // cross over a dark red photograph came out warm brown on dark
-            // red, which is a way out the reader cannot find.
-            //
-            // So the accent reaches this bar only where the bar has the
-            // application's own paper behind it. Where there is a lead, the
-            // controls are the system's, exactly as the note above says they
-            // are, and the theme says nothing about them.
-            .tint(hasHeadPicture ? nil : theme.accent(in: scheme))
-            // **No bar behind them, and no title in it.** The controls are
-            // already on glass of the system's own, which is what keeps them
-            // legible over a photograph ; a band of paper behind them would be
-            // a shelf bolted across the picture. A title cannot be there :
-            // plain type over somebody's photograph is unreadable on half the
-            // photographs there are, and the publisher is named in the byline
-            // under the headline anyway, where the page says it in its own
-            // voice.
+            // The page begins below the bar and runs to the bottom of the
+            // screen : the words are the whole of what is on it, and there is
+            // nothing above them for the controls to float over.
+            .ignoresSafeArea(edges: .bottom)
+            .tint(theme.accent(in: scheme))
+            // **Nothing in the bar and nothing behind it.** A band of paper
+            // with a name written across it is the top of a browser, and the
+            // name in it was the publisher's, which the byline says two lines
+            // lower in the page's own voice. What is left is the paper the
+            // article is printed on, running to the top of the screen, and the
+            // controls floating on the glass the system gives them.
             #if os(iOS)
                 .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
             #endif
@@ -407,7 +387,7 @@ struct ArticleScreen: View {
 
     private var fetching: some View {
         HStack(spacing: 8) {
-            ProgressView().controlSize(.small)
+            WaitingRing(side: 15)
             Text("Fetching the full article")
         }
         .font(theme.metadata)

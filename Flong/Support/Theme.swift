@@ -194,8 +194,9 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
     /// The colour a control takes, or nothing where the system's own is what
     /// is wanted.
     ///
-    /// Nothing under ``standard``, for the reason ``paints`` gives, and nothing
-    /// at all wherever glass floats over a photograph : see ``Themed``.
+    /// Nothing under ``standard``, for the reason ``paints`` gives. A screen
+    /// whose glass sits over a picture nobody chose hands it back too : see
+    /// ``Themed``.
     func accent(in scheme: ColorScheme) -> Color? {
         paints ? palette(in: scheme).accent.color : nil
     }
@@ -418,13 +419,14 @@ struct Themed: ViewModifier {
                 // line without a screen having heard of a palette.
                 .foregroundStyle(palette.ink.color)
                 // **A tint stops at the edge of a photograph.** Glass adapts
-                // what it draws to whatever is behind it, which is the whole
-                // reason the controls on an article may float over a picture
-                // nobody chose ; a tint is an instruction, and an instruction
-                // overrides the adaptation. A warm brown cross over a red
-                // photograph is a control the reader cannot find. So a screen
-                // whose glass sits over an image hands the tint back to the
-                // system, which ``ArticleScreen`` does with ``Theme/accent(in:)``.
+                // what it draws to whatever is behind it ; a tint is an
+                // instruction, and an instruction overrides the adaptation. A
+                // warm brown cross over a red photograph is a control the
+                // reader cannot find. So a screen whose glass sits over a
+                // picture nobody chose hands the tint back to the system with
+                // ``Theme/accent(in:)``. The article's page did that while a
+                // photograph ran under its controls ; it has none now, and the
+                // rule is here for the next screen that puts glass over one.
                 .tint(palette.accent.color)
                 // A list draws the system's grouped background, and a themed
                 // page with a grey trough down the middle of it is a page in

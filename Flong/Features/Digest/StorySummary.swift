@@ -39,6 +39,9 @@ struct StorySummary: View {
     let summary: String
     /// Whether a model wrote the headline or this line. See `Story`.
     let isGenerated: Bool
+    /// Whether what the model did was carry them across from another language
+    /// rather than write them, which is a different mark and a different thing.
+    var isTranslated = false
     /// The step of the scale the line is set at : a row of the front page can
     /// spare less than a story's own page.
     var style: Font.TextStyle = .subheadline
@@ -65,9 +68,7 @@ struct StorySummary: View {
             // the model` is the application talking about itself over the top
             // of the news. What a reader hears is the one place the mark cannot
             // be seen, and it is not a caption, it is the mark read out.
-            .accessibilityLabel(
-                isGenerated ? Text("Written by the model. \(summary)") : Text(verbatim: summary)
-            )
+            .accessibilityLabel(said)
     }
 
     /// The sentence, with the mark of who wrote it at the head of it.
@@ -89,10 +90,33 @@ struct StorySummary: View {
 
         // A step quieter than the words it stands in front of, and a size
         // under them : it says who wrote them and is not one of them.
-        return Text(Image(systemName: "text.line.3.summary"))
+        return Text(Image(systemName: mark))
             .font(markFont)
             .foregroundStyle(.tertiary)
             + Text(verbatim: " ") + sentence
+    }
+
+    /// **Two marks, because they say two things.** A summary written on this
+    /// device out of the articles underneath is one thing ; an editor's own
+    /// line, carried across into the reader's language, is another. Both are a
+    /// machine's doing and both are marked, and a reader who cannot tell them
+    /// apart cannot tell whose words they are reading. The glyph is the
+    /// system's own for translation, which is where the reader has met it.
+    private var mark: String {
+        isTranslated ? "translate" : "text.line.3.summary"
+    }
+
+    /// The mark, read out, since a glyph inside a sentence is nothing to
+    /// VoiceOver.
+    ///
+    /// Said here and nowhere else : the page says it in a mark and not in
+    /// words, and a line under every summary reading `written by the model`
+    /// would be the application talking about itself over the top of the news.
+    private var said: Text {
+        guard isGenerated else { return Text(verbatim: summary) }
+        return isTranslated
+            ? Text("Translated by the model. \(summary)")
+            : Text("Written by the model. \(summary)")
     }
 
     /// The step of the scale the mark is set at, which is under the words it

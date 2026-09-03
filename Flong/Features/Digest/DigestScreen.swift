@@ -560,6 +560,7 @@ struct StoryRow: View {
             StorySummary(
                 summary: summary,
                 isGenerated: story.isGenerated,
+                isTranslated: story.isTranslated,
                 style: standfirst,
                 lines: 3
             )

@@ -73,18 +73,15 @@ struct SharedArticleScreen: View {
         )
     }
 
-    private var hasHeadPicture: Bool { entry.imageURL != nil }
-
     var body: some View {
         NavigationStack {
-            ArticleWebView(
+            ArticlePage(
                 html: ArticleDocument.html(
                     for: article,
                     publisher: entry.sourceTitle ?? article.domain,
                     showing: model.sharedArticleHTML == nil ? .feed : .page,
                     theme: theme
-                ),
-                runsUnderTheBar: hasHeadPicture
+                )
             )
             .toolbar { toolbar }
             .overlay(alignment: .bottom) {
@@ -99,8 +96,14 @@ struct SharedArticleScreen: View {
                     }
                 }
             }
-            .ignoresSafeArea(edges: hasHeadPicture ? [.top, .bottom] : .bottom)
-            .tint(hasHeadPicture ? nil : theme.accent(in: scheme))
+            .ignoresSafeArea(edges: .bottom)
+            .tint(theme.accent(in: scheme))
+            // No band across the top, for the reason ``ArticleScreen`` gives :
+            // what is behind the controls is the paper the article is printed
+            // on, and nothing else.
+            #if os(iOS)
+                .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+            #endif
         }
         .task { await model.readShared(entry) }
         .onDisappear { model.closeShared() }
@@ -153,7 +156,7 @@ struct SharedArticleScreen: View {
     /// says the rest is coming rather than standing in front of it.
     private var fetching: some View {
         HStack(spacing: 8) {
-            ProgressView()
+            WaitingRing(side: 15)
             Text("Fetching the article")
                 .font(theme.metadata)
         }
