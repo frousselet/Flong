@@ -61,6 +61,29 @@ final class ReaderPanelUITests: XCTestCase {
         XCTAssertTrue(tidy.isHittable, "And it can be pressed")
     }
 
+    /// The repair for an iCloud out of step is offered to everybody.
+    ///
+    /// It shipped behind `#if DEBUG` for a while, so a release build had the
+    /// one command that puts a drifted device right and no way to reach it.
+    /// This is what notices if it goes back behind a build flag.
+    @MainActor
+    func testResynchronizingIsReachableInEveryBuild() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        let face = app.buttons["reader"].firstMatch
+        XCTAssertTrue(face.waitForExistence(timeout: 20))
+        face.tap()
+
+        let data = app.buttons["reader-data"].firstMatch
+        XCTAssertTrue(data.waitForExistence(timeout: 5))
+        data.tap()
+
+        let repair = app.buttons["force-synchronization"].firstMatch
+        XCTAssertTrue(repair.waitForExistence(timeout: 5), "The repair stands in `Your data`")
+        XCTAssertTrue(repair.isHittable, "And it can be pressed")
+    }
+
     /// Every subject the panel names leads somewhere.
     ///
     /// The rows are the whole of the panel's purpose : it shows the reader and
