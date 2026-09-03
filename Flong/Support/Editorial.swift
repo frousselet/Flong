@@ -101,19 +101,34 @@ struct LiveDot: View {
 ///
 /// It tells a burst from a trickle at a glance, which is the one thing a number
 /// cannot say.
+///
+/// **It scales to itself, and the number beside it is the comparison.** One
+/// row's busiest moment is the top of that row. Scaled instead against the
+/// busiest source of a whole page, as the figures first drew them, five of six
+/// publishers came out as a flat run of hairlines : the shape is there to say
+/// whether a week was steady or had a Thursday in it, and a shape flattened to
+/// nothing says neither.
 struct Sparkline: View {
     let values: [Int]
 
     var body: some View {
         GeometryReader { geometry in
             let peak = max(values.max() ?? 1, 1)
-            let width = geometry.size.width / CGFloat(max(values.count, 1))
+            // **The gap gives way before the bar does.** A fixed gap beside a
+            // bar clamped to a minimum width is a row that adds up to more than
+            // it was given : a hundred and thirteen months of arrivals in sixty
+            // points ran clean off the end of its own row and drew a dotted
+            // rule across the source beside it. The slot is the width divided,
+            // and the gap is a share of the slot, so the sum is the width
+            // however many marks there are.
+            let slot = geometry.size.width / CGFloat(max(values.count, 1))
+            let gap = min(1.5, slot * 0.3)
 
-            HStack(alignment: .bottom, spacing: 1.5) {
+            HStack(alignment: .bottom, spacing: gap) {
                 ForEach(Array(values.enumerated()), id: \.offset) { _, value in
                     Capsule()
                         .frame(
-                            width: max(width - 1.5, 1),
+                            width: max(slot - gap, 0.5),
                             height: max(geometry.size.height * CGFloat(value) / CGFloat(peak), 1.5)
                         )
                 }

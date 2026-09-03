@@ -89,7 +89,40 @@ struct ReaderCorner: ToolbarContent {
             }
         }
         ToolbarItem(placement: .primaryAction) {
+            StatisticsButton(model: model)
+        }
+        ToolbarItem(placement: .primaryAction) {
             ReaderButton(model: model)
+        }
+    }
+}
+
+/// The way to what the reader's stream adds up to, beside the reader themselves.
+///
+/// **In this corner rather than the other one.** The corner opposite holds what
+/// a reader tends : the sources they follow, the subjects they nudge, what
+/// Flong may interrupt them for. Nothing here is tended. It is a page about the
+/// person and their reading, in the same sense as the face beside it, and it
+/// belongs where the rest of what is theirs already is.
+///
+/// A chart for a mark, since what it opens is chart-shaped and there is no
+/// glyph for arithmetic. Beside the face and not behind it : a figure nobody
+/// can find is a figure nobody reads, and two presses is where a page like this
+/// goes to be forgotten.
+struct StatisticsButton: View {
+    let model: AppModel
+
+    @State private var isOpen = false
+
+    var body: some View {
+        Button {
+            isOpen = true
+        } label: {
+            Label("Statistics", systemImage: "chart.pie")
+        }
+        .accessibilityIdentifier("statistics")
+        .sheet(isPresented: $isOpen) {
+            StatisticsPanel(model: model)
         }
     }
 }

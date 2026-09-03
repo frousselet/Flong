@@ -12,6 +12,39 @@
         }
       }
     },
+    "%@ of arrivals" : {
+      "comment" : "Under the count of articles that arrived twice : what share of everything that came in they were.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ des arrivées"
+          }
+        }
+      }
+    },
+    "%@ of them" : {
+      "comment" : "Under the count of articles read : what share of the arrivals they are.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ d'entre eux"
+          }
+        }
+      }
+    },
+    "%@ on the stretch before" : {
+      "comment" : "Under a figure : how it compares with the same length of time just before.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ par rapport à la période précédente"
+          }
+        }
+      }
+    },
     "%@ · %lld results" : {
       "comment" : "Under a search read as a sentence. The first argument is what it was understood to ask for, the second how many articles answered.",
       "localizations" : {
@@ -177,6 +210,46 @@
         }
       }
     },
+    "%lld arrivals were an article you already had, and were not shown again." : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld arrival was an article you already had, and was not shown again."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld arrivals were an article you already had, and were not shown again."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld arrivée était un article que vous aviez déjà, et n'a pas été montrée une seconde fois."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld arrivées étaient des articles que vous aviez déjà, et n'ont pas été montrées une seconde fois."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld articles" : {
       "localizations" : {
         "en" : {
@@ -250,6 +323,47 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld auteurs"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld feeds" : {
+      "comment" : "Under the number of publishers : how many sources they were followed through.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld feed"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld feeds"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld fil"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld fils"
                 }
               }
             }
@@ -538,6 +652,47 @@
         }
       }
     },
+    "%lld read" : {
+      "comment" : "Beside a count of arrivals : how many of them were read.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld read"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld read"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lu"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld lus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld readers have shared their sources." : {
       "localizations" : {
         "en" : {
@@ -658,6 +813,47 @@
         }
       }
     },
+    "%lld signs" : {
+      "comment" : "The middle length of what a source puts in its feed, in characters.",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sign"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld signs"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld signe"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld signes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld stories" : {
       "localizations" : {
         "en" : {
@@ -694,6 +890,77 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "1 month" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 mois"
+          }
+        }
+      }
+    },
+    "1 week" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 semaine"
+          }
+        }
+      }
+    },
+    "1 year" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 an"
+          }
+        }
+      }
+    },
+    "24 h" : {
+      "comment" : "A window of the statistics page : the last twenty-four hours.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "24 h"
+          }
+        }
+      }
+    },
+    "3 months" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 mois"
+          }
+        }
+      }
+    },
+    "6 months" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "6 mois"
+          }
+        }
+      }
+    },
+    "9 months" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "9 mois"
           }
         }
       }
@@ -950,6 +1217,17 @@
         }
       }
     },
+    "All" : {
+      "comment" : "The widest window of the statistics page : everything the stream holds.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout"
+          }
+        }
+      }
+    },
     "All articles" : {
       "localizations" : {
         "fr" : {
@@ -1081,6 +1359,26 @@
         }
       }
     },
+    "Arrivals through the day" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les arrivées au fil de la journée"
+          }
+        }
+      }
+    },
+    "Arrivals, and what you read" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui arrive, et ce que vous lisez"
+          }
+        }
+      }
+    },
     "Art" : {
       "localizations" : {
         "fr" : {
@@ -1102,12 +1400,32 @@
         }
       }
     },
+    "Articles" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Articles"
+          }
+        }
+      }
+    },
     "Articles appear as they arrive." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les articles apparaissent à mesure qu'ils arrivent."
+          }
+        }
+      }
+    },
+    "Articles over time" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les articles au fil du temps"
           }
         }
       }
@@ -1128,6 +1446,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Intelligence artificielle"
+          }
+        }
+      }
+    },
+    "As the digest filed the stories" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Selon le classement des actualités"
           }
         }
       }
@@ -1225,6 +1553,17 @@
         }
       }
     },
+    "Busiest" : {
+      "comment" : "In the middle of the day dial : the hour most articles arrive in.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le plus actif"
+          }
+        }
+      }
+    },
     "Business" : {
       "localizations" : {
         "fr" : {
@@ -1253,6 +1592,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Par source"
+          }
+        }
+      }
+    },
+    "Bylines" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signatures"
           }
         }
       }
@@ -1461,6 +1810,17 @@
         }
       }
     },
+    "Date" : {
+      "comment" : "The axis a chart of arrivals is drawn along. Never displayed, read out to VoiceOver.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date"
+          }
+        }
+      }
+    },
     "Default" : {
       "localizations" : {
         "fr" : {
@@ -1573,6 +1933,26 @@
         }
       }
     },
+    "In the news" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans l'actualité"
+          }
+        }
+      }
+    },
+    "Languages" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Langues"
+          }
+        }
+      }
+    },
     "Last refreshed in the background %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1615,12 +1995,32 @@
         }
       }
     },
+    "Nothing arrived over this stretch" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien n'est arrivé sur cette période"
+          }
+        }
+      }
+    },
     "Nothing of yours is published until a member brings you in." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rien de vous n'est publié tant qu'un membre ne vous a pas fait entrer."
+          }
+        }
+      }
+    },
+    "Nothing yet" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien pour l'instant"
           }
         }
       }
@@ -1666,12 +2066,42 @@
         }
       }
     },
+    "Said twice" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dit deux fois"
+          }
+        }
+      }
+    },
     "Source code" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Code source"
+          }
+        }
+      }
+    },
+    "Statistics" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statistiques"
+          }
+        }
+      }
+    },
+    "The flow" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le flux"
           }
         }
       }
@@ -1707,12 +2137,52 @@
         }
       }
     },
+    "They give you a headline" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elles donnent un titre"
+          }
+        }
+      }
+    },
+    "They give you the article" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elles donnent l'article"
+          }
+        }
+      }
+    },
+    "Through the day" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Au fil de la journée"
+          }
+        }
+      }
+    },
     "Version %@" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Version %@"
+          }
+        }
+      }
+    },
+    "What lands in the feed" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui arrive dans le flux"
           }
         }
       }
@@ -1743,6 +2213,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce que vous gardez circule entre vos appareils par votre iCloud. Rien d'autre ne quitte celui-ci, hormis les requêtes vers les flux eux-mêmes. Pas de télémétrie, pas de traceur, aucun tiers."
+          }
+        }
+      }
+    },
+    "Who published" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qui publie"
           }
         }
       }
