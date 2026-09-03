@@ -1003,7 +1003,58 @@ nonisolated extension AppDatabase {
             }
         }
 
+        migrator.registerMigration("v43.anImportThatSurvivesTheLaunch", migrate: createImportJob)
+
         return migrator
+    }
+
+    /// An import of a remote account, written down so it can be finished later.
+    ///
+    /// Section 19 of the specification asks for a resumable initial import, and
+    /// an account of sixty feeds is minutes of network : the phone locks, the
+    /// application is put away, and without a row here the reader starts again
+    /// from nothing. What is written is where each stream got to, which is the
+    /// continuation token the service itself hands out, so a resumption asks for
+    /// the next page rather than for the first one again.
+    ///
+    /// **One import at a time**, and it holds no secret : the API password is in
+    /// the keychain under the job's identifier, as `docs/technical/credentials.md`
+    /// requires of every secret, and it is deleted the moment the import ends.
+    private static func createImportJob(_ db: Database) throws {
+        try db.create(table: "import_job") { table in
+            table.primaryKey("id", .blob)
+            table.column("endpoint", .text).notNull()
+            table.column("username", .text).notNull()
+            table.column("started_at", .datetime).notNull()
+            table.column("depth", .integer).notNull().defaults(to: 500)
+            table.column("wants_favourites", .boolean).notNull().defaults(to: true)
+            table.column("took_subscriptions", .boolean).notNull().defaults(to: false)
+            table.column("favourites_continuation", .text)
+            table.column("took_favourites", .boolean).notNull().defaults(to: false)
+            table.column("added", .integer).notNull().defaults(to: 0)
+            table.column("merged", .integer).notNull().defaults(to: 0)
+            table.column("articles", .integer).notNull().defaults(to: 0)
+            table.column("favourites", .integer).notNull().defaults(to: 0)
+            table.column("favourites_elsewhere", .integer).notNull().defaults(to: 0)
+        }
+
+        // Every subscription the service listed, ticked or not : the row is what
+        // the picker was showing, and an import finished a day later shows the
+        // same list rather than asking the service again and finding it changed.
+        try db.create(table: "import_source") { table in
+            table.column("job_id", .blob).notNull().references("import_job", onDelete: .cascade)
+            table.column("stream_id", .text).notNull()
+            table.column("address", .text).notNull()
+            table.column("title", .text).notNull().defaults(to: "")
+            table.column("site_address", .text)
+            table.column("icon_address", .text)
+            table.column("is_chosen", .boolean).notNull().defaults(to: true)
+            table.column("wants_articles", .boolean).notNull().defaults(to: false)
+            table.column("continuation", .text)
+            table.column("fetched", .integer).notNull().defaults(to: 0)
+            table.column("is_done", .boolean).notNull().defaults(to: false)
+            table.primaryKey(["job_id", "stream_id"])
+        }
     }
 
     /// Writes every stored byline the way ``Author/name(from:)`` spells it.

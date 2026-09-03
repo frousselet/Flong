@@ -761,11 +761,13 @@ This entry point is local to the machine ; it is neither remote nor available wi
 
 **Import from an existing service** : FreshRSS and Miniflux through their API, Feedbin and Feedly through theirs. Subscriptions, labels, stars and read states are retrieved, after which Flong runs on its own. Folders are read for the subscriptions inside them and not kept, as an OPML file's tree is not. No permanent synchronization is kept with the origin service.
 
+The reader chooses subscription by subscription, and a subscription already followed is merged rather than duplicated : what they decided about a source they already have outranks what the account says about it. Read states and stars are a union with what this device already holds and never a correction of it, so an import can be run twice and marks nothing unread. A star of a source the reader did not take is counted and reported rather than turned into a subscription nobody asked for. `docs/technical/service-import.md` sets out how much history is brought and why the identity of an imported article is a guess with a safety net.
+
 **Query translation** from FreshRSS to the Flong language, with an explicit report of the expressions that could not be translated rather than a silent approximate conversion.
 
 **Export** : OPML for subscriptions, JSON for everything, tags, rules, queries, collections and annotations included. A complete export must be able to rebuild the state of the application on a fresh install.
 
-The initial import runs in a resumable task with system progress.
+The initial import runs in a resumable task with system progress : the resume point is written down after every page, the system is asked to see the task through so the reader may leave, and where it refuses the screen holds them and says why. An import left unfinished is offered at the next launch rather than started.
 
 ---
 

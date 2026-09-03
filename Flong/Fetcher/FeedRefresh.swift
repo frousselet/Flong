@@ -35,6 +35,16 @@ nonisolated struct RefreshSummary: Hashable, Sendable {
     var attempted: Int { refreshed + unchanged + failed }
 }
 
+/// Which row one article landed in, and whether it had never been seen.
+///
+/// The identifier is what a caller that has something more to say about the
+/// article needs : an import carries the read and starred state of the account
+/// it came from, and can only apply it to a row it can name.
+nonisolated struct ArticleWrite: Hashable, Sendable {
+    let id: UUID
+    let isNew: Bool
+}
+
 /// Fetches feeds, reads them, and writes what they hold into the store.
 ///
 /// This is where the four modules meet : the fetcher brings bytes, the parser
@@ -279,7 +289,9 @@ nonisolated struct FeedRefresh: Sendable {
 
             var newArticles = 0
             for item in parsed.items {
-                if try Self.store(item, of: parsed, feed: stored, at: now, read: read, in: db) { newArticles += 1 }
+                if try Self.store(item, of: parsed, feed: stored, at: now, read: read, in: db)?.isNew == true {
+                    newArticles += 1
+                }
             }
 
             // The interval a feed suggests is read from what it just served,
@@ -294,16 +306,24 @@ nonisolated struct FeedRefresh: Sendable {
         }
     }
 
-    /// Writes one article down, and says whether it had never been seen.
-    private static func store(
+    /// Writes one article down, and says which row it landed in.
+    ///
+    /// **The one place an article is written from a feed's own items**, and
+    /// deliberately not private : an import from another service brings the same
+    /// shape from somebody else's server, and a second copy of this rule would
+    /// be a second opinion about what a duplicate is, how a byline is spelled
+    /// and which picture stands for a piece. What an import knows and a refresh
+    /// does not, the read and starred state its account holds, is applied on top
+    /// of what this writes. See ``ServiceImport``.
+    static func store(
         _ item: ParsedItem,
         of parsed: ParsedFeed,
         feed: Feed,
         at now: Date,
         read: Set<ArticleFingerprint>,
         in db: Database
-    ) throws -> Bool {
-        guard let identity = item.identity else { return false }
+    ) throws -> ArticleWrite? {
+        guard let identity = item.identity else { return nil }
 
         let base = item.url ?? feed.siteURL
         let bodyHTML = item.contentHTML ?? item.summaryHTML
@@ -387,7 +407,7 @@ nonisolated struct FeedRefresh: Sendable {
                 )
                 .upsert(db)
             }
-            return false
+            return ArticleWrite(id: entry.id, isNew: false)
         }
 
         let fingerprint = ArticleFingerprint(feedURL: feed.url, guid: identity)
@@ -422,7 +442,7 @@ nonisolated struct FeedRefresh: Sendable {
         if let sanitized {
             try EntryBody(entryID: entry.id, sanitizedHTML: sanitized, plainText: plainText).insert(db)
         }
-        return true
+        return ArticleWrite(id: entry.id, isNew: true)
     }
 
     private static func excerpt(of item: ParsedItem) -> String? {

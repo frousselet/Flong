@@ -69,6 +69,7 @@ struct StoreTests {
                 "v40.askedAboutWhat",
                 "v41.aHeadlineWithNoLineUnderIt",
                 "v42.carriedAcrossRatherThanWritten",
+                "v43.anImportThatSurvivesTheLaunch",
             ]
         )
     }

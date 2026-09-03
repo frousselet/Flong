@@ -80,12 +80,14 @@ struct SourcesPanel: View {
         case addingFeed
         case popularFeeds
         case editing(Feed)
+        case importingService
 
         var id: String {
             switch self {
             case .addingFeed: "adding"
             case .popularFeeds: "popular"
             case .editing(let feed): "editing-\(feed.id)"
+            case .importingService: "service"
             }
         }
     }
@@ -210,6 +212,9 @@ struct SourcesPanel: View {
             case .editing(let source):
                 SourceEditor(model: model, feed: source)
                     .themed()
+            case .importingService:
+                ServiceImportView(model: model)
+                    .themed()
             }
         }
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: OPMLDocument.types) { result in
@@ -240,6 +245,12 @@ struct SourcesPanel: View {
                     Label("Import an OPML file", systemImage: "square.and.arrow.down")
                 }
                 Button {
+                    presented = .importingService
+                } label: {
+                    Label("Import from FreshRSS", systemImage: "server.rack")
+                }
+                .accessibilityIdentifier("import-freshrss")
+                Button {
                     presented = .popularFeeds
                 } label: {
                     Label("Popular feeds", systemImage: "person.2")
@@ -249,6 +260,7 @@ struct SourcesPanel: View {
                     .labelStyle(.iconOnly)
                     .font(.body.weight(.medium))
             }
+            .accessibilityIdentifier("add-source")
 
             PanelDismiss()
         }
@@ -289,8 +301,24 @@ struct SourcesPanel: View {
     /// finish an import now. None of that belongs in a measure that disappears.
     @ViewBuilder
     private var status: some View {
-        if model.hasOutstandingWork || Self.isWorthSaying(model.syncStatus) {
+        if model.pendingImport != nil || model.hasOutstandingWork || Self.isWorthSaying(model.syncStatus) {
             Section {
+                // An import written down and not finished. Offered rather than
+                // resumed on its own : it is minutes of network, and the reader
+                // decides when to spend them.
+                if model.pendingImport != nil {
+                    HStack {
+                        Text("An import is waiting to be finished")
+                        Spacer(minLength: 8)
+                        if model.serviceProgress != nil {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Button("Finish it") { presented = .importingService }
+                                .buttonStyle(.borderless)
+                        }
+                    }
+                }
+
                 if model.hasOutstandingWork {
                     HStack {
                         if model.outstandingFeeds > 0 {

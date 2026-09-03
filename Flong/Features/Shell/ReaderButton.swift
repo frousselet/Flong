@@ -191,6 +191,10 @@ struct SourcesButton: View {
         } label: {
             Label("Sources", systemImage: "square.stack")
         }
+        // An identifier beside the label, because the label is translated and
+        // a test that looked for `Sources` would pass in English and fail on
+        // the reader's own device.
+        .accessibilityIdentifier("sources")
         .sheet(isPresented: $isOpen) {
             SourcesPanel(model: model) { kind in open(.view(kind)) }
         }

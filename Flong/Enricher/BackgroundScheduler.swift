@@ -254,9 +254,48 @@ nonisolated enum BackgroundScheduler {
                 scheduleFullPass()
             }
             BGTaskScheduler.shared.register(forTaskWithIdentifier: continuedIdentifier, using: nil) { task in
-                handle(task, budget: nil) { await process() }
+                continued.withLock { $0.progress = (task as? BGContinuedProcessingTask)?.progress }
+                handle(task, budget: nil) {
+                    await process()
+                    continued.withLock { $0.progress = nil }
+                }
             }
         }
+
+        /// The bar the system draws for the task the reader started.
+        ///
+        /// `BGContinuedProcessingTask` hands over a `Progress` and draws
+        /// whatever is written into it, in its own interface. It is the system
+        /// progress section 19 asks the initial import to run with, and without
+        /// it the reader watches a bar that never moves for the ten minutes an
+        /// account of thirty thousand articles takes.
+        ///
+        /// `Progress` is thread-safe and is not `Sendable`, which is the whole
+        /// of what the box is for.
+        private struct ContinuedProgress: @unchecked Sendable {
+            var progress: Progress?
+        }
+
+        private static let continued = Mutex(ContinuedProgress())
+
+        /// Moves that bar. Does nothing when the system did not take the task,
+        /// which is the ordinary case and not a failure.
+        static func report(done: Int, of total: Int) {
+            guard total > 0 else { return }
+            continued.withLock { held in
+                held.progress?.totalUnitCount = Int64(total)
+                held.progress?.completedUnitCount = Int64(min(done, total))
+            }
+        }
+    #endif
+
+    #if !os(iOS)
+        /// The same call, doing nothing : a Mac has no task of this kind to
+        /// draw a bar for, and the caller should not have to know that.
+        static func report(done: Int, of total: Int) {}
+    #endif
+
+    #if os(iOS)
 
         /// Asks the system to see a long job through, with its own progress
         /// interface, after the reader started it.
