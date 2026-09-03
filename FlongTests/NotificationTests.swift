@@ -1242,6 +1242,20 @@ struct AnnouncingSourceTests {
         #expect(announcer.posted.isEmpty)
     }
 
+    /// Off until the reader says otherwise, like every other switch here. It
+    /// is read from the shared store when that store has an answer, so a value
+    /// left there by anything at all is a switch the reader never threw.
+    @Test("The switch is off on a device that has never been asked")
+    func everySourceStartsOff() {
+        let fresh = Preferences(
+            cloud: nil,
+            local: UserDefaults(suiteName: "com.rslt.Flong.tests.\(UUID().uuidString)")!
+        )
+
+        #expect(!fresh.wantsNewArticleNotices)
+        #expect(!fresh.wantsNewStoryNotices)
+    }
+
     @Test("A refusal leaves the switch where it was")
     func everySourceRefused() async throws {
         announcer.granted = false
