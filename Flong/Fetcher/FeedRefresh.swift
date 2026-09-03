@@ -91,7 +91,6 @@ nonisolated struct FeedRefresh: Sendable {
     /// one pass is nearer the front of the next.
     func refreshDue(
         now: Date = Date(),
-        sparingly: Bool = false,
         until deadline: Date? = nil,
         onProgress: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
     ) async -> RefreshSummary {
@@ -109,7 +108,7 @@ nonisolated struct FeedRefresh: Sendable {
             .sorted { $0.1 > $1.1 }
             .map(\.0)
 
-        return await refresh(due, sparingly: sparingly, until: deadline, onProgress: onProgress)
+        return await refresh(due, until: deadline, onProgress: onProgress)
     }
 
     /// Refreshes every feed, due or not, which is what asking for a refresh
@@ -138,7 +137,6 @@ nonisolated struct FeedRefresh: Sendable {
     /// as failed.
     func refresh(
         _ feeds: [Feed],
-        sparingly: Bool = false,
         until deadline: Date? = nil,
         onProgress: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
     ) async -> RefreshSummary {
@@ -157,7 +155,7 @@ nonisolated struct FeedRefresh: Sendable {
             var running = 0
 
             while running < Self.concurrency, let feed = iterator.next() {
-                group.addTask { await refresh(feed, sparingly: sparingly) }
+                group.addTask { await refresh(feed) }
                 running += 1
             }
 
@@ -174,7 +172,7 @@ nonisolated struct FeedRefresh: Sendable {
 
                 guard !Task.isCancelled, deadline.map({ Date() < $0 }) ?? true else { continue }
                 if let feed = iterator.next() {
-                    group.addTask { await refresh(feed, sparingly: sparingly) }
+                    group.addTask { await refresh(feed) }
                 }
             }
 
@@ -186,7 +184,7 @@ nonisolated struct FeedRefresh: Sendable {
 
     /// Refreshes one feed, and writes down what happened either way.
     @discardableResult
-    func refresh(_ feed: Feed, sparingly: Bool = false) async -> RefreshResult {
+    func refresh(_ feed: Feed) async -> RefreshResult {
         // A feed the reader pays for is fetched with what proves they do. A
         // keychain that will not answer is a feed fetched without, which the
         // server answers 401 to and section 9 quarantines : that is a better
@@ -201,8 +199,7 @@ nonisolated struct FeedRefresh: Sendable {
             url: url,
             etag: feed.etag,
             lastModified: feed.lastModified,
-            credential: credential,
-            isExpensiveNetworkAllowed: !sparingly
+            credential: credential
         )
 
         switch await fetcher.fetch(request) {
@@ -416,7 +413,7 @@ nonisolated struct FeedRefresh: Sendable {
         // The same article reaching the reader through a second feed of the
         // same newsroom. It keeps its row, since it belongs to a feed they
         // follow, and points at the copy that arrived first.
-        entry.duplicateOf = key.flatMap { try? Self.original(of: $0, in: db) }
+        entry.duplicateOf = key.flatMap { try? ArticleKey.original(of: $0, in: db) }
         try entry.insert(db)
         // One field holds a whole newsroom, so the people it names are written
         // out beside the article : see ``AuthorStore/index(_:byline:in:)``.
@@ -426,23 +423,6 @@ nonisolated struct FeedRefresh: Sendable {
             try EntryBody(entryID: entry.id, sanitizedHTML: sanitized, plainText: plainText).insert(db)
         }
         return true
-    }
-
-    /// The first copy of an article, wherever it came from.
-    ///
-    /// Whatever feed, this one included. A feed that gives its articles a
-    /// fresh identifier on every build hands the same piece over again and
-    /// again, and the identifier is exactly what stops the ordinary path from
-    /// noticing. The key notices.
-    ///
-    /// Never a duplicate itself, so a third copy points at the original rather
-    /// than at the second.
-    private static func original(of key: String, in db: Database) throws -> UUID? {
-        try Entry
-            .filter(Column("canonical_key") == key && Column("duplicate_of") == nil)
-            .order(Column("received_at"))
-            .fetchOne(db)?
-            .id
     }
 
     private static func excerpt(of item: ParsedItem) -> String? {

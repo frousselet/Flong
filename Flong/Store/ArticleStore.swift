@@ -203,6 +203,22 @@ nonisolated enum ArticleFilter: Hashable, Sendable {
 
 /// Reads and writes articles.
 nonisolated struct ArticleStore: Sendable {
+    /// How many arrivals one notice is ever counted out of.
+    ///
+    /// **A safety valve and not a sentence's worth.** It was twenty, with the
+    /// watermark stamped from the last row read so the rest waited for the next
+    /// pass. That cannot work : a feed's articles are all written in one go and
+    /// share one `received_at` to the millisecond, so the cut falls inside a
+    /// group of equal stamps far more often than not, and a mark set to that
+    /// stamp skips every sibling that did not fit while a mark set just below it
+    /// announces the whole group again, for ever.
+    ///
+    /// So the mark stays the clock, and the bound is high enough that reaching
+    /// it means a pass nobody could write a sentence about anyway. What the
+    /// notice *names* is bounded separately, by ``Announcement`` : the count is
+    /// the whole truth and the list is the part that fits.
+    static let mostBeforeAnnouncing = 200
+
     private let database: AppDatabase
 
     init(_ database: AppDatabase) {
@@ -864,13 +880,36 @@ nonisolated struct ArticleStore: Sendable {
     /// tonight, and a notice about the ones dated today would be silent about
     /// everything the reader actually just received.
     ///
+    /// **And what another device has read is what keeps a synchronization
+    /// quiet.** An exchange with another of the reader's devices, or a repair
+    /// that reads the shared archives again, writes a fortnight of articles in
+    /// one go, and they did all reach this device just now. Almost every one of
+    /// them was read on the device that fetched them, so `is_read = 0` takes
+    /// them out ; what is left is news the reader has not seen anywhere, which
+    /// is exactly what a notice is for. Holding them to a floor on their own
+    /// date instead would silence a backfilled feed, which the paragraph above
+    /// exists to prevent.
+    ///
     /// What is hidden, what is a second copy of an article already here and
     /// what another device has already read are all left out : a rule the
     /// reader wrote to never see something is not undone by a notification, the
     /// same article arriving through two of one newsroom's feeds is one piece
     /// of news, and being told about what they read on the iPad an hour ago is
     /// worse than not being told.
-    func arrived(since moment: Date, limit: Int = 20) async throws -> [Arrival] {
+    ///
+    /// **Every feed, where the reader asked for every feed.** The switch on a
+    /// source is the finer instrument and stays exactly as it was ; the panel's
+    /// own switch says the same thing about all of them at once, and passing it
+    /// here is what keeps the two one question rather than two answers to
+    /// reconcile.
+    ///
+    /// - Parameter limit: how many are read at most, which is a bound on the
+    ///   work and not on the sentence. See ``mostBeforeAnnouncing``.
+    func arrived(
+        since moment: Date,
+        fromEveryFeed everyFeed: Bool = false,
+        limit: Int = mostBeforeAnnouncing
+    ) async throws -> [Arrival] {
         try await database.writer.read { db in
             try Row.fetchAll(
                 db,
@@ -893,7 +932,8 @@ nonisolated struct ArticleStore: Sendable {
                     WHERE e.received_at > ?
                       AND e.is_hidden = 0 AND e.duplicate_of IS NULL AND e.is_read = 0
                       AND (
-                            f.notifies_new_articles = 1
+                            ?
+                            OR f.notifies_new_articles = 1
                             OR EXISTS (
                                 SELECT 1 FROM entry_author a
                                 JOIN notified_author n ON n.name = a.name
@@ -908,7 +948,7 @@ nonisolated struct ArticleStore: Sendable {
                     ORDER BY e.received_at
                     LIMIT ?
                     """,
-                arguments: [moment, limit]
+                arguments: [moment, everyFeed, limit]
             )
             .map { row in
                 Arrival(

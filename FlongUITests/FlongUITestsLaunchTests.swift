@@ -19,6 +19,15 @@ final class FlongUITestsLaunchTests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+        // Portrait, whatever the simulator was left in. XCUITest reports an
+        // element's frame in the device's own space and taps in the screen's :
+        // in landscape the two come apart, so a tap aimed at one row of a sheet
+        // lands on another and the test fails somewhere it never went near.
+        // The iPhone is portrait only and cannot get there ; the iPad turns,
+        // and these suites run on it.
+        #if os(iOS)
+            XCUIDevice.shared.orientation = .portrait
+        #endif
     }
 
     @MainActor

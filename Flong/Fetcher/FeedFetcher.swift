@@ -25,19 +25,23 @@ nonisolated struct FetchRequest: Hashable, Sendable {
     /// to a site they subscribe to. Only ever that site's own.
     var cookies: [SessionCookie] = []
 
-    /// Whether the reader is waiting for this.
+    /// Whether the request may go over a network the reader pays for by the
+    /// megabyte.
     ///
-    /// Nobody is waiting for a background refresh, so it does not go over a
-    /// network the reader pays for by the megabyte or is tethering from their
-    /// phone. `URLSession` refuses such a request with
-    /// `networkUnavailableReason` rather than falling back, which is the right
-    /// answer : the feed is asked again on the next pass, over the Wi-Fi the
-    /// reader will be on by then.
+    /// **True, including in the background, which it was not.** iOS calls every
+    /// cellular interface expensive, always and not only under Low Data Mode,
+    /// and `URLSession` refuses a request it may not send rather than falling
+    /// back. So a background refresh on 5G sent nothing at all : not one feed
+    /// was asked, the pass reported itself a success, and the reader in the
+    /// street who had asked to be told about new articles was told nothing,
+    /// every half hour, all day. What a pass costs is bounded by the deadline it
+    /// works to and by the conditional request it makes of every feed, which is
+    /// a few hundred bytes for a feed with nothing new ; refusing the network
+    /// outright bought very little and cost the whole feature.
     ///
-    /// A refresh the reader asked for is a different matter. They pulled the
-    /// list down, they are looking at it, and second-guessing them about their
-    /// own data plan would be the application deciding something that is theirs
-    /// to decide.
+    /// Kept as a request's own answer rather than deleted, since section 8 of
+    /// the specification owes the reader a `Wi-Fi only` preference and this is
+    /// where it will be answered.
     var isExpensiveNetworkAllowed = true
 }
 
@@ -172,8 +176,7 @@ actor FeedFetcher {
     /// Whether the system refused to send the request rather than a server
     /// refusing to answer it.
     ///
-    /// `allowsExpensiveNetworkAccess` is what a background pass sets to false,
-    /// and `URLSession` answers a request it may not send with
+    /// `URLSession` answers a request it may not send with
     /// `networkUnavailableReason` rather than falling back. No network at all
     /// and cellular data switched off are the same kind of answer : the feed
     /// was never asked.

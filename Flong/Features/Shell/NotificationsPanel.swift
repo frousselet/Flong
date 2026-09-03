@@ -15,10 +15,15 @@ import UserNotifications
 /// Everything Flong may interrupt the reader for, in one panel.
 ///
 /// One switch per thing worth saying, and every one of them off until the
-/// reader turns it on. There is no master switch : a list of two switches with
-/// a third above them that overrules both is a list where nobody is sure what
-/// is on, and the system already has that switch, in the place a reader looks
-/// for it.
+/// reader turns it on.
+///
+/// **The first of them covers every source.** There was none : an article
+/// notice was asked for one publisher at a time, from a menu on that
+/// publisher's own row, and a reader who follows thirty feeds and wants to know
+/// when any of them publishes had thirty decisions to make to say one thing.
+/// Most of them never found the menu at all, and this panel, the one place they
+/// looked, offered them nothing about articles. The finer instrument stays,
+/// where it belongs, and what it singles out is listed underneath.
 ///
 /// **A panel from the bottom, and no longer a page.** It was pushed onto a
 /// navigation stack, which is a whole screen and a way back for one switch :
@@ -44,10 +49,19 @@ struct NotificationsPanel: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.scenePhase) private var scenePhase
 
     private var isRefused: Bool {
         model.notificationStatus == .denied
     }
+
+    /// Whether the system has been told to stop doing anything nobody asked
+    /// for, which includes waking a feed reader every half hour.
+    ///
+    /// Said here because nothing else in the application says it. A reader in
+    /// Low Power Mode with every switch on gets nothing, and an application
+    /// that stays quiet about the reason looks broken rather than obedient.
+    private var isSaving: Bool { ProcessInfo.processInfo.isLowPowerModeEnabled }
 
     /// The sources, the writers and the people the reader asked to be told
     /// about, which are switches like any other and belong in the one panel
@@ -80,18 +94,67 @@ struct NotificationsPanel: View {
         // pull the panel up to see the rest at once.
         let rows = min(announcing, Self.shownSources)
         let announced: CGFloat = rows == 0 ? 0 : 40 + CGFloat(rows) * 62
-        return (isRefused ? 250 : 132) + switches + announced
+        return (isRefused ? 330 : 226) + switches + announced
     }
 
-    /// What the panel may be pulled to, which is the whole page only when there
-    /// is more in it than a panel can hold.
+    /// What the panel may be pulled to.
+    ///
+    /// The full page is always one of them. The height above is an estimate of
+    /// what is drawn, and an estimate is what it can only ever be : the rows
+    /// grow with the reader's type size, so a reader at the accessibility sizes
+    /// had a panel too short for its own content and no way to make it taller.
     private var detents: Set<PresentationDetent> {
-        announcing > Self.shownSources ? [.height(height), .large] : [.height(height)]
+        [.height(height), .large]
     }
 
     var body: some View {
+        // Scrolled rather than laid out to a height. The panel stands at the
+        // height of what it holds, and what it holds grows with the reader's
+        // type size : at the accessibility sizes the way out of a refusal was
+        // below the bottom of the sheet, where nothing could reach it.
+        ScrollView {
+            content
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .themed()
+        .presentationDetents(detents)
+        .presentationDragIndicator(.visible)
+        .task {
+            await model.refreshNotificationStatus()
+            // The sources come with the sidebar, which is always in step ; the
+            // writers and the people are questions nothing else in the window
+            // asks, so the panel asks them when it opens.
+            await model.loadNotifiedAuthors()
+            await model.loadNotifiedNewsmakers()
+        }
+        // A reader sent to the system settings comes back having changed the
+        // one answer this panel cannot change, and the panel has to ask again :
+        // it read the refusal once, when it opened, and stayed refused for the
+        // rest of the session however the reader answered.
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await model.refreshNotificationStatus() }
+        }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 16) {
             head
+
+            Toggle(
+                isOn: Binding(
+                    get: { model.wantsNewArticleNotices },
+                    set: { wanted in Task { await model.setWantsNewArticleNotices(wanted) } }
+                )
+            ) {
+                Label("New articles", systemImage: "bell.fill")
+            }
+            .accessibilityIdentifier("notify-new-articles")
+            .disabled(isRefused)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(theme.surface(in: scheme), in: .rect(cornerRadius: 14))
 
             Toggle(
                 isOn: Binding(
@@ -101,6 +164,7 @@ struct NotificationsPanel: View {
             ) {
                 Label("New stories", systemImage: "newspaper.fill")
             }
+            .accessibilityIdentifier("notify-new-stories")
             .disabled(isRefused)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -133,22 +197,12 @@ struct NotificationsPanel: View {
 
             if isRefused {
                 refusal
+            } else {
+                standing
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 20)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .themed()
-        .presentationDetents(detents)
-        .presentationDragIndicator(.visible)
-        .task {
-            await model.refreshNotificationStatus()
-            // The sources come with the sidebar, which is always in step ; the
-            // writers and the people are questions nothing else in the window
-            // asks, so the panel asks them when it opens.
-            await model.loadNotifiedAuthors()
-            await model.loadNotifiedNewsmakers()
-        }
+        .padding(.vertical, 20)
     }
 
     /// The sources and the writers that announce everything they publish, one
@@ -175,40 +229,46 @@ struct NotificationsPanel: View {
     private var announcingSources: some View {
         if announcing > 0 {
             VStack(alignment: .leading, spacing: 8) {
-                Text("New articles")
+                // Named for what they are rather than for what they announce :
+                // with the switch above on, every source announces, and these
+                // are the ones the reader singled out one at a time.
+                Text("Asked about one at a time")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                ScrollView {
-                    VStack(spacing: 8) {
-                        ForEach(sources) { source in
-                            // Verbatim : it is what the publisher calls itself,
-                            // or what the reader called it.
-                            announcing(source.title, icon: "dot.radiowaves.up.forward") { wanted in
-                                await model.setNotifications(wanted, forSource: source.id)
-                            }
+                VStack(spacing: 8) {
+                    ForEach(sources) { source in
+                        // Verbatim : it is what the publisher calls itself,
+                        // or what the reader called it.
+                        announcing(source.title, icon: "dot.radiowaves.up.forward") { wanted in
+                            await model.setNotifications(wanted, forSource: source.id)
                         }
-                        // Verbatim too : a person is called what they are
-                        // called in every language.
-                        ForEach(writers, id: \.self) { writer in
-                            announcing(writer, icon: "signature") { wanted in
-                                await model.setNotifications(wanted, forAuthor: writer)
-                            }
+                    }
+                    // Verbatim too : a person is called what they are
+                    // called in every language.
+                    ForEach(writers, id: \.self) { writer in
+                        announcing(writer, icon: "signature") { wanted in
+                            await model.setNotifications(wanted, forAuthor: writer)
                         }
-                        // Verbatim too, and for the same reason.
-                        ForEach(people, id: \.self) { person in
-                            announcing(person, icon: "person.crop.rectangle.stack") { wanted in
-                                await model.setNotifications(wanted, forNewsmaker: person)
-                            }
+                    }
+                    // Verbatim too, and for the same reason.
+                    ForEach(people, id: \.self) { person in
+                        announcing(person, icon: "person.crop.rectangle.stack") { wanted in
+                            await model.setNotifications(wanted, forNewsmaker: person)
                         }
                     }
                 }
-                .scrollBounceBehavior(.basedOnSize)
             }
         }
     }
 
     /// One thing that may interrupt the reader, and the switch that stops it.
+    ///
+    /// **Never disabled, unlike the switches above.** A row is here because it
+    /// is on, so the only thing its switch does is turn it off, and that asks
+    /// the system for nothing. Held out with the rest of the panel under a
+    /// refusal, it left a reader who had refused Flong at the system level
+    /// unable to quieten the sources still queued to interrupt them.
     private func announcing(
         _ name: String,
         icon: String,
@@ -227,7 +287,6 @@ struct NotificationsPanel: View {
                 Image(systemName: icon)
             }
         }
-        .disabled(isRefused)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(theme.surface(in: scheme), in: .rect(cornerRadius: 14))
@@ -243,6 +302,42 @@ struct NotificationsPanel: View {
 
             PanelDismiss()
         }
+    }
+
+    /// Whether the background refresh is alive, as plainly as it can be put.
+    ///
+    /// **Because nothing else in the application says anything about it.**
+    /// `BGTaskScheduler` gives an application no way to ask how it is doing, so
+    /// a reader whose system grants Flong no time and a reader whose system
+    /// grants it plenty see exactly the same panel : one switch, on, and no
+    /// notices. This is the one honest thing that can be said, which is when
+    /// the last one ran.
+    @ViewBuilder
+    private var standing: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if isSaving {
+                saving
+            }
+
+            if let last = BackgroundScheduler.lastRefresh() {
+                Text("Last refreshed in the background \(last, format: .relative(presentation: .named))")
+            } else {
+                Text("The system has not granted a background refresh yet. Opening Flong always refreshes.")
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Why a reader with every switch on may still be hearing nothing.
+    ///
+    /// Low Power Mode is the reader telling the system, in so many words, to
+    /// stop doing things they did not ask for, and Flong stands aside for it.
+    /// Saying so is the difference between an application that obeys and one
+    /// that looks broken.
+    private var saving: some View {
+        Text("Low Power Mode is on, so Flong is not fetching in the background.")
     }
 
     /// What a refusal leaves the reader able to do, which is go and undo it.

@@ -41,7 +41,7 @@ They are sorted by how overdue each one is **against its own rhythm**. A daily f
 
 **Nothing runs in Low Power Mode.** The reader has told the system to stop doing things they did not ask for, and a feed reader waking the radio on its own is exactly such a thing. What they did ask for still works : opening Flong refreshes, and so does a pull on the front page.
 
-**A background refresh does not go over an expensive network.** `allowsExpensiveNetworkAccess` is false for a pass nobody is waiting for, so a reader on cellular data or tethering from their phone is not spending it on feeds they have not asked to see. `URLSession` refuses such a request rather than falling back, which is the right answer : the feed is asked again on the next pass, over the Wi-Fi they will be on by then.
+**Every refresh may go over a network the reader pays for, the background one included.** It could not, and that was a feature that ate the one behind it. iOS calls every cellular interface expensive, always and not only under Low Data Mode, and `URLSession` refuses a request it may not send rather than falling back : so a background refresh on 5G sent nothing at all, not one feed was asked, the task reported itself a success, and the reader in the street who had asked to be told about new articles was told nothing, every half hour, all day. What a pass costs is already bounded by the deadline it works to and by the conditional request it makes of every feed, which is a few hundred bytes for a feed with nothing new ; refusing the network outright bought very little and cost the whole of the notifications. `FetchRequest.isExpensiveNetworkAllowed` stays, unset by anything today, because it is where the `Wi-Fi only` preference of section 8 will be answered.
 
 A refresh the reader asked for is a different matter, and is allowed whatever network there is. They asked and they are looking at it, and second-guessing them about their own data plan would be the application deciding something that is theirs to decide.
 
@@ -71,7 +71,7 @@ A quarantined feed is not asked for at all until the reader does something about
 
 ## Not here yet
 
-The network settings of section 8 arrive with the settings screen : Wi-Fi only, the monthly cellular cap, and Low Power Mode as a preference rather than the hard rule it is today. The interval correction for sources that publish on business hours, and the quarantine notice offering to fix or delete a feed, are not written yet either.
+The network settings of section 8 arrive with the settings screen : Wi-Fi only, the monthly cellular cap, and Low Power Mode as a preference rather than the hard rule it is today. Until then the notifications panel says plainly when Low Power Mode is what has gone quiet, since an application that stays silent about the reason looks broken rather than obedient. The interval correction for sources that publish on business hours, and the quarantine notice offering to fix or delete a feed, are not written yet either.
 
 ## Pictures
 

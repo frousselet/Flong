@@ -26,16 +26,21 @@ struct CollaborationNoticeTests {
         #expect(Announcement.filings([]) == nil)
     }
 
-    /// The case worth writing well : the person leads, because a collaboration
-    /// is somebody doing something and not a calculation.
-    @Test("One filing names the person, the collection, and the headline")
+    /// The case worth writing well : where it landed, who put it there, and
+    /// what it is, on the three lines a notification gives them.
+    ///
+    /// The two names are said in their own right rather than woven into a
+    /// sentence : `X added to Y` needs a verb and a preposition, and that is
+    /// where a translated sentence about two proper nouns goes wrong. It read
+    /// `Marie a ajouté dans Typographie` in French.
+    @Test("One filing names the collection, the person, and the headline")
     func namesOneFiling() throws {
         let announcement = try #require(
             Announcement.filings([(collection: "Typographie", by: "Marie", title: "Une réforme", picture: nil)])
         )
 
-        #expect(announcement.title.contains("Marie"))
-        #expect(announcement.title.contains("Typographie"))
+        #expect(announcement.title == "Typographie")
+        #expect(try #require(announcement.subtitle).contains("Marie"))
         #expect(announcement.body == "Une réforme")
         #expect(announcement.thread == Announcement.Thread.filings)
     }
@@ -46,7 +51,8 @@ struct CollaborationNoticeTests {
             Announcement.filings([(collection: "Typographie", by: nil, title: "Une réforme", picture: nil)])
         )
 
-        #expect(announcement.title.contains("Typographie"))
+        #expect(announcement.title == "Typographie")
+        #expect(announcement.subtitle == nil)
         #expect(announcement.body == "Une réforme")
     }
 

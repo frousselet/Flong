@@ -12,7 +12,9 @@ The `aps-environment` entitlement is there for `CKSyncEngine`, which uses a sile
 
 A panel from the bottom, opened by the bell beside the sources, in the leading corner of every section a reader reads in. It was a line in the reader's menu leading to a screen of its own, and one switch does not want two presses and a way back : a reader who turns a notice on is answering a question and going back to what they were reading, which is still behind the panel while they answer.
 
-There is no master switch. A list of two switches with a third above them that overrules both is a list where nobody is sure what is on, and the system already has that switch, in the place a reader looks for it.
+**The first switch covers every source.** There was none, and its absence was the whole of what a reader meant by `Flong does not notify me`. An article notice could only be asked for one publisher at a time, from a menu on that publisher's own row ; a reader who follows thirty feeds and wants to know when any of them publishes had thirty decisions to make in order to say one thing, and most never found the menu at all. This panel, the one place they look, offered them nothing about articles whatever.
+
+The finer instrument stays exactly where it was, on the source, on the writer and on the person, and what it singles out is listed under the switches so it can be seen and quietened in one place. There is still no switch above the others overruling them : each says one thing, and the system's own switch, in the place a reader looks for it, is what turns the lot off.
 
 The panel is not the only place a notice is asked for. A source announcing its own articles is switched on where the source is, since it is a decision about that publisher ; the panel lists the ones that are on, so that everything Flong may interrupt the reader for can still be seen, and quietened, in one place.
 
@@ -32,6 +34,8 @@ A story is several articles, from several newsrooms, about one thing : the unit 
 
 **A cluster of one is not a story**, so this is not a notice per article. Two articles have to be close enough in vocabulary to be about the same thing before anything is opened at all.
 
+**All three questions are asked in the statement.** The third of them, that a story stands on more than one article, was asked in Swift over rows the statement had already capped : a pass could take twenty rows, drop eighteen of them for standing on a single article and return two, so the cap counted clusters rather than stories and the real ones behind them waited for a pass with room.
+
 **What counts as new** is a story row opened since this device last said anything, **and that the front page will actually show**. The identifier answers the first half : every technical key is a UUIDv7 and carries the moment it was made, so the question is a range on the primary key rather than a scan. Nothing else records it, `first_at` being the date of the story's earliest article, which may be days older than the story.
 
 The second half was missing, and the two questions came apart. The page holds a story to the three-day window and to having more than one article left inside it ; the announcement asked the key and nothing else. A pass that grouped a quiet feed's week-old backlog into stories announced every one of them and put none of them on the page, so the reader was told about news they then could not find : a notification about a page that had, as far as they could see, not changed at all. The announcement asks the same three questions the page asks.
@@ -39,6 +43,12 @@ The second half was missing, and the two questions came apart. The page holds a 
 Everything that was already open when the reader turned the notices on is not new : the watermark is stamped at that moment rather than at the beginning of time.
 
 **The watermark is this device's own**, kept in `UserDefaults` and never carried. One that travelled would have the second device stay silent about what only the first had announced.
+
+**It is the clock, and it does not move past a read that failed.** A pass cut short by its own budget swallowed the articles it had just fetched and marked them told, which is the one way a watermark eats the news it exists to meter ; a failure now leaves it exactly where it was.
+
+**And it is not derived from the last row read.** It was, briefly, to keep what a capped answer did not hold. That cannot work : a feed's articles are all written in one go and carry one arrival moment to the millisecond, so the cut falls inside a group of equal stamps far more often than not, and a mark set to that stamp skips every sibling that did not fit while one set just below it announces the whole group again for ever. All three reads are bounded against absurdity rather than against a sentence, at two hundred, and what the notice *names* is what is bounded : the count is the whole truth and the list is the newest few that fit.
+
+**A mark left behind by switches that are all off is a mark standing still**, and starting from it announces everything published since the reader last listened. So turning a notice on restarts the clock when nothing was asking, and leaves it exactly where it is when something already was : that is what keeps a reader who switches six sources on in a row from throwing away, five times over, what the first five were holding.
 
 **Nothing interrupts a reader who is looking at the page it would be about.** A story that opens appears on the front page, so a reader with Flong open has already seen it, and a notice about something they watched happen is a notice to dismiss for nothing. The watermark moves anyway : what it records is that the story reached them, not that a notification was posted. Being told tomorrow about what they saw today would be worse than not being told.
 
@@ -58,7 +68,7 @@ The question the stories cannot answer. A story is several newsrooms covering on
 
 **It is not the favourite under another name.** A favourite source is one the reader wants near the top of their own lists ; this is one they want to be interrupted for, which is a great deal more to ask. A reader with forty favourites who found they had signed up for forty notifications a day would turn the lot off, and the two are deliberately separate switches, in separate lines of the same menu and separate sections of the same editor.
 
-**There is still no master switch**, which is why nothing was added to the panel to overrule these. What the panel gained is a list of the sources that are on, so that a reader who has asked about six of them can see all six in one place and quieten any of them there ; adding one is done where the source is.
+**The panel's own switch says the same thing about every source at once**, and the per-source switch is what a reader reaches for when one paper turns out to be louder than the rest, or when they want one paper and not the other twenty-nine. The two are one question to the store : `ArticleStore.arrived(since:fromEveryFeed:)` takes the panel's answer as a term of the same `OR`, so an article is one row in the answer whichever of the two brought it, and neither can announce what the other has just announced.
 
 **Reached three ways, and asked for once.** The source's own editor holds it in a section of its own, the long press on a source in the sources panel toggles it, and the notifications panel takes it back off. All three go through the same call, which asks the system before writing anything : a source saved as announcing on a device that has refused Flong every notification would be a switch that promises what it cannot deliver.
 
@@ -68,9 +78,13 @@ The question the stories cannot answer. A story is several newsrooms covering on
 
 **The question is asked of the feeds and not of the articles.** A reader asks about a handful of sources out of hundreds, and a partial index covers exactly those, so a pass that brought nothing from any of them costs one look at almost nothing.
 
-**One article leads with its own headline**, for the same reason a lone story does, with the source underneath, and a tap opens the article over whatever the reader was on. **Several from one source are counted under its name**, since the source is what the reader asked about and naming it once is shorter than repeating it. **Several sources are counted and then listed by name**, the headlines giving way : a reader told `5 new articles` and left to work out where from would have to open the application to learn what they were just told.
+**What it came from leads, and the headline is the message.** It was the other way round, and the other way round is the wrong way : a banner gives the title one bold line and cuts it at about forty characters, where the body has two lines and four when it is opened. So the headline, routinely eighty characters, was the truncated part, and under it sat a source name of eight. The name of whoever the reader asked about goes first, the paper they wrote it for on the line between, and the headline underneath with room to be read. A tap opens the article over whatever the reader was on.
 
-**Announced where the articles land, and not where the model runs.** The stories are announced after the headlines are written, since the written headline is what the notice says ; this needs nothing written and nothing grouped, so it is said at the end of every pass that fetched, the twenty-five seconds of a background refresh included. Those are the moments the reader is not looking, and they are what this exists for.
+**Several from one source are counted under its name**, since the source is what the reader asked about and naming it once is shorter than repeating it ; the count goes on the middle line and the headlines underneath. **Several sources are counted and then listed by name**, the headlines giving way : a reader told `5 new articles` and left to work out where from would have to open the application to learn what they were just told.
+
+**A body names three headlines and no more.** A pass can bring twenty announceable articles, and twenty headlines joined by a middle dot is a paragraph : a paragraph in a banner is a wall the reader's eye slides off, and what they take from it is the count, which the line above already gave them. The count stays honest about all of them.
+
+**Announced first of everything that follows the fetching.** It needs nothing grouped, nothing written and nothing drawn, and it used to run last : after the grouping, and after reading back the whole of what a window shows, which on a background launch is a page nobody is looking at. A pass that spent its budget fetching then spent what was left on that and was cancelled before it got a word out. It is said the moment the fetch returns.
 
 **A decision arriving from another device says nothing about the backlog.** The switch travels ; the watermark does not. A device that has never said anything and meets a source already switched on stamps its watermark and stays silent for that pass, so the next one is the first that can speak.
 
@@ -106,7 +120,11 @@ The notifications panel lists the writers beside the sources, in one list and no
 
 **The one notice here that is a person and not a calculation.** Everything else Flong may say is something it worked out on its own, from feeds nobody else touched. This is somebody doing something, which is why the person leads the sentence and the collection follows it : a notice reading `2 new articles`, leaving the reader to work out who and where, would be the least useful way to say the most interesting thing in the application.
 
-**The people are counted and not the filings.** One person adding four pieces is one thing happening ; four names would be four things. Where several people filed into one collection, the collection is named in the title and the people are listed underneath. Where they filed into several, the title says so rather than naming one of them and being wrong about the rest.
+**Three lines, in the order a notification gives them room** : the collection it landed in, who put it there, and what it is. The two names are said in their own right rather than woven into a sentence about them. `X added to Y` needs a verb, and a verb needs a preposition, and a preposition between two proper nouns is exactly where a translated sentence goes wrong : it read `Marie a ajouté dans Typographie` in French, which is not a sentence anybody writes.
+
+**The filings are counted and the people are named.** One person adding four pieces is one thing happening, and the count says four while the line underneath says who. Where several people filed into one collection, the collection is named in the title and the people are listed underneath. Where they filed into several, the title says so rather than naming one of them and being wrong about the rest.
+
+**Nothing is said at all where this device cannot tell whose filing is whose.** The reader's own list is excluded by name, and that name is a round trip to iCloud which an offline pass, or one running before the shared engine has started, does not get. Left unresolved it excluded nobody, so the reader was told about the article they filed themselves a minute ago, under somebody else's name. Staying quiet for one pass is the lesser of the two.
 
 **A switch that only appears when there is something for it to be about.** A device in no shared collection is a device whose reader has never seen one, and a question about something they have never seen is a question they cannot answer. The switch arrives in the panel the moment they share a collection or accept an invitation to one.
 
@@ -114,7 +132,9 @@ The notifications panel lists the writers beside the sources, in one list and no
 
 **Nothing is said about what the reader filed themselves**, and the muted collections are left out of the query rather than filtered after it, so that a muted collection cannot move the watermark past one that is not.
 
-**When a thing arrived is not changed by somebody editing their list.** A participant's list is rewritten whole every time any of it changes, so the moment a row turned up here has to survive that rewrite : without it, an article that had been here a week would be stamped as new the moment its filer added something else, and announced all over again. `SharedEntryStore.replace` reads the existing arrival times and keeps them.
+**When a thing arrived is not changed by somebody editing their list.** A participant's list is rewritten whole every time any of it changes, so the moment a row turned up here has to survive that rewrite : without it, an article that had been here a week would be stamped as new the moment its filer added something else, and announced all over again. `SharedEntryStore.replace` reads the existing arrival times and keeps them, **asked of the zone and not of the list**, because that is what a row is unique by : two people filing the same piece is one row and the first to arrive keeps it, so a piece whose row belonged to somebody else who then removed it came back stamped as new.
+
+**And the answer is bounded, like the arrivals from a feed.** Accepting a share, or a zone re-synchronizing after a repair, brings a whole collection at once. The muted collections are left out in the statement rather than after it, so they cannot spend the answer's room on rows nobody will be told about ; it said so and did the opposite.
 
 ## The picture
 
@@ -138,7 +158,15 @@ A notice carrying the article's own photograph is the article ; the same notice 
 
 The digest is rebuilt wherever articles arrive : at launch, on the clock, on returning to the foreground, on the reader's own command, in the opportunistic background refresh and in the full pass. Only the background ones are moments the reader is not looking, and they are what this exists for.
 
-**Both background tasks were dead when this was written.** They were registered while the application launched, as they have to be, against a box that nothing ever filled ; on iOS no request was ever submitted either, so the system had nothing to schedule. Both are fixed here, since a notice that can only fire while the reader is watching is a notice that never fires.
+**A pass with no window is the ordinary pass, and it was the one that could not speak.** iOS reclaims a backgrounded application within minutes, so the refresh the system grants an hour later runs in a process with no scene at all, against a model built by `BackgroundWorkBox` and told nothing. A model is born believing the reader is looking at it, which is what stops it interrupting somebody about a page they have open ; there is no page there and nobody to interrupt, and left alone it silenced every notice the pass existed to post and stamped the watermark on its way out, so no later pass could say them either. A model is not reading until a window says it is.
+
+**The stories and the filings are said by the refresh too.** Both were reachable only from behind the guard that keeps the on-device model out of a background refresh, which is to say only from the full pass, which asks for the mains. On a phone that is not left on charge the one switch a reader could find never said anything at all. Neither needs the model : the stories were grouped a few lines above, and a filing is a plain read.
+
+## How it is delivered
+
+**Every notice carries the default sound.** The permission has asked for `.sound` since the beginning and nothing ever set one, so every notification Flong posted arrived silent and without a tap on the wrist : a reader with the phone in a pocket was told nothing they could perceive, which is indistinguishable from not being told. `.badge` is asked for at the same time, since a permission asked for once is the only one a refusal does not make permanent.
+
+**A notice that arrives while Flong is open is shown.** The system asks the delegate what to do with one, and a delegate that does not answer means `nothing`, silently. Almost nothing reaches that case, since nothing is announced while the reader is reading ; what does is a notice posted a moment before they opened the application, or by a pass that started while they were away, and those are worth showing. Whether a banner interrupts them is the reader's decision, in the system's own settings, and not this one.
 
 ## Tapping one from a cold start
 
@@ -148,12 +176,14 @@ The delegate has to be in place before launching finishes, or a notification tap
 
 The delivery needs an authorization, a bundle and a device, none of which a test can rely on, and none of which is where the mistakes are. `Announcing` is the seam : `Notifier` is the system, `MemoryAnnouncer` is a list a test reads back.
 
-What that buys is coverage of everything that can actually be wrong : the wording and the plural, the headline leading rather than being buried, the written line taking the place of the newsrooms when there is one, the middle dot rather than commas, which stories count as new, that nothing is said twice, that nothing is said while the reader is reading and that it is not saved up for later either, that a refusal leaves the switch where it was, and that a reader who asked for nothing has their watermark left alone so that turning the notices on later starts from that moment.
+What that buys is coverage of the wording and of the gates around it : the plural, the headline leading rather than being buried, the written line taking the place of the newsrooms when there is one, the middle dot rather than commas, which stories count as new, that nothing is said twice, that nothing is said while the reader is reading and that it is not saved up for later either, that a refusal leaves the switch where it was, and that a reader who asked for nothing has their watermark left alone so that turning the notices on later starts from that moment.
 
 For a writer it buys the guarantee that matters most : that an article from a source that announces, signed by a writer who is asked about, is announced once and not twice, which is a property of the query rather than of the wording. And that a byline naming several people answers for the one the reader asked about.
 
 For a source's own articles it buys the same : the wording for one article, for several from one source and for several from several, which articles count as new, that what arrived here is what is asked about rather than what is dated today, that what is read, hidden or a second copy is left out, that a refusal leaves the source alone rather than saving a switch that can never fire, and that a decision arriving from another device does not announce that source's backlog.
 
 For the picture it buys the part that is not the network : that the notice about one thing carries an address and the notice about several carries none, that a story takes the latest photograph in it rather than the first, that an arrival carries the same address the row in the list does, which type the bytes are written as, and that an address that is not the web never becomes a request. What is left is the fetch and the system's own drawing, which is the same seam as everywhere else here.
+
+And it now buys the state a model is born in, which is the one value nothing exercised : every test wrote `isReading` before asserting anything, so the value a windowless background launch actually keeps was never run. A model with no window announces what a pass brought it, a cancelled pass leaves the watermark where it was, a pass that brought more than one notice can name keeps the rest for the next one, and asking about a second source does not discard what the first one was holding.
 
 The prompt itself was checked by hand, on the simulator, outside XCUITest : XCUITest does not surface the notification permission alert at all, and a test that waits for it waits for ever.

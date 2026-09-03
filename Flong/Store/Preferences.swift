@@ -54,6 +54,7 @@ nonisolated final class Preferences: @unchecked Sendable {
         static let countryCode = "reader.country-code"
         static let device = "device.identifier"
         static let newStoryNotices = "notify.new-stories"
+        static let newArticleNotices = "notify.new-articles"
         static let storiesAnnouncedAt = "notify.stories-announced-at"
         static let articlesAnnouncedAt = "notify.articles-announced-at"
         static let collaborationNotices = "notify.collaborations"
@@ -66,7 +67,7 @@ nonisolated final class Preferences: @unchecked Sendable {
         /// Every key, for the one operation that has to name all of them.
         static let all = [
             articleBody, theme, firstName, lastName, picture, city, country, countryCode, device,
-            newStoryNotices, storiesAnnouncedAt, articlesAnnouncedAt, collaborationNotices,
+            newStoryNotices, newArticleNotices, storiesAnnouncedAt, articlesAnnouncedAt, collaborationNotices,
             mutedCollections, collaborationsAnnouncedAt, recentSearches,
             poolContributes, poolIdentifier,
         ]
@@ -217,6 +218,23 @@ nonisolated final class Preferences: @unchecked Sendable {
     var wantsNewStoryNotices: Bool {
         get { flag(for: Key.newStoryNotices) }
         set { set(newValue, for: Key.newStoryNotices) }
+    }
+
+    /// Whether the reader wants to hear about every article their sources
+    /// publish, whatever the source.
+    ///
+    /// **The one switch a reader arrives looking for.** Asking about a source
+    /// at a time is the finer instrument and it stays, on the source itself ;
+    /// but a reader who follows thirty feeds and wants to know when any of them
+    /// publishes was being asked to make thirty decisions to say one thing. The
+    /// two live together : this covers every source, and the switch on a source
+    /// covers that one when this is off.
+    ///
+    /// Off until the reader says otherwise, like every other switch, and
+    /// carried between their devices because it is a decision about themselves.
+    var wantsNewArticleNotices: Bool {
+        get { flag(for: Key.newArticleNotices) }
+        set { set(newValue, for: Key.newArticleNotices) }
     }
 
     /// Whether the reader wants to hear when somebody adds to a collection they

@@ -55,6 +55,9 @@ struct Notifier: Announcing {
     func authorize() async -> Bool {
         do {
             return try await UNUserNotificationCenter.current()
+                // No `.badge` : nothing here ever sets one, and a permission
+                // asked for and never spent is a row in the system settings
+                // that does nothing whichever way the reader sets it.
                 .requestAuthorization(options: [.alert, .sound])
         } catch {
             Log.notify.error("Notifications could not be asked for : \(error, privacy: .public)")
@@ -70,9 +73,25 @@ struct Notifier: Announcing {
     /// publisher for a photograph nobody will be shown is a request for
     /// nothing. See ``NotificationPicture``.
     func post(_ announcement: Announcement) async {
+        // Asked before anything is built. A revoked permission is not an error
+        // to report to the reader, but it is a reason not to ask a publisher
+        // for a photograph nobody will ever be shown.
+        let allowed = await status()
+        guard allowed == .authorized || allowed == .provisional else {
+            Log.notify.info("A notice was not posted : this device may not interrupt the reader")
+            return
+        }
+
+        // Asked for, and then never spent. The permission has carried `.sound`
+        // since the beginning while nothing here ever set one, so every notice
+        // Flong has ever posted arrived without a sound and without a tap on the
+        // wrist : a reader with the phone in a pocket was told nothing they
+        // could perceive, which is indistinguishable from not being told.
         let content = UNMutableNotificationContent()
         content.title = announcement.title
+        if let subtitle = announcement.subtitle { content.subtitle = subtitle }
         content.body = announcement.body
+        content.sound = .default
         content.threadIdentifier = announcement.thread
         // Held until the request has been added, and thrown out after : the
         // system copies an attachment into its own store rather than taking
@@ -198,6 +217,22 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
             self.waiting = nil
             open(waiting)
         }
+    }
+
+    /// What to do with a notice that arrives while Flong is open.
+    ///
+    /// **The system asks, and a delegate that does not answer means `nothing`.**
+    /// Without this the banner is dropped silently, which for most of these is
+    /// right : nothing is announced while the reader is reading, so a notice
+    /// that reaches a foreground application is one posted a moment before they
+    /// opened it, or by a pass that started while they were away. Those are
+    /// worth showing, and the reader is the one who decides whether a banner
+    /// interrupts them, not this.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .list, .sound]
     }
 
     func userNotificationCenter(

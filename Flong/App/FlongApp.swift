@@ -100,8 +100,12 @@ final class BackgroundWorkBox: @unchecked Sendable {
     }
 
     func refresh() async {
+        // The system's clock started when it called the handler, and preparing a
+        // model of our own can wait on iCloud : the fetch works to that instant
+        // and not to whatever is left once we are ready.
+        let started = Date()
         guard let work = lock.withLock({ refreshWork }) else {
-            await standInModel()?.backgroundRefresh()
+            await standInModel()?.backgroundRefresh(from: started)
             return
         }
         await work()
@@ -115,7 +119,37 @@ final class BackgroundWorkBox: @unchecked Sendable {
         await work()
     }
 
-    /// A model of the box's own, for a launch that has no window.
+    /// The one model this process has.
+    ///
+    /// **One, and not one per thing that asks.** The window used to build its
+    /// own and the background tasks another, which was harmless while the
+    /// second did nothing but read. It is not harmless now that it starts the
+    /// iCloud engines : two `CKSyncEngine` instances on one private database
+    /// both persist their serialized state into the single `sync_state` row, so
+    /// whichever writes second overwrites a state that knew about the first
+    /// one's queued records, and those records are never sent. A launch the
+    /// system made into the background followed by the reader opening the
+    /// application is the ordinary way to get both.
+    ///
+    /// Built here rather than in the window because this is the one thing that
+    /// exists before a window does and outlives one going away.
+    @MainActor
+    func model(for database: AppDatabase) -> AppModel {
+        lock.withLock {
+            if let standIn { return standIn }
+
+            let made = AppModel(database: database)
+            // A model is born believing the reader is looking at it, which is
+            // what stops it interrupting somebody about a page they have open.
+            // Whoever wants it read otherwise says so ; the window does, from
+            // its own scene phase.
+            made.isReading = false
+            standIn = made
+            return made
+        }
+    }
+
+    /// A model for a launch that has no window, with the engines started.
     ///
     /// **The window fills this box in from its own `.task`, which runs when a
     /// view appears.** An application the system launches into the background
@@ -124,20 +158,25 @@ final class BackgroundWorkBox: @unchecked Sendable {
     /// that fetches every feed a reader follows, skipped on exactly the
     /// occasions it was designed for, with no log line to say so.
     ///
-    /// The store is open by then either way, so the work is done against a
-    /// model of its own. It is built once and kept, and it is used only while
-    /// no window has offered anything better.
+    /// **The engines are started here, once.** They are started from the
+    /// window's own task otherwise, so a windowless pass exchanged nothing with
+    /// iCloud and could not tell the reader's own filings from anybody else's.
+    /// Starting them suspends for two round trips, and the model is claimed
+    /// before that : a second task arriving in the gap would otherwise have
+    /// built a second model and a second pair of engines.
     @MainActor
-    private func standInModel() -> AppModel? {
-        if let standIn = lock.withLock({ standIn }) { return standIn }
+    private func standInModel() async -> AppModel? {
         guard let database = lock.withLock({ database }) else {
             Log.enrich.error("A background task had neither a window nor a store to work with")
             return nil
         }
 
+        let claimed = lock.withLock { standIn == nil }
+        let model = model(for: database)
+        guard claimed else { return model }
+
         Log.enrich.notice("A background task ran without a window, against a model of its own")
-        let model = AppModel(database: database)
-        lock.withLock { standIn = model }
+        await model.startSyncEngines()
         return model
     }
 }

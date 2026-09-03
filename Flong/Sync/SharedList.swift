@@ -121,6 +121,12 @@ nonisolated enum SharedList {
 
 /// The articles of the collections the reader shares or was invited to.
 nonisolated struct SharedEntryStore: Sendable {
+    /// How many filings one notice is ever counted out of.
+    ///
+    /// The same bound, and for the same reason, as the arrivals from a feed :
+    /// see ``ArticleStore/mostBeforeAnnouncing``.
+    static let mostBeforeAnnouncing = 200
+
     private let database: AppDatabase
 
     init(_ database: AppDatabase) {
@@ -288,25 +294,35 @@ nonisolated struct SharedEntryStore: Sendable {
     /// about what you filed yourself is being told what you already know.
     ///
     /// `muted` are the collections the reader has asked to hear nothing about,
-    /// left out here rather than filtered afterwards so that a muted collection
-    /// cannot move the watermark past a collection that is not.
+    /// left out in the statement rather than filtered afterwards so that a
+    /// muted collection cannot spend the answer's room on rows nobody will be
+    /// told about. It said so and did the opposite.
+    ///
+    /// - Parameter limit: how many are read at most. Accepting a share, or a
+    ///   zone re-synchronizing after a repair, brings the whole of a collection
+    ///   at once, and a notice has no use for four hundred rows. A bound on the
+    ///   work and not on the sentence : see ``ArticleStore/mostBeforeAnnouncing``.
     func arrived(
         since: Date,
         excluding listKey: String?,
-        muted: Set<String> = []
+        muted: Set<String> = [],
+        limit: Int = mostBeforeAnnouncing
     ) async throws -> [(zone: String, author: String, entry: SharedEntry)] {
         try await database.writer.read { db in
-            try Row.fetchAll(
+            let quiet = muted.sorted()
+            let holes = quiet.isEmpty ? "" : "AND zone_name NOT IN (\(databaseQuestionMarks(count: quiet.count)))"
+            return try Row.fetchAll(
                 db,
                 sql: """
                     SELECT * FROM shared_entry
                     WHERE received_at > ? AND (? IS NULL OR list_key <> ?)
+                    \(holes)
                     \(Self.notRemoved)
                     ORDER BY received_at
+                    LIMIT ?
                     """,
-                arguments: [since, listKey, listKey]
+                arguments: [since, listKey, listKey] + StatementArguments(quiet) + [limit]
             )
-            .filter { !muted.contains($0["zone_name"] as String) }
             .map { (zone: $0["zone_name"] as String, author: $0["author_name"] as String, entry: Self.entry(from: $0)) }
         }
     }

@@ -93,13 +93,21 @@ struct AnnouncementTests {
         #expect(announcement.body == "Réforme, acte II · Procès, la suite")
     }
 
-    @Test("The count in the title is the number of headlines in the body")
+    @Test("The count in the title is honest about a body that names only a few")
     func theCountIsHonest() throws {
         let stories = (1...12).map { opened("Fil \($0)") }
         let announcement = try #require(Announcement.newStories(stories))
 
+        // The count says twelve because there are twelve. The body names the
+        // first three : twelve headlines joined by a middle dot is a paragraph,
+        // and a paragraph in a banner is a wall the reader's eye slides off.
+        // The newest three, and not the first three : every query behind these
+        // answers oldest first, so the front of the list is the stalest of them.
         #expect(announcement.title.contains("12"))
-        #expect(stories.allSatisfy { announcement.body.contains($0.title) })
+        for story in stories.suffix(3) {
+            #expect(announcement.body.contains(story.title))
+        }
+        #expect(!announcement.body.contains("Fil 1 "))
     }
 
     /// A picture where there is one story to show a picture of, and none where
@@ -525,13 +533,16 @@ struct SourceAnnouncementTests {
         #expect(Announcement.newArticles([]) == nil)
     }
 
-    @Test("One article leads with its own headline, and a tap opens it")
+    @Test("One article leads with where it came from, and a tap opens it")
     func one() throws {
         let article = arrival("Une réforme du calendrier scolaire")
         let announcement = try #require(Announcement.newArticles([article]))
 
-        #expect(announcement.title == "Une réforme du calendrier scolaire")
-        #expect(announcement.body == "Le Monde")
+        // The source in the one bold line a banner truncates at forty
+        // characters, and the headline where there is room to read it.
+        #expect(announcement.title == "Le Monde")
+        #expect(announcement.subtitle == nil)
+        #expect(announcement.body == "Une réforme du calendrier scolaire")
         #expect(announcement.article == article.id)
         // An article is read over everything, and a story is a page in the
         // digest : a tap has one place to land and this is not the other one.
@@ -562,8 +573,8 @@ struct SourceAnnouncementTests {
         let articles = [arrival("Une réforme"), arrival("Les macros Swift"), arrival("Le procès")]
         let announcement = try #require(Announcement.newArticles(articles))
 
-        #expect(announcement.title.contains("Le Monde"))
-        #expect(announcement.title.contains("3"))
+        #expect(announcement.title == "Le Monde")
+        #expect(try #require(announcement.subtitle).contains("3"))
         for article in articles {
             #expect(announcement.body.contains(article.title))
         }
@@ -608,10 +619,13 @@ struct SourceAnnouncementTests {
         )
         let announcement = try #require(Announcement.newArticles([article]))
 
-        #expect(announcement.title == "Une réforme du calendrier scolaire")
-        // The person and where they wrote it, joined the way the application's
-        // own bylines are : it is the answer to `why am I being told this`.
-        #expect(announcement.body == "Claire Ancelin · Le Monde")
+        // The person the reader asked about leads, the paper they wrote it for
+        // is the line between, and the headline is the message : that is the
+        // answer to `why am I being told this`, in the order a notification
+        // gives the three of them room.
+        #expect(announcement.title == "Claire Ancelin")
+        #expect(announcement.subtitle == "Le Monde")
+        #expect(announcement.body == "Une réforme du calendrier scolaire")
         #expect(announcement.article == article.id)
     }
 
@@ -625,8 +639,8 @@ struct SourceAnnouncementTests {
         ]
         let announcement = try #require(Announcement.newArticles(articles))
 
-        #expect(announcement.title.contains("Claire Ancelin"))
-        #expect(announcement.title.contains("2"))
+        #expect(announcement.title == "Claire Ancelin")
+        #expect(try #require(announcement.subtitle).contains("2"))
         #expect(announcement.body == "Une réforme · Un procès")
     }
 
@@ -897,6 +911,68 @@ struct ArrivedArticleTests {
     }
 }
 
+/// The state a model is born in, which is the state a background launch keeps.
+///
+/// **The whole of the reader's bug lived here.** Every test in this file used to
+/// write `isReading` before asserting anything, so the value a model is
+/// actually built with was the one value nothing exercised. iOS reclaims a
+/// backgrounded application within minutes, so the ordinary background refresh
+/// runs in a process with no scene, against a model nothing has ever told
+/// anything : it kept the `true` it was born with, suppressed every notice, and
+/// stamped the watermark on its way out so no later pass could say them either.
+@Suite("A model with no window")
+@MainActor
+struct WindowlessModelTests {
+    @Test("A model is not reading until a window says it is")
+    func notReadingUntilToldOtherwise() throws {
+        // A suite of its own, like every other model built here : a test that
+        // takes the standard defaults writes into the preferences of the
+        // application hosting it, and leaves them behind on the device.
+        let model = AppModel(
+            database: try AppDatabase.inMemory(),
+            preferences: Preferences(
+                cloud: nil,
+                local: UserDefaults(suiteName: "com.rslt.Flong.tests.\(UUID().uuidString)")!
+            )
+        )
+
+        #expect(!model.isReading)
+    }
+
+    @Test("A model with no window announces what a pass brought it")
+    func announcesWithNoWindow() async throws {
+        let database = try AppDatabase.inMemory()
+        let preferences = Preferences(
+            cloud: nil,
+            local: UserDefaults(suiteName: "com.rslt.Flong.tests.\(UUID().uuidString)")!
+        )
+        let announcer = MemoryAnnouncer()
+        // Built exactly as `BackgroundWorkBox` builds one, and told nothing
+        // else at all.
+        let model = AppModel(database: database, preferences: preferences, announcer: announcer)
+
+        var feed = Feed(url: URL(string: "https://lemonde.example.com/atom.xml")!, title: "Le Monde")
+        feed.siteURL = URL(string: "https://lemonde.example.com")
+        feed.notifiesNewArticles = true
+        try await database.writer.write { db in try feed.insert(db) }
+
+        await model.setNotifications(true, forSource: feed.id)
+
+        var entry = Entry(
+            feedID: feed.id,
+            guid: "urn:reforme",
+            title: "Une réforme",
+            receivedAt: Date().addingTimeInterval(1)
+        )
+        entry.hasMedia = false
+        try await database.writer.write { db in try entry.insert(db) }
+
+        await model.announceNewArticles()
+
+        #expect(announcer.posted.map(\.body) == ["Une réforme"])
+    }
+}
+
 /// When the reader is actually told about a source's own articles.
 @Suite("Telling the reader about a source they asked about", .serialized)
 @MainActor
@@ -946,7 +1022,8 @@ struct AnnouncingSourceTests {
         await model.announceNewArticles()
 
         #expect(announcer.posted.count == 1)
-        #expect(announcer.posted.first?.title == "Une réforme")
+        #expect(announcer.posted.first?.title == "Le Monde")
+        #expect(announcer.posted.first?.body == "Une réforme")
         #expect(announcer.posted.first?.article != nil)
     }
 
@@ -1073,8 +1150,9 @@ struct AnnouncingSourceTests {
         await model.announceNewArticles()
 
         #expect(announcer.posted.count == 1)
-        #expect(announcer.posted.first?.title == "Une réforme")
-        #expect(announcer.posted.first?.body == "Claire Ancelin · Le Monde")
+        #expect(announcer.posted.first?.title == "Claire Ancelin")
+        #expect(announcer.posted.first?.subtitle == "Le Monde")
+        #expect(announcer.posted.first?.body == "Une réforme")
     }
 
     @Test("A refusal leaves the writer alone")
@@ -1111,7 +1189,7 @@ struct AnnouncingSourceTests {
         // No source announces anything : the clock has to run for a reader who
         // asked only about people.
         await model.announceNewArticles()
-        #expect(announcer.posted.map(\.title) == ["Un procès"])
+        #expect(announcer.posted.map(\.body) == ["Un procès"])
     }
 
     @Test("A decision arriving from another device says nothing about the backlog")
@@ -1132,6 +1210,172 @@ struct AnnouncingSourceTests {
 
         try await article("Nouveau", of: feed, at: Date().addingTimeInterval(1))
         await model.announceNewArticles()
-        #expect(announcer.posted.map(\.title) == ["Nouveau"])
+        #expect(announcer.posted.map(\.body) == ["Nouveau"])
+    }
+
+    // MARK: - The switch that covers every source
+
+    /// The one a reader arrives looking for, and the one that was not there.
+    @Test("The panel's own switch announces a source nobody singled out")
+    func everySource() async throws {
+        let feed = try await source()
+        // Nothing was ticked on this feed, and nothing ever will be : this is
+        // the reader who follows thirty papers and wants to know when any of
+        // them publishes.
+        await model.setWantsNewArticleNotices(true)
+        model.isReading = false
+        try await article("Une réforme", of: feed, at: Date().addingTimeInterval(1))
+
+        await model.announceNewArticles()
+
+        #expect(announcer.posted.map(\.body) == ["Une réforme"])
+    }
+
+    @Test("With the switch off, a source nobody asked about says nothing")
+    func everySourceOff() async throws {
+        let feed = try await source()
+        await model.setNotifications(true, forAuthor: "Claire Ancelin")
+        preferences.articlesAnnouncedAt = now
+        model.isReading = false
+        try await article("Une réforme", of: feed, at: now.addingTimeInterval(60))
+
+        await model.announceNewArticles()
+
+        #expect(announcer.posted.isEmpty)
+    }
+
+    /// Off until the reader says otherwise, like every other switch here. It
+    /// is read from the shared store when that store has an answer, so a value
+    /// left there by anything at all is a switch the reader never threw.
+    @Test("The switch is off on a device that has never been asked")
+    func everySourceStartsOff() {
+        let fresh = Preferences(
+            cloud: nil,
+            local: UserDefaults(suiteName: "com.rslt.Flong.tests.\(UUID().uuidString)")!
+        )
+
+        #expect(!fresh.wantsNewArticleNotices)
+        #expect(!fresh.wantsNewStoryNotices)
+    }
+
+    @Test("A refusal leaves the switch where it was")
+    func everySourceRefused() async throws {
+        announcer.granted = false
+
+        await model.setWantsNewArticleNotices(true)
+
+        #expect(!model.wantsNewArticleNotices)
+        #expect(!preferences.wantsNewArticleNotices)
+        #expect(model.notificationStatus == .denied)
+    }
+
+    // MARK: - The watermark
+
+    /// Turning on a second source used to throw away what the first one had
+    /// waiting, and a reader switching six on threw it away five times.
+    @Test("Asking about a second source does not discard what the first one held")
+    func theClockStartsOnce() async throws {
+        let first = try await source()
+        let second = try await source("Libération", at: "liberation.example.com")
+
+        await model.setNotifications(true, forSource: first.id)
+        let started = try #require(preferences.articlesAnnouncedAt)
+
+        try await article("Une réforme", of: first, at: Date().addingTimeInterval(1))
+        await model.setNotifications(true, forSource: second.id)
+
+        #expect(preferences.articlesAnnouncedAt == started)
+    }
+
+    /// A mark left behind by switches that are all off now is a mark standing
+    /// still, and starting from it announces everything published since the
+    /// reader last listened.
+    @Test("Turning a notice back on after a silence starts from now, not from the silence")
+    func theClockRestartsAfterASilence() async throws {
+        let feed = try await source()
+
+        await model.setNotifications(true, forSource: feed.id)
+
+        // They find it noisy and turn it off. Nothing is asking now, so the
+        // mark stands still from here.
+        await model.setNotifications(false, forSource: feed.id)
+        preferences.articlesAnnouncedAt = now
+        // And a backlog piles up behind it.
+        try await article("Ancien", of: feed, at: now.addingTimeInterval(60))
+
+        await model.setWantsNewArticleNotices(true)
+
+        let restarted = try #require(preferences.articlesAnnouncedAt)
+        #expect(restarted > now.addingTimeInterval(60))
+
+        // And so the backlog is not read out.
+        model.isReading = false
+        await model.announceNewArticles()
+        #expect(announcer.posted.isEmpty)
+    }
+
+    /// Turning a second thing on while a first is already asking must NOT move
+    /// the mark : that would swallow whatever the first one has published since
+    /// the last pass.
+    @Test("Asking about a second thing while a first is on leaves the mark alone")
+    func theClockHoldsWhileSomethingIsOn() async throws {
+        let feed = try await source()
+        await model.setNotifications(true, forSource: feed.id)
+        let first = try #require(preferences.articlesAnnouncedAt)
+
+        await model.setWantsNewArticleNotices(true)
+
+        #expect(preferences.articlesAnnouncedAt == first)
+    }
+
+    /// The mark is what meters the news, so a read that failed must not move
+    /// it : a background pass cut short by its own budget used to swallow
+    /// everything it had just fetched, for good.
+    @Test("A pass that was cancelled leaves the watermark where it was")
+    func cancelledLeavesTheMark() async throws {
+        let feed = try await source()
+        await asked(about: feed, from: now)
+        model.isReading = false
+        try await article("Une réforme", of: feed, at: now.addingTimeInterval(60))
+
+        let task = Task { @MainActor in
+            await model.announceNewArticles()
+        }
+        task.cancel()
+        await task.value
+
+        #expect(announcer.posted.isEmpty)
+        #expect(preferences.articlesAnnouncedAt == now)
+    }
+
+    /// **A feed's articles all carry one arrival moment**, to the millisecond :
+    /// they are written in one go. So a watermark stamped from the last row a
+    /// capped answer returned would skip every sibling that did not fit, and
+    /// one stamped just below it would announce the whole group again for ever.
+    /// The mark is the clock, the read is bounded only against absurdity, and
+    /// what the notice *names* is what is bounded.
+    @Test("A pass brings every article of a feed at one moment, and none is skipped")
+    func onePassOneMoment() async throws {
+        let feed = try await source()
+        await model.setWantsNewArticleNotices(true)
+        preferences.articlesAnnouncedAt = now
+        model.isReading = false
+
+        // One moment for all of them, which is what a refresh actually writes.
+        let landed = Date().addingTimeInterval(-1)
+        for index in 0..<25 {
+            try await article("Article \(index)", of: feed, at: landed)
+        }
+
+        await model.announceNewArticles()
+
+        let notice = try #require(announcer.posted.first)
+        // The count is the whole truth ; the body names what fits.
+        #expect(try #require(notice.subtitle).contains("25"))
+
+        // And the pass is over : nothing is left behind the mark to be said
+        // again by the next one.
+        await model.announceNewArticles()
+        #expect(announcer.posted.count == 1)
     }
 }
