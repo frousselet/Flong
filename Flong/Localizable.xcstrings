@@ -1860,6 +1860,17 @@
         }
       }
     },
+    "iCloud" : {
+      "comment" : "A section heading in `Your data`.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud"
+          }
+        }
+      }
+    },
     "Languages" : {
       "localizations" : {
         "fr" : {
@@ -2037,6 +2048,16 @@
         }
       }
     },
+    "Sends everything to your iCloud again and reads all of it back, then asks every source. Nothing is lost. It takes a while and uses the network, so it is worth doing only when a device is out of step." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renvoie tout vers votre iCloud et le relit entièrement, puis interroge chaque source. Rien n'est perdu. C'est long et cela consomme du réseau : à faire seulement quand un appareil est désynchronisé."
+          }
+        }
+      }
+    },
     "Source code" : {
       "localizations" : {
         "fr" : {
@@ -2053,6 +2074,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Statistiques"
+          }
+        }
+      }
+    },
+    "Synchronize everything again" : {
+      "comment" : "The repair in `Your data` : sends the whole zone to iCloud again and reads it back.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout resynchroniser"
           }
         }
       }
@@ -2638,17 +2670,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Alimentation"
-          }
-        }
-      }
-    },
-    "Force a synchronization" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Forcer la synchronisation"
           }
         }
       }

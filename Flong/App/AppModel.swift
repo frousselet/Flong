@@ -2274,13 +2274,28 @@ final class AppModel {
     /// half alone, so the one thing a reader watching it wanted to see, the
     /// whole of the work happening again, was the one thing it did not do : two
     /// phases went by, `Synchronizing with iCloud` and then nothing.
+    /// **It runs without an iCloud account too, and does the half that
+    /// applies.** Guarded on the engine it did nothing at all on a device with
+    /// no account, which is the wrong answer to a press : section 3 has Flong
+    /// working perfectly well on one device, and on that device a repair still
+    /// means asking every source again and building the page again. What the
+    /// account buys is the exchange, and the exchange is the part that is
+    /// skipped.
     func forceSynchronization() async {
-        guard let cloud else { return }
+        isResynchronizing = true
+        defer { isResynchronizing = false }
 
-        await exclusively("A forced synchronization") { await self.resynchronizing(cloud) }
+        await exclusively("A forced synchronization") { await self.resynchronizing(self.cloud) }
     }
 
-    private func resynchronizing(_ cloud: CloudSync) async {
+    /// Whether the repair is running, which is what its own row shows.
+    ///
+    /// The ring in the corner says a pass is running and says it on every page ;
+    /// this says which button started it, so a reader who pressed it is not left
+    /// wondering whether it took.
+    private(set) var isResynchronizing = false
+
+    private func resynchronizing(_ cloud: CloudSync?) async {
         // The model is asked again too : a repair that left it silenced by
         // three failures from an hour ago would rebuild the page and leave it
         // with no headlines and no subjects, which is most of what a reader
@@ -2293,11 +2308,13 @@ final class AppModel {
         defer { endWork(pass) }
 
         moveWork(to: .synchronizing)
-        await cloud.resetFromScratch()
-        await cloud.enqueueEverything()
-        await cloud.enqueueReadStates()
-        await cloud.enqueueCatchUp()
-        await cloud.synchronize()
+        if let cloud {
+            await cloud.resetFromScratch()
+            await cloud.enqueueEverything()
+            await cloud.enqueueReadStates()
+            await cloud.enqueueCatchUp()
+            await cloud.synchronize()
+        }
 
         // Opened again from nothing, since the ledger of what has been read has
         // just been thrown away.

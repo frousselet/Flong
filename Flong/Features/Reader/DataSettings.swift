@@ -42,11 +42,7 @@ struct DataSettings: View {
     var body: some View {
         Form {
             tidying
-
-            #if DEBUG
-                development
-            #endif
-
+            repair
             dangerZone
         }
         .themedRows()
@@ -211,26 +207,55 @@ struct DataSettings: View {
         }
     }
 
-    // MARK: - What only a build being worked on has
+    // MARK: - Starting the exchange over
 
-    /// The exchange with iCloud, on demand.
+    /// The repair for an iCloud that has gone out of step with this device.
     ///
-    /// A development command, and only there. The engine decides when to send
-    /// and when to fetch and is right far more often than a button would be :
-    /// this is for watching an exchange happen on demand while something is
-    /// being built. It forgets the change tokens, the tags the server gave each
-    /// record and the archives already read, then sends and fetches the whole
-    /// of the zone, which is the repair path and spends the record budget of
-    /// section 7 in one go. That is why it does not ship.
-    #if DEBUG
-        private var development: some View {
-            Section {
-                Button {
-                    Task { await model.forceSynchronization() }
-                } label: {
-                    Label("Force a synchronization", systemImage: "arrow.trianglehead.2.clockwise")
+    /// **It was a development command and is offered to everybody now.** It was
+    /// kept back because it is expensive : it forgets the change tokens, the
+    /// tags the server gave each record and the ledger of archives already
+    /// read, then sends and fetches the whole of the zone, which spends a good
+    /// part of the record budget of section 7 in one go. That is a reason to
+    /// say what it costs, not a reason to keep the one repair that works away
+    /// from the reader who needs it. A device whose exchange has drifted has
+    /// nothing else to try, and the alternative it was being left with is
+    /// `Supprimer tout`.
+    ///
+    /// **Nothing is lost by pressing it.** It takes nothing away : it puts back
+    /// what should be there. What it costs is time and traffic, which is what
+    /// the line under it says.
+    ///
+    /// No question is asked first, unlike the card below. This is a repair, and
+    /// a repair a reader changes their mind about freely ; the alert belongs to
+    /// the one command here that cannot be undone.
+    ///
+    /// **It stands on a device with no iCloud account too.** It was hidden
+    /// there, on the reasoning that a repair against an account that does not
+    /// exist is not a repair to offer. That is the wrong half of the command to
+    /// reason about : the exchange is what the account buys, and the rest of it,
+    /// asking every source again and building the page again, is worth exactly
+    /// as much on one device. So the row stands and does the half that applies.
+    private var repair: some View {
+        Section {
+            Button {
+                Task { await model.forceSynchronization() }
+            } label: {
+                HStack(spacing: 8) {
+                    Label("Synchronize everything again", systemImage: "arrow.trianglehead.2.clockwise")
+                    if model.isResynchronizing {
+                        Spacer()
+                        ProgressView().controlSize(.small)
+                    }
                 }
             }
+            .accessibilityIdentifier("force-synchronization")
+            .disabled(model.isResynchronizing)
+        } header: {
+            Text("iCloud")
+        } footer: {
+            Text(
+                "Sends everything to your iCloud again and reads all of it back, then asks every source. Nothing is lost. It takes a while and uses the network, so it is worth doing only when a device is out of step."
+            )
         }
-    #endif
+    }
 }

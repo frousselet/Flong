@@ -134,7 +134,7 @@ Without the push the application still synchronizes : the engine sends what is p
 
 ## Starting again from nothing
 
-There is one command that repairs rather than exchanges, under `#if DEBUG` and nowhere else. It used to queue every local record and send them, which is only half of a repair : the engine still held its change tokens, so it asked the server what had changed since them and was told, correctly, that nothing had. A device whose copy had drifted learned nothing from the one command meant to fix exactly that.
+There is one command that repairs rather than exchanges, `Tout resynchroniser`, in `Vos données`. It used to queue every local record and send them, which is only half of a repair : the engine still held its change tokens, so it asked the server what had changed since them and was told, correctly, that nothing had. A device whose copy had drifted learned nothing from the one command meant to fix exactly that.
 
 It forgets four things first, and all four are needed. The engine's serialized state, which holds the change tokens, so a new engine fetches the zone from the beginning. What the server said about each record, so nothing is skipped for carrying a tag that looks current. And the ledger of which shared archives have been read, so the days the other devices wrote are taken in again rather than skipped as seen.
 
@@ -142,7 +142,9 @@ And what the model wrote goes with them : forgetting the change tokens repairs w
 
 Then it runs the whole of the ordinary pass : every feed asked again, the stories built again, the headlines and the subjects written again, the index and the purge, and iCloud once more at the end with everything that has just arrived. Each step names itself at the head of the front page, since a repair a reader cannot watch is a repair they cannot tell from a hang.
 
-It spends the record budget of section 7 in one exchange. That is the point of it, and the reason it does not ship.
+It spends the record budget of section 7 in one exchange. That is the point of it, and it is why the row that starts it says so in the line underneath rather than being kept back : a device whose copy has drifted has nothing else to try, and the only other command in that page is `Tout supprimer`.
+
+**It runs on a device with no iCloud account too**, and does the half that applies. Guarded on the engine it did nothing at all there, which is the wrong answer to a press : section 3 has Flong working perfectly well on one device, and on that device a repair still means asking every source again, discarding what the model wrote and building the page again. What the account buys is the exchange, and the exchange is the part that is skipped.
 
 ## The schema, and the day it stops being automatic
 

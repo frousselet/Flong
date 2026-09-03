@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- `Tout resynchroniser` ships : the repair for a device whose iCloud has drifted was behind a build flag, and it stands in `Vos données` now, with what it costs said under it. It runs without an iCloud account too, where it asks every source again and builds the page again.
+
 - The reader's own panel shows rather than sets : it opens on their face, their name, where they read from and what this device follows, and every setting stands behind one of six rows leading to a page of its own, with the danger zone at the foot of `Vos données`.
 - The collections everybody has are drawn small, in a line that scrolls sideways above the grid, so the page opens on the shelf the reader built rather than on two screenfuls of furniture.
 - A collection's square is drawn from the four newest pictures in it, in a two by two, one picture per address so a wire published four times under one photograph does not fill a square with it, and a single picture across the square when there are fewer than four.
