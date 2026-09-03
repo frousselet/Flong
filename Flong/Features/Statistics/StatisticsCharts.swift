@@ -47,8 +47,17 @@ nonisolated enum Figures {
     ///
     /// The row floats over the page and the page runs under it, so what it is
     /// standing in is the only thing separating it from the cards passing
-    /// behind : too little and a pill reads as stuck to the card under it.
-    static let brim: CGFloat = 13
+    /// behind : too little and a pill reads as stuck to the card under it, and
+    /// to the edge of the sheet above it. It was eight, then thirteen, and both
+    /// were still a row wedged between two things.
+    static let brim: CGFloat = 22
+
+    /// How far a chart stands in from the edges of its card.
+    ///
+    /// Half of the widest date the axis ever writes, which is what the first
+    /// and last labels hang into. Measured against `27 août` and `4 sept.` at
+    /// the body size, which are about forty points wide.
+    static let axisRoom: CGFloat = 26
 
     /// The shortest a bar is ever drawn.
     ///
@@ -188,6 +197,19 @@ struct FlowChart: View {
         }
         .chartXSelection(value: $chosen)
         .frame(height: 148)
+        // **The chart stands in from the card, and the dates bleed into that.**
+        // A date is centred under the mark it names, so half of the first one
+        // and half of the last hang off the ends of the plot : with the chart
+        // running the full width of the card they were painted outside it, over
+        // the rounded corner and onto the page.
+        //
+        // The room is taken here rather than through `chartPlotStyle`, which
+        // insets the bars and leaves the labels centred on ticks at the frame's
+        // own edges : the halves then hang off the frame instead of off the
+        // plot, which is the same overflow one step further in. Padding the
+        // chart moves the frame in, so what the labels hang into is the card's
+        // own margin.
+        .padding(.horizontal, Figures.axisRoom)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Articles received"))
         .accessibilityValue(Text("\(flow.reduce(0) { $0 + $1.count }) articles"))

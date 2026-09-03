@@ -105,6 +105,8 @@ The page is measured at the accessibility type sizes as well as at the default o
 - **A source's sparkline goes at an accessibility size.** It holds sixty points whatever the type does, and holding them cut `news.ycombinator.com` down to `news.yc…`, which is the one thing in the row nobody can do without. The count beside it is the row's fact ; the shape is a picture of it.
 - **The dates under the flow chart go with it**, for the same reason : four of them across a phone at that size is two of them hanging off the ends. The line above the chart already names the mark and its count.
 
+And one that breaks at the ordinary size too : **a date is centred under the mark it names**, so half of the first and half of the last hang off the ends of the plot. Running the chart the full width of its card painted `27 août` and `4 sept.` outside it, over the rounded corner and onto the page. The room is taken by padding the chart, `Figures.axisRoom`, and not through `chartPlotStyle` : insetting the plot leaves the labels centred on ticks at the frame's own edges, which is the same overflow one step further in.
+
 The footnote under a figure is `Avant : 391` and not `+915 % par rapport à la période précédente`, which did not fit, made an absurd number out of a device that had been collecting for ten days, and asked the reader to undo a percentage to get at a fact.
 
 ## Cost
