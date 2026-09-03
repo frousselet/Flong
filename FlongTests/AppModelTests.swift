@@ -685,13 +685,6 @@ struct CatchUpTests {
         #expect(!CatchUp.background.asksEveryFeed)
     }
 
-    @Test("Only a background pass spares the reader's data plan")
-    func sparingly() {
-        #expect(CatchUp.background.sparingly)
-        #expect(!CatchUp.pull.sparingly)
-        #expect(!CatchUp.clock.sparingly)
-    }
-
     @Test("The model is not run in the twenty-five seconds of a background refresh")
     func model() {
         // The system rate-limits a backgrounded application's sessions hard,

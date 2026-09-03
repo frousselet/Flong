@@ -176,15 +176,20 @@ struct RefreshOrderTests {
         #expect(RefreshSchedule.lateness(failing, now: now) < RefreshSchedule.lateness(working, now: now))
     }
 
-    @Test("A refresh nobody asked for does not go over a network the reader pays for")
-    func sparingly() {
+    /// **Nothing sets this today**, the background refusal having cost the
+    /// notifications everything it saved : iOS calls every cellular interface
+    /// expensive, so a pass that refused one asked no feed at all. It is the
+    /// seat of the `Wi-Fi only` preference of section 8, and this pins the
+    /// default a request carries until that preference exists.
+    @Test("A request goes over a network the reader pays for unless it is told not to")
+    func expensiveNetwork() {
         let asked = FetchRequest(url: URL(string: "https://feeds.example.com/f.xml")!)
         #expect(asked.isExpensiveNetworkAllowed)
 
-        let background = FetchRequest(
+        let withheld = FetchRequest(
             url: URL(string: "https://feeds.example.com/f.xml")!,
             isExpensiveNetworkAllowed: false
         )
-        #expect(!background.isExpensiveNetworkAllowed)
+        #expect(!withheld.isExpensiveNetworkAllowed)
     }
 }

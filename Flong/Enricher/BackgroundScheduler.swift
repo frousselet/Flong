@@ -39,6 +39,21 @@ nonisolated enum BackgroundScheduler {
     /// About what a refresh is given, and all it should count on.
     static let refreshBudget: TimeInterval = 25
 
+    /// What is kept back out of that budget for everything after the fetching.
+    ///
+    /// The watchdog below cancels the whole task when the budget runs out, and
+    /// the fetching honours its own deadline between feeds while letting what is
+    /// already in flight finish. Given the same instant to work to, the fetching
+    /// therefore always returned at or after the watchdog fired, and the
+    /// grouping, the reading and the one notice a refresh exists to post all ran
+    /// inside a cancelled task : GRDB throws `CancellationError` from every read,
+    /// so the pass fetched the articles and then could not say a word about
+    /// them. The two clocks must not be the same clock.
+    static let refreshTail: TimeInterval = 8
+
+    /// What the fetching itself is given, which is the budget less the tail.
+    static var fetchBudget: TimeInterval { refreshBudget - refreshTail }
+
     /// What the model's own work is given inside a full pass.
     ///
     /// The pass has minutes rather than seconds, and nothing here is urgent :
@@ -85,6 +100,22 @@ nonisolated enum BackgroundScheduler {
     /// second, which section 8 has a per-device stagger to prevent for exactly
     /// this reason.
     static let fullPassJitter: TimeInterval = 45 * 60
+
+    /// Where the moment of the last opportunistic refresh is written down.
+    ///
+    /// **Because nothing else records that one ran.** `BGTaskScheduler` gives an
+    /// application no way to ask how it is doing : a reader whose system has
+    /// decided to grant Flong no time, or who has turned Background App Refresh
+    /// off, sees exactly what a reader with a working one sees, which is
+    /// nothing. The notifications panel says when the last one was, and says so
+    /// plainly when there has never been one.
+    private static let lastRefreshKey = "flong.last-refresh"
+
+    /// When the last opportunistic refresh ran, or `nil` if none ever has.
+    static func lastRefresh(in defaults: UserDefaults = .standard) -> Date? {
+        let stamp = defaults.double(forKey: lastRefreshKey)
+        return stamp > 0 ? Date(timeIntervalSince1970: stamp) : nil
+    }
 
     /// Where the moment of the last full pass is written down.
     ///
@@ -159,6 +190,7 @@ nonisolated enum BackgroundScheduler {
     static func forgetTheLastFullPass(in defaults: UserDefaults = .standard) {
         lastFullPass.withLock { $0 = .distantPast }
         defaults.removeObject(forKey: lastFullPassKey)
+        defaults.removeObject(forKey: lastRefreshKey)
         isPassing.withLock { $0 = false }
     }
 
@@ -179,6 +211,9 @@ nonisolated enum BackgroundScheduler {
             return
         }
         await work()
+        // Written down after the work rather than before it, so what the panel
+        // shows is a refresh that happened and not one that was attempted.
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastRefreshKey)
     }
 
     #if os(macOS)

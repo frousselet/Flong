@@ -35,13 +35,25 @@ nonisolated enum Panel {
 /// both platforms would be a control saying what the gesture already says on
 /// the one where the gesture exists.
 struct PanelDismiss: View {
+    /// What closing means, where the environment's own answer is the wrong one.
+    ///
+    /// A `DismissAction` read inside a navigation stack pops the page it is on
+    /// rather than closing what the stack is in, so a page pushed inside a
+    /// panel needs to be handed the panel's own way out. Nothing at the root of
+    /// a panel passes anything, and the environment answers as it always did.
+    var close: (() -> Void)?
+
     @Environment(\.dismiss) private var dismiss
 
     @ViewBuilder
     var body: some View {
         #if os(macOS)
             Button {
-                dismiss()
+                if let close {
+                    close()
+                } else {
+                    dismiss()
+                }
             } label: {
                 Text("Done").font(.subheadline.weight(.medium))
             }

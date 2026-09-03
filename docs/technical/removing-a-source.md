@@ -59,7 +59,7 @@ Nothing is queued back : the device that removed it has already deleted every re
 
 The deletion of the subscription record is what carries the removal, and for a long time it was the one change in the application that could be lost without trace. The intention lived nowhere but in the sync engine's pending changes : no engine at the moment of the removal, a reset, or one refusal from the server, and the source stayed on the reader's other device for good, with nothing anywhere that would ever try again. It is written down before it is queued now, and `docs/technical/sync.md` sets out the four ways it used to go missing.
 
-That fixes the next removal and not the last one, because a deletion that was lost is not a change the server will ever mention again. `Tidy the sources`, in the reader's own panel, is the repair for a device already wrong : it reads the zone as it stands and offers to remove every source here whose record is not in it. It removes nothing on its own, since a source going takes the whole of the table above with it, and the removal it then performs is this one.
+That fixes the next removal and not the last one, because a deletion that was lost is not a change the server will ever mention again. `Tidy the sources`, on the `Vos données` page of the reader's own panel, is the repair for a device already wrong : it reads the zone as it stands and offers to remove every source here whose record is not in it. It removes nothing on its own, since a source going takes the whole of the table above with it, and the removal it then performs is this one.
 
 ## What is not touched
 

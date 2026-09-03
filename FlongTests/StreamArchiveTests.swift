@@ -98,6 +98,60 @@ struct StreamArchiveTests {
         #expect(article.bodyHTML == "<p>Un corps.</p>")
     }
 
+    /// **When it reached THIS device**, which is what the column means
+    /// everywhere else and what the announcing watermark rests on : that mark
+    /// is a clock, so every row written after it has to stand above it. Stamped
+    /// with the sending device's moment, a row inserted a minute ago could
+    /// carry one from before the last stamp and be invisible to every later
+    /// pass, and two devices a few minutes apart would be enough.
+    @Test("An article taken from another device arrives when it reaches that device")
+    func theArrivalMomentIsLocal() async throws {
+        let first = try Device(named: "phone", root: root)
+        let second = try Device(named: "pad", root: root)
+
+        let feed = try await first.follow(address)
+        let old = now.addingTimeInterval(-9 * 24 * 60 * 60)
+        try await first.add("urn:old", to: feed, title: "Ancienne", at: old)
+        _ = try await second.follow(address)
+
+        try await first.archive.write()
+        // Ingested now, nine days after the first device received it.
+        #expect(try await second.archive.ingest(read: [], at: now) == 1)
+
+        let summaries = try await second.articles.summaries(.all, now: now)
+        let taken = try #require(summaries.first)
+        let stored = try await second.database.writer.read { db in try Entry.fetchOne(db, key: taken.id) }
+        #expect(try #require(stored).receivedAt == now)
+
+        // And it is announceable, since it is unread : what the other device
+        // read is what keeps a synchronization quiet, and this the reader has
+        // seen nowhere.
+        let arrived = try await second.articles.arrived(
+            since: now.addingTimeInterval(-60), fromEveryFeed: true)
+        #expect(arrived.map(\.title) == ["Ancienne"])
+    }
+
+    /// The rule that decides a second copy lives in one place, and the archive
+    /// path did not ask it : those rows carried no key at all, so they were
+    /// exempt from cross-feed duplicate detection for ever.
+    @Test("An article taken from another device is keyed like one taken from a publisher")
+    func theKeyTravelsToo() async throws {
+        let first = try Device(named: "phone", root: root)
+        let second = try Device(named: "pad", root: root)
+
+        let feed = try await first.follow(address)
+        try await first.add("urn:1", to: feed, title: "Une réforme", at: now)
+        _ = try await second.follow(address)
+
+        try await first.archive.write()
+        #expect(try await second.archive.ingest(read: [], at: now) == 1)
+
+        let summaries = try await second.articles.summaries(.all, now: now)
+        let taken = try #require(summaries.first)
+        let stored = try await second.database.writer.read { db in try Entry.fetchOne(db, key: taken.id) }
+        #expect(try #require(stored).canonicalKey != nil)
+    }
+
     @Test("A device never reads its own folder back")
     func itsOwnFolderIsNotAnInbox() async throws {
         let first = try Device(named: "phone", root: root)

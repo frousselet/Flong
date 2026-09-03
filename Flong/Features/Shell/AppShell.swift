@@ -89,7 +89,11 @@ struct AppShell: View {
     @Environment(\.scenePhase) private var scenePhase
 
     init(database: AppDatabase) {
-        _model = State(initialValue: AppModel(database: database))
+        // The process's own, and not one of the window's. A background launch
+        // may already have built it and started the iCloud engines against it ;
+        // a second model here would be a second pair of engines writing over
+        // each other's state in the one row that holds it.
+        _model = State(initialValue: FlongApp.work.model(for: database))
     }
 
     var body: some View {

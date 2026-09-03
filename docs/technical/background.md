@@ -70,7 +70,7 @@ A feed that refuses to be fetched does not hold the queue for ever : three refus
 
 | API | What it does | What it is worth |
 | --- | ------------ | ---------------- |
-| `BGAppRefreshTask` | refreshes what is due and groups it, about twenty-five seconds | opportunistic, never counted on |
+| `BGAppRefreshTask` | refreshes what is due, announces it and groups it, about twenty-five seconds | opportunistic, never counted on |
 | `BGProcessingTask` | vectorizes, purges, compacts, `requiresExternalPower` | minutes of work, on charge |
 | `BGContinuedProcessingTask` | the reader starts it and watches it finish | iOS only, and refused often |
 | `NSBackgroundActivityScheduler` | both of the first two, on macOS | |
@@ -79,7 +79,11 @@ Every identifier is declared in `Config/Info.plist` under `BGTaskSchedulerPermit
 
 Registration happens in the application's initializer, before launching finishes, or the system refuses the identifiers for the whole run. The window fills in what the tasks should call once it exists, which is the one link between a task registered at launch and a model created later.
 
+**The budget is not one clock but two.** The watchdog cancels the whole task when the twenty-five seconds run out, and the fetching honours its own deadline between feeds while letting what is already in flight finish. Given the same instant to work to, the fetching therefore always returned at or after the watchdog had fired, and everything after it ran inside a cancelled task : GRDB throws `CancellationError` from every read, so a pass fetched its articles and then could not group them, could not read who they were about, and could not say a word about any of it. Eight seconds are held back out of the budget for the tail, so the two clocks are never the same clock.
+
 **And a task that finds no window does the work anyway.** The window fills the box in from its own `.task`, which runs when a view appears. An application the system launches into the background for a processing task may never render one, and the task then awaited a closure nobody had set and did nothing at all, silently : the one pass that fetches every feed a reader follows, skipped on exactly the occasions it exists for, with no log line to say so. The store is open by the time anything is registered, so the box keeps it and builds a model of its own when no window has offered a better one.
+
+That model is told two things a window would have told it. It is not reading, since there is no window and nobody to interrupt : born believing otherwise, it suppressed every notification the pass existed to post. And it is given the two iCloud engines, which are started from the window's own task : without them the nightly pass that exists to exchange with iCloud exchanged nothing, and the filings notice could not tell the reader's own additions from anybody else's. What is left to the window is what only a window needs : offering to the pool, publishing the member cards, and hearing about an invitation.
 
 **Background refresh is opportunistic and is treated as a bonus.** Section 25 is explicit : the system decides alone according to activity, battery and expected consumption, and the reader can turn it off. Returning to the foreground is the mechanism that actually refreshes, and the interface never presents an unread count as though it were real time.
 

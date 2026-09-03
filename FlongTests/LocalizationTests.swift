@@ -125,9 +125,31 @@ struct LocalizationTests {
         // The notice itself, which is the part a reader reads outside the
         // application and the one nobody would notice was English.
         #expect(String(localized: "\(3) new articles", locale: french) == "3 nouveaux articles")
+        #expect(String(localized: "\(1) new articles", locale: french) == "1 nouvel article")
+    }
+
+    /// A story is not a `fil` : that is what a French reader calls an RSS feed,
+    /// so the one switch this panel always shows read as `tell me when a feed
+    /// is added`, and the banner as `3 new feeds`.
+    @Test("What Flong says about a story is in French, and not in the word for a feed")
+    func tellingAboutAStory() {
+        #expect(String(localized: "New stories", locale: french) == "Nouvelles actualités")
+        #expect(String(localized: "\(3) new stories", locale: french) == "3 nouvelles actualités")
+        #expect(String(localized: "\(1) new stories", locale: french) == "1 nouvelle actualité")
+        #expect(String(localized: "Stories", locale: french) == "Actualités")
+    }
+
+    /// Two of these had no French at all at the key the compiler emits : the
+    /// translations sat under hand-written positional duplicates nothing ever
+    /// looked up, so a French device showed the notice in English.
+    @Test("What Flong says about a shared collection is in French too")
+    func tellingAboutAFiling() {
+        #expect(String(localized: "Added by \("Marie")", locale: french) == "Ajouté par Marie")
+        #expect(String(localized: "\(3) additions", locale: french) == "3 ajouts")
+        #expect(String(localized: "\(1) additions", locale: french) == "1 ajout")
         #expect(
-            String(localized: "\("Le Monde") : \(3) new articles", locale: french)
-                == "Le Monde : 3 nouveaux articles"
+            String(localized: "\(3) additions to your shared collections", locale: french)
+                == "3 ajouts à vos collections partagées"
         )
     }
 
@@ -301,6 +323,36 @@ struct LocalizationTests {
         #expect(String(localized: "\(42) feeds added", locale: french) == "42 flux ajoutés")
         #expect(String(localized: "\(3) already followed", locale: french) == "3 déjà suivis")
         #expect(String(localized: "\(1) ignored", locale: french) == "1 ignoré")
+    }
+
+    @Test("The reader's own panel names its pages in French")
+    func readerPages() {
+        // The panel shows and its pages set, so the six rows are the whole of
+        // how anybody finds a setting : a name that fell back to English would
+        // be a subject a French reader cannot look for.
+        #expect(inFrench(ReaderPage.profile.title) == "Profil")
+        #expect(inFrench(ReaderPage.appearance.title) == "Apparence")
+        #expect(inFrench(ReaderPage.popular.title) == "Flux populaires")
+        #expect(inFrench(ReaderPage.sites.title) == "Sites abonnés")
+        #expect(inFrench(ReaderPage.data.title) == "Vos données")
+        #expect(inFrench(ReaderPage.about.title) == "À propos")
+    }
+
+    @Test("What the application says about itself is in French too")
+    func about() {
+        #expect(String(localized: "Source code", locale: french) == "Code source")
+        #expect(String(localized: "License", locale: french) == "Licence")
+
+        // The two sentences that say what Flong does without, which are the
+        // only claim the page makes.
+        let claim = String(
+            localized: """
+                A feed reader with no server, no account and nothing to sign in to. Every device collects \
+                the feeds itself and keeps them in a database of its own.
+                """,
+            locale: french
+        )
+        #expect(claim.hasPrefix("Un lecteur de flux sans serveur"))
     }
 
     @Test("The two directories of people are named apart in French too")

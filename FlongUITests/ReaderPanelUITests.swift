@@ -14,18 +14,27 @@ import XCTest
 /// The reader's own panel, opened the way a reader opens it.
 ///
 /// XCUITest and not a unit test, because what is being asked is a question
-/// about the window : that the face in the corner opens the panel, and that the
-/// repair for a source removed on another device is in it and can be reached.
-/// A unit test can say what the command does and cannot say that anybody can
-/// press it.
+/// about the window : that the face in the corner opens the panel, that the
+/// panel leads to its pages, and that the repair for a source removed on
+/// another device is on one of them and can be reached. A unit test can say
+/// what the command does and cannot say that anybody can press it.
 ///
-/// Both controls are found by identifier and not by label : a label is
+/// Every control is found by identifier and not by label : a label is
 /// translated, and a test that looked for the English would pass here and fail
 /// on a device set to the reader's own language.
 final class ReaderPanelUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+        // Portrait, whatever the simulator was left in. XCUITest reports an
+        // element's frame in the device's own space and taps in the screen's :
+        // in landscape the two come apart, so a tap aimed at one row of a sheet
+        // lands on another and the test fails somewhere it never went near.
+        // The iPhone is portrait only and cannot get there ; the iPad turns,
+        // and these suites run on it.
+        #if os(iOS)
+            XCUIDevice.shared.orientation = .portrait
+        #endif
     }
 
     @MainActor
@@ -37,27 +46,43 @@ final class ReaderPanelUITests: XCTestCase {
         XCTAssertTrue(face.waitForExistence(timeout: 20), "The reader's own button is in the corner of every section")
         face.tap()
 
+        // The panel shows and does not set : every setting there is stands
+        // behind one of its rows, and what this one leads to is what this
+        // device and the reader's iCloud hold.
+        let data = app.buttons["reader-data"].firstMatch
+        XCTAssertTrue(data.waitForExistence(timeout: 5), "The panel leads to the page about the reader's own data")
+        data.tap()
+
         // The command that puts right a device holding a source another one
         // stopped following. It is under the reader's own face because it is
         // about their devices rather than about any one publisher.
-        //
-        // Scrolled to rather than waited for : the panel opens on the reader's
-        // own face and their name, and a form in SwiftUI builds its rows as
-        // they come into view, so a row further down does not exist yet.
-        //
-        // Dragged half a screen at a time rather than flicked. A flick carries
-        // momentum, and a row scrolled past is a row that no longer exists any
-        // more than one not reached yet : the test passed or failed on how far
-        // the list happened to coast.
         let tidy = app.buttons["tidy-sources"].firstMatch
-        let lower = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8))
-        let upper = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.4))
-
-        for _ in 0..<12 where !tidy.exists {
-            lower.press(forDuration: 0.1, thenDragTo: upper)
-        }
-
-        XCTAssertTrue(tidy.waitForExistence(timeout: 5), "The repair stands in the reader's own panel")
+        XCTAssertTrue(tidy.waitForExistence(timeout: 5), "The repair stands on that page")
         XCTAssertTrue(tidy.isHittable, "And it can be pressed")
+    }
+
+    /// Every subject the panel names leads somewhere.
+    ///
+    /// The rows are the whole of the panel's purpose : it shows the reader and
+    /// hands them off, so a row that led nowhere would be a subject with no
+    /// page behind it.
+    @MainActor
+    func testEverySubjectLeadsToItsPage() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        let face = app.buttons["reader"].firstMatch
+        XCTAssertTrue(face.waitForExistence(timeout: 20))
+        face.tap()
+
+        for identifier in ["reader-profile", "reader-appearance", "reader-popular", "reader-sites", "reader-about"] {
+            let row = app.buttons[identifier].firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 5), "\(identifier) stands in the panel")
+            row.tap()
+
+            let back = app.navigationBars.buttons.firstMatch
+            XCTAssertTrue(back.waitForExistence(timeout: 5), "\(identifier) opened a page with a way back")
+            back.tap()
+        }
     }
 }
