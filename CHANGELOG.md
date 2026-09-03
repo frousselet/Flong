@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- The collections everybody has are drawn small, in a line that scrolls sideways above the grid, so the page opens on the shelf the reader built rather than on two screenfuls of furniture.
+
 ### Removed
 
 - The band of fixed views at the head of the sources panel : `Non lus`, `Aujourd'hui`, `Articles favoris` and `Tous les articles` are a sidebar's furniture, and the tab bar has answered for them since the sections arrived.
