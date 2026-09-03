@@ -1261,6 +1261,35 @@ struct DigestShapeTests {
 
     // MARK: - The head of a story nobody wrote a brief for
 
+    @Test("A story says whether its words were written here or carried across")
+    func aStoryRemembersWhichKindOfMachineWorkItIs() async throws {
+        let database = try AppDatabase.inMemory()
+        let now = Date()
+
+        var story = Story(
+            id: .v7(),
+            title: "Pourquoi les inondations du Népal devraient inquiéter l'Inde",
+            summary: "Le désastre survient comme un avertissement.",
+            isGenerated: true,
+            isTranslated: true,
+            firstAt: now,
+            lastAt: now
+        )
+        try await database.writer.write { db in try story.insert(db) }
+
+        let read = try await database.writer.read { db in try Story.fetchOne(db, key: story.id) }
+        #expect(read?.isGenerated == true)
+        #expect(read?.isTranslated == true)
+
+        // A brief written here is the other kind, and the column says so
+        // rather than leaving the page to guess from the language.
+        story.isTranslated = false
+        try await database.writer.write { db in try story.update(db) }
+        let written = try await database.writer.read { db in try Story.fetchOne(db, key: story.id) }
+        #expect(written?.isGenerated == true)
+        #expect(written?.isTranslated == false)
+    }
+
     @Test("The headline and the line come from one article, or the line does not come")
     func fallbackKeepsOneArticleWhole() {
         // What a real page showed : a Guardian letter about the Great Lakes

@@ -984,6 +984,25 @@ nonisolated extension AppDatabase {
             )
         }
 
+        /// Whether the words on a story are the model's own or an editor's,
+        /// carried across.
+        ///
+        /// A story neither voice will write about is shown as one of its own
+        /// articles, and where no article in it is written in the language the
+        /// reader reads in, that article's headline and line are translated. It
+        /// is still a machine's text and still says so, but it says a different
+        /// thing : these are somebody else's words in your language, not a
+        /// summary written here. The page draws a different mark for it, so the
+        /// two cannot be read as one.
+        ///
+        /// Nothing existing is one : every brief already written was written
+        /// rather than carried across.
+        migrator.registerMigration("v42.carriedAcrossRatherThanWritten") { db in
+            try db.alter(table: "story") { table in
+                table.add(column: "is_translated", .boolean).notNull().defaults(to: false)
+            }
+        }
+
         return migrator
     }
 

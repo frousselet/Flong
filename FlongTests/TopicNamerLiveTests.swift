@@ -42,6 +42,24 @@ private var hasWorkingModel: Bool {
 
 @Suite("The digest, against the real model", .enabled(if: hasWorkingModel), .serialized)
 struct TopicNamerLiveTests {
+    /// Whether the model is still there, asked after the call rather than
+    /// before it.
+    ///
+    /// **A model can go away in the middle of a suite.** Hundreds of calls in a
+    /// row and the system unloads the assets : `assetsUnavailable` three times
+    /// over, and ``OnDeviceModel`` leaves it alone for a while, exactly as it
+    /// does on a device. Every answer after that is the path without a model,
+    /// which is the right behaviour and not something to assert against. What
+    /// these tests are for is what a working model writes, so they say so and
+    /// stop rather than reporting the machine's mood as a fault in the code.
+    private func modelIsStillThere(_ what: String) -> Bool {
+        guard OnDeviceModel.isAvailable else {
+            print("=== the model went away while checking \(what), so nothing was judged")
+            return false
+        }
+        return true
+    }
+
     private let headlines = [
         "Une réforme du calendrier scolaire à l'étude",
         "Calendrier scolaire : trois académies pilotes dès l'an prochain",
@@ -63,6 +81,7 @@ struct TopicNamerLiveTests {
     func briefOfEnglishArticles() async throws {
         let articles = english.map { (title: $0, excerpt: Optional($0)) }
         let brief = await StorySummarizer(locale: Locale(identifier: "fr_FR")).brief(forArticles: articles)
+        guard modelIsStillThere("a brief") else { return }
 
         let summary = try #require(brief.summary)
         #expect(brief.isGenerated)
@@ -96,7 +115,7 @@ struct TopicNamerLiveTests {
 
         for (headline, subject) in expected {
             guard case .chosen(let filed) = await namer.file(headline, summary: nil, into: vocabulary) else {
-                Issue.record("The model would not file \(headline)")
+                if modelIsStillThere("a filing") { Issue.record("The model would not file \(headline)") }
                 continue
             }
             print("=== \(headline) -> \(filed)")
@@ -128,7 +147,9 @@ struct TopicNamerLiveTests {
                 into: ["Jardinage", "Cuisine"]
             )
         else {
-            Issue.record("The model would not file the headline")
+            if modelIsStillThere("a filing with nothing that fits") {
+                Issue.record("The model would not file the headline")
+            }
             return
         }
         print("=== always something -> \(filed)")
@@ -173,6 +194,7 @@ struct TopicNamerLiveTests {
 
         let page = try await service.digest(now: now)
         let stories = try await database.writer.read { db in try Story.fetchAll(db) }
+        guard modelIsStillThere("a whole page") else { return }
 
         // What a reader opening the window sees : stories, written briefs, and
         // pills to narrow them by.

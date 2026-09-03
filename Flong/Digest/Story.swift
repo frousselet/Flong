@@ -26,6 +26,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         case title
         case summary
         case isGenerated = "is_generated"
+        case isTranslated = "is_translated"
         case briefLocked = "brief_locked"
         case briefLocale = "brief_locale"
         case topicsAskedAt = "topics_asked_at"
@@ -47,6 +48,14 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
     var summary: String?
     /// Whether a model wrote either of them, which the interface says out loud.
     var isGenerated: Bool
+    /// Whether what a model did to them was carry them across from another
+    /// language rather than write them.
+    ///
+    /// Always a model's work when it is true, so it is read beside
+    /// ``isGenerated`` and never instead of it : the page draws one mark for a
+    /// line written here and another for a line an editor wrote elsewhere, and
+    /// everything that clears what the model did clears both.
+    var isTranslated: Bool
     /// Whether the reader has settled the matter themselves.
     var briefLocked: Bool
 
@@ -103,6 +112,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         title: String,
         summary: String? = nil,
         isGenerated: Bool = false,
+        isTranslated: Bool = false,
         briefLocked: Bool = false,
         briefLocale: String? = nil,
         topicsAskedAt: Date? = nil,
@@ -119,6 +129,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         self.title = title
         self.summary = summary
         self.isGenerated = isGenerated
+        self.isTranslated = isTranslated
         self.briefLocked = briefLocked
         self.briefLocale = briefLocale
         self.topicsAskedAt = topicsAskedAt

@@ -21,6 +21,9 @@ nonisolated struct StoryBrief: Hashable, Sendable {
     let summary: String?
     /// Whether a model wrote it, which the card says out loud.
     let isGenerated: Bool
+    /// Whether what the model did was carry it across from the language its
+    /// publisher wrote it in, rather than write it. Never true on its own.
+    let isTranslated: Bool
 
     /// The language the model was asked in, when it was asked at all.
     ///
@@ -31,10 +34,17 @@ nonisolated struct StoryBrief: Hashable, Sendable {
     /// one would get the same answer.
     var askedIn: Locale?
 
-    init(title: String, summary: String?, isGenerated: Bool, askedIn: Locale? = nil) {
+    init(
+        title: String,
+        summary: String?,
+        isGenerated: Bool,
+        isTranslated: Bool = false,
+        askedIn: Locale? = nil
+    ) {
         self.title = title
         self.summary = summary
         self.isGenerated = isGenerated
+        self.isTranslated = isTranslated
         self.askedIn = askedIn
     }
 
@@ -57,6 +67,15 @@ nonisolated struct GeneratedBrief {
     var title: String
 
     @Guide(description: "The standfirst : the angle, in one or two sentences, answering what the headline left out")
+    var summary: String
+}
+
+/// A headline and its line, carried across into another language.
+@Generable
+nonisolated struct CarriedAcross {
+    @Guide(description: "The headline, in the reader's language, saying exactly what it said")
+    var title: String
+    @Guide(description: "The line under it, in the reader's language, saying exactly what it said")
     var summary: String
 }
 
@@ -281,6 +300,10 @@ nonisolated struct StorySummarizer: Sendable {
                 continue
             }
         }
+
+        // Neither voice would write about it, so the words stay the
+        // publisher's and only their language changes.
+        if let carried = await translated(fallback) { return carried }
 
         return fallback.asked(in: locale)
     }
@@ -614,6 +637,84 @@ nonisolated struct StorySummarizer: Sendable {
         } catch {
             OnDeviceModel.refused(error)
             return Self.outcome(of: error)
+        }
+    }
+
+    /// The publisher's own head, carried across into the reader's language.
+    ///
+    /// **The last thing tried, for the stories nothing else reaches.** Both
+    /// voices have refused by here, so there is no summary to be had and the
+    /// choice is between an English headline on a French page and somebody
+    /// else's sentence said in French. Measured on real stories, one
+    /// translation in four loses something : `renaming` came back as `le nom`.
+    /// The page is honest about that rather than hiding it, and wears a
+    /// different mark for a line carried across than for a line written here.
+    ///
+    /// **Only where there is something to carry.** A group with a French
+    /// article in it has already been shown that article, so nothing is
+    /// translated for it ; and a translation that comes back empty, refused, or
+    /// still in the language it started in leaves the publisher's own words
+    /// alone.
+    ///
+    /// The headline and the line go over together, in one session and one
+    /// answer, so the two halves cannot come back about different things or in
+    /// different languages.
+    private func translated(_ brief: StoryBrief) async -> StoryBrief? {
+        // **Only where there is a line to carry the mark.** The page draws the
+        // mark on the standfirst and nowhere else, so a headline carried across
+        // above nothing would be a machine's words with no way of saying so,
+        // which is the one thing section 14 does not allow. A story with no
+        // line keeps its publisher's headline in its publisher's language.
+        guard let line = brief.summary, !line.isEmpty else { return nil }
+
+        guard OnDeviceModel.writes(locale),
+            !Self.isWritten(in: locale, title: brief.title, summary: line)
+        else { return nil }
+
+        do {
+            let session = LanguageModelSession(
+                model: OnDeviceModel.model(),
+                instructions: """
+                    You translate a published news headline, and the line under it, into the reader's language.
+                    \(OnDeviceModel.languageInstruction(for: locale))
+
+                    You are carrying across what somebody else wrote. Say what it says, in as many words as it takes.
+                    Keep the proper nouns, the numbers and the quotations exactly as they are.
+                    Never summarize, never shorten, never explain, never comment, and never add anything.
+                    """
+            )
+
+            let answer = try await session.respond(
+                to: """
+                    Headline : \(brief.title)
+                    Line : \(line)
+                    \(OnDeviceModel.languageReminder(for: locale))
+                    """,
+                generating: CarriedAcross.self,
+                options: OnDeviceModel.options(maximumTokens: Self.reservedTokens)
+            )
+
+            let title = answer.content.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let carried = answer.content.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // A translation that came back in the language it started in is not
+            // one, and it is the shape that actually comes back : the model
+            // returning what it was shown.
+            guard !title.isEmpty, !carried.isEmpty, Self.isWritten(in: locale, title: title, summary: carried) else {
+                Log.enrich.notice("A headline would not carry across, so the story keeps its publisher's words")
+                return nil
+            }
+
+            return StoryBrief(
+                title: title,
+                summary: carried,
+                isGenerated: true,
+                isTranslated: true,
+                askedIn: locale
+            )
+        } catch {
+            OnDeviceModel.refused(error)
+            return nil
         }
     }
 

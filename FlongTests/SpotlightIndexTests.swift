@@ -101,6 +101,7 @@ struct SpotlightIndexTests {
             title: "La rentrée décalée d'une semaine",
             summary: summary,
             isGenerated: true,
+            isTranslated: false,
             articleCount: 6,
             feedMarks: [FeedMark(room: "lequotidien.example.com"), FeedMark(room: "lesoir.example.com")],
             feedCount: 2,

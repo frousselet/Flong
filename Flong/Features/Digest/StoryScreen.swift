@@ -115,7 +115,7 @@ struct StoryScreen: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if let summary = story.summary, !summary.isEmpty {
-                standfirst(summary, isGenerated: story.isGenerated)
+                standfirst(summary, story: story)
             }
 
             facts(story)
@@ -137,17 +137,24 @@ struct StoryScreen: View {
     /// A reader asking who wrote this presses this, which is where they were
     /// already looking.
     @ViewBuilder
-    private func standfirst(_ summary: String, isGenerated: Bool) -> some View {
-        let line = StorySummary(summary: summary, isGenerated: isGenerated, style: .body)
+    private func standfirst(_ summary: String, story: DigestStory) -> some View {
+        let line = StorySummary(
+            summary: summary,
+            isGenerated: story.isGenerated,
+            isTranslated: story.isTranslated,
+            style: .body
+        )
 
-        if isGenerated {
+        if story.isGenerated {
             Button {
                 isExplaining = true
             } label: {
                 line.contentShape(.rect)
             }
             .buttonStyle(.plain)
-            .popover(isPresented: $isExplaining, arrowEdge: .bottom) { explanation }
+            .popover(isPresented: $isExplaining, arrowEdge: .bottom) {
+                explanation(carriedAcross: story.isTranslated)
+            }
         } else {
             line
         }
@@ -160,10 +167,16 @@ struct StoryScreen: View {
     /// written headline gets the article's own, in one tap, and the application
     /// does not argue. It is said here, where it was asked for, rather than
     /// printed on the page whether anybody wondered or not.
-    private var explanation: some View {
+    private func explanation(carriedAcross: Bool) -> some View {
         VStack(alignment: .leading, spacing: 12) {
+            // Two marks, two answers : a line written here out of the articles
+            // below is not the same claim as an editor's own line said in
+            // another language, and a reader pressing the mark is asking which
+            // of the two this is.
             Text(
-                "The headline and the line above were written on this device, from the articles below. Nothing was sent anywhere."
+                carriedAcross
+                    ? "The headline and the line above are the publisher's own, translated on this device. Nothing was sent anywhere."
+                    : "The headline and the line above were written on this device, from the articles below. Nothing was sent anywhere."
             )
             .font(.callout)
 
