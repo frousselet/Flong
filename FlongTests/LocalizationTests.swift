@@ -57,10 +57,6 @@ struct LocalizationTests {
         #expect(String(localized: "Duplicates", locale: french) == "Doublons")
         #expect(String(localized: "Articles received", locale: french) == "Articles reçus")
         #expect(String(localized: "Articles per hour", locale: french) == "Articles par heure")
-        #expect(String(localized: "What the feeds send", locale: french) == "Ce que les flux envoient")
-        #expect(String(localized: "Full article", locale: french) == "Article complet")
-        #expect(String(localized: "Excerpt", locale: french) == "Extrait")
-        #expect(String(localized: "Headline only", locale: french) == "Titre seul")
         #expect(String(localized: "Peak hour", locale: french) == "Heure de pointe")
         #expect(String(localized: "No articles over this period", locale: french) == "Aucun article sur cette période")
 

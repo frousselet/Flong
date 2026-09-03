@@ -72,6 +72,21 @@ nonisolated enum StatisticsRange: String, CaseIterable, Hashable, Sendable, Iden
         duration.map { now.addingTimeInterval(-$0) }
     }
 
+    /// Whether a dial of this unit has anything to say over this window.
+    ///
+    /// **A dial is a comparison between the places on it**, and a place that
+    /// came round once over the whole window is not being compared with
+    /// anything : `Articles par jour de la semaine` over twenty-four hours is
+    /// one spoke and six empty ones, and `Articles par jour du mois` over a
+    /// week is seven of thirty-one. Both were drawn, and both were nonsense.
+    ///
+    /// Twice round is the floor. Below it the dial says what the chart at the
+    /// head of the page already said, bent into a circle.
+    func turns(every cycle: TimeInterval) -> Bool {
+        guard let duration else { return true }
+        return duration >= cycle * 2
+    }
+
     /// How the counts are grouped along the bottom of a chart.
     ///
     /// **Between twelve and about forty marks, whatever the window.** Fewer is
@@ -86,6 +101,17 @@ nonisolated enum StatisticsRange: String, CaseIterable, Hashable, Sendable, Iden
         case .year, .all: .month
         }
     }
+}
+
+/// How long the units a dial can be drawn round take to come round again.
+nonisolated enum Cycle {
+    /// A day, which the hours of a dial come round in.
+    static let day: TimeInterval = 24 * 60 * 60
+    /// A week, which its days come round in.
+    static let week: TimeInterval = 7 * day
+    /// A month, near enough : the mean length of one over a leap cycle, since
+    /// the question is whether the window holds two of them and not which two.
+    static let month: TimeInterval = 30.44 * day
 }
 
 /// How wide one mark of a chart is.
@@ -170,67 +196,6 @@ nonisolated struct SourceTally: Identifiable, Hashable, Sendable {
     }
 }
 
-/// How much of an article a source actually puts in its feed.
-///
-/// **The one figure here that is about the feeds rather than about the news.**
-/// A feed may carry the whole piece or a sentence and a link, and nothing in
-/// the interface ever says which : a reader only learns it by tapping through
-/// the same publisher for the tenth time. Measured across this corpus, more
-/// than half of every body stored is under two hundred characters, and one
-/// paper's median is six.
-///
-/// **A median and never a mean.** One long read drags an average across a whole
-/// publisher, and the question here is what a typical article of theirs looks
-/// like rather than what their longest one does.
-nonisolated struct BodyLength: Identifiable, Hashable, Sendable {
-    let domain: String?
-    let name: String
-    /// The middle length, in characters, of what its articles carry.
-    let median: Int
-    /// How many were measured, which is what keeps a source that published
-    /// once out of the ranking.
-    let articles: Int
-
-    var id: String { domain ?? name }
-
-    /// Which of the three kinds of feed this is.
-    ///
-    /// **The verdict is the figure, and the character count is not shown.**
-    /// `3 461 caractères` is a true number and a question rather than an
-    /// answer : characters of what, and is that a lot ? The reader's question
-    /// is whether they can read this source here or will be tapping through to
-    /// the site, and three words answer it.
-    var kind: Kind {
-        if median >= StatisticsStore.wholePiece { return .whole }
-        if median >= StatisticsStore.excerpt { return .excerpt }
-        return .headline
-    }
-
-    /// What a feed puts in front of the reader.
-    ///
-    /// **Thresholds and not a ranking.** The card cut the list in two and
-    /// called the top half whole articles and the bottom half headlines, which
-    /// is a verdict about a position rather than about a feed : a reader
-    /// following eight generous sources had the bottom four of them accused of
-    /// sending nothing. A length is measured against a length.
-    enum Kind: Hashable, Sendable {
-        /// The piece itself.
-        case whole
-        /// A paragraph or two, and the rest on the site.
-        case excerpt
-        /// A line and a link.
-        case headline
-
-        var name: LocalizedStringResource {
-            switch self {
-            case .whole: "Full article"
-            case .excerpt: "Excerpt"
-            case .headline: "Headline only"
-            }
-        }
-    }
-}
-
 /// How many articles fell in one mark of the chart.
 nonisolated struct Arrivals: Identifiable, Hashable, Sendable {
     /// The first moment the mark covers.
@@ -302,8 +267,6 @@ nonisolated struct Statistics: Hashable, Sendable {
     var bylines: [Tally] = []
     /// What it was written in.
     var languages: [Tally] = []
-    /// What each publisher puts in its feed, the fullest first.
-    var bodies: [BodyLength] = []
 
     /// How many articles carry each hour of the day, from midnight, and how
     /// many the reader read in each.
@@ -389,32 +352,6 @@ nonisolated struct StatisticsStore: Sendable {
     /// above it, and past a handful there is nothing left to compare.
     static let sparked = 6
 
-    /// How many articles a source has to have published before the middle
-    /// length of its bodies means anything.
-    ///
-    /// Eight. A median over two articles is one of those two articles, and a
-    /// ranking of publishers by it would open on whoever happened to publish
-    /// one long piece this week.
-    static let measuredAtLeast = 8
-
-    /// How long an article's body has to be before the feed is carrying the
-    /// piece rather than an invitation to go and read it.
-    ///
-    /// Twelve hundred characters, which is about two hundred words, or four
-    /// paragraphs. Below it a body is a standfirst : more than half of every
-    /// body in a real corpus sits under two hundred characters, and one paper
-    /// here stores a median of six.
-    static let wholePiece = 1_200
-
-    /// How long it has to be before it is an excerpt rather than a headline.
-    ///
-    /// Three hundred characters, which is a sentence or two : enough to know
-    /// whether the piece is worth opening, and nowhere near enough to be the
-    /// piece. Measured against a real corpus this puts `theguardian.com` at
-    /// seven hundred and thirty in the middle band where it belongs, and
-    /// leaves `bbc.co.uk` at a hundred and nine with the headlines.
-    static let excerpt = 300
-
     private let database: AppDatabase
 
     init(_ database: AppDatabase) {
@@ -466,8 +403,6 @@ nonisolated struct StatisticsStore: Sendable {
         var duplicates = 0
         var datedReads = 0
         var previous: Statistics.Previously?
-        /// The middle body length of each feed, and how many it was taken over.
-        var medians: [UUID: (median: Int, articles: Int)] = [:]
         /// One count per bucket, keyed as SQLite formatted it.
         var arrivals: [String: Int] = [:]
         var reading: [String: Int] = [:]
@@ -573,31 +508,6 @@ nonisolated struct StatisticsStore: Sendable {
                     """,
                 arguments: arguments
             ) ?? 0
-
-        // The middle length of what each feed carries.
-        //
-        // **A window function and not an average.** A single long read drags a
-        // mean across a whole publisher, and the question is what a typical
-        // article of theirs looks like. The same pattern the store already uses
-        // to take a few articles per favourite : see ``ArticleStore``.
-        for row in try Row.fetchAll(
-            db,
-            sql: """
-                WITH measured AS (
-                    SELECT e.feed_id AS feed_id, LENGTH(b.plain_text) AS length,
-                           ROW_NUMBER() OVER (PARTITION BY e.feed_id ORDER BY LENGTH(b.plain_text)) AS place,
-                           COUNT(*) OVER (PARTITION BY e.feed_id) AS measured
-                    FROM entry e JOIN entry_body b ON b.entry_id = e.id
-                    WHERE \(shown) AND \(window) AND b.plain_text IS NOT NULL
-                )
-                SELECT feed_id, length, measured FROM measured
-                WHERE place = (measured + 1) / 2 AND measured >= \(measuredAtLeast)
-                """,
-            arguments: arguments
-        ) {
-            guard let feed = row["feed_id"] as UUID? else { continue }
-            raw.medians[feed] = (row["length"], row["measured"])
-        }
 
         raw.previous = try previously(db, from: from, now: now, shown: shown)
 
@@ -916,30 +826,6 @@ nonisolated struct StatisticsStore: Sendable {
 
         report.publishers = gathered.count
         report.feeds = raw.feedTotals.count
-
-        // What each publisher puts in its feed, the fullest first.
-        //
-        // **The busiest feed of a publisher answers for it.** A median cannot
-        // be added to another median, so three addresses of one paper cannot be
-        // folded into one figure the way their counts can. The one that
-        // published the most is the one the reader mostly sees, and it is the
-        // honest stand-in : a paper whose main feed carries the piece is a
-        // paper that carries the piece.
-        var fullest: [String: BodyLength] = [:]
-        for (feed, measured) in raw.medians {
-            guard let identity = raw.feeds[feed] else { continue }
-            let key = identity.publisher ?? feed.uuidString
-            if let standing = fullest[key], standing.articles >= measured.articles { continue }
-            fullest[key] = BodyLength(
-                domain: identity.publisher,
-                name: identity.title,
-                median: measured.median,
-                articles: measured.articles
-            )
-        }
-        report.bodies = fullest.values.sorted {
-            $0.median == $1.median ? $0.id < $1.id : $0.median > $1.median
-        }
         report.sources =
             gathered
             .sorted { left, right in

@@ -48,24 +48,26 @@ struct StatisticsPanel: View {
 
     var body: some View {
         ScrollView {
-            // The window sits at the head of the page and stays there, the way
-            // the subjects do on the front page. A pinned section header rather
-            // than a bar in the safe area, for the reason the digest gives : a
-            // bar lays out under the title and draws itself somewhere else.
-            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
-                Section {
-                    page
-                } header: {
-                    ranges
-                }
-            }
-            .editorialColumn()
-            .padding(.horizontal, 20)
-            .padding(.bottom, 32)
+            page
+                .editorialColumn()
+                .padding(.horizontal, 20)
+                .padding(.bottom, 32)
         }
-        #if os(macOS)
-            .safeAreaInset(edge: .top, spacing: 0) { wayOut }
-        #endif
+        // **The windows are a bar and not a pinned header any more.**
+        //
+        // They were a pinned section header, the way the subjects are on the
+        // front page, and that is why three helpings of air round them changed
+        // nothing : a pinned header keeps its place in the scroll and draws no
+        // ground of its own, so the padding round the pills was space the cards
+        // were passing through rather than space between them. Eight points,
+        // then thirteen, then twenty-two, and the card was against the pill
+        // every time, because what was under the pill was the card.
+        //
+        // An inset in the safe area reserves the room instead. The page is laid
+        // out below it, so the air is air ; the soft edge under it is what the
+        // cards go into as they pass, which is still something moving behind
+        // the glass and still the reason the glass is there.
+        .safeAreaInset(edge: .top, spacing: 0) { windows }
         .scrollEdgeEffectStyle(.soft, for: .top)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -127,19 +129,31 @@ struct StatisticsPanel: View {
     /// than stacking eight sheets side by side, and the chosen one carries its
     /// own identity through the change : the colour slides from the pill that
     /// was to the pill that is instead of blinking between them.
-    private var ranges: some View {
-        ScrollView(.horizontal) {
-            GlassEffectContainer(spacing: 8) {
-                HStack(spacing: 8) {
-                    ForEach(StatisticsRange.allCases) { range in
-                        pill(range)
+    private var windows: some View {
+        VStack(spacing: 0) {
+            #if os(macOS)
+                wayOut
+            #endif
+
+            ScrollView(.horizontal) {
+                GlassEffectContainer(spacing: 8) {
+                    HStack(spacing: 8) {
+                        ForEach(StatisticsRange.allCases) { range in
+                            pill(range)
+                        }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, Figures.brim)
                 }
-                .padding(.vertical, Figures.brim)
             }
+            .scrollIndicators(.hidden)
+            .scrollClipDisabled()
         }
-        .scrollIndicators(.hidden)
-        .scrollClipDisabled()
+        // The page's own ground, so what passes underneath goes into the soft
+        // edge rather than up against the pills.
+        .background {
+            Rectangle().fill(theme.paper(in: scheme)).ignoresSafeArea(edges: .top)
+        }
     }
 
     private func pill(_ range: StatisticsRange) -> some View {
@@ -184,7 +198,6 @@ struct StatisticsPanel: View {
                     subjects(report)
                     people(report)
                     bylines(report)
-                    bodies(report)
                     languages(report)
                 }
             }
@@ -318,26 +331,29 @@ struct StatisticsPanel: View {
     /// order and are rotated here : a French reader's dial begins on Monday and
     /// an American one on Sunday, and neither of them is being shown somebody
     /// else's week.
+    @ViewBuilder
     private func weekdays(_ report: Statistics) -> some View {
         let first = calendar.firstWeekday - 1
         let order = (0..<7).map { ($0 + first) % 7 }
         let symbols = calendar.veryShortStandaloneWeekdaySymbols
 
-        return card(Text("Articles per weekday")) {
-            centred {
-                Dial(
-                    counts: order.map { report.arrivalsByWeekday[$0] },
-                    reading: order.map { report.readingByWeekday[$0] },
-                    marks: Dictionary(
-                        uniqueKeysWithValues: order.enumerated().map { place, weekday in
-                            (place, symbols.indices.contains(weekday) ? symbols[weekday] : "")
-                        }
-                    ),
-                    middle: { Text(verbatim: Self.weekday(order[$0], in: calendar)) },
-                    caption: "Peak day",
-                    spoken: "Articles per weekday",
-                    showsReading: report.showsReading
-                )
+        if report.range.turns(every: Cycle.week) {
+            card(Text("Articles per weekday")) {
+                centred {
+                    Dial(
+                        counts: order.map { report.arrivalsByWeekday[$0] },
+                        reading: order.map { report.readingByWeekday[$0] },
+                        marks: Dictionary(
+                            uniqueKeysWithValues: order.enumerated().map { place, weekday in
+                                (place, symbols.indices.contains(weekday) ? symbols[weekday] : "")
+                            }
+                        ),
+                        middle: { Text(verbatim: Self.weekday(order[$0], in: calendar)) },
+                        caption: "Peak day",
+                        spoken: "Articles per weekday",
+                        showsReading: report.showsReading
+                    )
+                }
             }
         }
     }
@@ -349,18 +365,21 @@ struct StatisticsPanel: View {
     /// window they are quieter for a reason that is about the calendar rather
     /// than about the news. The count is what the card says it is : see
     /// ``Statistics/arrivalsByDay``.
+    @ViewBuilder
     private func days(_ report: Statistics) -> some View {
-        card(Text("Articles per day of the month")) {
-            centred {
-                Dial(
-                    counts: report.arrivalsByDay,
-                    reading: report.readingByDay,
-                    marks: [0: "1", 9: "10", 19: "20", 29: "30"],
-                    middle: { Text(verbatim: ($0 + 1).formatted()) },
-                    caption: "Peak day",
-                    spoken: "Articles per day of the month",
-                    showsReading: report.showsReading
-                )
+        if report.range.turns(every: Cycle.month) {
+            card(Text("Articles per day of the month")) {
+                centred {
+                    Dial(
+                        counts: report.arrivalsByDay,
+                        reading: report.readingByDay,
+                        marks: [0: "1", 9: "10", 19: "20", 29: "30"],
+                        middle: { Text(verbatim: ($0 + 1).formatted()) },
+                        caption: "Peak day",
+                        spoken: "Articles per day of the month",
+                        showsReading: report.showsReading
+                    )
+                }
             }
         }
     }
@@ -523,67 +542,6 @@ struct StatisticsPanel: View {
     /// language there is.
     private static func language(_ tag: String) -> String {
         Locale.current.localizedString(forLanguageCode: tag)?.localizedCapitalized ?? tag.uppercased()
-    }
-
-    /// What each source actually puts in front of the reader.
-    ///
-    /// **The one card here about the feeds rather than about the news.** A feed
-    /// may carry the whole piece or a headline and a link, and nothing else in
-    /// the application ever says which : a reader learns it by tapping through
-    /// the same publisher for the tenth time and wondering why. Measured on a
-    /// real corpus, more than half of every body stored is under two hundred
-    /// characters and one paper's median is six.
-    ///
-    /// **A verdict per source, and no character count.** It drew the middle
-    /// length of each feed's bodies, which is a true number and a question
-    /// rather than an answer : characters of what, and is that a lot. And it
-    /// cut the list in two and called the top half whole articles and the
-    /// bottom half headlines, so a reader following eight generous sources had
-    /// the bottom four of them accused of sending nothing. The length is
-    /// measured against a length now, and what the reader is shown is the
-    /// answer to the question they actually have, which is whether they can
-    /// read this source here : see ``BodyLength/Kind``.
-    @ViewBuilder
-    private func bodies(_ report: Statistics) -> some View {
-        if !report.bodies.isEmpty {
-            card(Text("What the feeds send")) {
-                VStack(spacing: 0) {
-                    ForEach(Array(report.bodies.prefix(StatisticsStore.ranked).enumerated()), id: \.element.id) {
-                        index,
-                        source in
-                        if index > 0 {
-                            Divider().padding(.leading, 30)
-                        }
-                        length(source)
-                    }
-                }
-            }
-        }
-    }
-
-    private func length(_ source: BodyLength) -> some View {
-        let identity = source.domain.flatMap { publishers[$0] }
-
-        return HStack(spacing: 10) {
-            SourceIconView(identity: identity, side: 20)
-
-            Text(verbatim: identity?.name ?? source.name)
-                .font(.subheadline)
-                .lineLimit(1)
-                .truncationMode(.tail)
-
-            Spacer(minLength: 8)
-
-            // The verdict is the whole of what this row says, so the name is
-            // what gives way when there is not room for both.
-            Text(source.kind.name)
-                .font(.caption)
-                .foregroundStyle(source.kind == .whole ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
-                .lineLimit(1)
-                .layoutPriority(1)
-        }
-        .padding(.vertical, 9)
-        .accessibilityElement(children: .combine)
     }
 
     // MARK: - The shape every card takes

@@ -710,7 +710,7 @@ A page about the reader's own stream, opened from a chart in the corner beside t
 
 The window is measured on the date the stream itself sorts by, which is when the publisher says the article was written, or when it reached the device where they say nothing. Anything else would be a page of figures that disagrees with the list it is figures about. Reading is the one exception, counted on when the reader read rather than on when the piece was written, since an evening spent on last month's backlog is an evening in this week.
 
-What it draws : the flow of arrivals over the window with the reading over it, the shape of a day, of a week and of a month as three dials, the publishers ranked with each one's own shape beside it, the subjects, the people the articles are about, the bylines, what each source actually puts in its feed, and the languages. Copies and hidden articles are excluded from every count exactly as they are from every list, and how many copies there were is a figure of its own.
+What it draws : the flow of arrivals over the window with the reading over it, the shape of a day, of a week and of a month as three dials, the publishers ranked with each one's own shape beside it, the subjects, the people the articles are about, the bylines and the languages. A dial is drawn only where its unit comes round more than once in the window, so the days of the week want a month and the days of the month want three. Copies and hidden articles are excluded from every count exactly as they are from every list, and how many copies there were is a figure of its own.
 
 `docs/technical/statistics.md` records what each figure is counted from, and the four questions the schema cannot honestly answer.
 
