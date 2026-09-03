@@ -12,24 +12,22 @@
         }
       }
     },
-    "%@ of arrivals" : {
-      "comment" : "Under the count of articles that arrived twice : what share of everything that came in they were.",
+    "%@ of the articles" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ des arrivées"
+            "value" : "%@ des articles"
           }
         }
       }
     },
-    "%@ of them" : {
-      "comment" : "Under the count of articles read : what share of the arrivals they are.",
+    "%@ of the total" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ d'entre eux"
+            "value" : "%@ du total"
           }
         }
       }
@@ -330,6 +328,46 @@
         }
       }
     },
+    "%lld characters" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld character"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld characters"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld caractère"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld caractères"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld feeds" : {
       "comment" : "Under the number of publishers : how many sources they were followed through.",
       "localizations" : {
@@ -357,13 +395,13 @@
               "one" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld fil"
+                  "value" : "%lld flux"
                 }
               },
               "other" : {
                 "stringUnit" : {
                   "state" : "translated",
-                  "value" : "%lld fils"
+                  "value" : "%lld flux"
                 }
               }
             }
@@ -806,47 +844,6 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld rédactions"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "%lld signs" : {
-      "comment" : "The middle length of what a source puts in its feed, in characters.",
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld sign"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld signs"
-                }
-              }
-            }
-          }
-        },
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld signe"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld signes"
                 }
               }
             }
@@ -1359,26 +1356,6 @@
         }
       }
     },
-    "Arrivals through the day" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les arrivées au fil de la journée"
-          }
-        }
-      }
-    },
-    "Arrivals, and what you read" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce qui arrive, et ce que vous lisez"
-          }
-        }
-      }
-    },
     "Art" : {
       "localizations" : {
         "fr" : {
@@ -1420,16 +1397,6 @@
         }
       }
     },
-    "Articles over time" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les articles au fil du temps"
-          }
-        }
-      }
-    },
     "Articles per hour" : {
       "localizations" : {
         "fr" : {
@@ -1440,22 +1407,22 @@
         }
       }
     },
+    "Articles received" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Articles reçus"
+          }
+        }
+      }
+    },
     "Artificial intelligence" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Intelligence artificielle"
-          }
-        }
-      }
-    },
-    "As the digest filed the stories" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Selon le classement des actualités"
           }
         }
       }
@@ -1553,17 +1520,6 @@
         }
       }
     },
-    "Busiest" : {
-      "comment" : "In the middle of the day dial : the hour most articles arrive in.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le plus actif"
-          }
-        }
-      }
-    },
     "Business" : {
       "localizations" : {
         "fr" : {
@@ -1592,16 +1548,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Par source"
-          }
-        }
-      }
-    },
-    "Bylines" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Signatures"
           }
         }
       }
@@ -1923,6 +1869,17 @@
         }
       }
     },
+    "Duplicates" : {
+      "comment" : "A headline figure : how many arrivals were an article the reader already had.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Doublons"
+          }
+        }
+      }
+    },
     "Dynamic collections" : {
       "localizations" : {
         "fr" : {
@@ -1933,12 +1890,22 @@
         }
       }
     },
-    "In the news" : {
+    "Full article" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dans l'actualité"
+            "value" : "Article complet"
+          }
+        }
+      }
+    },
+    "Headline only" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Titre seulement"
           }
         }
       }
@@ -1995,12 +1962,12 @@
         }
       }
     },
-    "Nothing arrived over this stretch" : {
+    "No articles over this period" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rien n'est arrivé sur cette période"
+            "value" : "Aucun article sur cette période"
           }
         }
       }
@@ -2021,6 +1988,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rien pour l'instant"
+          }
+        }
+      }
+    },
+    "Number of stories" : {
+      "comment" : "Under the subjects : what the numbers beside them count.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombre d'actualités"
           }
         }
       }
@@ -2056,6 +2034,17 @@
         }
       }
     },
+    "Peak hour" : {
+      "comment" : "In the middle of the day dial : the hour most articles arrive in.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heure de pointe"
+          }
+        }
+      }
+    },
     "Profile" : {
       "localizations" : {
         "fr" : {
@@ -2066,12 +2055,12 @@
         }
       }
     },
-    "Said twice" : {
+    "Received and read" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dit deux fois"
+            "value" : "Reçus et lus"
           }
         }
       }
@@ -2092,16 +2081,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Statistiques"
-          }
-        }
-      }
-    },
-    "The flow" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le flux"
           }
         }
       }
@@ -2137,36 +2116,6 @@
         }
       }
     },
-    "They give you a headline" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elles donnent un titre"
-          }
-        }
-      }
-    },
-    "They give you the article" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elles donnent l'article"
-          }
-        }
-      }
-    },
-    "Through the day" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Au fil de la journée"
-          }
-        }
-      }
-    },
     "Version %@" : {
       "localizations" : {
         "fr" : {
@@ -2177,12 +2126,12 @@
         }
       }
     },
-    "What lands in the feed" : {
+    "What the feeds contain" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ce qui arrive dans le flux"
+            "value" : "Contenu des flux"
           }
         }
       }
@@ -2213,16 +2162,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce que vous gardez circule entre vos appareils par votre iCloud. Rien d'autre ne quitte celui-ci, hormis les requêtes vers les flux eux-mêmes. Pas de télémétrie, pas de traceur, aucun tiers."
-          }
-        }
-      }
-    },
-    "Who published" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Qui publie"
           }
         }
       }

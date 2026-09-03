@@ -200,7 +200,7 @@ struct StatisticsPanel: View {
             Image(systemName: "chart.pie")
                 .font(.system(size: 34))
                 .foregroundStyle(.quaternary)
-            Text("Nothing arrived over this stretch")
+            Text("No articles over this period")
                 .font(theme.standfirst(.subheadline))
                 .foregroundStyle(.secondary)
         }
@@ -230,7 +230,7 @@ struct StatisticsPanel: View {
                 value: Text(report.read.formatted()),
                 caption: Text("Read"),
                 footnote: report.arrived > 0 && report.read > 0
-                    ? Text("\(share(report.read, of: report.arrived)) of them") : nil
+                    ? Text("\(share(report.read, of: report.arrived)) of the articles") : nil
             )
             Figure(
                 value: Text(report.publishers.formatted()),
@@ -239,9 +239,9 @@ struct StatisticsPanel: View {
             )
             Figure(
                 value: Text(report.duplicates.formatted()),
-                caption: Text("Said twice"),
+                caption: Text("Duplicates"),
                 footnote: report.duplicates > 0
-                    ? Text("\(share(report.duplicates, of: report.arrived + report.duplicates)) of arrivals") : nil
+                    ? Text("\(share(report.duplicates, of: report.arrived + report.duplicates)) of the total") : nil
             )
         }
     }
@@ -270,13 +270,13 @@ struct StatisticsPanel: View {
     // MARK: - The cards
 
     private func flow(_ report: Statistics) -> some View {
-        card(Text("The flow"), note: report.showsReading ? Text("Arrivals, and what you read") : nil) {
+        card(Text("Articles received"), note: report.showsReading ? Text("Received and read") : nil) {
             FlowChart(flow: report.flow, grain: report.grain, showsReading: report.showsReading)
         }
     }
 
     private func day(_ report: Statistics) -> some View {
-        card(Text("Through the day")) {
+        card(Text("Articles per hour")) {
             HStack(spacing: 18) {
                 DayDial(
                     arrivals: report.arrivalsByHour,
@@ -296,7 +296,7 @@ struct StatisticsPanel: View {
     /// the reader's own where they have given it one : two places calling
     /// `lemonde.fr` two different things is two places to keep true.
     private func sources(_ report: Statistics) -> some View {
-        card(Text("Who published")) {
+        card(Text("Sources")) {
             VStack(spacing: 0) {
                 ForEach(Array(report.sources.enumerated()), id: \.element.id) { index, source in
                     if index > 0 {
@@ -347,7 +347,7 @@ struct StatisticsPanel: View {
     @ViewBuilder
     private func subjects(_ report: Statistics) -> some View {
         if !report.subjects.isEmpty {
-            card(Text("Subjects"), note: Text("As the digest filed the stories")) {
+            card(Text("Subjects"), note: Text("Number of stories")) {
                 RankedBars(entries: report.subjects, counted: .stories)
             }
         }
@@ -356,7 +356,7 @@ struct StatisticsPanel: View {
     @ViewBuilder
     private func people(_ report: Statistics) -> some View {
         if !report.people.isEmpty {
-            card(Text("In the news")) {
+            card(Text("Newsmakers")) {
                 RankedBars(entries: report.people)
             }
         }
@@ -365,7 +365,7 @@ struct StatisticsPanel: View {
     @ViewBuilder
     private func bylines(_ report: Statistics) -> some View {
         if !report.bylines.isEmpty {
-            card(Text("Bylines")) {
+            card(Text("Authors")) {
                 RankedBars(entries: report.bylines)
             }
         }
@@ -440,10 +440,10 @@ struct StatisticsPanel: View {
             let generous = report.bodies.prefix(4)
             let terse = report.bodies.suffix(4).reversed()
 
-            card(Text("What lands in the feed")) {
+            card(Text("What the feeds contain")) {
                 VStack(alignment: .leading, spacing: 16) {
-                    lengths(Text("They give you the article"), Array(generous))
-                    lengths(Text("They give you a headline"), Array(terse))
+                    lengths(Text("Full article"), Array(generous))
+                    lengths(Text("Headline only"), Array(terse))
                 }
             }
         }
@@ -469,7 +469,11 @@ struct StatisticsPanel: View {
                     // Characters and not words : a language is not a number of
                     // words per idea, and the two lists are read against each
                     // other rather than against a reading speed.
-                    Text("\(source.median) signs")
+                    //
+                    // `caractères` and not `signes`, which is a printer's word
+                    // for the same thing and a word nobody outside a print shop
+                    // uses.
+                    Text("\(source.median) characters")
                         .font(.caption.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
