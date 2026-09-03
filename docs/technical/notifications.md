@@ -44,6 +44,10 @@ Everything that was already open when the reader turned the notices on is not ne
 
 **The watermark is this device's own**, kept in `UserDefaults` and never carried. One that travelled would have the second device stay silent about what only the first had announced.
 
+**It is the clock, and it does not move past a read that failed.** A pass cut short by its own budget swallowed the articles it had just fetched and marked them told, which is the one way a watermark eats the news it exists to meter ; a failure now leaves it exactly where it was.
+
+**And it is not derived from the last row read.** It was, briefly, to keep what a capped answer did not hold. That cannot work : a feed's articles are all written in one go and carry one arrival moment to the millisecond, so the cut falls inside a group of equal stamps far more often than not, and a mark set to that stamp skips every sibling that did not fit while one set just below it announces the whole group again for ever. The read is bounded against absurdity rather than against a sentence, and what the notice *names* is what is bounded : the count is the whole truth and the list is the part that fits.
+
 **Nothing interrupts a reader who is looking at the page it would be about.** A story that opens appears on the front page, so a reader with Flong open has already seen it, and a notice about something they watched happen is a notice to dismiss for nothing. The watermark moves anyway : what it records is that the story reached them, not that a notification was posted. Being told tomorrow about what they saw today would be worse than not being told.
 
 **One story leads with its own headline.** The headline is the news, and a notification titled `New story` with the headline underneath buries the thing the reader is being told. Underneath goes the line the model wrote saying what happened, or, when there is none, the newsrooms covering it, which is the front page's own signal that something is happening. A tap opens that story.

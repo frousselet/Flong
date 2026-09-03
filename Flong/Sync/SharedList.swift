@@ -121,11 +121,11 @@ nonisolated enum SharedList {
 
 /// The articles of the collections the reader shares or was invited to.
 nonisolated struct SharedEntryStore: Sendable {
-    /// How many filings one notice is ever built out of.
+    /// How many filings one notice is ever counted out of.
     ///
     /// The same bound, and for the same reason, as the arrivals from a feed :
     /// see ``ArticleStore/mostBeforeAnnouncing``.
-    static let mostBeforeAnnouncing = 20
+    static let mostBeforeAnnouncing = 200
 
     private let database: AppDatabase
 
@@ -305,10 +305,8 @@ nonisolated struct SharedEntryStore: Sendable {
     ///
     /// - Parameter limit: how many are read at most. Accepting a share, or a
     ///   zone re-synchronizing after a repair, brings the whole of a collection
-    ///   at once, and one notification built out of four hundred filings is a
-    ///   notification about nothing. The caller stamps its watermark from the
-    ///   last row rather than from the clock, so the rest waits for the next
-    ///   pass instead of being lost.
+    ///   at once, and a notice has no use for four hundred rows. A bound on the
+    ///   work and not on the sentence : see ``ArticleStore/mostBeforeAnnouncing``.
     func arrived(
         since: Date,
         excluding listKey: String?,

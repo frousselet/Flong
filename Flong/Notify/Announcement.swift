@@ -154,7 +154,7 @@ nonisolated struct Announcement: Hashable, Sendable {
         let body =
             people.isEmpty
             ? joined(filings.map(\.title))
-            : ListFormatter.localizedString(byJoining: people.sorted())
+            : named(people.sorted())
 
         guard collections.count == 1 else {
             return Announcement(
@@ -232,7 +232,7 @@ nonisolated struct Announcement: Hashable, Sendable {
         guard subjects.count == 1, let subject = subjects.first else {
             return Announcement(
                 title: String(localized: "\(arrivals.count) new articles"),
-                body: ListFormatter.localizedString(byJoining: subjects),
+                body: named(subjects),
                 thread: Thread.newArticles
             )
         }
@@ -264,6 +264,16 @@ nonisolated struct Announcement: Hashable, Sendable {
     /// where the reader learns there was more.
     private static func joined(_ titles: [String]) -> String {
         titles.prefix(mostNamed).joined(separator: " · ")
+    }
+
+    /// The names a body lists, joined the way a language joins a list.
+    ///
+    /// Names and not headlines, so the language's own list formatter is right
+    /// here where the middle dot is right there. Bounded for the same reason :
+    /// a pass that brought articles from forty sources would otherwise put
+    /// forty names in a banner.
+    private static func named(_ names: [String]) -> String {
+        ListFormatter.localizedString(byJoining: Array(names.prefix(mostNamed)))
     }
 
     enum Thread {

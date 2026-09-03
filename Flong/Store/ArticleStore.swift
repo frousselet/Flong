@@ -203,15 +203,21 @@ nonisolated enum ArticleFilter: Hashable, Sendable {
 
 /// Reads and writes articles.
 nonisolated struct ArticleStore: Sendable {
-    /// How many arrivals one notice is ever built out of.
+    /// How many arrivals one notice is ever counted out of.
     ///
-    /// A notification has room for a title, a subtitle and about four lines,
-    /// and a reader who follows three hundred feeds can be brought two hundred
-    /// articles by one pass. Twenty is already more than the sentence can name ;
-    /// what it is really for is the watermark, which is stamped from the last
-    /// row read rather than from the clock, so the rest waits for the next pass
-    /// instead of being lost.
-    static let mostBeforeAnnouncing = 20
+    /// **A safety valve and not a sentence's worth.** It was twenty, with the
+    /// watermark stamped from the last row read so the rest waited for the next
+    /// pass. That cannot work : a feed's articles are all written in one go and
+    /// share one `received_at` to the millisecond, so the cut falls inside a
+    /// group of equal stamps far more often than not, and a mark set to that
+    /// stamp skips every sibling that did not fit while a mark set just below it
+    /// announces the whole group again, for ever.
+    ///
+    /// So the mark stays the clock, and the bound is high enough that reaching
+    /// it means a pass nobody could write a sentence about anyway. What the
+    /// notice *names* is bounded separately, by ``Announcement`` : the count is
+    /// the whole truth and the list is the part that fits.
+    static let mostBeforeAnnouncing = 200
 
     private let database: AppDatabase
 
@@ -896,9 +902,8 @@ nonisolated struct ArticleStore: Sendable {
     /// here is what keeps the two one question rather than two answers to
     /// reconcile.
     ///
-    /// - Parameter limit: how many are read at most. The caller stamps its
-    ///   watermark from the last row rather than from the clock, so what does
-    ///   not fit here is announced by the next pass instead of being lost.
+    /// - Parameter limit: how many are read at most, which is a bound on the
+    ///   work and not on the sentence. See ``mostBeforeAnnouncing``.
     func arrived(
         since moment: Date,
         fromEveryFeed everyFeed: Bool = false,

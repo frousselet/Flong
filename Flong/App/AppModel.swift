@@ -1646,13 +1646,10 @@ final class AppModel {
     /// that the articles reached this device, not that a notification was
     /// posted.
     ///
-    /// **It does not move past a read that failed, nor past a row nobody
-    /// read.** Those are the two ways a watermark silently eats the news it
-    /// exists to meter : a pass cut short by its own budget swallowed the
-    /// articles it had just fetched, and a pass that brought more than the
-    /// answer holds threw away everything past the twentieth. So a failure
-    /// leaves the mark where it was, and a full answer moves it only as far as
-    /// its last row.
+    /// **It does not move past a read that failed.** That is how a watermark
+    /// silently eats the news it exists to meter : a pass cut short by its own
+    /// budget swallowed the articles it had just fetched and marked them told.
+    /// A failure leaves the mark exactly where it was.
     ///
     /// A reader who has asked for nothing at all has no watermark either, so
     /// that asking for their first thing starts from that moment rather than
@@ -1680,9 +1677,7 @@ final class AppModel {
             Log.notify.error("The arrivals could not be read : the watermark stays where it was")
             return
         }
-        preferences.articlesAnnouncedAt =
-            arrived.count < ArticleStore.mostBeforeAnnouncing
-            ? Date() : (arrived.last?.receivedAt ?? Date())
+        preferences.articlesAnnouncedAt = Date()
 
         guard !isReading, let announcement = Announcement.newArticles(arrived) else { return }
         await announcer.post(announcement)
@@ -1774,13 +1769,7 @@ final class AppModel {
             Log.notify.error("The filings could not be read : the watermark stays where it was")
             return
         }
-        // Past what was actually read, exactly as the arrivals from a feed are :
-        // accepting a share brings a whole collection at once, and the answer
-        // is capped, so a mark set to now would leave everything past the
-        // twentieth behind it for good.
-        preferences.collaborationsAnnouncedAt =
-            arrived.count < SharedEntryStore.mostBeforeAnnouncing
-            ? Date() : (arrived.last?.entry.receivedAt ?? Date())
+        preferences.collaborationsAnnouncedAt = Date()
 
         guard !isReading, !arrived.isEmpty else { return }
 

@@ -1305,29 +1305,34 @@ struct AnnouncingSourceTests {
         #expect(preferences.articlesAnnouncedAt == now)
     }
 
-    /// A pass can bring more than one notice can name. The mark then stops at
-    /// the last row that was read rather than at the clock, so the rest is
-    /// announced by the next pass instead of being lost.
-    @Test("A pass that brought more than it could name keeps the rest for the next")
-    func theMarkStopsAtWhatWasRead() async throws {
+    /// **A feed's articles all carry one arrival moment**, to the millisecond :
+    /// they are written in one go. So a watermark stamped from the last row a
+    /// capped answer returned would skip every sibling that did not fit, and
+    /// one stamped just below it would announce the whole group again for ever.
+    /// The mark is the clock, the read is bounded only against absurdity, and
+    /// what the notice *names* is what is bounded.
+    @Test("A pass brings every article of a feed at one moment, and none is skipped")
+    func onePassOneMoment() async throws {
         let feed = try await source()
         await model.setWantsNewArticleNotices(true)
+        preferences.articlesAnnouncedAt = now
         model.isReading = false
 
-        let first = Date().addingTimeInterval(1)
-        for index in 0..<(ArticleStore.mostBeforeAnnouncing + 5) {
-            try await article("Article \(index)", of: feed, at: first.addingTimeInterval(Double(index)))
+        // One moment for all of them, which is what a refresh actually writes.
+        let landed = Date().addingTimeInterval(-1)
+        for index in 0..<25 {
+            try await article("Article \(index)", of: feed, at: landed)
         }
 
         await model.announceNewArticles()
-        #expect(announcer.posted.count == 1)
 
-        // Not past the twenty-fifth : past the twentieth, which is as far as
-        // this pass ever looked.
-        let mark = try #require(preferences.articlesAnnouncedAt)
-        #expect(mark < first.addingTimeInterval(Double(ArticleStore.mostBeforeAnnouncing + 4)))
+        let notice = try #require(announcer.posted.first)
+        // The count is the whole truth ; the body names what fits.
+        #expect(try #require(notice.subtitle).contains("25"))
 
+        // And the pass is over : nothing is left behind the mark to be said
+        // again by the next one.
         await model.announceNewArticles()
-        #expect(announcer.posted.count == 2)
+        #expect(announcer.posted.count == 1)
     }
 }

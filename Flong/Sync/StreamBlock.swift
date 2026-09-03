@@ -199,7 +199,13 @@ nonisolated enum StreamBlock {
                     // A block from a device that predates the field says
                     // nothing, and the publication date is the closer of the
                     // two remaining answers.
-                    receivedAt: header.receivedAt ?? header.publishedAt ?? now,
+                    //
+                    // **Never later than now.** Publishers date articles in the
+                    // future, by a timezone or by a scheduling mistake, and an
+                    // arrival moment ahead of the clock is one no watermark can
+                    // ever get past : the article would be announced by every
+                    // pass, for ever.
+                    receivedAt: min(header.receivedAt ?? header.publishedAt ?? now, now),
                     isRead: read.contains(ArticleFingerprint(feedURL: feedURL, guid: header.guid)),
                     canonicalKey: key
                 )
