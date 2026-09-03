@@ -1,38 +1,6 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "%@ and %lld others" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ et %2$lld autres"
-          }
-        }
-      }
-    },
-    "%@ articles each" : {
-      "comment" : "Under the count of stories : how many articles a story gathered, on average.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ articles chacune"
-          }
-        }
-      }
-    },
-    "%@ of the articles" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ des articles"
-          }
-        }
-      }
-    },
     "%@ · %lld results" : {
       "comment" : "Under a search read as a sentence. The first argument is what it was understood to ask for, the second how many articles answered.",
       "localizations" : {
@@ -74,6 +42,38 @@
         }
       }
     },
+    "%@ and %lld others" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ et %2$lld autres"
+          }
+        }
+      }
+    },
+    "%@ articles each" : {
+      "comment" : "Under the count of stories : how many articles a story gathered, on average.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ articles chacune"
+          }
+        }
+      }
+    },
+    "%@ of the articles" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ des articles"
+          }
+        }
+      }
+    },
     "%@, read" : {
       "localizations" : {
         "fr" : {
@@ -97,24 +97,6 @@
     "%lld additions" : {
       "extractionState" : "manual",
       "localizations" : {
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld ajout"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld ajouts"
-                }
-              }
-            }
-          }
-        },
         "en" : {
           "variations" : {
             "plural" : {
@@ -128,6 +110,24 @@
                 "stringUnit" : {
                   "state" : "new",
                   "value" : "%lld additions"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ajout"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld ajouts"
                 }
               }
             }
@@ -199,6 +199,7 @@
       }
     },
     "%lld arrivals were an article you already had, and were not shown again." : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "variations" : {
@@ -871,17 +872,6 @@
         }
       }
     },
-    "24 h" : {
-      "comment" : "A window of the statistics page : the last twenty-four hours.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "24 h"
-          }
-        }
-      }
-    },
     "3 months" : {
       "localizations" : {
         "fr" : {
@@ -908,6 +898,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "9 mois"
+          }
+        }
+      }
+    },
+    "24 h" : {
+      "comment" : "A window of the statistics page : the last twenty-four hours.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "24 h"
           }
         }
       }
@@ -1860,327 +1861,6 @@
         }
       }
     },
-    "iCloud" : {
-      "comment" : "A section heading in `Your data`.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iCloud"
-          }
-        }
-      }
-    },
-    "Languages" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Langues"
-          }
-        }
-      }
-    },
-    "Last refreshed in the background %@" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dernière actualisation en arrière-plan %@"
-          }
-        }
-      }
-    },
-    "License" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Licence"
-          }
-        }
-      }
-    },
-    "Low Power Mode is on, so Flong is not fetching in the background." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le mode économie d’énergie est activé, donc Flong ne récupère rien en arrière-plan."
-          }
-        }
-      }
-    },
-    "Nerd" : {
-      "comment" : "Under the easter egg at the foot of the statistics page. The same word in French.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nerd"
-          }
-        }
-      }
-    },
-    "Never suggested, whoever follows them." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jamais suggérées, quel que soit celui qui les suit."
-          }
-        }
-      }
-    },
-    "No articles over this period" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aucun article sur cette période"
-          }
-        }
-      }
-    },
-    "Nothing of yours is published until a member brings you in." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rien de vous n'est publié tant qu'un membre ne vous a pas fait entrer."
-          }
-        }
-      }
-    },
-    "Nothing yet" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Rien pour l'instant"
-          }
-        }
-      }
-    },
-    "Number of stories" : {
-      "comment" : "Under the subjects : what the numbers beside them count.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nombre d'actualités"
-          }
-        }
-      }
-    },
-    "Offers to remove the sources you stopped following on another device." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Propose de retirer les sources que vous avez cessé de suivre sur un autre appareil."
-          }
-        }
-      }
-    },
-    "Only addresses. Never your name, a secret address or a source behind a password." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seulement des adresses. Jamais votre nom, une adresse secrète ou une source protégée par un mot de passe."
-          }
-        }
-      }
-    },
-    "Only readers somebody has brought in can add to the list. Give your code to a reader who is already in. Nothing of yours is published until then." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seuls les lecteurs parrainés peuvent alimenter la liste. Donnez votre code à un lecteur qui en fait déjà partie. Rien de ce que vous suivez n’est publié d’ici là."
-          }
-        }
-      }
-    },
-    "Peak day" : {
-      "comment" : "Under the weekday and day-of-month dials : the day most articles arrive on.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Jour de pointe"
-          }
-        }
-      }
-    },
-    "Peak hour" : {
-      "comment" : "In the middle of the day dial : the hour most articles arrive in.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Heure de pointe"
-          }
-        }
-      }
-    },
-    "Profile" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Profil"
-          }
-        }
-      }
-    },
-    "Received and read" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reçus et lus"
-          }
-        }
-      }
-    },
-    "Sends everything to your iCloud again and reads all of it back, then asks every source. Nothing is lost. It takes a while and uses the network, so it is worth doing only when a device is out of step." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Renvoie tout vers votre iCloud et le relit entièrement, puis interroge chaque source. Rien n'est perdu. C'est long et cela consomme du réseau : à faire seulement quand un appareil est désynchronisé."
-          }
-        }
-      }
-    },
-    "Source code" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Code source"
-          }
-        }
-      }
-    },
-    "Statistics" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Statistiques"
-          }
-        }
-      }
-    },
-    "Synchronize everything again" : {
-      "comment" : "The repair in `Your data` : sends the whole zone to iCloud again and reads it back.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tout resynchroniser"
-          }
-        }
-      }
-    },
-    "The one dependency, for SQLite" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La seule dépendance, pour SQLite"
-          }
-        }
-      }
-    },
-    "The session goes to the keychain, never a password." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La session va dans le trousseau, jamais un mot de passe."
-          }
-        }
-      }
-    },
-    "The system has not granted a background refresh yet. Opening Flong always refreshes." : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le système n’a pas encore accordé d’actualisation en arrière-plan. Ouvrir Flong actualise toujours."
-          }
-        }
-      }
-    },
-    "Version %@" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Version %@"
-          }
-        }
-      }
-    },
-    "What they follow is suggested straight away." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce qu'ils suivent est suggéré immédiatement."
-          }
-        }
-      }
-    },
-    "What they offer counts for nobody, and nor does what anybody they brought in offers." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce qu'ils proposent ne compte pour personne, ni ce que proposent ceux qu'ils ont fait entrer."
-          }
-        }
-      }
-    },
-    "What you choose to keep travels between your own devices through your own iCloud. Nothing else leaves this one but the requests to the feeds themselves. No telemetry, no tracker, no third party." : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce que vous gardez circule entre vos appareils par votre iCloud. Rien d'autre ne quitte celui-ci, hormis les requêtes vers les flux eux-mêmes. Pas de télémétrie, pas de traceur, aucun tiers."
-          }
-        }
-      }
-    },
-    "You shared this" : {
-      "comment" : "Under the reader's own name in a shared collection, which reads `Vous` above it : the French agrees with it where the English cannot.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Avez partagé"
-          }
-        }
-      }
-    },
-    "Your data" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Vos données"
-          }
-        }
-      }
-    },
     "Écologie" : {
       "comment" : "The former name of the Environment section, kept so a rename can find it",
       "localizations" : {
@@ -2835,6 +2515,17 @@
         }
       }
     },
+    "iCloud" : {
+      "comment" : "A section heading in `Your data`.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud"
+          }
+        }
+      }
+    },
     "iCloud is not answering" : {
       "localizations" : {
         "fr" : {
@@ -3018,6 +2709,16 @@
         }
       }
     },
+    "Languages" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Langues"
+          }
+        }
+      }
+    },
     "Last answered" : {
       "localizations" : {
         "fr" : {
@@ -3034,6 +2735,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nom"
+          }
+        }
+      }
+    },
+    "Last refreshed in the background %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière actualisation en arrière-plan %@"
           }
         }
       }
@@ -3059,6 +2771,16 @@
         }
       }
     },
+    "License" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Licence"
+          }
+        }
+      }
+    },
     "Live stories" : {
       "localizations" : {
         "fr" : {
@@ -3075,6 +2797,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Régions"
+          }
+        }
+      }
+    },
+    "Low Power Mode is on, so Flong is not fetching in the background." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le mode économie d’énergie est activé, donc Flong ne récupère rien en arrière-plan."
           }
         }
       }
@@ -3170,12 +2903,33 @@
         }
       }
     },
+    "Nerd" : {
+      "comment" : "Under the easter egg at the foot of the statistics page. The same word in French.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nerd"
+          }
+        }
+      }
+    },
     "Never" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Jamais"
+          }
+        }
+      }
+    },
+    "Never suggested, whoever follows them." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jamais suggérées, quel que soit celui qui les suit."
           }
         }
       }
@@ -3227,6 +2981,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Personnalités"
+          }
+        }
+      }
+    },
+    "No articles over this period" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun article sur cette période"
           }
         }
       }
@@ -3412,6 +3176,16 @@
         }
       }
     },
+    "Nothing of yours is published until a member brings you in." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien de vous n'est publié tant qu'un membre ne vous a pas fait entrer."
+          }
+        }
+      }
+    },
     "Nothing to read" : {
       "localizations" : {
         "fr" : {
@@ -3450,6 +3224,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rien n'a été modifié. Réessayez quand cet appareil sera de nouveau en ligne."
+          }
+        }
+      }
+    },
+    "Nothing yet" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien pour l'instant"
           }
         }
       }
@@ -3494,12 +3278,54 @@
         }
       }
     },
+    "Number of stories" : {
+      "comment" : "Under the subjects : what the numbers beside them count.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombre d'actualités"
+          }
+        }
+      }
+    },
+    "Offers to remove the sources you stopped following on another device." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Propose de retirer les sources que vous avez cessé de suivre sur un autre appareil."
+          }
+        }
+      }
+    },
     "OK" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "OK"
+          }
+        }
+      }
+    },
+    "Only addresses. Never your name, a secret address or a source behind a password." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seulement des adresses. Jamais votre nom, une adresse secrète ou une source protégée par un mot de passe."
+          }
+        }
+      }
+    },
+    "Only readers somebody has brought in can add to the list. Give your code to a reader who is already in. Nothing of yours is published until then." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seuls les lecteurs parrainés peuvent alimenter la liste. Donnez votre code à un lecteur qui en fait déjà partie. Rien de ce que vous suivez n’est publié d’ici là."
           }
         }
       }
@@ -3567,6 +3393,28 @@
         }
       }
     },
+    "Peak day" : {
+      "comment" : "Under the weekday and day-of-month dials : the day most articles arrive on.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jour de pointe"
+          }
+        }
+      }
+    },
+    "Peak hour" : {
+      "comment" : "In the middle of the day dial : the hour most articles arrive in.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heure de pointe"
+          }
+        }
+      }
+    },
     "Picture via %@" : {
       "comment" : "Credit under a picture : the publisher whose article it came with",
       "localizations" : {
@@ -3605,6 +3453,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vie privée"
+          }
+        }
+      }
+    },
+    "Profile" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Profil"
           }
         }
       }
@@ -3667,6 +3525,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Lecture des personnalités"
+          }
+        }
+      }
+    },
+    "Received and read" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reçus et lus"
           }
         }
       }
@@ -3946,6 +3814,16 @@
         }
       }
     },
+    "Sends everything to your iCloud again and reads all of it back, then asks every source. Nothing is lost. It takes a while and uses the network, so it is worth doing only when a device is out of step." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renvoie tout vers votre iCloud et le relit entièrement, puis interroge chaque source. Rien n'est perdu. C'est long et cela consomme du réseau : à faire seulement quand un appareil est désynchronisé."
+          }
+        }
+      }
+    },
     "Serif headlines on warm paper, with the contrast pulled back." : {
       "localizations" : {
         "fr" : {
@@ -4208,6 +4086,16 @@
         }
       }
     },
+    "Source code" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Code source"
+          }
+        }
+      }
+    },
     "Sources" : {
       "localizations" : {
         "fr" : {
@@ -4298,6 +4186,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Articles favoris"
+          }
+        }
+      }
+    },
+    "Statistics" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statistiques"
           }
         }
       }
@@ -4420,6 +4318,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Suggestions"
+          }
+        }
+      }
+    },
+    "Synchronize everything again" : {
+      "comment" : "The repair in `Your data` : sends the whole zone to iCloud again and reads it back.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout resynchroniser"
           }
         }
       }
@@ -4554,12 +4463,32 @@
         }
       }
     },
+    "The one dependency, for SQLite" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La seule dépendance, pour SQLite"
+          }
+        }
+      }
+    },
     "The sections every reader has. The model files each story under one or two of these, or of yours, and can write none of its own." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les rubriques que tout lecteur connaît. Le modèle classe chaque actualité sous une ou deux d’entre elles, ou des vôtres, et n’en écrit aucune lui-même."
+          }
+        }
+      }
+    },
+    "The session goes to the keychain, never a password." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La session va dans le trousseau, jamais un mot de passe."
           }
         }
       }
@@ -4581,6 +4510,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les abonnements n'ont pas pu être enregistrés."
+          }
+        }
+      }
+    },
+    "The system has not granted a background refresh yet. Opening Flong always refreshes." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le système n’a pas encore accordé d’actualisation en arrière-plan. Ouvrir Flong actualise toujours."
           }
         }
       }
@@ -4934,6 +4874,16 @@
         }
       }
     },
+    "Version %@" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version %@"
+          }
+        }
+      }
+    },
     "Video games" : {
       "localizations" : {
         "fr" : {
@@ -5026,12 +4976,42 @@
         }
       }
     },
+    "What they follow is suggested straight away." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qu'ils suivent est suggéré immédiatement."
+          }
+        }
+      }
+    },
+    "What they offer counts for nobody, and nor does what anybody they brought in offers." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qu'ils proposent ne compte pour personne, ni ce que proposent ceux qu'ils ont fait entrer."
+          }
+        }
+      }
+    },
     "What they signed has been purged, or has not arrived yet." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ce qu'elle a signé a été purgé, ou n'est pas encore arrivé."
+          }
+        }
+      }
+    },
+    "What you choose to keep travels between your own devices through your own iCloud. Nothing else leaves this one but the requests to the feeds themselves. No telemetry, no tracker, no third party." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que vous gardez circule entre vos appareils par votre iCloud. Rien d'autre ne quitte celui-ci, hormis les requêtes vers les flux eux-mêmes. Pas de télémétrie, pas de traceur, aucun tiers."
           }
         }
       }
@@ -5159,12 +5139,33 @@
         }
       }
     },
+    "You shared this" : {
+      "comment" : "Under the reader's own name in a shared collection, which reads `Vous` above it : the French agrees with it where the English cannot.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avez partagé"
+          }
+        }
+      }
+    },
     "Your contributor code" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Votre code de contributeur"
+          }
+        }
+      }
+    },
+    "Your data" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vos données"
           }
         }
       }
