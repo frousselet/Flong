@@ -84,6 +84,7 @@ struct AppShell: View {
     @State private var isAddingFeed = false
     @State private var isChoosingFile = false
     @State private var isSeeingPopular = false
+    @State private var isImportingService = false
     @Namespace private var zoom
 
     @Environment(\.scenePhase) private var scenePhase
@@ -108,6 +109,7 @@ struct AppShell: View {
                         isAddingFeed: $isAddingFeed,
                         isChoosingFile: $isChoosingFile,
                         isSeeingPopular: $isSeeingPopular,
+                        isImportingService: $isImportingService,
                         open: open
                     )
                 }
@@ -200,6 +202,10 @@ struct AppShell: View {
         }
         .sheet(isPresented: $isSeeingPopular) {
             PopularFeedsView(model: model)
+                .themed()
+        }
+        .sheet(isPresented: $isImportingService) {
+            ServiceImportView(model: model)
                 .themed()
         }
         .fileImporter(isPresented: $isChoosingFile, allowedContentTypes: OPMLDocument.types) { result in
@@ -306,6 +312,21 @@ struct AppShell: View {
             Text("Import finished"),
             isPresented: Binding(get: { model.report != nil }, set: { if !$0 { model.report = nil } }),
             presenting: model.report
+        ) { _ in
+            Button("OK", role: .cancel) {}
+        } message: { report in
+            Text(verbatim: Self.summary(of: report))
+        }
+        // Said here rather than in the import screen, because the import
+        // outlives it : a reader who started one and closed the sheet is told
+        // what it came to wherever they happen to be when it ends.
+        .alert(
+            Text("Import finished"),
+            isPresented: Binding(
+                get: { model.serviceReport != nil },
+                set: { if !$0 { model.serviceReport = nil } }
+            ),
+            presenting: model.serviceReport
         ) { _ in
             Button("OK", role: .cancel) {}
         } message: { report in
@@ -448,6 +469,35 @@ struct AppShell: View {
         #else
             content.navigationTransition(.zoom(sourceID: id, in: zoom))
         #endif
+    }
+
+    /// What an import of a remote account came to, in lines a reader reads at a
+    /// glance rather than a paragraph they have to parse.
+    ///
+    /// Only what happened is said : an account with no favourites says nothing
+    /// about favourites, and a line of nought is a line nobody needed.
+    private static func summary(of report: ServiceImportReport) -> String {
+        var lines: [String] = []
+        if !report.isComplete {
+            lines.append(String(localized: "Stopped part way. Finish it from the sources list."))
+        }
+        lines.append(String(localized: "\(report.added) sources added"))
+        if report.merged > 0 {
+            lines.append(String(localized: "\(report.merged) already followed"))
+        }
+        if report.articles > 0 {
+            lines.append(String(localized: "\(report.articles) articles brought in"))
+        }
+        if report.favourites > 0 {
+            lines.append(String(localized: "\(report.favourites) favourites"))
+        }
+        if report.favouritesElsewhere > 0 {
+            lines.append(String(localized: "\(report.favouritesElsewhere) favourites of sources you did not take"))
+        }
+        if !report.skipped.isEmpty {
+            lines.append(String(localized: "\(report.skipped.count) ignored"))
+        }
+        return lines.joined(separator: "\n")
     }
 
     private static func summary(of report: OPMLImportReport) -> String {

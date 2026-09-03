@@ -279,6 +279,46 @@
         }
       }
     },
+    "%lld articles brought in" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld article brought in"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld articles brought in"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld article récupéré"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld articles récupérés"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld authors" : {
       "localizations" : {
         "en" : {
@@ -312,6 +352,86 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld auteurs"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld favourites" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favourite"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favourites"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favori"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favoris"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld favourites of sources you did not take" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favourite of a source you did not take"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favourites of sources you did not take"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favori d'une source non reprise"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld favoris de sources non reprises"
                 }
               }
             }
@@ -600,6 +720,46 @@
         }
       }
     },
+    "%lld of %lld" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld of %lld"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld of %lld"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sur %lld"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sur %lld"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld people" : {
       "comment" : "What a pile of faces is read out as, where the faces themselves say nothing.",
       "localizations" : {
@@ -802,6 +962,46 @@
         }
       }
     },
+    "%lld sources added" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld source added"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sources added"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld source ajoutée"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sources ajoutées"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld stories" : {
       "localizations" : {
         "en" : {
@@ -835,6 +1035,46 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld actualités"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld subscriptions" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld subscription"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld subscriptions"
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld abonnement"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld abonnements"
                 }
               }
             }
@@ -913,6 +1153,16 @@
         }
       }
     },
+    "A favourite lands where its source is one you follow. The others are counted and left." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un favori arrive si sa source est une de celles que vous suivez. Les autres sont comptés et laissés."
+          }
+        }
+      }
+    },
     "A feed reader with no server, no account and nothing to sign in to. Every device collects the feeds itself and keeps them in a database of its own." : {
       "localizations" : {
         "fr" : {
@@ -939,6 +1189,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Une source qui déménage garde ses articles, tout ce que vous y avez marqué et les collections où ils sont classés. Elle est interrogée aussitôt, et vos autres appareils suivent."
+          }
+        }
+      }
+    },
+    "A source you already follow keeps the name and the settings you gave it here." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une source que vous suivez déjà garde le nom et les réglages que vous lui avez donnés ici."
           }
         }
       }
@@ -999,6 +1259,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ajouter un flux"
+          }
+        }
+      }
+    },
+    "Add a feed, bring your subscriptions over, or see what other readers follow." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajoutez un flux, transférez vos abonnements, ou voyez ce que suivent les autres lecteurs."
           }
         }
       }
@@ -1155,6 +1425,16 @@
         }
       }
     },
+    "Address of your FreshRSS" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adresse de votre FreshRSS"
+          }
+        }
+      }
+    },
     "Agriculture" : {
       "localizations" : {
         "fr" : {
@@ -1216,6 +1496,26 @@
         }
       }
     },
+    "Already followed" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déjà suivi"
+          }
+        }
+      }
+    },
+    "An import is waiting to be finished" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un import attend d'être terminé"
+          }
+        }
+      }
+    },
     "Another source is already followed at this address." : {
       "localizations" : {
         "fr" : {
@@ -1243,6 +1543,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Réponses sans changement"
+          }
+        }
+      }
+    },
+    "API password" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mot de passe API"
           }
         }
       }
@@ -1498,6 +1808,56 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Livres"
+          }
+        }
+      }
+    },
+    "Bring the favourites" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récupérer les favoris"
+          }
+        }
+      }
+    },
+    "Bring their articles too" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récupérer aussi leurs articles"
+          }
+        }
+      }
+    },
+    "Bringing the articles" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récupération des articles"
+          }
+        }
+      }
+    },
+    "Bringing the favourites" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récupération des favoris"
+          }
+        }
+      }
+    },
+    "Bringing your subscriptions and your articles in" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récupération de vos abonnements et de vos articles"
           }
         }
       }
@@ -1861,12 +2221,217 @@
         }
       }
     },
+    "Everything" : {
+      "comment" : "The whole history of every source an import takes.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout"
+          }
+        }
+      }
+    },
+    "Finish it" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le terminer"
+          }
+        }
+      }
+    },
+    "Finish it now" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le terminer maintenant"
+          }
+        }
+      }
+    },
+    "Flong reads the account once. It never signs in again on its own, changes nothing there, and keeps no link with the server." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flong lit le compte une fois. Il ne s'y reconnecte jamais seul, n'y change rien, et ne garde aucun lien avec le serveur."
+          }
+        }
+      }
+    },
+    "Give up on it" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L'abandonner"
+          }
+        }
+      }
+    },
+    "How much" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Combien"
+          }
+        }
+      }
+    },
+    "Import" : {
+      "comment" : "Starts bringing the chosen subscriptions in.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importer"
+          }
+        }
+      }
+    },
+    "Import from FreshRSS" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Importer depuis FreshRSS"
+          }
+        }
+      }
+    },
+    "Importing from FreshRSS" : {
+      "comment" : "The title of the background task the system draws while the import runs.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import depuis FreshRSS"
+          }
+        }
+      }
+    },
+    "In FreshRSS, allow API access under Authentication, then set an API password in your profile. It is not the one you sign in to the site with." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dans FreshRSS, autorisez l'accès API dans Authentification, puis définissez un mot de passe API dans votre profil. Ce n'est pas celui du site."
+          }
+        }
+      }
+    },
+    "Keep Flong open until this is done. It picks up where it stopped if you have to leave." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gardez Flong ouvert jusqu'à la fin. Il reprend où il s'est arrêté si vous devez partir."
+          }
+        }
+      }
+    },
+    "None" : {
+      "comment" : "Unticks every subscription of the list.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun"
+          }
+        }
+      }
+    },
+    "Nothing already brought in is fetched again. It carries on from where it stopped." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien de ce qui est déjà arrivé n'est récupéré à nouveau. Il reprend où il s'est arrêté."
+          }
+        }
+      }
+    },
+    "Stopped part way. Finish it from the sources list." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrêté en cours de route. Terminez-le depuis la liste des sources."
+          }
+        }
+      }
+    },
+    "Taking the subscriptions" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récupération des abonnements"
+          }
+        }
+      }
+    },
     "The headline and the line above are the publisher's own, translated on this device. Nothing was sent anywhere." : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Le titre et la ligne ci-dessus sont ceux de l'éditeur, traduits sur cet appareil. Rien n'a été envoyé nulle part."
+          }
+        }
+      }
+    },
+    "The last 100 of each" : {
+      "comment" : "How much of each source's history an import brings.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les 100 derniers de chaque"
+          }
+        }
+      }
+    },
+    "The last 500 of each" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les 500 derniers de chaque"
+          }
+        }
+      }
+    },
+    "The password for this import is gone. Start it again." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le mot de passe de cet import a disparu. Recommencez-le."
+          }
+        }
+      }
+    },
+    "This name and this password were not accepted. FreshRSS wants the API password from your profile, not the one you sign in to the site with." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce nom et ce mot de passe ont été refusés. FreshRSS attend le mot de passe API de votre profil, pas celui avec lequel vous vous connectez au site."
+          }
+        }
+      }
+    },
+    "This server did not answer as a FreshRSS instance." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce serveur n'a pas répondu comme une instance FreshRSS."
           }
         }
       }
@@ -1878,6 +2443,36 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Traduit par le modèle. %@"
+          }
+        }
+      }
+    },
+    "Username" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom d'utilisateur"
+          }
+        }
+      }
+    },
+    "What was read stays read, and nothing you have already read here is undone. Everything can be tens of thousands of articles and takes several minutes." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce qui était lu reste lu, et rien de ce que vous avez déjà lu ici n'est défait. Tout peut représenter des dizaines de milliers d'articles et prendre plusieurs minutes."
+          }
+        }
+      }
+    },
+    "You can leave Flong. The import carries on and finishes on its own." : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vous pouvez quitter Flong. L'import continue et se termine tout seul."
           }
         }
       }

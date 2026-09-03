@@ -42,6 +42,39 @@ struct LocalizationTests {
         #expect(String(localized: "Subscribed sites", locale: french) == "Sites abonnés")
     }
 
+    /// The screen a reader arriving from another reader sees first.
+    ///
+    /// **The one word they must not misread is the password.** FreshRSS has two,
+    /// and the one that works here is the one nobody has ever typed, so both
+    /// the field and the line under it name it.
+    @Test("The import from a service speaks French")
+    func serviceImport() {
+        #expect(String(localized: "Import from FreshRSS", locale: french) == "Importer depuis FreshRSS")
+        #expect(String(localized: "API password", locale: french) == "Mot de passe API")
+        #expect(String(localized: "Bring their articles too", locale: french) == "Récupérer aussi leurs articles")
+        #expect(String(localized: "Bring the favourites", locale: french) == "Récupérer les favoris")
+        #expect(String(localized: "Already followed", locale: french) == "Déjà suivi")
+        #expect(
+            String(localized: "An import is waiting to be finished", locale: french)
+                == "Un import attend d'être terminé")
+        #expect(
+            String(localized: "You can leave Flong. The import carries on and finishes on its own.", locale: french)
+                == "Vous pouvez quitter Flong. L'import continue et se termine tout seul."
+        )
+    }
+
+    /// The stages of an import, which are read off ``ServiceImportProgress``
+    /// rather than written in the screen, so the resource is what has to reach
+    /// French.
+    @Test("What the import is doing is said in French")
+    func serviceStages() {
+        #expect(inFrench(ServiceImportProgress.Stage.subscribing.title) == "Récupération des abonnements")
+        #expect(inFrench(ServiceImportProgress.Stage.articles.title) == "Récupération des articles")
+        #expect(inFrench(ServiceImportProgress.Stage.favourites.title) == "Récupération des favoris")
+        #expect(inFrench(ImportDepth.everything.title) == "Tout")
+        #expect(inFrench(ImportDepth.hundred.title) == "Les 100 derniers de chaque")
+    }
+
     /// The page of figures says what a thing is, not what it does.
     ///
     /// **Every label here is a word the application already uses elsewhere.**

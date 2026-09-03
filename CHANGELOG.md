@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- An import from a FreshRSS account, chosen subscription by subscription, bringing the history of each source picked and the favourites, merging a source already followed rather than duplicating it, resumable across launches and carried on by the system when the reader leaves.
 - A `Statistiques` page, opened from a chart beside the reader's own face : the articles received, how many were read, the sources, the stories the digest made of them, the hours, the days of the week and of the month, the subjects, the personalities, the authors and the languages, over everything by default and down to a day. Every card is a sheet of Liquid Glass over a wash the page scrolls across. There is something under the last card for whoever scrolls that far.
 - An `À propos` page at the foot of the reader's own panel : the icon, the version and the build, what Flong does without, and links to the source, the licence and its one dependency.
 - A `Nouveaux articles` switch in the notifications panel, covering every source at once, with the per-source, per-writer and per-person switches kept underneath it.

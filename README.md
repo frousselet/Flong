@@ -81,6 +81,8 @@ There is no account to close, so the reader's panel deletes everything instead, 
 
 Flong is not a client for any service. FreshRSS, Miniflux, Feedbin and Feedly are one-shot import sources : subscriptions, labels, stars and read states are read once, after which Flong runs on its own.
 
+The import from FreshRSS is in : sign in with the API password, tick the subscriptions to take, and choose how much of each source's history and whether to bring the favourites. A source already followed is merged and keeps its name. It is resumable, the system carries it on when you leave, and it may be finished later from the sources list.
+
 ## Documentation
 
 | Document | Contents |

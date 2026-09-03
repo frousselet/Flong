@@ -24,6 +24,9 @@ struct DigestScreen: View {
     @Binding var isAddingFeed: Bool
     @Binding var isChoosingFile: Bool
     @Binding var isSeeingPopular: Bool
+    /// The reader arriving from another reader, which is the commonest way a
+    /// first launch has anything to show at all.
+    @Binding var isImportingService: Bool
     let open: (Route) -> Void
 
     @Environment(\.theme) private var theme
@@ -232,9 +235,10 @@ struct DigestScreen: View {
             ContentUnavailableView {
                 Label("No feed yet", systemImage: "dot.radiowaves.up.forward")
             } description: {
-                Text("Add a feed, import an OPML file, or see what other readers follow.")
+                Text("Add a feed, bring your subscriptions over, or see what other readers follow.")
             } actions: {
                 Button("Add a feed") { isAddingFeed = true }
+                Button("Import from FreshRSS") { isImportingService = true }
                 Button("Import an OPML file") { isChoosingFile = true }
                 Button("Popular feeds") { isSeeingPopular = true }
             }

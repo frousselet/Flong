@@ -86,6 +86,9 @@ nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
     case notRemoved
     case addressAlreadyFollowed
     case noAddress
+    case serviceRejected
+    case serviceUnreadable
+    case noServicePassword
 
     var id: Self { self }
 
@@ -111,6 +114,16 @@ nonisolated enum AppFailure: Hashable, Identifiable, Sendable {
         case .notRemoved: "This source could not be removed. Try again in a moment."
         case .addressAlreadyFollowed: "Another source is already followed at this address."
         case .noAddress: "Type the address this source is served at."
+        // **It names the one thing a reader gets wrong here.** FreshRSS asks
+        // for a second password under Profile, for programs rather than for the
+        // browser, and the one they signed in with does not work at all.
+        case .serviceRejected:
+            """
+            This name and this password were not accepted. \
+            FreshRSS wants the API password from your profile, not the one you sign in to the site with.
+            """
+        case .serviceUnreadable: "This server did not answer as a FreshRSS instance."
+        case .noServicePassword: "The password for this import is gone. Start it again."
         }
     }
 }
@@ -202,6 +215,8 @@ final class AppModel {
     private let retention: Retention
     private let finder: FeedFinder
     private let opml: OPMLImport
+    /// A one-shot import of a remote account, from wherever it stands.
+    private let service: ServiceImport
     private let credentials: CredentialStoring
     private let sessions: SessionStoring
     private let preferences: Preferences
@@ -928,6 +943,39 @@ final class AppModel {
     var report: OPMLImportReport?
     var failure: AppFailure?
 
+    // MARK: - The import of a remote account
+
+    /// What the import of a remote account is doing, or `nil` when none is.
+    private(set) var serviceProgress: ServiceImportProgress?
+    /// The summary of the last one, until the reader dismisses it.
+    var serviceReport: ServiceImportReport?
+    /// An import written down and not finished, which the reader is offered.
+    ///
+    /// **Offered rather than started.** The resume point is on disk and nothing
+    /// is lost, but finishing it is minutes of network, and an application that
+    /// helped itself to that on a launch over cellular would be an application
+    /// nobody trusts with their data allowance. The sources panel is where the
+    /// offer stands, as its own note has always said it would.
+    private(set) var pendingImport: ImportJob?
+    /// Whether the system took the import on, so the reader may leave.
+    ///
+    /// `false` means the screen has to hold them : the bar goes full width and
+    /// asks them to stay until it is over.
+    private(set) var importRunsInBackground = false
+
+    /// The session an import is running under, kept between signing in and
+    /// starting so the reader signs in once.
+    private var serviceClient: GoogleReaderClient?
+    /// The API password, from the moment it is typed to the moment the job is
+    /// written down and it goes to the keychain. Never longer, and never to
+    /// disk from here.
+    private var servicePassword: String?
+    /// What the account listed, for the picker to show.
+    private(set) var serviceSubscriptions: [GoogleReaderSubscription] = []
+    /// The one runner, so the screen and the background task cannot both walk
+    /// the same streams at once.
+    private var serviceTask: Task<Void, Never>?
+
     /// What is in the search field.
     ///
     /// Results follow it as it is typed, after a pause short enough not to be
@@ -1149,6 +1197,7 @@ final class AppModel {
         self.retention = Retention(database)
         self.finder = FeedFinder(fetcher: fetcher)
         self.opml = OPMLImport(subscriptions)
+        self.service = ServiceImport(database)
     }
 
     /// The fixed views, which every reader has whatever they follow.
@@ -1264,6 +1313,7 @@ final class AppModel {
         enriching?.cancel()
         showingWork?.cancel()
         clearingWork?.cancel()
+        serviceTask?.cancel()
     }
 
     /// How often an open window asks the publishers.
@@ -1312,6 +1362,10 @@ final class AppModel {
         recentSearches = preferences.recentSearches
         loadProfile()
         await countOutstandingWork()
+        // An import somebody started and did not finish. Found rather than
+        // resumed : the sources panel offers it, and the reader decides when to
+        // spend the minutes of network it takes.
+        await findPendingImport()
     }
 
     // MARK: - The digest
@@ -2130,6 +2184,15 @@ final class AppModel {
     /// just arrived rather than on what was here this morning ; iCloud comes
     /// last, so what goes out is the whole of it.
     func backgroundProcessing() async {
+        // **The import first, and it is why this handler has a third caller.**
+        // A reader who starts an import and puts the phone away is asking for
+        // exactly this task : the system took it on, it re-enters here, and
+        // what it finds is either a run already going, which it waits on and so
+        // keeps alive, or a written-down import to carry further. An account of
+        // thirty thousand articles is minutes of network and nobody watches a
+        // screen for that.
+        await resumeServiceImport()
+
         // Whatever made the model fail hours ago is worth trying again now :
         // the assets may have finished downloading, the reader may have
         // switched Apple Intelligence on, a rate limit has certainly lifted.
@@ -4909,6 +4972,234 @@ final class AppModel {
         } catch {
             failure = .notSaved
             Log.store.error("The import could not be saved : \(error, privacy: .public)")
+        }
+    }
+
+    // MARK: - Importing from a FreshRSS account
+
+    /// Opens a session and asks the account what it holds.
+    ///
+    /// Nothing is written : this is the step before the reader has decided
+    /// anything, and what comes back is the list the picker shows.
+    func signInToService(address: String, username: String, password: String) async -> Bool {
+        do {
+            let client = try await GoogleReaderClient.signIn(
+                to: address,
+                username: username.trimmingCharacters(in: .whitespacesAndNewlines),
+                password: password
+            )
+            serviceSubscriptions = try await client.subscriptions()
+            serviceClient = client
+            servicePassword = password
+            return true
+        } catch {
+            failure = Self.failure(of: error)
+            Log.store.error("The account would not open : \(String(describing: error), privacy: .public)")
+            return false
+        }
+    }
+
+    /// Forgets the session, when the reader closes the screen without starting.
+    func forgetService() {
+        guard serviceTask == nil else { return }
+        serviceClient = nil
+        servicePassword = nil
+        serviceSubscriptions = []
+    }
+
+    /// The addresses this device already follows.
+    ///
+    /// What the picker needs in order to say which of somebody else's
+    /// subscriptions are new : an address is canonicalized before it is
+    /// compared, so two spellings of one feed are one row here as everywhere.
+    func followedAddresses() async -> Set<URL> {
+        Set(((try? await subscriptions.feeds()) ?? []).map(\.url))
+    }
+
+    /// Writes down what the reader chose and starts bringing it in.
+    func startServiceImport(
+        chosen: Set<String>,
+        depth: ImportDepth,
+        wantsArticles: Bool,
+        wantsFavourites: Bool
+    ) async {
+        guard let client = serviceClient, let password = servicePassword else { return }
+
+        do {
+            let job = try await service.begin(
+                account: client.account,
+                password: password,
+                listed: serviceSubscriptions,
+                chosen: chosen,
+                depth: depth,
+                wantsArticles: wantsArticles,
+                wantsFavourites: wantsFavourites,
+                credentials: credentials
+            )
+            // It is in the keychain now, under the job, and has no further
+            // business in memory.
+            servicePassword = nil
+            pendingImport = job
+            serviceReport = nil
+            await resumeServiceImport()
+        } catch {
+            failure = .notSaved
+            Log.store.error("The import could not be started : \(error, privacy: .public)")
+        }
+    }
+
+    /// Carries a written-down import as far as it goes.
+    ///
+    /// **One runner.** The screen calls this, and so does the background task
+    /// the system gives the reader when they leave ; a second walk through the
+    /// same streams would double every request for nothing, so a caller
+    /// arriving while one is running waits for it instead of starting another.
+    func resumeServiceImport() async {
+        if let running = serviceTask {
+            await running.value
+            return
+        }
+        guard let job = (try? await service.standing()) ?? nil else {
+            pendingImport = nil
+            return
+        }
+        guard let client = await session(for: job) else { return }
+
+        let task = Task { [weak self] in
+            // Discarded because the call is optional and the task is not : a
+            // window that has gone leaves nothing to carry the import.
+            _ = await self?.carry(job, using: client)
+        }
+        serviceTask = task
+        await task.value
+    }
+
+    /// Gives up on the import waiting to be finished, and forgets the account.
+    ///
+    /// What it already brought in stays : those subscriptions and those
+    /// articles are the reader's now.
+    func abandonServiceImport() async {
+        serviceTask?.cancel()
+        serviceTask = nil
+
+        if let job = (try? await service.standing()) ?? nil {
+            try? await service.finish(job, credentials: credentials)
+        }
+        pendingImport = nil
+        serviceProgress = nil
+        serviceClient = nil
+        servicePassword = nil
+    }
+
+    /// Looks for an import left unfinished, which is asked at every launch.
+    func findPendingImport() async {
+        pendingImport = (try? await service.standing()) ?? nil
+    }
+
+    /// The session to run a written-down import under.
+    ///
+    /// The one already open where the reader has just signed in, and a fresh
+    /// one otherwise, from the API password the keychain is holding for this
+    /// job. A password that will not open the account any more is the one thing
+    /// the reader has to act on, so it is said rather than logged.
+    private func session(for job: ImportJob) async -> GoogleReaderClient? {
+        if let held = serviceClient, held.account == job.account { return held }
+
+        guard let password = (try? service.password(of: job, credentials: credentials)) ?? nil else {
+            failure = .noServicePassword
+            return nil
+        }
+
+        do {
+            let client = try await GoogleReaderClient.signIn(
+                to: job.endpoint.absoluteString,
+                username: job.username,
+                password: password
+            )
+            serviceClient = client
+            return client
+        } catch {
+            failure = Self.failure(of: error)
+            Log.store.error("The account would not open again : \(String(describing: error), privacy: .public)")
+            return nil
+        }
+    }
+
+    /// Runs the import, and settles everything it brought in.
+    private func carry(_ job: ImportJob, using client: GoogleReaderClient) async {
+        serviceProgress = ServiceImportProgress()
+        askTheSystemToSeeItThrough()
+
+        defer {
+            serviceProgress = nil
+            importRunsInBackground = false
+            serviceTask = nil
+        }
+
+        let report: ServiceImportReport
+        do {
+            report = try await service.run(job, using: client) { progress in
+                BackgroundScheduler.report(done: progress.done, of: progress.total)
+                Task { @MainActor [weak self] in self?.serviceProgress = progress }
+            }
+        } catch {
+            failure = Self.failure(of: error)
+            Log.store.error("The import stopped : \(String(describing: error), privacy: .public)")
+            pendingImport = (try? await service.standing()) ?? nil
+            return
+        }
+
+        serviceReport = report
+
+        if report.isComplete {
+            try? await service.finish(job, credentials: credentials)
+            pendingImport = nil
+            serviceClient = nil
+        } else {
+            pendingImport = (try? await service.standing()) ?? nil
+        }
+
+        // What was starred has to reach Spotlight and the reader's other
+        // devices, exactly as a star made by hand does.
+        await apply(marks: report.starred)
+        await load()
+
+        // Only once the whole of it is in. A source taken an hour ago has never
+        // been fetched and is worth asking, but asking three hundred publishers
+        // in the middle of an import is asking them again when it resumes.
+        guard report.isComplete else { return }
+        await cloud?.enqueueEverything()
+        await offerToPool()
+        await refreshAll()
+    }
+
+    /// Asks the system to see the import through when the reader leaves.
+    ///
+    /// **A refusal is not a failure.** The system decides, and section 15 says
+    /// this API is not to be relied on : where it says no, the work carries on
+    /// in the application and the screen holds the reader until it is done. That
+    /// is what ``importRunsInBackground`` is read for.
+    private func askTheSystemToSeeItThrough() {
+        #if os(iOS)
+            importRunsInBackground = BackgroundScheduler.requestContinuedProcessing(
+                title: String(localized: "Importing from FreshRSS"),
+                subtitle: String(localized: "Bringing your subscriptions and your articles in")
+            )
+        #else
+            // A Mac application goes on running when it is not in front, so
+            // there is nothing to ask for : what the reader must not do is quit
+            // it, and the screen says so either way.
+            importRunsInBackground = false
+        #endif
+    }
+
+    /// What the reader is told about a service that would not answer.
+    private static func failure(of error: any Error) -> AppFailure {
+        switch error as? ServiceError {
+        case .badAddress: .invalidAddress
+        case .rejected: .serviceRejected
+        case .unreachable: .unreachableFeed
+        default: .serviceUnreadable
         }
     }
 }
