@@ -31,6 +31,9 @@ struct DigestScreen: View {
     /// Carries a pill's glass from one state to the next.
     @Namespace private var pills
 
+    /// How far the page has been scrolled, which the wash behind it follows.
+    @State private var scrolled: CGFloat = 0
+
     var body: some View {
         ScrollView {
             // The gesture, from UIKit. It draws nothing and takes no room here ;
@@ -55,13 +58,22 @@ struct DigestScreen: View {
             .editorialColumn()
             .padding(.horizontal, 22)
             .padding(.bottom, 90)
-            // Behind the page and rising above it, so the colour is under the
-            // bar as well as under the subjects. In the content rather than
-            // behind the scroll view, so it scrolls away with the head of the
-            // page it belongs to instead of staying on as chrome.
-            .background(alignment: .top) {
-                PageWash(url: model.digest.lead?.imageURL)
-            }
+        }
+        // **Behind the scroll view, and the width of the page.** It was the
+        // background of the column of type, which is held to a measure and
+        // inset by its own margins, inside a scroll view that clips : at rest
+        // the clip fell on the edges of the screen and nothing showed, and the
+        // moment a transition turned the page into an inset card the
+        // rectangle's own three edges came into view as hard lines across it.
+        // It still scrolls away with the head of the page, from the offset
+        // below rather than by being carried along.
+        .background(alignment: .top) {
+            PageWash(url: model.digest.lead?.imageURL, scrolled: scrolled)
+        }
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top
+        } action: { _, position in
+            scrolled = position
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         // **The pull, on the front page and nowhere else.** The page does keep
@@ -130,24 +142,18 @@ struct DigestScreen: View {
 
     @ViewBuilder
     private var stories: some View {
-        // **The page and its lead are read once, together.**
+        // **The page and its lead are one value.**
         //
-        // The lead was worked out by a computed property the row closure
-        // called. A `LazyVStack` calls that closure when it gets round to
-        // building the row, which can be long after the page was laid out and
-        // outside the pass that tracks what the page depends on : the row then
-        // compared a story from the array it had been handed with a lead
-        // worked out from whatever the store held at that later moment. After
-        // a refresh the two disagreed, every row answered `false`, the page
-        // ran without a lead at all, and nothing ever put it back, since
-        // nothing had recorded that the row depended on the lead.
-        //
-        // Read here, into a value the closures capture, the two cannot come
-        // apart : the story is from this array and the lead is from the same
-        // read of the same page.
-        let live = model.digest.live
-        let rest = model.digest.stories
-        let lead = live.first?.id ?? rest.first?.id
+        // The lead was worked out here, from the two lists, which is the right
+        // rule in the wrong place : a story moves between the two as it gains
+        // articles and keeps its identifier, and a lead derived by whatever
+        // happens to be rendering is one the row that was the lead and the row
+        // that is can disagree about, until the application is opened again.
+        // It is decided where the page is built now : see ``Digest/leadID``.
+        let page = model.digest
+        let live = page.live
+        let rest = page.stories
+        let lead = page.leadID
 
         if !live.isEmpty {
             header {

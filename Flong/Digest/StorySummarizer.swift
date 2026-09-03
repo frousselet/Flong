@@ -221,6 +221,9 @@ nonisolated struct StorySummarizer: Sendable {
 
             let title = generated.title.trimmingCharacters(in: .whitespacesAndNewlines)
             let summary = generated.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+            // An empty headline is the model answering nothing, which is not
+            // the same as the model being unusable : the same rule as the two
+            // catch blocks, said once.
             guard !title.isEmpty else { return fallback.asked(in: locale) }
 
             OnDeviceModel.succeeded()
@@ -300,9 +303,11 @@ nonisolated struct StorySummarizer: Sendable {
                 )
             }
 
+            // Nothing, rather than the article's own : see the same decision
+            // in ``retry(in:saying:fallback:)``.
             return StoryBrief(
                 title: title,
-                summary: summary.isEmpty ? fallback.summary : summary,
+                summary: summary.isEmpty ? nil : summary,
                 isGenerated: true,
                 askedIn: locale
             )
@@ -312,8 +317,25 @@ nonisolated struct StorySummarizer: Sendable {
             // A model that will not write about this story will not write about
             // it next time either, so the asking stops. A model that is broken
             // may well be working at the next launch, so it does not.
-            return OnDeviceModel.isTheModelItself(error) ? fallback : fallback.asked(in: locale)
+            return Self.outcome(of: error, keeping: fallback, in: locale)
         }
+    }
+
+    /// What a failure means about this story.
+    ///
+    /// **The model being unusable is not an answer about the story.** A rate
+    /// limit, an asset still downloading, a language this model does not write :
+    /// none of them says anything about these articles, and stamping the story
+    /// would leave it wearing its own headline for ever on a device that was
+    /// simply busy for a second. A refusal is different : the model has read
+    /// this and declined, and asking again in the same language gets the same
+    /// answer.
+    ///
+    /// The line was drawn in one of the three places a brief can fail and not
+    /// in the other two, so a second call that hit a rate limit stamped what
+    /// the first call would have left alone.
+    static func outcome(of error: Error, keeping fallback: StoryBrief, in locale: Locale) -> StoryBrief {
+        OnDeviceModel.isTheModelItself(error) ? fallback : fallback.asked(in: locale)
     }
 
     /// What a story is called when no model is available.
@@ -325,13 +347,60 @@ nonisolated struct StorySummarizer: Sendable {
             return StoryBrief(title: "", summary: nil, isGenerated: false)
         }
 
-        let summary = first.excerpt?.trimmingCharacters(in: .whitespacesAndNewlines)
+        // **Asked of every article in the story, not only the lead.** One of
+        // them usually carries a line the publisher actually wrote, and that is
+        // worth more than the top of the lead's body.
         return StoryBrief(
             title: first.title,
-            summary: (summary?.isEmpty ?? true) ? nil : summary,
+            summary: articles.lazy.compactMap { Self.standfirst(from: $0.excerpt, under: first.title) }.first,
             isGenerated: false
         )
     }
+
+    /// A publisher's own standfirst, where what is offered is one.
+    ///
+    /// **An excerpt is not a standfirst.** Where a publisher writes no summary,
+    /// the excerpt is the top of the article body flattened and cut at three
+    /// hundred characters on the nearest space : a sentence stopped in the
+    /// middle, with whatever the feed staples underneath it. A release note
+    /// went out as `Release: llm-gemini 0.34 New model ... #146 Fixed async
+    /// responses ... #137 Tags: llm, gemini`, ticket numbers and all, under the
+    /// heading the page gives a standfirst.
+    ///
+    /// So a line that only repeats the headline, that reads as a body rather
+    /// than a summary, or that is a machine's footer is dropped. A story with
+    /// no standfirst is a story shown as a headline, which is what a page of
+    /// headlines is made of.
+    static func standfirst(from excerpt: String?, under title: String) -> String? {
+        guard var text = excerpt?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
+            return nil
+        }
+
+        // What a feed staples to the foot of an entry. Cut rather than
+        // rejected : the sentence above it is often a real one.
+        for marker in Self.footers {
+            guard let found = text.range(of: marker, options: [.caseInsensitive]) else { continue }
+            text = String(text[text.startIndex..<found.lowerBound]).trimmingCharacters(
+                in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: "-–|·"))
+            )
+        }
+
+        // **It has to end.** A publisher's standfirst is a finished sentence ;
+        // an excerpt is the top of the body flattened and cut at three hundred
+        // characters on the nearest space, so it stops wherever it stopped. That
+        // is the one signal that tells the two apart whatever language they are
+        // in and whatever the article is about, and it is what a reader sees
+        // first : a line trailing off mid-thought under a headline.
+        guard let last = text.last, Self.ends.contains(last) else { return nil }
+        guard !Self.repeats(title, in: text), Self.isBrief(text) else { return nil }
+        return text
+    }
+
+    /// What the end of a sentence looks like, in the languages a feed arrives in.
+    private static let ends: Set<Character> = [".", "!", "?", "…", "»", "\"", "”", "。", "！", "？"]
+
+    /// What a feed writes under an entry rather than in it.
+    private static let footers = ["Tags:", "Tagged:", "Filed under", "Read more", "Lire la suite", "The post "]
 
     /// Asks again, saying what was wrong with the first answer.
     ///
@@ -362,18 +431,23 @@ nonisolated struct StorySummarizer: Sendable {
             // dropped rather than asked for again : the article's own is at
             // least a real one, and a third call is a second and a half nobody
             // has and comes out of the same budget as the subjects.
+            // **Dropped, and not replaced by the article's own.** Substituted,
+            // the story went out marked as written by the model with a line the
+            // model did not write : the page draws that mark on the standfirst
+            // and nowhere else, and VoiceOver reads `Written by the model` over
+            // it. A headline the model wrote above no standfirst at all is the
+            // honest shape.
             let usable = !Self.repeats(title, in: summary) && Self.isBrief(summary)
-            let kept = usable ? summary : (fallback.summary ?? "")
 
             return StoryBrief(
                 title: title,
-                summary: kept.isEmpty ? fallback.summary : kept,
+                summary: usable ? summary : nil,
                 isGenerated: true,
                 askedIn: locale
             )
         } catch {
             OnDeviceModel.refused(error)
-            return fallback.asked(in: locale)
+            return Self.outcome(of: error, keeping: fallback, in: locale)
         }
     }
 

@@ -102,6 +102,19 @@ nonisolated struct Digest: Hashable, Sendable {
     var live: [DigestStory] = []
     var stories: [DigestStory] = []
 
+    /// The story the page leads on, decided where the page is built.
+    ///
+    /// **A property of the page and not a question asked of it.** It was worked
+    /// out in the view, from the two lists : the first of what is happening
+    /// now, or failing that the first of the rest. Which is the right rule, and
+    /// the wrong place for it. A story moves between the two lists as it gains
+    /// articles, keeping its identifier, and a page whose lead is derived by
+    /// whatever happens to be rendering is a page where the row that was the
+    /// lead and the row that is can disagree until the application is opened
+    /// again. Decided once, beside the two lists it is drawn from, there is one
+    /// answer and nothing to fall out of step with.
+    var leadID: UUID?
+
     /// The subjects on the page, whichever one is being shown : narrowing to
     /// one must not take the others off the page, or the only way back would
     /// be a button that is no longer there.
@@ -266,6 +279,7 @@ nonisolated struct DigestStore: Sendable {
                 return left > right
             }
 
+        digest.leadID = digest.live.first?.id ?? digest.stories.first?.id
         return digest
     }
 

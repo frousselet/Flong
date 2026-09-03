@@ -31,7 +31,11 @@ xcrun simctl list devices available                # Pick a simulator for -desti
 
 ### Running the application
 
-**Never run Flong on the Mac.** Every launch, every test run and every screenshot goes through the iOS Simulator, on `iPhone 17 Pro` with the latest installed runtime. The macOS destination is for compiling only : `xcodebuild build -destination 'platform=macOS'` to check the platform still builds, and never `xcodebuild test`, `run`, or anything else that opens a window on the user's own machine.
+**Never run Flong on the Mac.** Every launch, every test run and every screenshot goes through the iOS Simulator, on `iPhone 17 Pro` with the latest installed runtime.
+
+**One simulator at a time, and leave it running.** Booting a second device to try a layout, a locale or a screenshot leaves several copies of the application on the author's machine for nothing : work on the one device and reinstall over it. Do not shut it down afterwards either, since the author is using it. And never uninstall the application to get a clean state : the container holds their own feeds and articles, and `simctl uninstall` deletes them, where reinstalling over an existing install keeps them.
+
+The macOS destination is for compiling only : `xcodebuild build -destination 'platform=macOS'` to check the platform still builds, and never `xcodebuild test`, `run`, or anything else that opens a window on the user's own machine.
 
 ```bash
 xcrun simctl boot 'iPhone 17 Pro'

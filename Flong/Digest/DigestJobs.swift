@@ -34,6 +34,14 @@ nonisolated struct FileStoriesJob: ResumableJob {
     let name = "file-stories"
     static let batchSize = 4
 
+    /// What the model is asked about a story, as the store spells it.
+    ///
+    /// The headline and the head of the standfirst, which is the whole of the
+    /// prompt. Written beside the stamp so that a story asked about under one
+    /// headline and given another is asked again : the filing outruns the
+    /// writing, so that is the ordinary case and not the exception.
+    static let question = "s.title || char(10) || COALESCE(substr(s.summary, 1, 240), '')"
+
     private let database: AppDatabase
     private let locale: Locale
     private let since: Date
@@ -60,7 +68,12 @@ nonisolated struct FileStoriesJob: ResumableJob {
                 sql: """
                     SELECT COUNT(*) FROM story s
                     LEFT JOIN story_topic t ON t.story_id = s.id
-                    WHERE s.last_at >= ? AND t.story_id IS NULL AND s.topics_asked_at IS NULL
+                    WHERE s.last_at >= ? AND t.story_id IS NULL
+                      AND (
+                            s.topics_asked_at IS NULL
+                            OR s.topics_asked_for IS NULL
+                            OR s.topics_asked_for <> \(Self.question)
+                          )
                     """,
                 arguments: [since]
             ) ?? 0
@@ -77,8 +90,19 @@ nonisolated struct FileStoriesJob: ResumableJob {
                 sql: """
                     SELECT s.id AS id, s.title AS title, s.summary AS summary FROM story s
                     LEFT JOIN story_topic t ON t.story_id = s.id
-                    WHERE s.last_at >= ? AND t.story_id IS NULL AND s.topics_asked_at IS NULL
-                    ORDER BY s.last_at DESC
+                    WHERE s.last_at >= ? AND t.story_id IS NULL
+                      AND (
+                            s.topics_asked_at IS NULL
+                            OR s.topics_asked_for IS NULL
+                            OR s.topics_asked_for <> \(Self.question)
+                          )
+                    -- **Briefed first.** A brief costs three model calls to a
+                    -- filing's one, so the filing runs ahead and would decide
+                    -- the one durable answer on the raw headline of whichever
+                    -- article was nearest the middle of the group. Deferred and
+                    -- never blocked : a story that never gets a standfirst is
+                    -- still filed, behind the ones that have one.
+                    ORDER BY (s.summary IS NULL), s.last_at DESC
                     LIMIT \(Self.batchSize)
                     """,
                 arguments: [since]
@@ -144,8 +168,15 @@ nonisolated struct FileStoriesJob: ResumableJob {
             // same, and the unfiled are taken newest first, so it would sit at
             // the head of the queue and stop everything behind it.
             try await database.writer.write { db in
+                // The question beside the answer, computed by the store so the
+                // two sides cannot spell it differently.
                 try db.execute(
-                    sql: "UPDATE story SET topics_asked_at = ? WHERE id = ?",
+                    sql: """
+                        UPDATE story
+                        SET topics_asked_at = ?,
+                            topics_asked_for = title || char(10) || COALESCE(substr(summary, 1, 240), '')
+                        WHERE id = ?
+                        """,
                     arguments: [Date(), story.id]
                 )
                 for name in filed {
@@ -168,11 +199,31 @@ nonisolated struct BriefStoriesJob: ResumableJob {
 
     private let database: AppDatabase
     private let summarizer: StorySummarizer
+    private let since: Date
 
-    init(_ database: AppDatabase, summarizer: StorySummarizer = StorySummarizer()) {
+    init(_ database: AppDatabase, summarizer: StorySummarizer = StorySummarizer(), now: Date = Date()) {
         self.database = database
         self.summarizer = summarizer
+        self.since = now.addingTimeInterval(-DigestStore.window)
     }
+
+    /// The articles the model is shown, named as one value the store can compare.
+    ///
+    /// **The newest, because that is the list the reader is looking at.** They
+    /// were the most central ones, which is a different set : the model was
+    /// briefed on the heart of the group while the page showed its head, so the
+    /// headline could be about articles nobody could see under it.
+    ///
+    /// Sorted by identifier rather than by date, so the key is a set : the same
+    /// six in another order is the same question, and a newcomer displacing the
+    /// oldest of them is a new one.
+    static let membersKey = """
+        (SELECT group_concat(id) FROM (
+            SELECT hex(m.entry_id) AS id FROM story_member m JOIN entry e ON e.id = m.entry_id
+            WHERE m.story_id = story.id AND e.duplicate_of IS NULL
+            ORDER BY COALESCE(e.published_at, e.received_at) DESC LIMIT \(StorySummarizer.articlesShown))
+         ORDER BY id)
+        """
 
     func remaining() async throws -> Int {
         let work = self.work
@@ -201,14 +252,12 @@ nonisolated struct BriefStoriesJob: ResumableJob {
             let articles = try await self.articles(of: story.id)
             let brief = await summarizer.brief(forArticles: articles)
 
-            // A batch that changes nothing will change nothing next time
-            // either, and saying so is what stops the runner.
-            guard
-                brief.title != story.title || brief.summary != story.summary
-                    || brief.isGenerated != story.isGenerated
-                    || brief.askedIn?.identifier != story.briefLocale
-            else { continue }
-
+            // **Every story looked at is written down, answer or not.** The key
+            // is what takes it out of the work set, so a story whose articles
+            // changed and whose model then answered word for word the same
+            // would be asked again at every pass, for ever, and the runner
+            // stops the whole phase on a batch that reports nothing done : the
+            // stories behind it would never be reached at all.
             try await save(brief, for: story.id)
             changed += 1
         }
@@ -231,23 +280,43 @@ nonisolated struct BriefStoriesJob: ResumableJob {
     /// Without a model the summary is filled from the article's own standfirst,
     /// so the count reaches zero and the job stops rather than asking for ever.
     private var work: (sql: String, arguments: StatementArguments) {
-        Self.work(locale: summarizer.locale, hasModel: OnDeviceModel.isAvailable)
+        Self.work(locale: summarizer.locale, hasModel: OnDeviceModel.isAvailable, since: since)
     }
 
-    static func work(locale: Locale, hasModel: Bool) -> (sql: String, arguments: StatementArguments) {
+    static func work(locale: Locale, hasModel: Bool, since: Date) -> (
+        sql: String, arguments: StatementArguments
+    ) {
         guard hasModel else {
             return ("brief_locked = 0 AND summary IS NULL", [])
         }
+        // **And whether it is still about the same articles.** Held to the
+        // window the page reads, so what is asked again is what the reader can
+        // actually open ; a story nobody can reach is not worth a model call.
+        // **The language asked in, and not whether there is a summary.** A
+        // brief may honestly have no standfirst : the model wrote a headline
+        // and its line was a paragraph, or the story's articles carry no line
+        // a publisher wrote. Asked on `summary IS NULL`, every one of those
+        // came back at every pass for ever, and three of them in one batch
+        // stopped the whole phase.
         return (
             """
-            brief_locked = 0 AND (
-                summary IS NULL OR brief_locale IS NULL OR brief_locale <> ?
+            brief_locked = 0 AND last_at >= ? AND (
+                brief_locale IS NULL OR brief_locale <> ?
+                OR brief_members IS NOT \(membersKey)
             )
             """,
-            [locale.identifier]
+            [since, locale.identifier]
         )
     }
 
+    /// What the model is shown, which is what the reader is shown.
+    ///
+    /// **Newest first, and not most central first.** The two are different
+    /// lists : the page is a story shown for where it has got to rather than
+    /// for where it started, exactly as its photograph is, and a headline
+    /// written about the heart of the group is a headline about articles that
+    /// may have dropped out of the three days the page reads. The same six the
+    /// key above names.
     private func articles(of storyID: UUID) async throws -> [(title: String, excerpt: String?)] {
         try await database.writer.read { db in
             try Row.fetchAll(
@@ -256,7 +325,8 @@ nonisolated struct BriefStoriesJob: ResumableJob {
                     SELECT e.title AS title, e.excerpt AS excerpt
                     FROM story_member m JOIN entry e ON e.id = m.entry_id
                     WHERE m.story_id = ? AND e.duplicate_of IS NULL
-                    ORDER BY m.similarity DESC
+                    ORDER BY COALESCE(e.published_at, e.received_at) DESC
+                    LIMIT \(StorySummarizer.articlesShown)
                     """,
                 arguments: [storyID]
             )
@@ -274,6 +344,15 @@ nonisolated struct BriefStoriesJob: ResumableJob {
             story.briefLocale = brief.askedIn?.identifier
             story.updatedAt = Date()
             try story.update(db)
+
+            // Written in the same transaction as the brief it belongs to, and
+            // written whatever the answer was : it is what says this story has
+            // been asked about *these* articles, and a story left without it
+            // comes back at the next pass however the model answered.
+            try db.execute(
+                sql: "UPDATE story SET brief_members = \(Self.membersKey) WHERE id = ?",
+                arguments: [storyID]
+            )
         }
     }
 }
@@ -395,7 +474,7 @@ nonisolated struct DigestService: Sendable {
             try db.execute(
                 sql: """
                     UPDATE story
-                    SET summary = NULL, is_generated = 0, brief_locale = NULL
+                    SET summary = NULL, is_generated = 0, brief_locale = NULL, brief_members = NULL
                     WHERE brief_locked = 0
                     """
             )
