@@ -186,6 +186,7 @@ struct NotificationsButton: View {
         } label: {
             Label("Notifications", systemImage: "bell")
         }
+        .accessibilityIdentifier("notifications")
         .sheet(isPresented: $isOpen) {
             NotificationsPanel(model: model)
         }

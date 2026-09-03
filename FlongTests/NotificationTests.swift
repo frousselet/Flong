@@ -923,7 +923,16 @@ struct ArrivedArticleTests {
 struct WindowlessModelTests {
     @Test("A model is not reading until a window says it is")
     func notReadingUntilToldOtherwise() throws {
-        let model = AppModel(database: try AppDatabase.inMemory())
+        // A suite of its own, like every other model built here : a test that
+        // takes the standard defaults writes into the preferences of the
+        // application hosting it, and leaves them behind on the device.
+        let model = AppModel(
+            database: try AppDatabase.inMemory(),
+            preferences: Preferences(
+                cloud: nil,
+                local: UserDefaults(suiteName: "com.rslt.Flong.tests.\(UUID().uuidString)")!
+            )
+        )
 
         #expect(!model.isReading)
     }

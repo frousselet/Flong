@@ -150,6 +150,7 @@ struct NotificationsPanel: View {
             ) {
                 Label("New articles", systemImage: "bell.fill")
             }
+            .accessibilityIdentifier("notify-new-articles")
             .disabled(isRefused)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -163,6 +164,7 @@ struct NotificationsPanel: View {
             ) {
                 Label("New stories", systemImage: "newspaper.fill")
             }
+            .accessibilityIdentifier("notify-new-stories")
             .disabled(isRefused)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
