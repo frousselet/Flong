@@ -28,6 +28,13 @@ import SwiftUI
 /// Then the months, which fall out of when a copy was kept and cost the reader
 /// nothing to maintain.
 ///
+/// **The first part is a line, and the rest is the grid.** The squares
+/// everybody has are the same seven every time and are gone to by name ; at
+/// the size of the grid they are two screenfuls of furniture standing in front
+/// of the shelf the reader actually built. They are drawn small and laid in a
+/// line that scrolls sideways instead, which puts what the reader made at the
+/// top of their own page.
+///
 /// **The four favourites stand together for the same reason.** A star on an
 /// article, a favourite source, a favourite author and a favourite newsmaker
 /// are four judgements about four different things : the piece, who printed it,
@@ -56,18 +63,20 @@ struct CollectionsScreen: View {
 
     var body: some View {
         ScrollView {
-            LazyVGrid(columns: [Self.square], spacing: 18) {
-                section(nil, of: builtIn)
-                section("My collections", of: mine)
-                section("Dynamic collections", of: dynamic)
-                // Last, and under a heading that says whose they are. A
-                // collection somebody else shared holds excerpts rather than
-                // the reader's own articles, and mixing it in with the shelf
-                // above would say the two are the same thing.
-                section("Shared with me", of: shared)
+            VStack(alignment: .leading, spacing: 0) {
+                shelf
+                LazyVGrid(columns: [Self.square], spacing: 18) {
+                    section("My collections", of: mine)
+                    section("Dynamic collections", of: dynamic)
+                    // Last, and under a heading that says whose they are. A
+                    // collection somebody else shared holds excerpts rather
+                    // than the reader's own articles, and mixing it in with
+                    // the shelf above would say the two are the same thing.
+                    section("Shared with me", of: shared)
+                }
+                .padding(.horizontal, 22)
             }
             .editorialColumn()
-            .padding(.horizontal, 22)
             .padding(.bottom, 90)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
@@ -149,12 +158,48 @@ struct CollectionsScreen: View {
         .task { await model.loadShareMembers() }
     }
 
-    /// One band of squares, which draws nothing at all when it holds nothing.
+    /// The ones every reader has, in a line that scrolls sideways.
     ///
-    /// A band with no title draws no heading either, which is what puts the
-    /// favourites at the top of the page rather than inside something.
+    /// **Small, and out of the grid.** These squares are furniture : the same
+    /// seven on every device, in the same order, never added to and never
+    /// removed. Given a cell the size of a collection the reader made, they
+    /// take the first two screenfuls of the page and push what the reader
+    /// actually built below the fold. Laid in a line at half the size they
+    /// stay one glance and one reach, and the page opens on the shelf its
+    /// owner filled.
+    ///
+    /// **A line that scrolls is right here and wrong for a suggestion.** What
+    /// is off the end of this one is known before it is seen : a reader
+    /// looking for their notes knows the square exists and will push the line
+    /// along to reach it. Nothing here has to catch an eye that was not
+    /// already looking.
     @ViewBuilder
-    private func section(_ title: LocalizedStringKey?, of collections: [ArticleCollection]) -> some View {
+    private var shelf: some View {
+        if !builtIn.isEmpty {
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: 12) {
+                    ForEach(builtIn) { collection in
+                        Button {
+                            open(collection.kind)
+                        } label: {
+                            CollectionSquare(collection: collection, compact: true)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 22)
+            }
+            .scrollIndicators(.hidden)
+            // A breath under the title. The line is the first thing in the
+            // page and would otherwise hang off the bottom of the heading,
+            // which reads as part of it rather than as the page beginning.
+            .padding(.top, 20)
+        }
+    }
+
+    /// One band of squares, which draws nothing at all when it holds nothing.
+    @ViewBuilder
+    private func section(_ title: LocalizedStringKey, of collections: [ArticleCollection]) -> some View {
         if !collections.isEmpty {
             Section {
                 ForEach(collections) { collection in
@@ -170,7 +215,7 @@ struct CollectionsScreen: View {
                     .buttonStyle(.plain)
                 }
             } header: {
-                if let title { heading(title) }
+                heading(title)
             }
         }
     }
@@ -218,22 +263,38 @@ struct CollectionSquare: View {
     /// other square, which is most of them.
     var members: [ShareMember] = []
     var faces: [String: CGImage] = [:]
+    /// Drawn small, at a width of its own, for the line of built-in squares
+    /// that scrolls sideways above the grid.
+    var compact = false
 
     @Environment(\.theme) private var theme
 
+    /// How wide a small square is.
+    ///
+    /// Narrow enough that three of them and the start of a fourth fit across
+    /// a phone, which is what says the line goes on past the edge without
+    /// anything having to announce it.
+    private static let small: CGFloat = 104
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: compact ? 5 : 7) {
             cover
 
             VStack(alignment: .leading, spacing: 1) {
                 Self.name(of: collection.kind)
-                    .font(.system(.subheadline, weight: .medium))
-                    .lineLimit(1)
+                    .font(.system(compact ? .caption : .subheadline, weight: .medium))
+                    // Two lines in the small square : `Favourite newsmakers`
+                    // does not fit on one at this width. The room for the
+                    // second is not held open when it goes unused, since the
+                    // line hangs its squares from the top and a gap under
+                    // every short name would be paid for by all of them.
+                    .lineLimit(compact ? 2 : 1)
                 Self.count(of: collection)
-                    .font(theme.metadata)
+                    .font(compact ? .caption2 : theme.metadata)
                     .foregroundStyle(.secondary)
             }
         }
+        .frame(width: compact ? Self.small : nil, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
 
@@ -254,14 +315,14 @@ struct CollectionSquare: View {
                 ZStack {
                     Rectangle().fill(.quaternary)
                     Image(systemName: Self.mark(of: collection.kind))
-                        .font(.system(size: 30))
+                        .font(.system(size: compact ? 20 : 30))
                         .foregroundStyle(.secondary)
                     if collection.cover != nil {
                         RemoteImage(url: collection.cover, aspect: 1, corner: 0)
                     }
                 }
             }
-            .clipShape(.rect(cornerRadius: 12))
+            .clipShape(.rect(cornerRadius: compact ? 9 : 12))
             // **Who is in it, on the picture rather than under it.** The name
             // goes below because type laid over a photograph needs a scrim to
             // stay readable, and a scrim is a thing between the reader and the
