@@ -698,6 +698,22 @@ Two ways to answer it. **Typing is the road** : the town is completed by MapKit 
 
 A refusal leaves the reader in front of the search, which is the thing that works in every case, and leaves whatever they had chosen by hand alone. `docs/technical/place.md` records the two paths, what is sent to Apple while they choose, and what is not.
 
+### The figures
+
+A page about the reader's own stream, opened from a chart in the corner beside their face, and about the person for the same reason their name and their town are : nothing on it is tended, and everything on it is theirs.
+
+**A page and not a dashboard.** Nobody operates a feed reader, so there is no gauge, no needle and nothing that scores anybody. Four figures in large type at the head, then a run of cards, each one drawing one question, in the same type and on the same paper as the rest of the application.
+
+**It refuses the number a feed reader is usually about.** There is no unread count here and no streak. The wire of this section is something to watch rather than something to finish, and a page that opened on how far behind the reader is would undo that in a line. Everything counted is something that happened, never something outstanding.
+
+**The window is the whole interaction.** Eight of them : a day, a week, one, three, six and nine months, a year, and everything. They sit on glass at the head of the page and stay there as it scrolls, since a filter that leaves the screen is a filter a reader has to go back up to change. This is the third place the application draws Liquid Glass of its own, and it is the same rule as the other two : a control floating over a page that moves behind it.
+
+The window is measured on the date the stream itself sorts by, which is when the publisher says the article was written, or when it reached the device where they say nothing. Anything else would be a page of figures that disagrees with the list it is figures about. Reading is the one exception, counted on when the reader read rather than on when the piece was written, since an evening spent on last month's backlog is an evening in this week.
+
+What it draws : the flow of arrivals over the window with the reading over it, the shape of a day as a dial of twenty-four hours, the publishers ranked with each one's own shape beside it, the subjects, the people the articles are about, the bylines, what each source actually puts in its feed, and the languages. Copies and hidden articles are excluded from every count exactly as they are from every list, and how many copies there were is a figure of its own.
+
+`docs/technical/statistics.md` records what each figure is counted from, and the four questions the schema cannot honestly answer.
+
 ### The icon
 
 The mark is an ornate **F**, drawn once, black on nothing. It is kept as an Icon Composer document at `Flong/AppIcon.icon` rather than as a folder of exported squares : the system lays the glyph on the plate, cuts the shape each platform asks for, lights it and casts its shadow, and derives the light, dark and tinted appearances from that one layer. So iPhone, iPad and Mac wear the same icon, and changing it is changing one file rather than reconciling a dozen.

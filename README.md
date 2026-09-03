@@ -34,6 +34,8 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **Enrichment happens on the device.** Headlines, summaries and filing come from the system model, in your own language whatever language the articles are in, and no article content is sent anywhere.
 
+**And you can see what it all adds up to.** A page of figures beside your own face : how much arrived and from whom, over a day, a season or the lot. What the news was about, who it was about, who signed it, the hour of the day your sources are busiest, how much of what arrived was the same piece twice, and which of them put the whole article in the feed and which put a headline and a link. No unread count, no streak, nothing that scores you.
+
 **It is set like a page**, not like a control panel : one column, a readable measure, hairline rules, serif headlines over a sans body. Three themes, each stating both appearances.
 
 ## Screenshots
@@ -84,7 +86,7 @@ Flong is not a client for any service. FreshRSS, Miniflux, Feedbin and Feedly ar
 | Document | Contents |
 | -------- | -------- |
 | [`docs/specification.md`](docs/specification.md) | The product and technical specification : the reference for every decision |
-| [`docs/technical/`](docs/technical/) | One page per subject : feed identity, fetching, ingestion, search, marks, sync, sharing, popular feeds, the digest, authors, newsmakers, the interface, erasure |
+| [`docs/technical/`](docs/technical/) | One page per subject : feed identity, fetching, ingestion, search, marks, sync, sharing, popular feeds, the digest, authors, newsmakers, the statistics, the interface, erasure |
 | [`CHANGELOG.md`](CHANGELOG.md) | Change history, following [Keep a Changelog](https://keepachangelog.com/) |
 | [`CLAUDE.md`](CLAUDE.md) | Working conventions : architecture, guidelines, git and release workflow |
 

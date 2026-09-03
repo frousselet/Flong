@@ -191,6 +191,7 @@ final class AppModel {
     private let collectionStore: CollectionStore
     private let authorStore: AuthorStore
     private let newsmakerStore: NewsmakerStore
+    private let statisticsStore: StatisticsStore
     private let marks: MarkStore
     private let spotlight: SpotlightIndex
     private let digestService: DigestService
@@ -1140,6 +1141,7 @@ final class AppModel {
         self.syncState = SyncState(database)
         self.authorStore = AuthorStore(database)
         self.newsmakerStore = NewsmakerStore(database)
+        self.statisticsStore = StatisticsStore(database)
         self.marks = MarkStore(database)
         self.spotlight = SpotlightIndex(articles, subscriptions)
         self.digestService = DigestService(database)
@@ -1874,6 +1876,43 @@ final class AppModel {
 
     /// Every subject there is, for the screen that manages them.
     private(set) var knownTopics: [TopicPreferences.Known] = []
+
+    // MARK: - The page of figures
+
+    /// How far back the figures go, which the reader picks and Flong remembers
+    /// for as long as the window is open.
+    var statisticsRange = StatisticsRange.week
+
+    /// The figures, for the window above.
+    ///
+    /// **A snapshot and not a view that follows the store.** Reading it is a
+    /// dozen counts over the whole stream : running them again on every batch
+    /// that lands would make a refresh cost as much as a page nobody may even
+    /// be looking at. It is read when the page opens and when the reader
+    /// changes the window, and it is put down when they close it, so opening
+    /// it again reads it afresh rather than showing yesterday.
+    private(set) var statistics: Statistics?
+
+    /// Whether the figures are being counted, which is what the page shows
+    /// while it has none.
+    private(set) var isCounting = false
+
+    func loadStatistics(for range: StatisticsRange) async {
+        statisticsRange = range
+        isCounting = statistics == nil
+        defer { isCounting = false }
+
+        do {
+            statistics = try await statisticsStore.report(for: range)
+        } catch {
+            Log.store.error("The figures could not be counted : \(error, privacy: .public)")
+        }
+    }
+
+    /// Puts the figures down, so the page is counted again next time it opens.
+    func forgetStatistics() {
+        statistics = nil
+    }
 
     /// Writes down the sections every reader has, once, at the first launch
     /// that finds them missing.
