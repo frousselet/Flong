@@ -244,10 +244,14 @@ nonisolated struct CollectionStore: Sendable {
                 db,
                 sql: """
                     SELECT t.path AS path, COUNT(i.id) AS count,
-                           (SELECT i2.image_url FROM entry i2
-                            JOIN tag_binding c ON c.target_id = i2.id AND c.target_kind = ?
-                            WHERE c.tag_id = t.id AND i2.image_url IS NOT NULL
-                            ORDER BY COALESCE(i2.published_at, i2.received_at) DESC LIMIT 1) AS cover
+                           \(
+                               CollectionCovers.sql(
+                                   where: """
+                                       i.id IN (SELECT c.target_id FROM tag_binding c
+                                                WHERE c.tag_id = t.id AND c.target_kind = ?)
+                                       """
+                               )
+                           ) AS covers
                     FROM tag t
                     LEFT JOIN tag_binding b ON b.tag_id = t.id AND b.target_kind = ?
                     -- Counting the articles and not the bindings. A binding
@@ -260,7 +264,9 @@ nonisolated struct CollectionStore: Sendable {
                 arguments: [Self.targetKind, Self.targetKind, Self.root + "/%"]
             )
             .compactMap { row in
-                (row["path"] as String?).map { Counted(name: $0, count: row["count"], cover: row["cover"]) }
+                (row["path"] as String?).map {
+                    Counted(name: $0, count: row["count"], covers: CollectionCovers.read(row["covers"]))
+                }
             }
         }
 
@@ -268,7 +274,7 @@ nonisolated struct CollectionStore: Sendable {
             counted
             .compactMap { counted in
                 Self.name(ofPath: counted.name).map {
-                    ArticleCollection(kind: .made($0), count: counted.count, cover: counted.cover)
+                    ArticleCollection(kind: .made($0), count: counted.count, covers: counted.covers)
                 }
             }
             .sorted { Self.before($0.name ?? "", $1.name ?? "") }
@@ -355,13 +361,13 @@ nonisolated struct CollectionStore: Sendable {
         for one in described {
             let node = QueryParser.parse(one.query, now: now)
             let count = (try? await articles.count(.all, matching: node, now: now)) ?? 0
-            // The newest few, for a picture : the first of them with one is the
-            // face of the collection, and asking for all of them to find it
-            // would be reading a collection to draw a square.
-            let cover = (try? await articles.summaries(.all, matching: node, limit: 12, now: now))?
-                .compactMap(\.imageURL).first
+            // The newest few, for the four pictures the square is drawn from :
+            // asking for all of them to find four would be reading a whole
+            // collection to draw a thumbnail. See ``CollectionCovers``.
+            let newest = (try? await articles.summaries(.all, matching: node, limit: CollectionCovers.pool, now: now))
+            let covers = CollectionCovers.of((newest ?? []).compactMap(\.imageURL))
 
-            found.append(ArticleCollection(kind: .dynamic(one.name), count: count, cover: cover))
+            found.append(ArticleCollection(kind: .dynamic(one.name), count: count, covers: covers))
         }
         return found.sorted { Self.before($0.name ?? "", $1.name ?? "") }
     }
@@ -386,7 +392,7 @@ nonisolated struct CollectionStore: Sendable {
     private struct Counted: Sendable {
         var name: String
         var count: Int
-        var cover: URL?
+        var covers: [URL]
     }
 
     /// What a binding points at, which is an article.

@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - The collections everybody has are drawn small, in a line that scrolls sideways above the grid, so the page opens on the shelf the reader built rather than on two screenfuls of furniture.
+- A collection's square is drawn from the four newest pictures in it, in a two by two, one picture per address so a wire published four times under one photograph does not fill a square with it, and a single picture across the square when there are fewer than four.
 
 ### Removed
 

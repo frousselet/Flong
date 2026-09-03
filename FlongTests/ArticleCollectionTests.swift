@@ -42,14 +42,19 @@ struct ArticleCollectionTests {
     }
 
     @discardableResult
-    private func article(_ title: String, in feed: Feed, image: String? = nil) async throws -> UUID {
+    private func article(
+        _ title: String,
+        in feed: Feed,
+        image: String? = nil,
+        at published: Date? = nil
+    ) async throws -> UUID {
         var stored = Entry(
             feedID: feed.id,
             guid: "urn:example:\(title)",
             url: URL(string: "https://example.com/\(title)"),
             title: title,
-            publishedAt: now,
-            receivedAt: now
+            publishedAt: published ?? now,
+            receivedAt: published ?? now
         )
         stored.imageURL = image.flatMap(URL.init(string:))
         try await database.writer.write { db in try stored.insert(db) }
@@ -70,8 +75,53 @@ struct ArticleCollectionTests {
         let made = try #require(await collections.made().first)
         #expect(made.kind == .made("Typographie"))
         #expect(made.count == 1)
-        #expect(made.cover?.absoluteString == "https://example.com/a.jpg")
+        #expect(made.covers.map(\.absoluteString) == ["https://example.com/a.jpg"])
         #expect(try await articles.summaries(in: .made("Typographie")).map(\.title) == ["Les macros Swift"])
+    }
+
+    @Test("A square is drawn from the four newest pictures, one to an address")
+    func covers() async throws {
+        let paper = try await feed("https://a.example.com/f.xml", title: "Le Quotidien")
+        #expect(try await collections.create("Typographie") == "Typographie")
+
+        // Oldest first, one article carrying no picture at all and two of them
+        // published under the same photograph.
+        let filed = [
+            try await article("Un", in: paper, image: "https://example.com/1.jpg", at: now),
+            try await article("Deux", in: paper, at: now + 60),
+            try await article("Trois", in: paper, image: "https://example.com/2.jpg", at: now + 120),
+            try await article("Quatre", in: paper, image: "https://example.com/3.jpg", at: now + 180),
+            try await article("Cinq", in: paper, image: "https://example.com/3.jpg", at: now + 240),
+            try await article("Six", in: paper, image: "https://example.com/4.jpg", at: now + 300),
+            try await article("Sept", in: paper, image: "https://example.com/5.jpg", at: now + 360),
+        ]
+        try await collections.add(filed, to: "Typographie")
+
+        let made = try #require(await collections.made().first)
+        #expect(made.count == filed.count)
+        // Four, newest first, the article with no picture passed over and the
+        // repeated photograph counted once at the date of its newer article.
+        #expect(
+            made.covers.map(\.absoluteString) == [
+                "https://example.com/5.jpg",
+                "https://example.com/4.jpg",
+                "https://example.com/3.jpg",
+                "https://example.com/2.jpg",
+            ]
+        )
+    }
+
+    @Test("The same four are chosen the same way when Swift chooses them")
+    func coversInSwift() throws {
+        let addresses = ["1", "2", "2", "3", "4", "5"].compactMap { URL(string: "https://example.com/\($0).jpg") }
+        #expect(
+            CollectionCovers.of(addresses).map(\.absoluteString) == [
+                "https://example.com/1.jpg",
+                "https://example.com/2.jpg",
+                "https://example.com/3.jpg",
+                "https://example.com/4.jpg",
+            ]
+        )
     }
 
     @Test("An article is in as many collections as the reader filed it in")

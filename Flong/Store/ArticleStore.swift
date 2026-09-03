@@ -490,18 +490,16 @@ nonisolated struct ArticleStore: Sendable {
                     db,
                     sql: """
                         SELECT COUNT(*) AS count,
-                               (SELECT i.image_url FROM entry i
-                                WHERE \(ofTheCover) AND i.image_url IS NOT NULL AND i.is_hidden = 0
-                                ORDER BY COALESCE(i.published_at, i.received_at) DESC LIMIT 1) AS cover
+                               \(CollectionCovers.sql(where: "\(ofTheCover) AND i.is_hidden = 0")) AS covers
                         FROM entry e WHERE \(condition) AND e.is_hidden = 0 AND e.duplicate_of IS NULL
                         """
                 )
                 guard let row, row["count"] as Int > 0 else { return nil }
-                return Counted(kind: kind, count: row["count"], cover: row["cover"])
+                return Counted(kind: kind, count: row["count"], covers: CollectionCovers.read(row["covers"]))
             }
         }
 
-        return counted.map { ArticleCollection(kind: .builtIn($0.kind), count: $0.count, cover: $0.cover) }
+        return counted.map { ArticleCollection(kind: .builtIn($0.kind), count: $0.count, covers: $0.covers) }
     }
 
     /// Articles served by a publisher the reader singled out.
@@ -720,7 +718,7 @@ nonisolated struct ArticleStore: Sendable {
     private struct Counted: Sendable {
         var kind: ArticleCollection.BuiltIn
         var count: Int
-        var cover: URL?
+        var covers: [URL]
     }
 
     private static func condition(for kind: ArticleCollection.Kind) -> (String, StatementArguments) {

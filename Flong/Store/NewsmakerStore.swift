@@ -404,7 +404,7 @@ nonisolated struct NewsmakerStore: Sendable {
                             WHERE NOT EXISTS (SELECT 1 FROM entry_newsmaker m
                                               JOIN entry e ON e.id = m.entry_id
                                               WHERE m.name = d.name AND \(Self.shown("e")))) AS decided,
-                           \(Self.cover(where: Self.aboutSomebody("i"))) AS cover
+                           \(Self.covers(where: Self.aboutSomebody("i"))) AS covers
                     """,
                 arguments: [Newsmaker.leastArticles]
             )
@@ -416,13 +416,19 @@ nonisolated struct NewsmakerStore: Sendable {
             // people the reader singled out whatever their count.
             let people = (directory?["listed"] as Int? ?? 0) + (directory?["decided"] as Int? ?? 0)
             if people > 0 {
-                found.append(ArticleCollection(kind: .builtIn(.newsmakers), count: people, cover: directory?["cover"]))
+                found.append(
+                    ArticleCollection(
+                        kind: .builtIn(.newsmakers),
+                        count: people,
+                        covers: CollectionCovers.read(directory?["covers"])
+                    )
+                )
             }
 
             let favourites = try Row.fetchOne(
                 db,
                 sql: """
-                    SELECT COUNT(*) AS count, \(Self.cover(where: Self.aboutAFavourite("i"))) AS cover
+                    SELECT COUNT(*) AS count, \(Self.covers(where: Self.aboutAFavourite("i"))) AS covers
                     FROM entry e WHERE \(Self.aboutAFavourite("e")) AND \(Self.shown("e"))
                     """
             )
@@ -431,7 +437,7 @@ nonisolated struct NewsmakerStore: Sendable {
                     ArticleCollection(
                         kind: .builtIn(.favouriteNewsmakers),
                         count: favourites["count"],
-                        cover: favourites["cover"]
+                        covers: CollectionCovers.read(favourites["covers"])
                     )
                 )
             }
@@ -471,12 +477,8 @@ nonisolated struct NewsmakerStore: Sendable {
     }
 
     /// The newest picture among the articles a condition holds, for a square.
-    private static func cover(where condition: String) -> String {
-        """
-        (SELECT i.image_url FROM entry i
-         WHERE \(condition) AND i.image_url IS NOT NULL AND \(shown("i"))
-         ORDER BY COALESCE(i.published_at, i.received_at) DESC LIMIT 1)
-        """
+    private static func covers(where condition: String) -> String {
+        CollectionCovers.sql(where: "\(condition) AND \(shown("i"))")
     }
 
     /// What one person is written about, and where.
