@@ -279,7 +279,7 @@ struct ArticleScreen: View {
         NavigationStack {
             Group {
                 if let article = model.article, article.id == articleID {
-                    ArticleWebView(
+                    ArticlePage(
                         html: ArticleDocument.html(
                             for: article,
                             publisher: publisher(of: article)?.name ?? article.domain ?? article.feedTitle,
@@ -289,15 +289,6 @@ struct ArticleScreen: View {
                         )
                     )
                     .toolbar { toolbar(for: article) }
-                    // The publisher, not the desk : a reader who opened a piece
-                    // from `Le Monde - Sport` is reading Le Monde, and the page
-                    // that says so agrees with every row that led them here.
-                    .navigationTitle(
-                        Text(verbatim: publisher(of: article)?.name ?? article.domain ?? article.feedTitle)
-                    )
-                    #if os(iOS)
-                        .navigationBarTitleDisplayMode(.inline)
-                    #endif
                     .overlay(alignment: .bottom) {
                         if model.isFetchingFullText {
                             fetching
@@ -321,6 +312,15 @@ struct ArticleScreen: View {
             // nothing above them for the controls to float over.
             .ignoresSafeArea(edges: .bottom)
             .tint(theme.accent(in: scheme))
+            // **Nothing in the bar and nothing behind it.** A band of paper
+            // with a name written across it is the top of a browser, and the
+            // name in it was the publisher's, which the byline says two lines
+            // lower in the page's own voice. What is left is the paper the
+            // article is printed on, running to the top of the screen, and the
+            // controls floating on the glass the system gives them.
+            #if os(iOS)
+                .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+            #endif
         }
         .task {
             pageGaveNothing = false
@@ -374,7 +374,7 @@ struct ArticleScreen: View {
 
     private var fetching: some View {
         HStack(spacing: 8) {
-            ProgressView().controlSize(.small)
+            WaitingRing(side: 15)
             Text("Fetching the full article")
         }
         .font(theme.metadata)

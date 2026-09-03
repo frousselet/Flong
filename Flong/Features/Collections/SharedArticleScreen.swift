@@ -75,7 +75,7 @@ struct SharedArticleScreen: View {
 
     var body: some View {
         NavigationStack {
-            ArticleWebView(
+            ArticlePage(
                 html: ArticleDocument.html(
                     for: article,
                     publisher: entry.sourceTitle ?? article.domain,
@@ -98,6 +98,12 @@ struct SharedArticleScreen: View {
             }
             .ignoresSafeArea(edges: .bottom)
             .tint(theme.accent(in: scheme))
+            // No band across the top, for the reason ``ArticleScreen`` gives :
+            // what is behind the controls is the paper the article is printed
+            // on, and nothing else.
+            #if os(iOS)
+                .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+            #endif
         }
         .task { await model.readShared(entry) }
         .onDisappear { model.closeShared() }
@@ -150,7 +156,7 @@ struct SharedArticleScreen: View {
     /// says the rest is coming rather than standing in front of it.
     private var fetching: some View {
         HStack(spacing: 8) {
-            ProgressView()
+            WaitingRing(side: 15)
             Text("Fetching the article")
                 .font(theme.metadata)
         }

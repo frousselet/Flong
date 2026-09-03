@@ -2791,6 +2791,17 @@
         }
       }
     },
+    "Loading" : {
+      "comment" : "Said by the ring on an article that is being laid out.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chargement"
+          }
+        }
+      }
+    },
     "Local news" : {
       "localizations" : {
         "fr" : {

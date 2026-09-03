@@ -26,6 +26,14 @@ import WebKit
 struct ArticleWebView {
     let html: String
 
+    /// Said once the page has finished, with the document that finished.
+    ///
+    /// A web view is done when its main frame is, which is after the pictures
+    /// in it have arrived : it is the moment a page stops moving under the
+    /// reader, and therefore the moment there is something worth showing them.
+    /// See ``ArticlePage``, which is what waits for it.
+    var onLoad: ((String) -> Void)?
+
     fileprivate func makeWebView(coordinator: Coordinator) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = false
@@ -37,10 +45,25 @@ struct ArticleWebView {
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = coordinator
         webView.isInspectable = false
+        // **Nothing of its own behind the page.** A web view paints white
+        // under whatever it is showing, which is a white flash before the
+        // article on a dark page and a white band past the end of it when the
+        // reader pulls. What shows through instead is the paper the screen is
+        // already painted in, which is the paper the document states.
+        webView.underPageBackgroundColor = .clear
+        #if os(iOS)
+            webView.isOpaque = false
+            webView.backgroundColor = .clear
+            webView.scrollView.backgroundColor = .clear
+        #endif
         return webView
     }
 
     fileprivate func update(_ webView: WKWebView, coordinator: Coordinator) {
+        // Kept up to date rather than handed over once : the closure is a new
+        // one on every pass of the body it was written in.
+        coordinator.onLoad = onLoad
+
         guard coordinator.html != html else { return }
         coordinator.html = html
         // No base address is given : a relative link in a body that escaped the
@@ -56,6 +79,33 @@ struct ArticleWebView {
     /// reader expects the rest of the web to happen.
     final class Coordinator: NSObject, WKNavigationDelegate {
         var html: String?
+        var onLoad: ((String) -> Void)?
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            finished()
+        }
+
+        /// A load that failed is a load that is over.
+        ///
+        /// Nothing here is fetched from a network, so this is all but
+        /// unreachable ; unreachable and silent is a page that never appears,
+        /// which is worse than a page that appears wrong.
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            finished()
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFailProvisionalNavigation navigation: WKNavigation!,
+            withError error: Error
+        ) {
+            finished()
+        }
+
+        private func finished() {
+            guard let html else { return }
+            onLoad?(html)
+        }
 
         func webView(
             _ webView: WKWebView,
