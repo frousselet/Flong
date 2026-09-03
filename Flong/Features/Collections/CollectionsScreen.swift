@@ -298,9 +298,9 @@ struct CollectionSquare: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// The picture, over the mark of what the square holds.
+    /// The pictures, over the mark of what the square holds.
     ///
-    /// The mark is always drawn and the picture laid over it rather than
+    /// The mark is always drawn and the pictures laid over it rather than
     /// instead of it : a cover that is slow, or that never answers, would
     /// otherwise leave a hole in the grid where a square should be.
     ///
@@ -308,6 +308,13 @@ struct CollectionSquare: View {
     /// by two, which is the shape a photograph arrives in ; a grid is a
     /// different argument, where equal cells are what let the eye run down it,
     /// and a square is the only shape that stays equal in both directions.
+    ///
+    /// **Four quarters when there are four pictures, one picture when there
+    /// are fewer.** A collection is a number of things and a square of four
+    /// says so at a glance, where one photograph says only what the newest
+    /// article looked like. Fewer than four is not drawn as a mosaic with
+    /// holes in it : three quarters filled and one empty reads as a square
+    /// that failed to load rather than as a collection of three.
     private var cover: some View {
         Color.clear
             .aspectRatio(1, contentMode: .fit)
@@ -317,8 +324,10 @@ struct CollectionSquare: View {
                     Image(systemName: Self.mark(of: collection.kind))
                         .font(.system(size: compact ? 20 : 30))
                         .foregroundStyle(.secondary)
-                    if collection.cover != nil {
-                        RemoteImage(url: collection.cover, aspect: 1, corner: 0)
+                    if collection.covers.count >= CollectionCovers.most {
+                        mosaic
+                    } else if let only = collection.covers.first {
+                        RemoteImage(url: only, aspect: 1, corner: 0)
                     }
                 }
             }
@@ -333,6 +342,30 @@ struct CollectionSquare: View {
                 MemberPile(members: members, faces: faces)
                     .padding(7)
             }
+    }
+
+    /// Four pictures in a two by two, edge to edge.
+    ///
+    /// No gap between the quarters and no corner on any of them : the four are
+    /// one picture of one collection, and a gutter would make them four
+    /// thumbnails that happen to be next to each other. Each quarter is filled
+    /// and cropped exactly as the whole square is when there is only one
+    /// picture, so a photograph never changes shape to fit.
+    private var mosaic: some View {
+        Grid(horizontalSpacing: 0, verticalSpacing: 0) {
+            GridRow {
+                quarter(0)
+                quarter(1)
+            }
+            GridRow {
+                quarter(2)
+                quarter(3)
+            }
+        }
+    }
+
+    private func quarter(_ index: Int) -> some View {
+        RemoteImage(url: collection.covers[index], aspect: 1, corner: 0)
     }
 
     static func name(of kind: ArticleCollection.Kind) -> Text {

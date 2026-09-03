@@ -371,7 +371,7 @@ struct AuthorStoreTests {
 
         let people = try #require(found.first { $0.kind == .builtIn(.authors) })
         #expect(people.count == 2)
-        #expect(people.cover == URL(string: "https://example.com/1.jpg"))
+        #expect(people.covers == [URL(string: "https://example.com/1.jpg")!])
 
         let favourites = try #require(found.first { $0.kind == .builtIn(.favouriteAuthors) })
         #expect(favourites.count == 2)

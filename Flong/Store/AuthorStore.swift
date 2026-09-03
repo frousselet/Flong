@@ -251,7 +251,7 @@ nonisolated struct AuthorStore: Sendable {
                             WHERE NOT EXISTS (SELECT 1 FROM entry_author a
                                               JOIN entry e ON e.id = a.entry_id
                                               WHERE a.name = f.name AND \(Self.shown("e")))) AS forgotten,
-                           \(Self.cover(where: Self.signed("i"))) AS cover
+                           \(Self.covers(where: Self.signed("i"))) AS covers
                     """
             )
             // The people, counted, and never their articles : this square is a
@@ -259,13 +259,19 @@ nonisolated struct AuthorStore: Sendable {
             // of rows the reader will find there.
             let people = (writers?["signing"] as Int? ?? 0) + (writers?["forgotten"] as Int? ?? 0)
             if people > 0 {
-                found.append(ArticleCollection(kind: .builtIn(.authors), count: people, cover: writers?["cover"]))
+                found.append(
+                    ArticleCollection(
+                        kind: .builtIn(.authors),
+                        count: people,
+                        covers: CollectionCovers.read(writers?["covers"])
+                    )
+                )
             }
 
             let favourites = try Row.fetchOne(
                 db,
                 sql: """
-                    SELECT COUNT(*) AS count, \(Self.cover(where: Self.byAFavouriteAuthor("i"))) AS cover
+                    SELECT COUNT(*) AS count, \(Self.covers(where: Self.byAFavouriteAuthor("i"))) AS covers
                     FROM entry e WHERE \(Self.byAFavouriteAuthor("e")) AND \(Self.shown("e"))
                     """
             )
@@ -274,7 +280,7 @@ nonisolated struct AuthorStore: Sendable {
                     ArticleCollection(
                         kind: .builtIn(.favouriteAuthors),
                         count: favourites["count"],
-                        cover: favourites["cover"]
+                        covers: CollectionCovers.read(favourites["covers"])
                     )
                 )
             }
@@ -318,12 +324,8 @@ nonisolated struct AuthorStore: Sendable {
     }
 
     /// The newest picture among the articles a condition holds, for a square.
-    private static func cover(where condition: String) -> String {
-        """
-        (SELECT i.image_url FROM entry i
-         WHERE \(condition) AND i.image_url IS NOT NULL AND \(shown("i"))
-         ORDER BY COALESCE(i.published_at, i.received_at) DESC LIMIT 1)
-        """
+    private static func covers(where condition: String) -> String {
+        CollectionCovers.sql(where: "\(condition) AND \(shown("i"))")
     }
 
     /// What one writer has signed, and where.

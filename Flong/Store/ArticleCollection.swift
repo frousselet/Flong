@@ -112,8 +112,12 @@ nonisolated struct ArticleCollection: Identifiable, Hashable, Sendable {
 
     var kind: Kind
     var count: Int
-    /// The picture of the most recent article in it, when there is one.
-    var cover: URL?
+    /// The pictures the square is drawn from, newest first.
+    ///
+    /// Up to four, and often fewer : a collection of three articles has three,
+    /// and one whose articles carry no picture at all has none. See
+    /// ``CollectionCovers``.
+    var covers: [URL] = []
 
     var id: Kind { kind }
 

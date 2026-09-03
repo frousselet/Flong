@@ -108,7 +108,7 @@ nonisolated struct SharedCollectionStore: Sendable {
                 ArticleCollection(
                     kind: .shared(zone: shared.zoneName, title: shared.title),
                     count: held.count,
-                    cover: held.compactMap(\.imageURL).first.flatMap(URL.init(string:))
+                    covers: CollectionCovers.of(held.compactMap { $0.imageURL.flatMap(URL.init(string:)) })
                 )
             )
         }

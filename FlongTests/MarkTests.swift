@@ -132,7 +132,7 @@ struct MarkTests {
         let notes = try #require(built.first { $0.kind == ArticleCollection.Kind.builtIn(.annotated) })
 
         #expect(favourites.count == 1)
-        #expect(favourites.cover != nil)
+        #expect(favourites.covers.count == 1)
         #expect(notes.count == 1)
     }
 

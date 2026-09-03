@@ -274,6 +274,14 @@ Notes and the months are in neither menu. An article joins notes by being writte
 
 **A square is square.** Everything else on the page is set at three by two, which is the shape a photograph arrives in. A grid is a different argument : equal cells are what let the eye run down it, and a square is the only shape that stays equal in both directions. The mark of what the square holds is drawn under the picture rather than instead of it, so a cover that is slow or that never answers leaves no hole in the grid.
 
+**Four pictures, in a two by two.** One photograph said what a collection held only when the newest article in it happened to be typical of the rest ; four say it at a glance, and a square of four small pictures is read as a number of things rather than as one article. It is the shape a photo library and a record shelf both give the same idea. The quarters meet edge to edge, with no gutter and no corner of their own : they are one picture of one collection, and a gap would make them four thumbnails that happen to be adjacent.
+
+**Fewer than four is one picture, not a mosaic with holes in it.** Three quarters filled and one empty reads as a square that failed to load. A collection of two articles shows the newer one's photograph across the whole square, exactly as it did before, and one whose articles carry no picture at all shows the mark alone.
+
+**One picture per address, however many articles carry it.** A morning's wire from one newsroom is routinely four pieces under one photograph, and four copies of it in a square looks like a bug. So the newest few are grouped by address before four are kept, and each is dated by the newest article that carries it.
+
+**The four are looked for in the newest forty and no further.** A thumbnail is not worth a scan of a corpus of a hundred and twenty-five thousand articles, and the newest few are what a picture of a collection should be made of anyway. The rule lives once, in `CollectionCovers`, as a SQL fragment for the five squares a query answers and as a Swift function for the two it cannot : a dynamic collection, which holds no list, and a shared one, which arrives as excerpts. Six places worked out a cover before, and a page where one band picks its pictures differently from the band above it is a page that looks broken in a way nobody can name.
+
 **A heading takes the colour of the mark beside it.** The live band is the one place on the page with a colour of its own, and the dot and the word are one mark : the word is set in the dot's colour at the quiet end of its pulse, so the dot stays the loud half and the pair reads as one thing. Both come from `LiveDot`, named rather than written twice, since two literals that happen to agree today are two literals that stop agreeing the first time one of them is changed.
 
 ## Searching, and what was searched before
