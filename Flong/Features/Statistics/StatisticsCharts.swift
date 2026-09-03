@@ -265,31 +265,46 @@ struct FlowChart: View {
     }
 }
 
-// MARK: - The shape of a day
+// MARK: - The shape of a day, a week and a month
 
-/// When articles arrive, around the twenty-four hours of a dial.
+/// When articles arrive, around a dial of however many places the unit has.
 ///
-/// **A dial and not a row of bars, because a day is round.** Midnight at the
-/// top and noon at the bottom is the shape everybody already reads a clock in,
-/// and it is the one arrangement in which the quiet small hours are a gap you
-/// can see rather than a stretch at one end of a line. A row of twenty-four
-/// bars says the same thing and says it as a queue, which a day is not : it
-/// wraps, and eleven at night is next to midnight.
+/// **A dial and not a row of bars, because every unit here is round.** A day
+/// wraps at midnight, a week at Sunday and a month at its last day, and a row of
+/// bars says the opposite : it says the thing has a beginning and an end and
+/// that the two are as far apart as they look. Midnight at the top and noon at
+/// the bottom is the shape everybody already reads a clock in, and it is the
+/// one arrangement in which the quiet small hours are a gap you can see rather
+/// than a stretch at one end of a line.
 ///
-/// **The busiest hour is the one thing in colour.** Everything else is the
+/// **The busiest place is the one thing in colour.** Everything else is the
 /// page's own ink, so the dial reads as one object with a mark on it rather
 /// than as twenty-four things competing.
 ///
 /// **The reader's own hours are the inner ring**, drawn only when they have
-/// read something at a known hour. It is a small ring inside a large one on
+/// read something at a known place. It is a small ring inside a large one on
 /// purpose : what arrives is a torrent and what anybody reads is a handful, and
 /// two rings scaled to look alike would say the reader keeps up.
-struct DayDial: View {
-    /// How many arrived in each hour, from midnight.
-    let arrivals: [Int]
-    /// How many the reader read in each, from midnight.
+///
+/// **One view for the three cards.** The hours of a day, the days of a week and
+/// the days of a month differ in how many places they have, what is written
+/// round the edge and what the hole in the middle says. Three views would be
+/// three drawings to keep in step, and they would drift the first time one of
+/// them was adjusted.
+struct Dial: View {
+    /// How many arrived in each place, in order.
+    let counts: [Int]
+    /// How many the reader read in each.
     let reading: [Int]
-    /// Whether the reader's own hours are known well enough to be drawn : see
+    /// What is written round the edge, by place.
+    let marks: [Int: String]
+    /// What the hole in the middle says about the busiest place.
+    let middle: (Int) -> Text
+    /// The word under the dial for what the middle is.
+    let caption: LocalizedStringResource
+    /// What a reader listening to the page is told the dial is about.
+    let spoken: LocalizedStringResource
+    /// Whether the reader's own places are known well enough to be drawn : see
     /// ``Statistics/showsReading``.
     var showsReading = true
 
@@ -298,76 +313,98 @@ struct DayDial: View {
     @ScaledMetric(relativeTo: .body) private var side: CGFloat = 168
 
     /// How far the spokes start from the middle, as a share of the dial.
-    private static let hub: CGFloat = 0.42
-    /// How far they may reach.
-    private static let reach: CGFloat = 0.96
+    private static let hub: CGFloat = 0.38
 
-    private var peak: Int { max(arrivals.max() ?? 0, 1) }
+    /// How far they may reach.
+    ///
+    /// **Short of what is written round the edge.** At ninety-six hundredths a
+    /// spoke ends where the label sits, so the busiest one was drawn straight
+    /// through the `L` of a Monday and through the `1` of a first of the month.
+    /// What is left between is the air a word needs.
+    private static let reach: CGFloat = 0.84
+
+    private var peak: Int { max(counts.max() ?? 0, 1) }
     private var readPeak: Int { max(reading.max() ?? 0, 1) }
     private var hasReading: Bool { showsReading && reading.contains { $0 > 0 } }
     private var busiest: Int? {
-        guard let most = arrivals.max(), most > 0 else { return nil }
-        return arrivals.firstIndex(of: most)
+        guard let most = counts.max(), most > 0 else { return nil }
+        return counts.firstIndex(of: most)
+    }
+
+    /// How wide one spoke is drawn.
+    ///
+    /// **Thinner as there are more of them.** Five points is right for the
+    /// twenty-four hours of a day and would have the seven days of a week
+    /// drawn as seven fat wedges with the paper showing between them ; the
+    /// share of its own slice that a spoke takes is what stays the same.
+    ///
+    /// Held under ten points however few there are. A week has seven places and
+    /// a slice seventy points wide, and a third of that is a wedge rather than
+    /// a spoke : a quiet Sunday beside a loud Monday came out as a lozenge
+    /// lying on its side, which reads as a fault in the drawing.
+    private var width: CGFloat {
+        let slice = .pi * side * Self.reach / CGFloat(max(counts.count, 1))
+        return min(max(slice * 0.34, 3), 10)
     }
 
     var body: some View {
         VStack(spacing: 6) {
             ZStack {
                 ring
-                hours
-                middle
+                edge
+                hole
             }
             .frame(width: side, height: side)
 
             // **Under the dial and not in the hole in it.** The hub is the
             // width of the hole minus the spokes around it, which is about
             // eighty points : `Heure de pointe` set in it ran under the ring
-            // and came out with its last word behind a bar. The hour is what
-            // has to be in the middle, being the thing the shape cannot say ;
-            // the word for it has the whole width of the card underneath.
+            // and came out with its last word behind a bar. What has to be in
+            // the middle is the place itself, being the thing the shape cannot
+            // say ; the word for it has the whole width of the card underneath.
             if busiest != nil {
-                Text("Peak hour")
+                Text(caption)
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Articles per hour"))
-        .accessibilityValue(busiestSpoken)
+        .accessibilityLabel(Text(spoken))
+        .accessibilityValue(busiest.map { Text("\(counts[$0]) articles") } ?? Text("Nothing yet"))
     }
 
-    /// The twenty-four spokes, and the reader's own inside them.
+    /// The spokes, and the reader's own inside them.
     private var ring: some View {
         GeometryReader { geometry in
             let radius = min(geometry.size.width, geometry.size.height) / 2
 
             ZStack {
-                ForEach(0..<24, id: \.self) { hour in
+                ForEach(Array(counts.enumerated()), id: \.offset) { place, count in
                     spoke(
-                        hour,
-                        count: arrivals[hour],
+                        place,
+                        count: count,
                         peak: peak,
                         radius: radius,
                         from: Self.hub,
                         to: Self.reach,
-                        colour: hour == busiest
+                        colour: place == busiest
                             ? AnyShapeStyle(Color.accentColor)
                             : AnyShapeStyle(Color.primary.opacity(Figures.inkOpacity)),
-                        width: 5
+                        width: width
                     )
                 }
 
                 if hasReading {
-                    ForEach(0..<24, id: \.self) { hour in
+                    ForEach(Array(reading.enumerated()), id: \.offset) { place, count in
                         spoke(
-                            hour,
-                            count: reading[hour],
+                            place,
+                            count: count,
                             peak: readPeak,
                             radius: radius,
                             from: 0.16,
                             to: Self.hub - 0.05,
                             colour: AnyShapeStyle(Color.accentColor.opacity(0.55)),
-                            width: 3
+                            width: max(width * 0.6, 2.5)
                         )
                     }
                 }
@@ -376,15 +413,15 @@ struct DayDial: View {
         }
     }
 
-    /// One hour, laid along its own radius and turned to where it belongs.
+    /// One place, laid along its own radius and turned to where it belongs.
     ///
     /// Drawn from the middle outwards and then rotated, rather than placed at a
     /// computed point : a capsule that is rotated about the centre of the dial
-    /// keeps its width square to the ring at every hour, and one positioned by
+    /// keeps its width square to the ring at every place, and one positioned by
     /// its coordinates does not.
     @ViewBuilder
     private func spoke(
-        _ hour: Int,
+        _ place: Int,
         count: Int,
         peak: Int,
         radius: CGFloat,
@@ -396,31 +433,39 @@ struct DayDial: View {
         let available = radius * (outer - inner)
         let length = count > 0 ? max(available * CGFloat(count) / CGFloat(peak), Figures.floor) : 0
         let start = radius * inner
+        // **A mark never gets wider than it is long.** Held at the full width,
+        // one article against a busiest of twelve hundred was drawn as a
+        // lozenge lying across the ring : a seventh of the height of the tallest
+        // spoke for a fourteen-hundredth of its value, and thirty-one of them
+        // round a month read as a dotted circle rather than as a quiet month.
+        // Narrowing the smallest marks costs the dial nothing and gives a
+        // single article the weight of a single article.
+        let stroke = min(width, length)
 
         if length > 0 {
             Capsule()
                 .fill(colour)
-                .frame(width: width, height: length)
+                .frame(width: stroke, height: length)
                 // Half its own length out from the middle, plus the hub, which
                 // puts its inner end on the hub and its outer end at the count.
                 .offset(y: -(start + length / 2))
-                .rotationEffect(.degrees(Double(hour) / 24 * 360))
+                .rotationEffect(.degrees(turn(of: place)))
                 .animation(reduceMotion ? nil : .snappy(duration: 0.3), value: count)
         }
     }
 
-    /// The four quarters of the day, written where a clock writes them.
+    /// What is written round the edge, where anything is.
     ///
     /// **Turned into place and then turned back.** A label carried round the
-    /// dial by one rotation arrives lying on its side at six and upside down at
-    /// midday, which is a clock nobody can read : the second rotation, equal
-    /// and opposite, puts the glyph back on its feet while leaving it where the
-    /// first one took it.
-    private var hours: some View {
-        ForEach([0, 6, 12, 18], id: \.self) { hour in
-            let turn = Double(hour) / 24 * 360
+    /// dial by one rotation arrives lying on its side a quarter of the way
+    /// round and upside down at the bottom, which is a dial nobody can read :
+    /// the second rotation, equal and opposite, puts the glyph back on its feet
+    /// while leaving it where the first one took it.
+    private var edge: some View {
+        ForEach(marks.keys.sorted(), id: \.self) { place in
+            let turn = turn(of: place)
 
-            Text(verbatim: "\(hour)")
+            Text(verbatim: marks[place] ?? "")
                 .font(.system(size: 10, weight: .medium, design: .rounded))
                 .foregroundStyle(.tertiary)
                 .rotationEffect(.degrees(-turn))
@@ -429,31 +474,25 @@ struct DayDial: View {
         }
     }
 
+    /// Where a place sits round the dial, from the top and clockwise.
+    private func turn(of place: Int) -> Double {
+        Double(place) / Double(max(counts.count, 1)) * 360
+    }
+
     /// What the dial is about, in the hole in the middle.
     ///
-    /// The hour, not the count : the spokes already say how much, and the one
-    /// thing a shape cannot say is which hour the tall one is. What the hour
-    /// means is written under the dial, where there is room for it.
+    /// The place, not the count : the spokes already say how much, and the one
+    /// thing a shape cannot say is which of them the tall one is. What the
+    /// place means is written under the dial, where there is room for it.
     @ViewBuilder
-    private var middle: some View {
+    private var hole: some View {
         if let busiest {
-            Text(hour(busiest), format: .dateTime.hour())
+            middle(busiest)
                 .font(theme.headline(.subheadline))
                 .lineLimit(1)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.5)
                 .frame(width: side * Self.hub * 1.3)
         }
-    }
-
-    /// A moment standing for an hour of the day, so the hour is written the way
-    /// the reader's own clock writes it : `17 h` or `5 PM`, never both.
-    private func hour(_ hour: Int) -> Date {
-        Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: .now) ?? .now
-    }
-
-    private var busiestSpoken: Text {
-        guard let busiest else { return Text("Nothing yet") }
-        return Text("\(arrivals[busiest]) articles")
     }
 }
 

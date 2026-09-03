@@ -34,7 +34,7 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **Enrichment happens on the device.** Headlines, summaries and filing come from the system model, in your own language whatever language the articles are in, and no article content is sent anywhere.
 
-**And you can see what it all adds up to.** A page of figures beside your own face, over a day, a season or the lot : the articles received, the sources they came from, the hour of the day your feeds are busiest, the subjects, the people, the authors, the languages, how many arrived twice, and which feeds send the whole article, which send an excerpt and which send a headline and a link. No unread count, no streak, nothing that scores you.
+**And you can see what it all adds up to.** A page of figures beside your own face, over a day, a season or the lot : the articles received, the sources they came from, the hour of the day, the day of the week and the day of the month your feeds are busiest, the subjects, the people, the authors, the languages, how many arrived twice, and which feeds send the whole article, which send an excerpt and which send a headline and a link. No unread count, no streak, nothing that scores you.
 
 **It is set like a page**, not like a control panel : one column, a readable measure, hairline rules, serif headlines over a sans body. Three themes, each stating both appearances.
 

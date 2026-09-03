@@ -310,6 +310,27 @@ nonisolated struct Statistics: Hashable, Sendable {
     var arrivalsByHour = [Int](repeating: 0, count: 24)
     var readingByHour = [Int](repeating: 0, count: 24)
 
+    /// The same, by day of the week, Sunday first.
+    ///
+    /// **Sunday first because that is where SQLite counts from**, and never
+    /// because it is where a week begins : `strftime('%w')` answers nought for
+    /// Sunday whatever the reader's calendar says. The dial turns it round to
+    /// the reader's own first weekday when it draws it, which is the one place
+    /// that knows.
+    var arrivalsByWeekday = [Int](repeating: 0, count: 7)
+    var readingByWeekday = [Int](repeating: 0, count: 7)
+
+    /// The same, by day of the month, the first at index nought.
+    ///
+    /// **The last three are structurally quieter and it is not a lie.** A
+    /// thirty-first only comes round in seven months of twelve and a
+    /// twenty-ninth in one year of four, so over a long window those spokes
+    /// stand for fewer days than the ones before them. The count is what was
+    /// asked for and what is drawn ; dividing it by the number of times the day
+    /// came round would be an average of a count and no longer articles.
+    var arrivalsByDay = [Int](repeating: 0, count: 31)
+    var readingByDay = [Int](repeating: 0, count: 31)
+
     /// Whether anything at all was counted.
     var isEmpty: Bool { arrived == 0 }
 
@@ -462,6 +483,10 @@ nonisolated struct StatisticsStore: Sendable {
         var languages: [Tally] = []
         var arrivalsByHour = [Int](repeating: 0, count: 24)
         var readingByHour = [Int](repeating: 0, count: 24)
+        var arrivalsByWeekday = [Int](repeating: 0, count: 7)
+        var readingByWeekday = [Int](repeating: 0, count: 7)
+        var arrivalsByDay = [Int](repeating: 0, count: 31)
+        var readingByDay = [Int](repeating: 0, count: 31)
     }
 
     /// The little a ranking needs to know about a feed.
@@ -647,23 +672,51 @@ nonisolated struct StatisticsStore: Sendable {
             raw.reading[bucket] = row["count"]
         }
 
-        raw.arrivalsByHour = try hours(
-            db,
-            sql: """
-                SELECT CAST(strftime('%H', \(when), 'localtime') AS INTEGER) AS hour, COUNT(*) AS count
-                FROM entry e WHERE \(shown) AND \(window) GROUP BY hour
-                """,
-            arguments: arguments
-        )
-        raw.readingByHour = try hours(
-            db,
-            sql: """
-                SELECT CAST(strftime('%H', e.read_at, 'localtime') AS INTEGER) AS hour, COUNT(*) AS count
-                FROM entry e
-                WHERE \(shown) AND e.read_at IS NOT NULL AND \(readWindow) GROUP BY hour
-                """,
-            arguments: readArguments
-        )
+        // The three ways round a dial : the hours of a day, the days of a week
+        // and the days of a month. One shape, asked three times, of the
+        // arrivals and then of the reading.
+        //
+        // `%w` counts the week from Sunday and `%d` the month from one, so the
+        // day of the month is shifted to sit at nought : see ``Statistics``.
+        for (unit, format, slots, first) in [
+            ("hour", "%H", 24, 0),
+            ("weekday", "%w", 7, 0),
+            ("day", "%d", 31, 1),
+        ] {
+            let arrivals = try dial(
+                db,
+                sql: """
+                    SELECT CAST(strftime('\(format)', \(when), 'localtime') AS INTEGER) AS slot, COUNT(*) AS count
+                    FROM entry e WHERE \(shown) AND \(window) GROUP BY slot
+                    """,
+                arguments: arguments,
+                slots: slots,
+                first: first
+            )
+            let reading = try dial(
+                db,
+                sql: """
+                    SELECT CAST(strftime('\(format)', e.read_at, 'localtime') AS INTEGER) AS slot, COUNT(*) AS count
+                    FROM entry e
+                    WHERE \(shown) AND e.read_at IS NOT NULL AND \(readWindow) GROUP BY slot
+                    """,
+                arguments: readArguments,
+                slots: slots,
+                first: first
+            )
+
+            switch unit {
+            case "hour":
+                raw.arrivalsByHour = arrivals
+                raw.readingByHour = reading
+            case "weekday":
+                raw.arrivalsByWeekday = arrivals
+                raw.readingByWeekday = reading
+            default:
+                raw.arrivalsByDay = arrivals
+                raw.readingByDay = reading
+            }
+        }
 
         // **A subject belongs to a story and reaches an article through it.**
         // The digest is what files the news, and only the articles it grouped
@@ -764,13 +817,25 @@ nonisolated struct StatisticsStore: Sendable {
         }
     }
 
-    /// Twenty-four counts, from midnight, with the hours nothing fell in left
+    /// One count per place round a dial, with the places nothing fell in left
     /// at nought rather than missing.
-    private static func hours(_ db: Database, sql: String, arguments: StatementArguments) throws -> [Int] {
-        var counts = [Int](repeating: 0, count: 24)
+    ///
+    /// - Parameter slots: how many places the dial has.
+    /// - Parameter first: what SQLite calls the first of them, which is nought
+    ///   for an hour and for a weekday and one for a day of the month.
+    private static func dial(
+        _ db: Database,
+        sql: String,
+        arguments: StatementArguments,
+        slots: Int,
+        first: Int
+    ) throws -> [Int] {
+        var counts = [Int](repeating: 0, count: slots)
         for row in try Row.fetchAll(db, sql: sql, arguments: arguments) {
-            guard let hour = row["hour"] as Int?, (0..<24).contains(hour) else { continue }
-            counts[hour] = row["count"]
+            guard let slot = row["slot"] as Int? else { continue }
+            let place = slot - first
+            guard counts.indices.contains(place) else { continue }
+            counts[place] = row["count"]
         }
         return counts
     }
@@ -801,6 +866,10 @@ nonisolated struct StatisticsStore: Sendable {
         report.bylines = raw.bylines
         report.arrivalsByHour = raw.arrivalsByHour
         report.readingByHour = raw.readingByHour
+        report.arrivalsByWeekday = raw.arrivalsByWeekday
+        report.readingByWeekday = raw.readingByWeekday
+        report.arrivalsByDay = raw.arrivalsByDay
+        report.readingByDay = raw.readingByDay
         report.languages = raw.languages
 
         // The marks of the chart, every one of them, in order. Built from the
