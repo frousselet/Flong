@@ -503,7 +503,7 @@ nonisolated struct DigestService: Sendable {
             .map { (title: $0["title"] as String, excerpt: $0["excerpt"] as String?) }
         }
 
-        let brief = StorySummarizer.fallback(for: articles ?? [])
+        let brief = StorySummarizer.fallback(for: articles ?? [], readIn: locale)
         try? await database.writer.write { db in
             guard var story = try Story.fetchOne(db, key: storyID) else { return }
             story.title = brief.title.isEmpty ? story.title : brief.title

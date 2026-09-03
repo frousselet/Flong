@@ -67,8 +67,47 @@ struct StoreTests {
                 "v38.whatTheReaderCallsThem",
                 "v39.whatTheBriefWasWrittenFrom",
                 "v40.askedAboutWhat",
+                "v41.aHeadlineWithNoLineUnderIt",
             ]
         )
+    }
+
+    @Test("A story left with a headline and no line under it is asked about once more")
+    func aHeadlineWithNoLineIsAskedAgain() throws {
+        let queue = try DatabaseQueue()
+        // The schema as it stood while a standfirst was dropped rather than
+        // asked for again.
+        try AppDatabase.migrator.migrate(queue, upTo: "v40.askedAboutWhat")
+
+        let hollow = UUID.v7()
+        let whole = UUID.v7()
+        let now = Date()
+        try queue.write { db in
+            for (id, summary) in [(hollow, nil), (whole, "Ce que le titre n'a pas dit.")] as [(UUID, String?)] {
+                try db.execute(
+                    sql: """
+                        INSERT INTO story
+                        (id, title, summary, is_generated, brief_locked, article_count, feed_count,
+                         first_at, last_at, updated_at, brief_locale)
+                        VALUES (?, ?, ?, 1, 0, 2, 2, ?, ?, ?, 'fr_FR')
+                        """,
+                    arguments: [id, "Un titre écrit par le modèle", summary, now, now, now]
+                )
+            }
+        }
+
+        try AppDatabase.migrator.migrate(queue)
+
+        let asked = try queue.read { db in
+            try [hollow, whole].map { id in
+                try String.fetchOne(db, sql: "SELECT brief_locale FROM story WHERE id = ?", arguments: [id])
+            }
+        }
+
+        // Asked in nothing is asked again : the next pass puts the question and
+        // writes the language back down. A story that has its line is left
+        // alone.
+        #expect(asked == [nil, "fr_FR"])
     }
 
     @Test("The folders go, and what a source is now is worked out rather than filed")

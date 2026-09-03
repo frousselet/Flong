@@ -1244,10 +1244,13 @@ struct DigestShapeTests {
 
     @Test("Without a model, a story is named after its most central article")
     func fallbackBrief() {
-        let brief = StorySummarizer.fallback(for: [
-            (title: "Une réforme du calendrier scolaire", excerpt: "Le ministère envisage un décalage."),
-            (title: "Autre chose", excerpt: nil),
-        ])
+        let brief = StorySummarizer.fallback(
+            for: [
+                (title: "Une réforme du calendrier scolaire", excerpt: "Le ministère envisage un décalage."),
+                (title: "Autre chose", excerpt: nil),
+            ],
+            readIn: Locale(identifier: "fr_FR")
+        )
 
         #expect(brief.title == "Une réforme du calendrier scolaire")
         #expect(brief.summary == "Le ministère envisage un décalage.")
@@ -1256,9 +1259,129 @@ struct DigestShapeTests {
         #expect(!brief.isGenerated)
     }
 
+    // MARK: - The head of a story nobody wrote a brief for
+
+    @Test("The headline and the line come from one article, or the line does not come")
+    func fallbackKeepsOneArticleWhole() {
+        // What a real page showed : a Guardian letter about the Great Lakes
+        // over a French line about a mapping application climbing the charts.
+        let brief = StorySummarizer.fallback(
+            for: [
+                (title: "Donald Trump's shallow renaming of the Great Lakes | Letters", excerpt: nil),
+                (
+                    title: "Apple Maps renames Lake Ontario as Lake America",
+                    excerpt: "Apple has renamed the lake for users in the United States."
+                ),
+            ],
+            readIn: Locale(identifier: "en_GB")
+        )
+
+        #expect(brief.title == "Apple Maps renames Lake Ontario as Lake America")
+        #expect(brief.summary == "Apple has renamed the lake for users in the United States.")
+    }
+
+    @Test("Where no article carries a line, the story is shown as a headline")
+    func fallbackWithNoLineAnywhere() {
+        let brief = StorySummarizer.fallback(
+            for: [(title: "Une réforme du calendrier scolaire", excerpt: nil)],
+            readIn: Locale(identifier: "fr_FR")
+        )
+
+        #expect(brief.title == "Une réforme du calendrier scolaire")
+        #expect(brief.summary == nil)
+    }
+
+    @Test("The reader's own language decides which article stands for the story")
+    func fallbackPrefersTheReadersLanguage() {
+        let brief = StorySummarizer.fallback(
+            for: [
+                (
+                    title: "Apple Maps renames Lake Ontario as Lake America after Trump order",
+                    excerpt: "The change follows an executive order signed last week in Washington."
+                ),
+                (
+                    title: "« Lac Ontario » vs « Lake America » : l'appli MapQuest tient tête à Donald Trump",
+                    excerpt: "Une application de cartographie vient de doubler Google Maps au classement."
+                ),
+            ],
+            readIn: Locale(identifier: "fr_FR")
+        )
+
+        #expect(brief.title.hasPrefix("« Lac Ontario »"))
+        #expect(brief.summary?.hasPrefix("Une application") == true)
+    }
+
+    @Test("The furniture a template staples to a headline comes off")
+    func headlineFurniture() {
+        #expect(
+            StorySummarizer.plainTitle("Climate injustices have been laid bare in the flood disaster | Letters")
+                == "Climate injustices have been laid bare in the flood disaster"
+        )
+        #expect(
+            StorySummarizer.plainTitle("Farewell Keir Starmer, a politician we wanted more from | Zoe Williams")
+                == "Farewell Keir Starmer, a politician we wanted more from"
+        )
+        // What stands after the pipe has to be short, and what stands before it
+        // has to still be a headline.
+        #expect(StorySummarizer.plainTitle("Swift | Objective-C") == "Swift | Objective-C")
+        let plain = "Une réforme du calendrier scolaire"
+        #expect(StorySummarizer.plainTitle(plain) == plain)
+    }
+
+    // MARK: - What the model writes, and what is done about it
+
+    @Test("A line whose first sentence is the headline again has spent itself")
+    func aFirstSentenceThatRepeats() {
+        let title = "La Russie revendique des frappes dans les régions de Kiev et d'Odessa"
+
+        // Straight off the page : the headline, then two more sentences, which
+        // used to pass because the line as a whole added enough words.
+        #expect(
+            StorySummarizer.repeats(
+                title,
+                in: """
+                    La Russie revendique des frappes dans les régions de Kiev et d'Odessa. \
+                    Vladimir Poutine justifie les frappes de représailles. Treize oblasts touchés.
+                    """
+            )
+        )
+        // And a line that names the same subject while going on to say
+        // something is left alone.
+        #expect(
+            !StorySummarizer.repeats(
+                title,
+                in: """
+                    Treize oblasts ukrainiens ont été touchés dans la nuit, et Kiev fait état de \
+                    dégâts sur son réseau électrique.
+                    """
+            )
+        )
+    }
+
+    @Test("A standfirst that ran long is cut back to the sentences that fit")
+    func aLongLineIsCut() {
+        let long = """
+            Le président a annoncé la mesure lundi. Elle entrera en vigueur en janvier et concerne \
+            les communes de plus de dix mille habitants. Les préfets disposeront de six mois pour \
+            publier les arrêtés correspondants, et les recours devront être déposés avant la fin de \
+            l'année suivante, faute de quoi ils seront jugés irrecevables par le tribunal.
+            """
+        let kept = try? #require(StorySummarizer.shortened(long))
+
+        #expect(kept != nil)
+        #expect(StorySummarizer.isBrief(kept ?? long))
+        // Whole sentences, and the model's own words in its own order.
+        #expect(kept?.hasPrefix("Le président a annoncé la mesure lundi.") == true)
+        #expect(long.hasPrefix(kept ?? ""))
+
+        // A single sentence that is itself a paragraph leaves nothing to keep.
+        let oneBreath = String(repeating: "mot ", count: 60) + "."
+        #expect(StorySummarizer.shortened(oneBreath) == nil)
+    }
+
     @Test("A story with no articles has nothing to be named after")
     func emptyBrief() {
-        let brief = StorySummarizer.fallback(for: [])
+        let brief = StorySummarizer.fallback(for: [], readIn: Locale(identifier: "fr_FR"))
 
         #expect(brief.title.isEmpty)
         #expect(brief.summary == nil)

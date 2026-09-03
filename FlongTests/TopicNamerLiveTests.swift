@@ -27,15 +27,17 @@ import Testing
 ///
 /// It asserts the shape of what comes back, never its wording : the model is
 /// entitled to call a subject whatever it likes.
-/// A simulator answers `available` and then fails every call, which is the very
-/// case the refusal counter exists for, so it is not a machine this suite can
-/// run on.
+///
+/// **It runs on the simulator, and it used to refuse to.** A simulator was held
+/// to answer `available` and then fail every call, so the suite skipped itself
+/// there ; since every test of this project runs on a simulator, it skipped
+/// itself everywhere and nothing has been checked against a real model for as
+/// long as that has been true. A simulator borrows the Mac's own Apple
+/// Intelligence and answers exactly as a device does, which is measurable and
+/// was measured : thirty real stories written on one. So the question is the
+/// only one worth asking, which is whether there is a model here.
 private var hasWorkingModel: Bool {
-    #if targetEnvironment(simulator)
-        false
-    #else
-        OnDeviceModel.isAvailable
-    #endif
+    OnDeviceModel.isAvailable
 }
 
 @Suite("The digest, against the real model", .enabled(if: hasWorkingModel), .serialized)
@@ -160,6 +162,11 @@ struct TopicNamerLiveTests {
                 try EntryBody(entryID: entry.id, plainText: title).insert(db)
             }
         }
+
+        // The sections every reader has, which the window writes down at
+        // launch and a service built by hand does not : a story cannot be filed
+        // under a vocabulary nobody has written yet.
+        try await TopicPreferences(database).seedStandards(at: now)
 
         let service = DigestService(database, locale: Locale(identifier: "fr_FR"))
         _ = await service.rebuild(now: now)

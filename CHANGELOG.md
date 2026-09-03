@@ -26,6 +26,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The digest asks the model a second time, as the condensing of published headlines it is, where the first ask is refused for sensitive content, asks again for a single field rather than for the whole brief where one comes back wrong, cuts a standfirst that ran to a paragraph back to its first whole sentences, and takes the headline and the line of a story it could not write from one and the same article, preferring one already in the reader's language : measured over thirty real stories, twenty-four are written instead of twenty and twenty-six read in the reader's language instead of twenty-three.
+
 - The front page keeps its frame rate under the thumb : the scroll position it washes its head with was rebuilding the whole page on every frame, and it is held apart from the page now.
 - The line of collections reads across again : `Personnalités favorites` takes two lines where its neighbours take one, and the room for the second was not held open, so every count in the row sat on a different baseline.
 

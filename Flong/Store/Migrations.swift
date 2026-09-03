@@ -963,6 +963,27 @@ nonisolated extension AppDatabase {
             )
         }
 
+        /// The stories the old rule left with a headline and no line.
+        ///
+        /// A standfirst that repeated the headline or ran to a paragraph was
+        /// dropped, twice, and the story was stamped as asked : it wore a
+        /// written headline over nothing for the rest of its life, and the lead
+        /// of the page was one of them often enough for a reader to notice. The
+        /// line is asked for on its own now, once more, so what is left with
+        /// none has been refused three times rather than two.
+        ///
+        /// Clearing the language they were asked in is what puts them back in
+        /// the question, exactly once : the next pass asks, writes the language
+        /// down again, and they settle wherever the third answer leaves them.
+        migrator.registerMigration("v41.aHeadlineWithNoLineUnderIt") { db in
+            try db.execute(
+                sql: """
+                    UPDATE story SET brief_locale = NULL
+                    WHERE is_generated = 1 AND (summary IS NULL OR summary = '')
+                    """
+            )
+        }
+
         return migrator
     }
 
