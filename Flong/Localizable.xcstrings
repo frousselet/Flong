@@ -1912,6 +1912,17 @@
         }
       }
     },
+    "Nerd" : {
+      "comment" : "Under the easter egg at the foot of the statistics page. The same word in French.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nerd"
+          }
+        }
+      }
+    },
     "Never suggested, whoever follows them." : {
       "localizations" : {
         "fr" : {

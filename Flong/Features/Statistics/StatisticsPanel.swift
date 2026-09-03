@@ -199,6 +199,7 @@ struct StatisticsPanel: View {
                     people(report)
                     bylines(report)
                     languages(report)
+                    nerd
                 }
             }
         } else if model.isCounting {
@@ -206,6 +207,34 @@ struct StatisticsPanel: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 80)
         }
+    }
+
+    /// The one thing on the page that is not a figure.
+    ///
+    /// **Past the end, and it has to be got to.** It is under the last card
+    /// with a card's worth of quiet above it, so it is not part of the page and
+    /// is not in the way of it : a reader who came for the numbers reads the
+    /// numbers and never meets it, and a reader who kept scrolling after the
+    /// numbers ran out is exactly the reader it is for.
+    ///
+    /// Nothing about it can be pressed, and it says nothing about the reader's
+    /// stream. A page that has just spent nine cards counting somebody's
+    /// reading may as well admit what sort of person reads a page like that.
+    private var nerd: some View {
+        VStack(spacing: 2) {
+            Text(verbatim: "👉 🤓 👈")
+                .font(.system(size: 30))
+            Text("Nerd")
+                .font(theme.metadata)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 40)
+        // One element and one word. Read out glyph by glyph it is three
+        // pointing hands and a face, which is a sentence nobody wants and not
+        // the joke.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Nerd"))
     }
 
     /// A window with nothing in it, which is a fact about the window rather
