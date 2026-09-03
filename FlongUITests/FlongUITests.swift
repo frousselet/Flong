@@ -24,7 +24,9 @@ final class FlongUITests: XCTestCase {
         // lands on another and the test fails somewhere it never went near.
         // The iPhone is portrait only and cannot get there ; the iPad turns,
         // and these suites run on it.
-        XCUIDevice.shared.orientation = .portrait
+        #if os(iOS)
+            XCUIDevice.shared.orientation = .portrait
+        #endif
 
         // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
     }

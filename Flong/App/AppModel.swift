@@ -1454,7 +1454,7 @@ final class AppModel {
             return
         }
 
-        startAnnouncingArticles()
+        await startAnnouncingArticles()
         preferences.wantsNewArticleNotices = true
         wantsNewArticleNotices = true
     }
@@ -1501,7 +1501,7 @@ final class AppModel {
     func setNotifications(_ wanted: Bool, forSource id: UUID) async {
         if wanted {
             guard await authorizeNotifications() else { return }
-            startAnnouncingArticles()
+            await startAnnouncingArticles()
         }
 
         do {
@@ -1542,7 +1542,7 @@ final class AppModel {
     func setNotifications(_ wanted: Bool, forAuthor name: String) async {
         if wanted {
             guard await authorizeNotifications() else { return }
-            startAnnouncingArticles()
+            await startAnnouncingArticles()
         }
 
         do {
@@ -1588,7 +1588,7 @@ final class AppModel {
     func setNotifications(_ wanted: Bool, forNewsmaker name: String) async {
         if wanted {
             guard await authorizeNotifications() else { return }
-            startAnnouncingArticles()
+            await startAnnouncingArticles()
         }
 
         do {
@@ -1633,9 +1633,38 @@ final class AppModel {
     /// just turned on were already holding. What the stamp is for is that a
     /// source's back catalogue is not announced as though it had just arrived,
     /// and the first switch answers that for all of them.
-    private func startAnnouncingArticles() {
-        guard preferences.articlesAnnouncedAt == nil else { return }
+    private func startAnnouncingArticles() async {
+        // Nothing has ever asked : the clock starts, and this pass says nothing.
+        guard preferences.articlesAnnouncedAt != nil else {
+            preferences.articlesAnnouncedAt = Date()
+            return
+        }
+        // Something is already asking, so the mark is live and moving : leaving
+        // it alone is the whole point, since jumping it forward would swallow
+        // whatever the sources already on have published since the last pass.
+        guard !(await isAnnouncingArticles) else { return }
+        // Everything was off, so the mark has been standing still since the
+        // reader last listened. Starting from it would announce months.
         preferences.articlesAnnouncedAt = Date()
+    }
+
+    /// Whether anything at all is asking to be told about an article.
+    ///
+    /// Read before a switch is written, so it answers about the state the
+    /// reader is coming from rather than the one they are going to.
+    private var isAnnouncingArticles: Bool {
+        get async {
+            if wantsNewArticleNotices { return true }
+            // A read that failed answers `yes`, which is the conservative way
+            // round : it leaves the mark alone, and the worst that costs is one
+            // stale mark, which the pass below puts right.
+            guard
+                let sources = try? await subscriptions.announcing(),
+                let writers = try? await authorStore.notified(),
+                let people = try? await newsmakerStore.notified()
+            else { return true }
+            return !sources.isEmpty || !writers.isEmpty || !people.isEmpty
+        }
     }
 
     /// Tells the reader what their sources, and the writers and people they
@@ -1655,12 +1684,27 @@ final class AppModel {
     /// that asking for their first thing starts from that moment rather than
     /// from whatever a silent pass had stamped.
     func announceNewArticles() async {
+        guard !Task.isCancelled else { return }
+
         let everyFeed = wantsNewArticleNotices
         if !everyFeed {
-            let sources = (try? await subscriptions.announcing()) ?? []
-            let writers = (try? await authorStore.notified()) ?? []
-            let people = (try? await newsmakerStore.notified()) ?? []
-            guard !sources.isEmpty || !writers.isEmpty || !people.isEmpty else { return }
+            // **A read that failed is not an answer.** Under cancellation every
+            // one of these throws, and taking that for `nobody is asking` would
+            // move the mark below on a pass that learnt nothing at all.
+            guard
+                let sources = try? await subscriptions.announcing(),
+                let writers = try? await authorStore.notified(),
+                let people = try? await newsmakerStore.notified()
+            else { return }
+
+            guard !sources.isEmpty || !writers.isEmpty || !people.isEmpty else {
+                // Nothing is being announced, so nothing is being metered. The
+                // mark is kept at now rather than left to rot, and never
+                // created, since having none is how a first switch starts from
+                // the moment it was thrown.
+                if preferences.articlesAnnouncedAt != nil { preferences.articlesAnnouncedAt = Date() }
+                return
+            }
         }
 
         guard let since = preferences.articlesAnnouncedAt else {
@@ -2013,8 +2057,13 @@ final class AppModel {
     /// fetching must not be a pass that swallowed them.
     /// **The fetching stops short of the budget**, so that what follows it
     /// happens at all. See ``BackgroundScheduler/refreshTail``.
-    func backgroundRefresh() async {
-        let deadline = Date().addingTimeInterval(BackgroundScheduler.fetchBudget)
+    /// - Parameter start: when the system handed the time over, which is when
+    ///   its own clock started. Measured from here rather than from the first
+    ///   line of this function : preparing the model can wait on two iCloud
+    ///   round trips, and whatever that costs would otherwise come out of the
+    ///   tail this reservation exists to protect rather than out of the fetch.
+    func backgroundRefresh(from start: Date = Date()) async {
+        let deadline = start.addingTimeInterval(BackgroundScheduler.fetchBudget)
         await cloud?.enqueueReadStates()
 
         await catchUp(.background, until: deadline)
@@ -4418,7 +4467,7 @@ final class AppModel {
             if await authorizeNotifications() {
                 // From now : what the source published before the reader asked
                 // about it is not news.
-                startAnnouncingArticles()
+                await startAnnouncingArticles()
             } else {
                 edit.notifiesNewArticles = false
             }

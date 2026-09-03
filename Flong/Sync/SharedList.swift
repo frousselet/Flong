@@ -255,15 +255,10 @@ nonisolated struct SharedEntryStore: Sendable {
             // new the moment its filer added something else, and every notice
             // built on the stamp would announce it again. What was here keeps
             // the moment it turned up.
-            // **Asked of the zone and not of the list**, because that is what
-            // the row is unique by : two people filing the same piece is one
-            // row, and the first to arrive keeps it. Scoped to the list, a
-            // piece whose row belonged to somebody else and who then removed it
-            // came back stamped as new, and was announced a second time.
             let arrived = try Row.fetchAll(
                 db,
-                sql: "SELECT guid, received_at FROM shared_entry WHERE zone_name = ?",
-                arguments: [zoneName]
+                sql: "SELECT guid, received_at FROM shared_entry WHERE zone_name = ? AND list_key = ?",
+                arguments: [zoneName, listKey]
             )
             .reduce(into: [String: Date]()) { found, row in found[row["guid"] as String] = row["received_at"] as Date }
 

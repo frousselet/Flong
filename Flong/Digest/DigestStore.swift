@@ -326,7 +326,15 @@ nonisolated struct DigestStore: Sendable {
     /// is a range on the key, not a scan with a timestamp unpacked per row.
     /// Nothing else records when a story was opened, `first_at` being the date
     /// of its earliest article, which may be days older than the story.
-    func opened(since moment: Date, limit: Int = 20, now: Date = Date()) async throws -> [Opened] {
+    /// - Parameter limit: the same bound the other two watermarked reads carry,
+    ///   and for the same reason : the mark is the clock, so anything this
+    ///   answer does not hold is behind it at the next pass. See
+    ///   ``ArticleStore/mostBeforeAnnouncing``.
+    func opened(
+        since moment: Date,
+        limit: Int = ArticleStore.mostBeforeAnnouncing,
+        now: Date = Date()
+    ) async throws -> [Opened] {
         let since = now.addingTimeInterval(-Self.window)
 
         return try await database.writer.read { db in

@@ -98,11 +98,14 @@ struct StreamArchiveTests {
         #expect(article.bodyHTML == "<p>Un corps.</p>")
     }
 
-    /// An archive holds a fortnight, so the moment an article turns up on the
-    /// receiving device decides whether the reader is told about a fortnight of
-    /// somebody else's backlog as though it had all just broken.
-    @Test("An article taken from another device keeps the moment that device received it")
-    func theArrivalMomentTravels() async throws {
+    /// **When it reached THIS device**, which is what the column means
+    /// everywhere else and what the announcing watermark rests on : that mark
+    /// is a clock, so every row written after it has to stand above it. Stamped
+    /// with the sending device's moment, a row inserted a minute ago could
+    /// carry one from before the last stamp and be invisible to every later
+    /// pass, and two devices a few minutes apart would be enough.
+    @Test("An article taken from another device arrives when it reaches that device")
+    func theArrivalMomentIsLocal() async throws {
         let first = try Device(named: "phone", root: root)
         let second = try Device(named: "pad", root: root)
 
@@ -118,14 +121,14 @@ struct StreamArchiveTests {
         let summaries = try await second.articles.summaries(.all, now: now)
         let taken = try #require(summaries.first)
         let stored = try await second.database.writer.read { db in try Entry.fetchOne(db, key: taken.id) }
-        let entry = try #require(stored)
+        #expect(try #require(stored).receivedAt == now)
 
-        #expect(entry.receivedAt < now.addingTimeInterval(-24 * 60 * 60))
-        // And so nothing announces it : a notice asks what arrived since a
-        // moment, and this did not arrive now.
+        // And it is announceable, since it is unread : what the other device
+        // read is what keeps a synchronization quiet, and this the reader has
+        // seen nowhere.
         let arrived = try await second.articles.arrived(
             since: now.addingTimeInterval(-60), fromEveryFeed: true)
-        #expect(arrived.isEmpty)
+        #expect(arrived.map(\.title) == ["Ancienne"])
     }
 
     /// The rule that decides a second copy lives in one place, and the archive

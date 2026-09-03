@@ -55,7 +55,10 @@ struct Notifier: Announcing {
     func authorize() async -> Bool {
         do {
             return try await UNUserNotificationCenter.current()
-                .requestAuthorization(options: [.alert, .sound, .badge])
+                // No `.badge` : nothing here ever sets one, and a permission
+                // asked for and never spent is a row in the system settings
+                // that does nothing whichever way the reader sets it.
+                .requestAuthorization(options: [.alert, .sound])
         } catch {
             Log.notify.error("Notifications could not be asked for : \(error, privacy: .public)")
             return false

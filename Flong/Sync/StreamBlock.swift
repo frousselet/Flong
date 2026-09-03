@@ -195,17 +195,22 @@ nonisolated enum StreamBlock {
                     author: header.author,
                     language: header.language,
                     publishedAt: header.publishedAt,
-                    // What the sending device recorded, and not this instant.
-                    // A block from a device that predates the field says
-                    // nothing, and the publication date is the closer of the
-                    // two remaining answers.
+                    // **When it reached THIS device**, which is what the column
+                    // means everywhere else and what the announcing watermark
+                    // rests on : that mark is a clock, so every row written
+                    // after it must stand above it. Stamped with the sending
+                    // device's moment instead, a row inserted a minute ago could
+                    // carry one from before the last stamp and be invisible to
+                    // every later pass : two devices a few minutes apart, or a
+                    // clock a little askew, and the second one announces nothing
+                    // it was told about.
                     //
-                    // **Never later than now.** Publishers date articles in the
-                    // future, by a timezone or by a scheduling mistake, and an
-                    // arrival moment ahead of the clock is one no watermark can
-                    // ever get past : the article would be announced by every
-                    // pass, for ever.
-                    receivedAt: min(header.receivedAt ?? header.publishedAt ?? now, now),
+                    // Keeping a fortnight of somebody else's archive quiet is
+                    // a different question, and the read state answers it : what
+                    // the other device fetched it also mostly read, and an
+                    // unread article a fortnight old is news the reader has seen
+                    // nowhere. See ``ArticleStore/arrived(since:)``.
+                    receivedAt: now,
                     isRead: read.contains(ArticleFingerprint(feedURL: feedURL, guid: header.guid)),
                     canonicalKey: key
                 )

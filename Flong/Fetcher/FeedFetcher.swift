@@ -39,7 +39,7 @@ nonisolated struct FetchRequest: Hashable, Sendable {
     /// a few hundred bytes for a feed with nothing new ; refusing the network
     /// outright bought very little and cost the whole feature.
     ///
-    /// Kept as a request's own answer rather than deleted, since section 19 of
+    /// Kept as a request's own answer rather than deleted, since section 8 of
     /// the specification owes the reader a `Wi-Fi only` preference and this is
     /// where it will be answered.
     var isExpensiveNetworkAllowed = true

@@ -60,6 +60,11 @@ nonisolated enum ArticleKey {
             .id
     }
 
+    /// What two copies of one article have in common.
+    ///
+    /// The address where there is one, reduced to what identifies the page, and
+    /// otherwise the spelling of the headline with the day and the publisher.
+    /// `docs/technical/ingestion.md` sets out both and why.
     static func of(url: URL?, title: String, publishedAt: Date?, room: String?) -> String? {
         if let address = address(url) { return address }
         return spelling(title, publishedAt: publishedAt, room: room)

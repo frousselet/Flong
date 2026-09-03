@@ -807,13 +807,6 @@ nonisolated struct ArticleStore: Sendable {
     nonisolated struct Arrival: Identifiable, Hashable, Sendable {
         let id: UUID
         let title: String
-        /// When this device received it.
-        ///
-        /// Carried out of the query so the watermark can be stamped past what
-        /// was actually read rather than past the moment of reading : the
-        /// answer is capped, and a pass that brought more than it returned
-        /// would otherwise leave the rest behind the mark for good.
-        let receivedAt: Date
         /// What the source is called.
         let source: String
         /// The picture that stands for the article, when it has one.
@@ -856,7 +849,6 @@ nonisolated struct ArticleStore: Sendable {
         init(
             id: UUID,
             title: String,
-            receivedAt: Date = Date(),
             source: String,
             picture: URL? = nil,
             author: String? = nil,
@@ -864,7 +856,6 @@ nonisolated struct ArticleStore: Sendable {
         ) {
             self.id = id
             self.title = title
-            self.receivedAt = receivedAt
             self.source = source
             self.picture = picture
             self.author = author
@@ -888,6 +879,16 @@ nonisolated struct ArticleStore: Sendable {
     /// backfills a month of articles published them a month ago and served them
     /// tonight, and a notice about the ones dated today would be silent about
     /// everything the reader actually just received.
+    ///
+    /// **And what another device has read is what keeps a synchronization
+    /// quiet.** An exchange with another of the reader's devices, or a repair
+    /// that reads the shared archives again, writes a fortnight of articles in
+    /// one go, and they did all reach this device just now. Almost every one of
+    /// them was read on the device that fetched them, so `is_read = 0` takes
+    /// them out ; what is left is news the reader has not seen anywhere, which
+    /// is exactly what a notice is for. Holding them to a floor on their own
+    /// date instead would silence a backfilled feed, which the paragraph above
+    /// exists to prevent.
     ///
     /// What is hidden, what is a second copy of an article already here and
     /// what another device has already read are all left out : a rule the
@@ -913,8 +914,7 @@ nonisolated struct ArticleStore: Sendable {
             try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT e.id AS id, e.title AS title, e.received_at AS received_at,
-                           f.title AS source,
+                    SELECT e.id AS id, e.title AS title, f.title AS source,
                            e.image_url AS image_url,
                            (SELECT a.name FROM entry_author a
                             JOIN notified_author n ON n.name = a.name
@@ -954,7 +954,6 @@ nonisolated struct ArticleStore: Sendable {
                 Arrival(
                     id: row["id"],
                     title: row["title"],
-                    receivedAt: row["received_at"],
                     source: row["source"] ?? "",
                     picture: (row["image_url"] as String?).flatMap(URL.init(string:)),
                     author: row["author"],

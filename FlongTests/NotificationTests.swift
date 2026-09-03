@@ -101,11 +101,13 @@ struct AnnouncementTests {
         // The count says twelve because there are twelve. The body names the
         // first three : twelve headlines joined by a middle dot is a paragraph,
         // and a paragraph in a banner is a wall the reader's eye slides off.
+        // The newest three, and not the first three : every query behind these
+        // answers oldest first, so the front of the list is the stalest of them.
         #expect(announcement.title.contains("12"))
-        for story in stories.prefix(3) {
+        for story in stories.suffix(3) {
             #expect(announcement.body.contains(story.title))
         }
-        #expect(!announcement.body.contains("Fil 4"))
+        #expect(!announcement.body.contains("Fil 1 "))
     }
 
     /// A picture where there is one story to show a picture of, and none where
@@ -1283,6 +1285,47 @@ struct AnnouncingSourceTests {
         await model.setNotifications(true, forSource: second.id)
 
         #expect(preferences.articlesAnnouncedAt == started)
+    }
+
+    /// A mark left behind by switches that are all off now is a mark standing
+    /// still, and starting from it announces everything published since the
+    /// reader last listened.
+    @Test("Turning a notice back on after a silence starts from now, not from the silence")
+    func theClockRestartsAfterASilence() async throws {
+        let feed = try await source()
+
+        await model.setNotifications(true, forSource: feed.id)
+
+        // They find it noisy and turn it off. Nothing is asking now, so the
+        // mark stands still from here.
+        await model.setNotifications(false, forSource: feed.id)
+        preferences.articlesAnnouncedAt = now
+        // And a backlog piles up behind it.
+        try await article("Ancien", of: feed, at: now.addingTimeInterval(60))
+
+        await model.setWantsNewArticleNotices(true)
+
+        let restarted = try #require(preferences.articlesAnnouncedAt)
+        #expect(restarted > now.addingTimeInterval(60))
+
+        // And so the backlog is not read out.
+        model.isReading = false
+        await model.announceNewArticles()
+        #expect(announcer.posted.isEmpty)
+    }
+
+    /// Turning a second thing on while a first is already asking must NOT move
+    /// the mark : that would swallow whatever the first one has published since
+    /// the last pass.
+    @Test("Asking about a second thing while a first is on leaves the mark alone")
+    func theClockHoldsWhileSomethingIsOn() async throws {
+        let feed = try await source()
+        await model.setNotifications(true, forSource: feed.id)
+        let first = try #require(preferences.articlesAnnouncedAt)
+
+        await model.setWantsNewArticleNotices(true)
+
+        #expect(preferences.articlesAnnouncedAt == first)
     }
 
     /// The mark is what meters the news, so a read that failed must not move

@@ -115,9 +115,10 @@ nonisolated struct Announcement: Hashable, Sendable {
     /// the reader to work out who and where would be the least useful way to
     /// say the most interesting thing in the application.
     ///
-    /// **The people are counted, not the filings**, when there are several :
-    /// one person adding four pieces is one thing happening, and four names
-    /// would be four. Where one person did it all, they are named.
+    /// **The filings are counted and the people are named**, when there are
+    /// several : four pieces is four things filed, and saying who put them there
+    /// is what a reader acts on. Where one person did it all, they are named
+    /// once.
     ///
     /// A collection with nothing new in it says nothing, which is the ordinary
     /// case for a pass that fetched somebody's unchanged list.
@@ -262,8 +263,12 @@ nonisolated struct Announcement: Hashable, Sendable {
     /// and a comma list of them reads as one long broken sentence. What does
     /// not fit is dropped rather than summarized, the count in the title being
     /// where the reader learns there was more.
+    ///
+    /// **The newest, and not the first three.** Every query behind these
+    /// builders answers oldest first, so taking the front of the list named the
+    /// stalest three and dropped everything the reader had not seen.
     private static func joined(_ titles: [String]) -> String {
-        titles.prefix(mostNamed).joined(separator: " · ")
+        titles.suffix(mostNamed).joined(separator: " · ")
     }
 
     /// The names a body lists, joined the way a language joins a list.
@@ -272,8 +277,16 @@ nonisolated struct Announcement: Hashable, Sendable {
     /// here where the middle dot is right there. Bounded for the same reason :
     /// a pass that brought articles from forty sources would otherwise put
     /// forty names in a banner.
+    ///
+    /// **A list that was cut says so.** `A, B and C` is a sentence claiming
+    /// there were three ; the conjunction is what makes the claim, and it is
+    /// exactly wrong about the other thirty-seven. So the ones that fit are
+    /// named and the rest are counted.
     private static func named(_ names: [String]) -> String {
-        ListFormatter.localizedString(byJoining: Array(names.prefix(mostNamed)))
+        let kept = Array(names.suffix(mostNamed))
+        let joined = ListFormatter.localizedString(byJoining: kept)
+        guard names.count > kept.count else { return joined }
+        return String(localized: "\(joined) and \(names.count - kept.count) others")
     }
 
     enum Thread {
