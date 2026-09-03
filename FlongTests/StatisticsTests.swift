@@ -404,6 +404,50 @@ struct StatisticsTests {
         #expect(!report.showsReading)
     }
 
+    @Test("A dial counts the hour, the weekday and the day of the month it belongs to")
+    func theThreeDialsAgreeWithTheCalendar() async throws {
+        let feed = try await subscribe("https://a.example.com/f.xml", "A")
+        let when = hours(30)
+        try await add("Une", to: feed, published: when)
+
+        let report = try await figures(.week)
+
+        // **SQLite counts a week from Sunday and a month from one**, and the
+        // report keeps the first and shifts the second. Asked of the calendar
+        // rather than written out, so the expectation cannot drift with the
+        // fixture's date or with the machine's zone.
+        let hour = calendar.component(.hour, from: when)
+        let weekday = calendar.component(.weekday, from: when) - 1
+        let day = calendar.component(.day, from: when)
+
+        #expect(report.arrivalsByHour[hour] == 1)
+        #expect(report.arrivalsByHour.reduce(0, +) == 1)
+
+        #expect(report.arrivalsByWeekday.count == 7)
+        #expect(report.arrivalsByWeekday[weekday] == 1)
+        #expect(report.arrivalsByWeekday.reduce(0, +) == 1)
+
+        // The first of the month sits at nought, so a piece dated the fifth is
+        // at index four and never at five.
+        #expect(report.arrivalsByDay.count == 31)
+        #expect(report.arrivalsByDay[day - 1] == 1)
+        #expect(report.arrivalsByDay.reduce(0, +) == 1)
+    }
+
+    @Test("A day nothing arrived on keeps its place on every dial")
+    func quietPlacesKeepTheirPlace() async throws {
+        let report = try await figures(.week)
+
+        // A dial with nothing in it is still a dial : seven days, twenty-four
+        // hours and thirty-one dates, all at nought.
+        #expect(report.arrivalsByHour.count == 24)
+        #expect(report.arrivalsByWeekday.count == 7)
+        #expect(report.arrivalsByDay.count == 31)
+        #expect(report.arrivalsByHour.allSatisfy { $0 == 0 })
+        #expect(report.arrivalsByWeekday.allSatisfy { $0 == 0 })
+        #expect(report.arrivalsByDay.allSatisfy { $0 == 0 })
+    }
+
     @Test("The reading is counted on when it was read and not on when it was written")
     func readingIsCountedWhenItHappened() async throws {
         let feed = try await subscribe("https://a.example.com/f.xml", "A")

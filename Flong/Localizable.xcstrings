@@ -1346,12 +1346,32 @@
         }
       }
     },
+    "Articles per day of the month" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Articles par jour du mois"
+          }
+        }
+      }
+    },
     "Articles per hour" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Articles par heure"
+          }
+        }
+      }
+    },
+    "Articles per weekday" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Articles par jour de la semaine"
           }
         }
       }
@@ -2001,6 +2021,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Seuls les lecteurs parrainés peuvent alimenter la liste. Donnez votre code à un lecteur qui en fait déjà partie. Rien de ce que vous suivez n’est publié d’ici là."
+          }
+        }
+      }
+    },
+    "Peak day" : {
+      "comment" : "Under the weekday and day-of-month dials : the day most articles arrive on.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jour de pointe"
           }
         }
       }

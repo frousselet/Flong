@@ -43,6 +43,21 @@ The page is read when it opens and when the reader changes the window, and it is
 
 Everything crosses back out of the read block as plain values. A `Row` is not `Sendable`, and a block that hands one back picks GRDB's synchronous read, which would count a season of articles on the thread drawing the screen.
 
+## The three dials
+
+The hours of a day, the days of a week and the days of a month, each round a dial of however many places the unit has. One view draws all three : they differ in how many places they have, what is written round the edge and what the hole in the middle says, and three drawings would be three things to keep in step.
+
+A dial and not a row of bars because every one of these units is round. A day wraps at midnight, a week at Sunday and a month at its last day ; a row of bars says the thing has a beginning and an end and that the two are as far apart as they look.
+
+**SQLite counts a week from Sunday and a month from one.** `strftime('%w')` answers nought for Sunday whatever the reader's calendar says, and `strftime('%d')` answers one for the first. The store keeps the first convention and shifts the second so day one sits at index nought ; the weekday dial turns the array round to `Calendar.firstWeekday` when it draws it, which is the only thing that knows where a reader's week begins. A French reader's dial starts on Monday and an American one on Sunday.
+
+**The last three places of the month dial stand for fewer days than the others.** A thirty-first comes round in seven months of twelve and a twenty-ninth in one year of four, so over a long window those spokes are quieter for a reason about the calendar rather than about the news. The count is what the card says it is ; dividing by the number of times the day came round would be an average of a count and no longer articles.
+
+Two rules make the drawing readable at any distribution :
+
+- **A spoke ends short of what is written round the edge.** At ninety-six hundredths of the radius the busiest one was drawn straight through the `L` of a Monday and the `1` of a first of the month.
+- **A mark never gets wider than it is long.** Held at the full spoke width, one article against a busiest of twelve hundred was a lozenge lying across the ring : a seventh of the tallest spoke's height for a fourteen-hundredth of its value, and thirty-one of them round a month read as a dotted circle rather than as a quiet month.
+
 ## The publishers
 
 Ranked by publisher and never by feed : `The Guardian` is followed here through three addresses, and a list naming all three would say the paper is a third of what it is.

@@ -41,6 +41,7 @@ struct StatisticsPanel: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.publishers) private var publishers
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.calendar) private var calendar
 
     /// Carries a pill's glass from one window to the next.
     @Namespace private var pills
@@ -176,7 +177,9 @@ struct StatisticsPanel: View {
                 VStack(alignment: .leading, spacing: Figures.gap) {
                     figures(report)
                     flow(report)
-                    day(report)
+                    hours(report)
+                    weekdays(report)
+                    days(report)
                     sources(report)
                     subjects(report)
                     people(report)
@@ -290,18 +293,99 @@ struct StatisticsPanel: View {
         }
     }
 
-    private func day(_ report: Statistics) -> some View {
+    /// The hours of a day, round a clock.
+    private func hours(_ report: Statistics) -> some View {
         card(Text("Articles per hour")) {
-            HStack(spacing: 18) {
-                DayDial(
-                    arrivals: report.arrivalsByHour,
+            centred {
+                Dial(
+                    counts: report.arrivalsByHour,
                     reading: report.readingByHour,
+                    marks: [0: "0", 6: "6", 12: "12", 18: "18"],
+                    middle: { Text(Self.hour($0), format: .dateTime.hour()) },
+                    caption: "Peak hour",
+                    spoken: "Articles per hour",
                     showsReading: report.showsReading
                 )
-                .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity)
         }
+    }
+
+    /// The days of a week, round a dial that starts where the reader's week
+    /// does.
+    ///
+    /// **Turned to the reader's own first weekday.** SQLite counts a week from
+    /// Sunday whatever anybody's calendar says, so the counts arrive in that
+    /// order and are rotated here : a French reader's dial begins on Monday and
+    /// an American one on Sunday, and neither of them is being shown somebody
+    /// else's week.
+    private func weekdays(_ report: Statistics) -> some View {
+        let first = calendar.firstWeekday - 1
+        let order = (0..<7).map { ($0 + first) % 7 }
+        let symbols = calendar.veryShortStandaloneWeekdaySymbols
+
+        return card(Text("Articles per weekday")) {
+            centred {
+                Dial(
+                    counts: order.map { report.arrivalsByWeekday[$0] },
+                    reading: order.map { report.readingByWeekday[$0] },
+                    marks: Dictionary(
+                        uniqueKeysWithValues: order.enumerated().map { place, weekday in
+                            (place, symbols.indices.contains(weekday) ? symbols[weekday] : "")
+                        }
+                    ),
+                    middle: { Text(verbatim: Self.weekday(order[$0], in: calendar)) },
+                    caption: "Peak day",
+                    spoken: "Articles per weekday",
+                    showsReading: report.showsReading
+                )
+            }
+        }
+    }
+
+    /// The days of a month, round a dial of thirty-one.
+    ///
+    /// **The last three spokes stand for fewer days than the others**, a
+    /// thirty-first coming round in seven months of twelve, so over a long
+    /// window they are quieter for a reason that is about the calendar rather
+    /// than about the news. The count is what the card says it is : see
+    /// ``Statistics/arrivalsByDay``.
+    private func days(_ report: Statistics) -> some View {
+        card(Text("Articles per day of the month")) {
+            centred {
+                Dial(
+                    counts: report.arrivalsByDay,
+                    reading: report.readingByDay,
+                    marks: [0: "1", 9: "10", 19: "20", 29: "30"],
+                    middle: { Text(verbatim: ($0 + 1).formatted()) },
+                    caption: "Peak day",
+                    spoken: "Articles per day of the month",
+                    showsReading: report.showsReading
+                )
+            }
+        }
+    }
+
+    /// A dial sits in the middle of its card, the drawing being the whole of
+    /// what the card holds.
+    private func centred(@ViewBuilder _ dial: () -> some View) -> some View {
+        HStack {
+            Spacer(minLength: 0)
+            dial()
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// A moment standing for an hour of the day, so the hour is written the way
+    /// the reader's own clock writes it : `17 h` or `5 PM`, never both.
+    private static func hour(_ hour: Int) -> Date {
+        Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: .now) ?? .now
+    }
+
+    /// A day of the week by its own name, Sunday being nought.
+    private static func weekday(_ weekday: Int, in calendar: Calendar) -> String {
+        let names = calendar.standaloneWeekdaySymbols
+        guard names.indices.contains(weekday) else { return "" }
+        return names[weekday].localizedCapitalized
     }
 
     /// The publishers, loudest first, each with its own shape beside it.
