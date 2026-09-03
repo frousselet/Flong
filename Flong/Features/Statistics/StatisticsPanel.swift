@@ -38,7 +38,6 @@ struct StatisticsPanel: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
-    @Environment(\.colorScheme) private var scheme
     @Environment(\.publishers) private var publishers
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.calendar) private var calendar
@@ -48,10 +47,16 @@ struct StatisticsPanel: View {
 
     var body: some View {
         ScrollView {
-            page
-                .editorialColumn()
-                .padding(.horizontal, 20)
-                .padding(.bottom, 32)
+            // **One container for every piece of glass on the page.** The cards
+            // are a column of separate sheets, and the system merges the ones
+            // that come near each other and lets each pick up the wash behind
+            // it rather than compositing ten materials independently.
+            GlassEffectContainer(spacing: Figures.gap) {
+                page
+                    .editorialColumn()
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 32)
+            }
         }
         // **The windows are a bar and not a pinned header any more.**
         //
@@ -67,6 +72,7 @@ struct StatisticsPanel: View {
         // out below it, so the air is air ; the soft edge under it is what the
         // cards go into as they pass, which is still something moving behind
         // the glass and still the reason the glass is there.
+        .background { wash }
         .safeAreaInset(edge: .top, spacing: 0) { windows }
         .scrollEdgeEffectStyle(.soft, for: .top)
         .presentationDetents([.large])
@@ -108,12 +114,6 @@ struct StatisticsPanel: View {
             .padding(.horizontal, 20)
             .padding(.top, 14)
             .padding(.bottom, 6)
-            .background(alignment: .bottom) {
-                // The paper under it rather than a material : the pills below
-                // are the glass on this page, and a second surface directly
-                // above them is the stacking the guidance forbids.
-                Rectangle().fill(theme.paper(in: scheme)).ignoresSafeArea()
-            }
         }
     #endif
 
@@ -149,11 +149,11 @@ struct StatisticsPanel: View {
             .scrollIndicators(.hidden)
             .scrollClipDisabled()
         }
-        // The page's own ground, so what passes underneath goes into the soft
-        // edge rather than up against the pills.
-        .background {
-            Rectangle().fill(theme.paper(in: scheme)).ignoresSafeArea(edges: .top)
-        }
+        // **No ground of its own.** The inset is what reserves the room, and
+        // painting the paper on top of it would put the pills on a bar : glass
+        // over an opaque colour is glass over nothing, which is the one thing
+        // the material must never be. What the cards go into as they pass under
+        // it is the scroll view's own soft edge, said on the page.
     }
 
     private func pill(_ range: StatisticsRange) -> some View {
@@ -237,6 +237,26 @@ struct StatisticsPanel: View {
         .accessibilityLabel(Text("Nerd"))
     }
 
+    /// The tint the whole page stands on.
+    ///
+    /// The theme's accent at both ends and nothing in the middle, so the ground
+    /// under a card at the head of the page is not the ground under one at its
+    /// foot. It is fixed while the page scrolls over it, which is what makes
+    /// the glass move : see ``Figures/washTop``.
+    private var wash: some View {
+        LinearGradient(
+            stops: [
+                .init(color: Color.accentColor.opacity(Figures.washTop), location: 0),
+                .init(color: .clear, location: 0.45),
+                .init(color: .clear, location: 0.62),
+                .init(color: Color.accentColor.opacity(Figures.washFoot), location: 1),
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+    }
+
     /// A window with nothing in it, which is a fact about the window rather
     /// than a failure.
     private var nothing: some View {
@@ -285,10 +305,9 @@ struct StatisticsPanel: View {
                 footnote: Text("\(report.feeds) feeds")
             )
             Figure(
-                value: Text(report.duplicates.formatted()),
-                caption: Text("Duplicates"),
-                footnote: report.duplicates > 0
-                    ? Text("\(share(report.duplicates, of: report.arrived + report.duplicates)) of the total") : nil
+                value: Text(report.stories.formatted()),
+                caption: Text("Stories"),
+                footnote: gathered(report)
             )
         }
     }
@@ -320,6 +339,18 @@ struct StatisticsPanel: View {
     /// percent, and `0 %` says the reader read none of them, which is not what
     /// happened. Under a percent it keeps one significant figure ; above it,
     /// nobody wants the decimal.
+    /// How many articles a story gathered, on average.
+    ///
+    /// **The line that makes the count mean something.** A hundred and fifteen
+    /// stories beside eight hundred articles is a ratio the reader would have
+    /// to work out ; four articles apiece is the same fact said, and it is a
+    /// fact about the press rather than about Flong : four papers wrote about
+    /// the same thing.
+    private func gathered(_ report: Statistics) -> Text? {
+        guard let average = report.articlesPerStory, average >= 1 else { return nil }
+        return Text("\(average.formatted(.number.precision(.fractionLength(0)))) articles each")
+    }
+
     private func share(_ part: Int, of whole: Int) -> String {
         let share = Double(part) / Double(whole)
         return share > 0 && share < 0.01
@@ -597,7 +628,11 @@ struct StatisticsPanel: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Figures.padding)
-        .background(theme.surface(in: scheme), in: .rect(cornerRadius: Figures.corner))
+        // **Glass and not a fill.** A card of figures is a sheet laid on the
+        // page, and the wash behind it is what it shows : scrolled, the same
+        // card carries a different tint at the head of the page and at its
+        // foot. See ``Figures/washTop``.
+        .glassEffect(.regular, in: .rect(cornerRadius: Figures.corner))
     }
 }
 
@@ -608,7 +643,6 @@ struct Figure: View {
     var footnote: Text?
 
     @Environment(\.theme) private var theme
-    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
@@ -637,7 +671,7 @@ struct Figure: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 14)
         .padding(.vertical, 13)
-        .background(theme.surface(in: scheme), in: .rect(cornerRadius: Figures.corner))
+        .glassEffect(.regular, in: .rect(cornerRadius: Figures.corner))
         .accessibilityElement(children: .combine)
     }
 }

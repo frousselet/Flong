@@ -4,7 +4,7 @@ What the page of statistics counts, what it counts it from, and the four questio
 
 ## The window
 
-Eight, from a day to everything, and every figure and every chart on the page is about the one the reader picked. The window is measured back from now rather than snapped to a calendar : a reader opening the page at nine in the morning and asking for a day means the last twenty-four hours, not the ninety minutes since midnight.
+Eight, and `Tout` is the first of them and the one the page opens on : a reader opening a page of figures is asking what it all comes to, and a narrower window is a question they ask afterwards. It is also the page's best case, since a day on a device that has been collecting since the afternoon has almost nothing in it. Every figure and every chart on the page is about the one the reader picked. The window is measured back from now rather than snapped to a calendar : a reader opening the page at nine in the morning and asking for a day means the last twenty-four hours, not the ninety minutes since midnight.
 
 **Everything is narrowed on `COALESCE(published_at, received_at)`**, which is the date the stream itself sorts by and the date `ArticleStore` already coalesces on everywhere else. A page of figures narrowed on `received_at` would count last week's arrivals as today's and disagree with the list it is figures about.
 
@@ -16,7 +16,7 @@ Two clauses are on every count, exactly as they are on every list :
 e.is_hidden = 0 AND e.duplicate_of IS NULL
 ```
 
-A duplicate is never shown, so it must never be counted, or the page reports a fifth more articles than the reader was ever offered. On a real corpus that is twenty-one per cent of the rows. **The one figure that inverts the second clause is the count of copies**, which is the whole point of it, and anybody tidying that query should leave it alone.
+A duplicate is never shown, so it must never be counted, or the page reports a fifth more articles than the reader was ever offered. On a real corpus that is twenty-one per cent of the rows.
 
 ## The grain
 
@@ -42,6 +42,26 @@ Every query runs inside one `database.writer.read`, so the figure at the head an
 The page is read when it opens and when the reader changes the window, and it is put down when they close it. It is a dozen counts over the whole stream : following the store the way the digest does would make every batch that lands cost a full recount of a page nobody may be looking at.
 
 Everything crosses back out of the read block as plain values. A `Row` is not `Sendable`, and a block that hands one back picks GRDB's synchronous read, which would count a season of articles on the thread drawing the screen.
+
+## The fourth figure
+
+The grid opens on **Articles**, **Lus**, **Sources** and **Actualités** : how many arrived, how many were read, how many publishers spoke, and how many things the digest made of it, with `9 articles chacune` under the last.
+
+It was a count of duplicates, which is a fact about Flong's plumbing rather than about the reader, and it was taken out for that. What replaced it says what the wire came to rather than how much of it there was : five thousand articles is a number nobody can hold, three hundred and nineteen things that happened is a season.
+
+**The average is taken over the articles the stories gathered, not over the window.** The digest groups what it can, which on a real corpus is about fifty-seven per cent of what arrives ; dividing the whole window would count articles that are in no story towards the size of the ones that are.
+
+## The glass
+
+Every card and every figure tile on this page is a sheet of Liquid Glass, and the page stands on a wash : the theme's accent at the top of the screen and again at its foot, faint at both ends, with nothing in between.
+
+**The wash is what makes the glass glass.** A material shows what is behind it, and a column of cards on one flat colour gives every card the same nothing to show : the glass is there and does not read as glass. The wash is fixed while the page scrolls over it, so the same card carries a different tint at the head of the page and at its foot, which is the whole of what the material is for.
+
+The cards sit in one `GlassEffectContainer`, so the system merges neighbouring sheets and composites them once rather than stacking ten independent materials.
+
+**The row of windows carries no ground of its own.** It is an inset in the safe area, which is what reserves its room ; painting the paper behind it would put the pills on a bar, and glass over an opaque colour is glass over nothing. What the cards go into as they pass under it is the scroll view's own soft edge.
+
+This is a deliberate widening of the rule the rest of the application follows, where the material belongs to the navigation layer and to controls floating over a page. The author asked for it by name.
 
 ## The three dials
 

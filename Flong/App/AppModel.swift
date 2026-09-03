@@ -1881,7 +1881,11 @@ final class AppModel {
 
     /// How far back the figures go, which the reader picks and Flong remembers
     /// for as long as the window is open.
-    var statisticsRange = StatisticsRange.week
+    ///
+    /// Everything there is, to begin with : a reader opening the page is asking
+    /// what it all comes to, and a narrower window is a question they ask
+    /// afterwards. See ``StatisticsRange/all``.
+    var statisticsRange = StatisticsRange.all
 
     /// The figures, for the window above.
     ///

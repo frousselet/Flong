@@ -43,6 +43,21 @@ nonisolated enum Figures {
     /// column has a rhythm ; said at each call site, it has a history.
     static let gap: CGFloat = 18
 
+    /// How much of the accent the wash behind the page carries at its top, and
+    /// at its foot.
+    ///
+    /// **The ground the glass has to work with.** A material shows what is
+    /// behind it, and a page of cards on one flat colour gives every card the
+    /// same nothing to show : the glass is there and does not read as glass. A
+    /// wash makes the ground different at the top of the page from the bottom,
+    /// so a card picks up a different tint as it is scrolled, which is the
+    /// whole of what the material is for.
+    ///
+    /// Faint at both ends. It is a tint on the paper and not a colour field :
+    /// the page is a page of figures, and the figures are the thing.
+    static let washTop: Double = 0.22
+    static let washFoot: Double = 0.12
+
     /// The air above and below the row of windows.
     ///
     /// The row floats over the page and the page runs under it, so what it is

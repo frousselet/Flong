@@ -54,7 +54,7 @@ struct LocalizationTests {
     @Test("The figures are named in the words the rest of the application uses")
     func statisticsSpeakPlainly() {
         #expect(String(localized: "Statistics", locale: french) == "Statistiques")
-        #expect(String(localized: "Duplicates", locale: french) == "Doublons")
+        #expect(String(localized: "Stories", locale: french) == "Actualités")
         #expect(String(localized: "Articles received", locale: french) == "Articles reçus")
         #expect(String(localized: "Articles per hour", locale: french) == "Articles par heure")
         #expect(String(localized: "Peak hour", locale: french) == "Heure de pointe")

@@ -24,6 +24,15 @@ import GRDB
 /// reader opening this at nine in the morning and asking for a day means the
 /// last twenty-four hours, not the ninety minutes since midnight.
 nonisolated enum StatisticsRange: String, CaseIterable, Hashable, Sendable, Identifiable {
+    /// Everything there is, which is what the page opens on.
+    ///
+    /// **First in the row and not last.** A reader opening a page of figures
+    /// for the first time is asking what it all comes to, not what happened
+    /// since yesterday : the widest window is the answer to that, and every
+    /// narrower one is a question they ask afterwards. It also opens on the
+    /// page's best case, since a window of a day on a device that has been
+    /// collecting for an afternoon has almost nothing in it.
+    case all
     case day
     case week
     case month
@@ -31,13 +40,13 @@ nonisolated enum StatisticsRange: String, CaseIterable, Hashable, Sendable, Iden
     case half
     case threeQuarters
     case year
-    case all
 
     var id: String { rawValue }
 
     /// What the reader picks it by, short enough to sit on a pill.
     var name: LocalizedStringResource {
         switch self {
+        case .all: "All"
         case .day: "24 h"
         case .week: "1 week"
         case .month: "1 month"
@@ -45,7 +54,6 @@ nonisolated enum StatisticsRange: String, CaseIterable, Hashable, Sendable, Iden
         case .half: "6 months"
         case .threeQuarters: "9 months"
         case .year: "1 year"
-        case .all: "All"
         }
     }
 
@@ -56,6 +64,7 @@ nonisolated enum StatisticsRange: String, CaseIterable, Hashable, Sendable, Iden
     var duration: TimeInterval? {
         let day: TimeInterval = 24 * 60 * 60
         switch self {
+        case .all: return nil
         case .day: return day
         case .week: return 7 * day
         case .month: return 30 * day
@@ -63,7 +72,6 @@ nonisolated enum StatisticsRange: String, CaseIterable, Hashable, Sendable, Iden
         case .half: return 182 * day
         case .threeQuarters: return 274 * day
         case .year: return 365 * day
-        case .all: return nil
         }
     }
 
@@ -95,10 +103,10 @@ nonisolated enum StatisticsRange: String, CaseIterable, Hashable, Sendable, Iden
     /// month by month.
     var grain: StatisticsGrain {
         switch self {
+        case .year, .all: .month
         case .day: .hour
         case .week, .month, .quarter: .day
         case .half, .threeQuarters: .week
-        case .year, .all: .month
         }
     }
 }
@@ -243,9 +251,17 @@ nonisolated struct Statistics: Hashable, Sendable {
     /// the shape of *when* it was read is not, and a chart drawn from a third
     /// of the truth would be a chart about the wrong evenings.
     var datedReads = 0
-    /// How many arrivals were the same article reaching the reader a second
-    /// time through another feed, and were never shown.
-    var duplicates = 0
+    /// How many stories the digest made of the window, and how many articles
+    /// it gathered into them.
+    ///
+    /// **What the wire came to, rather than how much of it there was.** Eight
+    /// hundred articles is a number nobody can hold ; a hundred and fifteen
+    /// things that happened is a day. The two counts are kept apart because the
+    /// digest groups what it can and not everything : the average below is
+    /// taken over the articles it actually gathered, or it would be an average
+    /// of a story and a heap of things that are in no story.
+    var stories = 0
+    var storiedArticles = 0
 
     /// The same counts over the window immediately before this one, or nothing
     /// where there is no such window : `Tout` has nothing before it, and a
@@ -309,6 +325,11 @@ nonisolated struct Statistics: Hashable, Sendable {
 
     /// The counts of the window before this one, for the only thing that makes
     /// a number interesting, which is the number before it.
+    /// How many articles a story gathered, on average, where any did.
+    var articlesPerStory: Double? {
+        stories > 0 ? Double(storiedArticles) / Double(stories) : nil
+    }
+
     nonisolated struct Previously: Hashable, Sendable {
         var arrived = 0
         var read = 0
@@ -400,7 +421,8 @@ nonisolated struct StatisticsStore: Sendable {
         var arrived = 0
         var read = 0
         var starred = 0
-        var duplicates = 0
+        var stories = 0
+        var storiedArticles = 0
         var datedReads = 0
         var previous: Statistics.Previously?
         /// One count per bucket, keyed as SQLite formatted it.
@@ -485,17 +507,21 @@ nonisolated struct StatisticsStore: Sendable {
             raw.starred = row["starred"]
         }
 
-        // The copies, which are the one thing here counted from the rows that
-        // are never shown.
-        raw.duplicates =
-            try Int.fetchOne(
-                db,
-                sql: """
-                    SELECT COUNT(*) FROM entry e
-                    WHERE e.is_hidden = 0 AND e.duplicate_of IS NOT NULL AND \(window)
-                    """,
-                arguments: arguments
-            ) ?? 0
+        // What the digest made of it. An article belongs to one story at most,
+        // so the members are the articles gathered and the distinct stories are
+        // the things that happened.
+        if let row = try Row.fetchOne(
+            db,
+            sql: """
+                SELECT COUNT(DISTINCT sm.story_id) AS stories, COUNT(*) AS gathered
+                FROM story_member sm JOIN entry e ON e.id = sm.entry_id
+                WHERE \(shown) AND \(window)
+                """,
+            arguments: arguments
+        ) {
+            raw.stories = row["stories"]
+            raw.storiedArticles = row["gathered"]
+        }
 
         // How many of the read articles know when they were read, which is
         // what decides whether the reading may be drawn at all.
@@ -768,7 +794,8 @@ nonisolated struct StatisticsStore: Sendable {
         report.arrived = raw.arrived
         report.read = raw.read
         report.starred = raw.starred
-        report.duplicates = raw.duplicates
+        report.stories = raw.stories
+        report.storiedArticles = raw.storiedArticles
         report.datedReads = raw.datedReads
         report.previous = raw.previous
         report.subjects = raw.subjects
