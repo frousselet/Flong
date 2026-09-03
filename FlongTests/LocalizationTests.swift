@@ -67,6 +67,10 @@ struct LocalizationTests {
         #expect(String(localized: "Newsmakers", locale: french) == "Personnalités")
         #expect(String(localized: "Subjects", locale: french) == "Thématiques")
 
+        // The one thing on the page that is not a figure, and the one word on
+        // it that is the same in both languages.
+        #expect(String(localized: "Nerd", locale: french) == "Nerd")
+
         // A feed is a `flux` here and nowhere a `fil`.
         #expect(inFrench("\(3) feeds") == "3 flux")
 

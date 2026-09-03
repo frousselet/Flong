@@ -111,6 +111,12 @@ And one that breaks at the ordinary size too : **a date is centred under the mar
 
 The footnote under a figure is `Avant : 391` and not `+915 % par rapport à la période précédente`, which did not fit, made an absurd number out of a device that had been collecting for ten days, and asked the reader to undo a percentage to get at a fact.
 
+## The foot of the page
+
+There is an easter egg under the last card, a card's worth of quiet below it : `👉 🤓 👈`, and `Nerd` under that. It is past the end, so a reader who came for the numbers reads the numbers and never meets it, and a reader who kept scrolling after the numbers ran out is the reader it is for. Nothing about it can be pressed and it says nothing about the reader's stream.
+
+It is one accessibility element carrying one word. Read out glyph by glyph it is two pointing hands and a face, which is a sentence nobody wants and not the joke.
+
 ## Cost
 
 Every count is a `GROUP BY` in SQLite over indexed columns, and none of them returns more rows than the grain allows : a year is twelve rows however many articles fell in it. Measured on a corpus of 5 979 articles and 63 feeds, the whole page reads in well under a tenth of a second, the median body lengths included. The one query whose cost follows the corpus rather than the grain is the per-feed, per-mark flow, which is bounded by the number of feeds times the number of marks.
