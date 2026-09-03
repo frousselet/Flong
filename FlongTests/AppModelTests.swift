@@ -860,3 +860,55 @@ struct ExchangeTimingTests {
         #expect(model.syncStatus == .waiting(until: nil))
     }
 }
+
+/// One page, one collection.
+///
+/// A screen is drawn before its own `task` has run, so whatever the model is
+/// holding is what the reader sees for a frame. Holding the collection they
+/// have just left is how they see a flash of it in the one they have just
+/// opened.
+@Suite("What an open collection holds")
+@MainActor
+struct OpenCollectionTests {
+    private let first = ArticleCollection.Kind.shared(zone: "shared-a", title: "A")
+    private let second = ArticleCollection.Kind.shared(zone: "shared-b", title: "B")
+
+    private func entry(_ guid: String) -> SharedEntry {
+        SharedEntry(guid: guid, title: guid, url: "https://example.com/\(guid)", publishedAt: Date())
+    }
+
+    @Test("A collection is never handed the rows of the one before it")
+    func doesNotHandOverThePreviousCollection() async throws {
+        let database = try AppDatabase.inMemory()
+        try await SharedEntryStore(database).replace(
+            [entry("one")], inList: "list-x-", by: "_them", inZone: "shared-a"
+        )
+        let model = AppModel(database: database)
+
+        await model.loadCollection(first)
+        #expect(model.items(in: first).count == 1)
+
+        // The frame the reader used to see the first one's rows in : the second
+        // page is drawn, and its own read has not run yet.
+        #expect(model.items(in: second).isEmpty)
+        #expect(!model.hasLoaded(second))
+
+        // And asking for it empties what was in hand rather than leaving it
+        // standing until the answer arrives.
+        await model.loadCollection(second)
+        #expect(model.items(in: first).isEmpty)
+        #expect(model.hasLoaded(second))
+    }
+
+    /// A collection still being read is not a collection with nothing in it,
+    /// and the page must not say so.
+    @Test("Nothing read is told apart from nothing in it")
+    func tellsUnreadFromEmpty() async throws {
+        let model = AppModel(database: try AppDatabase.inMemory())
+
+        #expect(!model.hasLoaded(first))
+        await model.loadCollection(first)
+        #expect(model.hasLoaded(first))
+        #expect(model.items(in: first).isEmpty)
+    }
+}
