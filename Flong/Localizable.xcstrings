@@ -12,22 +12,23 @@
         }
       }
     },
+    "%@ articles each" : {
+      "comment" : "Under the count of stories : how many articles a story gathered, on average.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ articles chacune"
+          }
+        }
+      }
+    },
     "%@ of the articles" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@ des articles"
-          }
-        }
-      }
-    },
-    "%@ of the total" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ du total"
           }
         }
       }
@@ -1845,17 +1846,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Terminé"
-          }
-        }
-      }
-    },
-    "Duplicates" : {
-      "comment" : "A headline figure : how many arrivals were an article the reader already had.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Doublons"
           }
         }
       }

@@ -114,7 +114,6 @@ struct StatisticsTests {
         // says one : a figure that counted both would report a fifth more
         // articles than the reader was ever offered.
         #expect(report.arrived == 1)
-        #expect(report.duplicates == 1)
     }
 
     @Test("A hidden article is counted nowhere")
@@ -128,7 +127,6 @@ struct StatisticsTests {
 
         let report = try await figures(.day)
         #expect(report.arrived == 1)
-        #expect(report.duplicates == 0)
     }
 
     @Test("The window is measured on the date the stream itself sorts by")
@@ -308,6 +306,39 @@ struct StatisticsTests {
         }
     }
 
+    @Test("The stories are counted, and averaged over what they gathered")
+    func storiesAreCountedAndAveraged() async throws {
+        let feed = try await subscribe("https://a.example.com/f.xml", "A")
+
+        // Two stories of three articles, and two articles the digest grouped
+        // into nothing.
+        try await file("Politique", stories: 2, articles: 3, in: feed, from: 1)
+        try await add("Seule", to: feed, published: hours(2))
+        try await add("Seule aussi", to: feed, published: hours(3))
+
+        let report = try await figures(.day)
+
+        #expect(report.arrived == 8)
+        #expect(report.stories == 2)
+        // **Averaged over what the stories gathered and not over the window.**
+        // Six articles in two stories is three apiece ; dividing the eight that
+        // arrived would say four, and count two articles that are in no story
+        // towards the size of the ones that are.
+        #expect(report.storiedArticles == 6)
+        #expect(report.articlesPerStory == 3)
+    }
+
+    @Test("A window the digest grouped nothing in has no average to give")
+    func noStoriesMeansNoAverage() async throws {
+        let feed = try await subscribe("https://a.example.com/f.xml", "A")
+        try await add("Seule", to: feed, published: hours(2))
+
+        let report = try await figures(.day)
+        #expect(report.arrived == 1)
+        #expect(report.stories == 0)
+        #expect(report.articlesPerStory == nil)
+    }
+
     @Test("The languages are ranked, and a feed that states none is left out of them")
     func languagesAreRanked() async throws {
         let feed = try await subscribe("https://a.example.com/f.xml", "A")
@@ -346,6 +377,23 @@ struct StatisticsTests {
         #expect(report.read == 10)
         #expect(report.datedReads == 0)
         #expect(!report.showsReading)
+    }
+
+    @Test("Everything there is leads the row of windows")
+    func theWidestWindowComesFirst() {
+        // A reader opening the page is asking what it all comes to, and a
+        // narrower window is a question they ask afterwards. It is also the
+        // page's best case : a day on a device collecting since this afternoon
+        // has almost nothing in it.
+        #expect(StatisticsRange.allCases.first == .all)
+        #expect(StatisticsRange.all.duration == nil)
+        #expect(StatisticsRange.all.grain == .month)
+
+        // And the rest still run from the narrowest to the widest.
+        #expect(
+            StatisticsRange.allCases.dropFirst().map(\.self) == [
+                .day, .week, .month, .quarter, .half, .threeQuarters, .year,
+            ])
     }
 
     @Test("A dial is only drawn where its unit comes round more than once")
