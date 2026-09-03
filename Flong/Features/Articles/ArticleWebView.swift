@@ -26,18 +26,6 @@ import WebKit
 struct ArticleWebView {
     let html: String
 
-    /// Whether the page runs under the bar rather than beginning below it.
-    ///
-    /// **It decides who owns the inset at the top, and only one of the two may
-    /// own it.** A scroll view adjusting itself for the safe area gives itself
-    /// a top inset, which is a region above the document that can be scrolled
-    /// into and stays there : not a rubber band that springs back, but real
-    /// empty space above the page, white under the controls. That is right
-    /// when the page begins below the bar, and it is exactly wrong when the
-    /// page is meant to run under it, where the view has already been extended
-    /// to the top of the screen and the inset is counted a second time.
-    var runsUnderTheBar = false
-
     fileprivate func makeWebView(coordinator: Coordinator) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = false
@@ -49,34 +37,16 @@ struct ArticleWebView {
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = coordinator
         webView.isInspectable = false
-        #if os(iOS)
-            adjust(webView)
-        #endif
         return webView
     }
 
     fileprivate func update(_ webView: WKWebView, coordinator: Coordinator) {
-        #if os(iOS)
-            // Asked again on every update : whether there is a picture to run
-            // under the bar is known once the article has been read out of the
-            // store, which is after the view was made.
-            adjust(webView)
-        #endif
-
         guard coordinator.html != html else { return }
         coordinator.html = html
         // No base address is given : a relative link in a body that escaped the
         // sanitizer must not resolve to anything.
         webView.loadHTMLString(html, baseURL: nil)
     }
-
-    #if os(iOS)
-        private func adjust(_ webView: WKWebView) {
-            let behaviour: UIScrollView.ContentInsetAdjustmentBehavior = runsUnderTheBar ? .never : .always
-            guard webView.scrollView.contentInsetAdjustmentBehavior != behaviour else { return }
-            webView.scrollView.contentInsetAdjustmentBehavior = behaviour
-        }
-    #endif
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 

@@ -72,8 +72,7 @@ nonisolated enum ArticleDocument {
         theme: Theme = .standard
     ) -> String {
         let credits = byline(of: article, publisher: publisher, mark: mark, portraits: portraits)
-        let chosen = (body == .page ? article.extractedHTML : nil) ?? article.bodyHTML ?? ""
-        let markup = without(article.imageURL, in: chosen)
+        let markup = (body == .page ? article.extractedHTML : nil) ?? article.bodyHTML ?? ""
 
         return """
             <!doctype html>
@@ -86,63 +85,14 @@ nonisolated enum ArticleDocument {
             <style>\(credits.rules)</style>
             </head>
             <body>
-            \(lead(of: article))
-            <div class="column">
             <header>
             <h1>\(HTMLEntities.escape(article.title))</h1>
             <div class="byline">\(credits.rows)</div>
             </header>
             <article>\(markup)</article>
-            </div>
             </body>
             </html>
             """
-    }
-
-    /// The picture the article is headed with, running the whole width.
-    ///
-    /// **Above the headline and under the controls.** It is the same picture
-    /// the row the reader tapped was carrying, so the page opens on what they
-    /// were looking at when they decided to open it. The controls float over
-    /// it, which is what the width is for : a picture inset inside the column
-    /// with a bar of its own above it would be a photograph with a shelf on it.
-    ///
-    /// **Its own height, and no crop.** Every other picture in the application
-    /// is shown at three by two, which is what makes a list of them read as a
-    /// column ; a page is not a list, and it is the only place a photograph is
-    /// looked at rather than glanced at. A portrait cropped to a landscape box
-    /// on the one screen where there is room for it is a crop made for nothing.
-    ///
-    /// It also means the head takes no room until there is something to put in
-    /// it : a box reserved at a ratio is a box that is empty while the picture
-    /// loads and stays empty if it never arrives.
-    private static func lead(of article: Article) -> String {
-        guard let address = article.imageURL, HTTPURL.isFetchable(address) else { return "" }
-        let source = HTMLEntities.escape(address.absoluteString)
-        return "<figure class=\"lead\"><img src=\"\(source)\" alt=\"\"></figure>"
-    }
-
-    /// The body without the picture the page is already headed with.
-    ///
-    /// An article's picture is taken from the feed or, failing that, from the
-    /// first picture in its body : in the second case the head and the first
-    /// paragraph would be the same photograph twice, one above the other. What
-    /// is removed is the tag and nothing around it ; an empty `figure` left
-    /// behind is drawn as nothing, which the stylesheet sees to.
-    static func without(_ picture: URL?, in markup: String) -> String {
-        guard let address = picture?.absoluteString, !address.isEmpty else { return markup }
-        guard let found = markup.range(of: address) else { return markup }
-
-        // Back to the `<` that opens the tag holding it, and on to the `>` that
-        // closes it. Anything else between them is that tag's own business.
-        let before = markup.startIndex..<found.lowerBound
-        let after = found.upperBound..<markup.endIndex
-
-        guard let opening = markup.range(of: "<img", options: [.backwards, .caseInsensitive], range: before),
-            let closing = markup.range(of: ">", range: after)
-        else { return markup }
-
-        return markup.replacingCharacters(in: opening.lowerBound..<closing.upperBound, with: "")
     }
 
     /// Where it came from and when, then who wrote it : two lines, each name
@@ -379,28 +329,34 @@ nonisolated enum ArticleDocument {
 
     /// Everything about the page that no theme changes.
     private static let page = """
-        body {
-          margin: 0; padding: 0;
-          /* The shorthand carries Dynamic Type ; the family after it carries the
-             voice, which is the theme's to decide. */
+        /* The shorthand carries Dynamic Type ; the family after it carries the
+           voice, which is the theme's to decide. It is set here rather than on
+           the body so that the body may take a share of it, which is what the
+           note below is about. */
+        html {
           font: -apple-system-body; font-family: var(--body);
+        }
+        body {
+          margin: 0 auto; padding: 16px; max-width: 42em;
+          /* A notch above the size the system calls body, and a share of it
+             rather than a size of its own : the reader's own type size is still
+             what decides, and a page of prose read from beginning to end wants
+             a little more than a size picked for labels and rows. Every other
+             size on the page is stated against this one, so the byline, the
+             captions and the headings all come up with it. */
+          font-size: 1.1em;
           line-height: 1.55; color: var(--text); background: var(--paper);
           -webkit-text-size-adjust: 100%; overflow-wrap: break-word;
         }
-        /* The measure lives here rather than on the body, so that the picture
-           at the head can run the whole width while the words do not. */
-        .column { margin: 0 auto; padding: 16px; max-width: 42em; }
-        /* Edge to edge, under the controls, and at whatever height its own
-           shape gives it. */
-        .lead { margin: 0; }
-        .lead img { display: block; width: 100%; height: auto; }
         /* The headline, and the headings the publisher wrote inside the piece,
            in the theme's own headline face : they are the same kind of thing,
            and a page whose title is monospace and whose subheadings are not is
            a page set in two themes. */
-        h1, h2, h3, h4 { font-family: var(--headline); }
+        h1, h2, h3, h4, h5, h6 {
+          font-family: var(--headline); font-style: normal; text-decoration: none;
+        }
         h1 { font-size: 1.6em; line-height: 1.25; margin: 0 0 8px; }
-        h2, h3, h4 { line-height: 1.3; margin: 1.4em 0 0.4em; }
+        h2, h3, h4, h5, h6 { line-height: 1.3; margin: 1.4em 0 0.4em; }
         /* What the application says about the article, rather than the article. */
         /* Two lines : where it came from and when, then who wrote it. */
         .byline {
@@ -465,7 +421,8 @@ nonisolated enum ArticleDocument {
         a { color: var(--link); }
         img, video, audio, iframe { max-width: 100%; height: auto; }
         figure { margin: 1em 0; }
-        /* What is left where the head's own picture was taken out of the body. */
+        /* A feed's own empty paragraphs and figures, drawn as the nothing they
+           are rather than as a gap in the middle of the piece. */
         figure:empty, p:empty { display: none; margin: 0; }
         figcaption { font-family: var(--voice); color: var(--muted); font-size: 0.85em; }
         blockquote {
@@ -477,5 +434,25 @@ nonisolated enum ArticleDocument {
         table { display: block; overflow-x: auto; border-collapse: collapse; }
         td, th { border: 1px solid var(--rule); padding: 4px 8px; }
         hr { border: none; border-top: 1px solid var(--rule); }
+        /* **Nothing a publisher puts inside a heading changes how it is set.**
+           A heading is a level, and the level is the whole of what it says :
+           bold inside something already bold, half a subheading in italic, one
+           word of it in the link colour, in monospace or at another size are
+           marks made in somebody's template about their house style, and they
+           arrive here as a heading that disagrees with the four others on the
+           page. So a heading is set once, and everything inside it inherits
+           that and nothing else. The level is the publisher's, the setting is
+           the page's.
+
+           **Last in the sheet, and it has to be.** `a` and `code` above name
+           one element each, which is the same specificity as a heading and a
+           descendant, and a tie is settled by whichever comes later : stated up
+           with the headings, this rule lost the colour of a link and the face
+           of a `code` in every heading that held one. */
+        :is(h1, h2, h3, h4, h5, h6) * {
+          font: inherit; letter-spacing: inherit; text-transform: none;
+          text-decoration: none; color: inherit; background: none;
+          vertical-align: baseline;
+        }
         """
 }

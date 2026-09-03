@@ -164,27 +164,27 @@ struct ArticleStoreTests {
         #expect(try await articles.summaries(.today, now: now).map(\.title) == ["today", "starred"])
     }
 
-    @Test("The picture the head is set with is taken out of the body")
-    func theHeadPictureIsNotShownTwice() {
-        let picture = URL(string: "https://example.com/photo.jpg")!
-        let body =
-            "<figure><img src=\"https://example.com/photo.jpg\" alt=\"\"><figcaption>Ici</figcaption></figure><p>Le corps.</p>"
+    @Test("The article's picture stays where the publisher put it")
+    func thePictureIsNotMoved() throws {
+        let article = Article(
+            id: UUID.v7(),
+            title: "Un match",
+            feedTitle: "Le Monde",
+            imageURL: URL(string: "https://example.com/photo.jpg"),
+            bodyHTML: "<p>Le corps.</p>"
+                + "<figure><img src=\"https://example.com/photo.jpg\" alt=\"\">"
+                + "<figcaption>Ici</figcaption></figure>"
+        )
 
-        let stripped = ArticleDocument.without(picture, in: body)
+        let page = ArticleDocument.html(for: article, publisher: "Le Monde", showing: .feed)
 
-        // The tag goes and nothing around it does : the caption is the
-        // publisher's and belongs to whatever is left of the figure.
-        #expect(!stripped.contains("<img"))
-        #expect(stripped.contains("<figcaption>Ici</figcaption>"))
-        #expect(stripped.contains("<p>Le corps.</p>"))
-    }
-
-    @Test("A body whose pictures are not the head's is left alone")
-    func anotherPictureIsLeftAlone() {
-        let body = "<p><img src=\"https://example.com/other.jpg\"></p>"
-
-        #expect(ArticleDocument.without(URL(string: "https://example.com/photo.jpg"), in: body) == body)
-        #expect(ArticleDocument.without(nil, in: body) == body)
+        // Nothing is hoisted above the headline and nothing is taken out of the
+        // body : where a picture sits in the piece is the publisher's decision
+        // about their own article, and the page reads it where they wrote it.
+        let headline = try #require(page.range(of: "<h1>Un match</h1>"))
+        let picture = try #require(page.range(of: "<img src=\"https://example.com/photo.jpg\" alt=\"\">"))
+        #expect(headline.upperBound < picture.lowerBound)
+        #expect(page.contains("<figcaption>Ici</figcaption>"))
     }
 
     @Test("The publisher is set apart on a pill, with their mark in front of the name")

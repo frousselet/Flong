@@ -105,7 +105,7 @@ nonisolated struct Article: Identifiable, Hashable, Sendable {
     let feedTitle: String
     /// The publisher it came from, whose name is what the page is headed with.
     let domain: String?
-    /// The picture that stands for it, which the page runs across its head.
+    /// The picture that stands for it, which a row and a story's page show.
     let imageURL: URL?
     let author: String?
     let url: URL?

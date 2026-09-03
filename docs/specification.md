@@ -670,7 +670,11 @@ Reader mode when the reader has chosen it, a switch to the feed content or the w
 
 **Presented over the window rather than pushed onto a section.** An article on a section's stack is an article under the tab bar, which is a row of places to go laid across the one thing that asks to be read with nothing else in the way. It grows out of the row that opened it and is put down with a cross : the page it came from never went anywhere, so there is nothing to go back to.
 
-**It opens on the picture the row was carrying**, run across the head above the headline, edge to edge and under the controls, at its own height rather than cropped : a page is the one place a photograph is looked at rather than glanced at. The same picture is taken out of the body where it came from there, so the page does not show it twice.
+**The picture stays where the publisher put it.** The page opened on the article's own photograph for a while, hoisted above the headline and run edge to edge under the controls, with the same picture taken out of the body so it was not shown twice. Where a picture sits in a piece is a decision its publisher made about their own piece, and a first screen that is a photograph and no words is a page that has to be scrolled before it can be read. The page hoists nothing and takes nothing out : the picture is read in the column with the words, where it was written. An article whose picture came from the feed's metadata alone has none in the body and shows none, the row that opened it having carried it already.
+
+**The body is set a notch above the size the system calls body**, as a share of it rather than a size of its own, so the reader's own type size still decides and every other size on the page comes up with it. A page of prose read from beginning to end wants a little more than a size picked for labels and rows.
+
+**A heading is set by the page, whatever the publisher put inside it.** A heading level is the whole of what a heading says ; bold inside something already bold, half a subheading in italic or one word of it in the link colour are marks made in somebody's template about their house style, and they arrive as a heading that disagrees with the four others on the page. The level is the publisher's, the setting is the page's.
 
 ### Search
 

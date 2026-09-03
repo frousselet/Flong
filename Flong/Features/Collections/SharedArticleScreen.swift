@@ -73,8 +73,6 @@ struct SharedArticleScreen: View {
         )
     }
 
-    private var hasHeadPicture: Bool { entry.imageURL != nil }
-
     var body: some View {
         NavigationStack {
             ArticleWebView(
@@ -83,8 +81,7 @@ struct SharedArticleScreen: View {
                     publisher: entry.sourceTitle ?? article.domain,
                     showing: model.sharedArticleHTML == nil ? .feed : .page,
                     theme: theme
-                ),
-                runsUnderTheBar: hasHeadPicture
+                )
             )
             .toolbar { toolbar }
             .overlay(alignment: .bottom) {
@@ -99,8 +96,8 @@ struct SharedArticleScreen: View {
                     }
                 }
             }
-            .ignoresSafeArea(edges: hasHeadPicture ? [.top, .bottom] : .bottom)
-            .tint(hasHeadPicture ? nil : theme.accent(in: scheme))
+            .ignoresSafeArea(edges: .bottom)
+            .tint(theme.accent(in: scheme))
         }
         .task { await model.readShared(entry) }
         .onDisappear { model.closeShared() }
