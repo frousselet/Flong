@@ -59,9 +59,12 @@ struct StatisticsPanel: View {
             }
             .editorialColumn()
             .padding(.horizontal, 20)
+            .padding(.top, 6)
             .padding(.bottom, 32)
         }
-        .safeAreaInset(edge: .top, spacing: 0) { head }
+        #if os(macOS)
+            .safeAreaInset(edge: .top, spacing: 0) { wayOut }
+        #endif
         .scrollEdgeEffectStyle(.soft, for: .top)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -74,28 +77,42 @@ struct StatisticsPanel: View {
         .onDisappear { model.forgetStatistics() }
     }
 
-    // MARK: - The head
+    // MARK: - The head there is not
 
-    /// What the page is, and the way out on the platform that needs one.
-    private var head: some View {
-        HStack(spacing: 14) {
-            Text("Statistics")
-                .font(theme.headline(.title3))
-
-            Spacer(minLength: 8)
-
-            PanelDismiss()
+    /// **Untitled, and the windows are the head of it.**
+    ///
+    /// It carried `Statistiques` in the theme's own headline face, over the row
+    /// of windows, which is a line spent naming the page to a reader who
+    /// arrived by pressing the one control that opens it. What it cost was the
+    /// top of the screen : the figures are the thing, and a bar above the
+    /// filter above them pushed the first of them down out of the opening view.
+    ///
+    /// The windows say what the page is anyway. A row reading `24 h` and
+    /// `1 semaine` over a column of counts is not a page anybody has to be told
+    /// the name of, and ``ReaderPanel`` drops its own title for the neighbouring
+    /// reason : a panel that opens on the thing itself needs no word about it.
+    ///
+    /// **A Mac still needs its way out**, and gets that and nothing else. A
+    /// sheet on iOS is flicked away and the indicator at the top says so ; a Mac
+    /// sheet cannot be flicked, and a reader with no button is a reader
+    /// stranded. See ``PanelDismiss``.
+    #if os(macOS)
+        private var wayOut: some View {
+            HStack {
+                Spacer(minLength: 0)
+                PanelDismiss()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 14)
+            .padding(.bottom, 6)
+            .background(alignment: .bottom) {
+                // The paper under it rather than a material : the pills below
+                // are the glass on this page, and a second surface directly
+                // above them is the stacking the guidance forbids.
+                Rectangle().fill(theme.paper(in: scheme)).ignoresSafeArea()
+            }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 18)
-        .padding(.bottom, 10)
-        .background(alignment: .bottom) {
-            // The paper under it rather than a material : the pills below are
-            // the glass on this page, and a second surface directly above them
-            // is the stacking the guidance forbids.
-            Rectangle().fill(theme.paper(in: scheme)).ignoresSafeArea()
-        }
-    }
+    #endif
 
     /// The eight windows, on glass, at the head of the page.
     ///
