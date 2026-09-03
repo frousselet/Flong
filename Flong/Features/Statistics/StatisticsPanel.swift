@@ -151,8 +151,8 @@ struct StatisticsPanel: View {
             Text(range.name)
                 .font(.subheadline.weight(isCurrent ? .semibold : .regular))
                 .foregroundStyle(isCurrent ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
