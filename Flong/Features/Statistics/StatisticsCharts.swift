@@ -166,7 +166,7 @@ struct FlowChart: View {
         .chartXSelection(value: $chosen)
         .frame(height: 148)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Articles over time"))
+        .accessibilityLabel(Text("Articles received"))
         .accessibilityValue(Text("\(flow.reduce(0) { $0 + $1.count }) articles"))
     }
 
@@ -266,14 +266,28 @@ struct DayDial: View {
     }
 
     var body: some View {
-        ZStack {
-            ring
-            hours
-            middle
+        VStack(spacing: 6) {
+            ZStack {
+                ring
+                hours
+                middle
+            }
+            .frame(width: side, height: side)
+
+            // **Under the dial and not in the hole in it.** The hub is the
+            // width of the hole minus the spokes around it, which is about
+            // eighty points : `Heure de pointe` set in it ran under the ring
+            // and came out with its last word behind a bar. The hour is what
+            // has to be in the middle, being the thing the shape cannot say ;
+            // the word for it has the whole width of the card underneath.
+            if busiest != nil {
+                Text("Peak hour")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
         }
-        .frame(width: side, height: side)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Arrivals through the day"))
+        .accessibilityLabel(Text("Articles per hour"))
         .accessibilityValue(busiestSpoken)
     }
 
@@ -373,20 +387,16 @@ struct DayDial: View {
     /// What the dial is about, in the hole in the middle.
     ///
     /// The hour, not the count : the spokes already say how much, and the one
-    /// thing a shape cannot say is which hour the tall one is.
+    /// thing a shape cannot say is which hour the tall one is. What the hour
+    /// means is written under the dial, where there is room for it.
     @ViewBuilder
     private var middle: some View {
         if let busiest {
-            VStack(spacing: 0) {
-                Text(hour(busiest), format: .dateTime.hour())
-                    .font(theme.headline(.subheadline))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                Text("Busiest")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.tertiary)
-            }
-            .frame(width: side * Self.hub * 1.6)
+            Text(hour(busiest), format: .dateTime.hour())
+                .font(theme.headline(.subheadline))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .frame(width: side * Self.hub * 1.3)
         }
     }
 

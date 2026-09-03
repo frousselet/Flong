@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- A `Statistiques` page, opened from a chart beside the reader's own face : what arrived and from whom, the shape of the flow and of the day, the subjects, the people, the bylines, the languages, how much was said twice and which sources put the article in the feed, over a day, a season or everything.
+- A `Statistiques` page, opened from a chart beside the reader's own face : the articles received, the sources, the hours, the subjects, the personalities, the authors, the languages, the duplicates and what each feed actually contains, over a day, a season or everything.
 - An `À propos` page at the foot of the reader's own panel : the icon, the version and the build, what Flong does without, and links to the source, the licence and its one dependency.
 - A `Nouveaux articles` switch in the notifications panel, covering every source at once, with the per-source, per-writer and per-person switches kept underneath it.
 

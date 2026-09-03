@@ -42,6 +42,40 @@ struct LocalizationTests {
         #expect(String(localized: "Subscribed sites", locale: french) == "Sites abonnés")
     }
 
+    /// The page of figures says what a thing is, not what it does.
+    ///
+    /// **Every label here is a word the application already uses elsewhere.**
+    /// The first cut of this page invented a synonym for each of them :
+    /// `Qui publie` for the sources, `Signatures` for the authors, `Dans
+    /// l'actualité` for the newsmakers, `Dit deux fois` for the duplicates. A
+    /// reader then has two names for one thing and has to work out that they
+    /// are one thing, which is exactly what the sources list already learned
+    /// when it stopped naming three desks of one paper separately.
+    @Test("The figures are named in the words the rest of the application uses")
+    func statisticsSpeakPlainly() {
+        #expect(String(localized: "Statistics", locale: french) == "Statistiques")
+        #expect(String(localized: "Duplicates", locale: french) == "Doublons")
+        #expect(String(localized: "Articles received", locale: french) == "Articles reçus")
+        #expect(String(localized: "Articles per hour", locale: french) == "Articles par heure")
+        #expect(String(localized: "What the feeds contain", locale: french) == "Contenu des flux")
+        #expect(String(localized: "Full article", locale: french) == "Article complet")
+        #expect(String(localized: "Headline only", locale: french) == "Titre seulement")
+        #expect(String(localized: "Peak hour", locale: french) == "Heure de pointe")
+        #expect(String(localized: "No articles over this period", locale: french) == "Aucun article sur cette période")
+
+        // The four the page shares with the rest of the application, which is
+        // the whole point : one thing, one name.
+        #expect(String(localized: "Sources", locale: french) == "Sources")
+        #expect(String(localized: "Authors", locale: french) == "Auteurs")
+        #expect(String(localized: "Newsmakers", locale: french) == "Personnalités")
+        #expect(String(localized: "Subjects", locale: french) == "Thématiques")
+
+        // A feed is a `flux` here and nowhere a `fil`.
+        #expect(inFrench("\(3) feeds") == "3 flux")
+        #expect(inFrench("\(1) characters") == "1 caractère")
+        #expect(inFrench("\(9) characters") == "9 caractères")
+    }
+
     @Test("The third way to find a source speaks French")
     func popularFeeds() {
         #expect(String(localized: "Popular feeds", locale: french) == "Flux populaires")

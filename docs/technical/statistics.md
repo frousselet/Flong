@@ -77,6 +77,14 @@ A median cannot be added to another median, so a publisher's three feeds cannot 
 
 **Sources that have gone quiet.** Measuring a feed against its own `observed_interval` is a good figure and it is not this page's : it is not a fact about a window, so it would be the one card on the page that ignores the control at the head of it. It belongs beside the feed health in the source editor.
 
+## The words on it
+
+Every label is a word the rest of the application already uses : `Sources`, `Auteurs`, `Personnalités`, `Thématiques`, `Langues`, `Doublons`, and a feed is a `flux` and never a `fil`.
+
+The first cut of this page invented a synonym for each of them : `Qui publie` for the sources, `Signatures` for the authors, `Dans l'actualité` for the newsmakers, `Dit deux fois` for the duplicates, `Ce qui arrive dans le flux` for the body lengths. Every one of those is a phrase describing what the card does instead of naming what it holds, and the effect is a reader carrying two names for one thing. It is the same mistake the sources list already corrected when it stopped naming three desks of one paper separately.
+
+The rule is in `CLAUDE.md` and it is worth repeating here because a page of figures is where it is easiest to break : say the thing that matters, then stop. `LocalizationTests.statisticsSpeakPlainly` is what notices if it drifts back.
+
 ## Cost
 
 Every count is a `GROUP BY` in SQLite over indexed columns, and none of them returns more rows than the grain allows : a year is twelve rows however many articles fell in it. Measured on a corpus of 5 979 articles and 63 feeds, the whole page reads in well under a tenth of a second, the median body lengths included. The one query whose cost follows the corpus rather than the grain is the per-feed, per-mark flow, which is bounded by the number of feeds times the number of marks.
