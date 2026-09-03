@@ -6,7 +6,7 @@ The article is at the end of that link. Flong goes and gets it, once, and keeps 
 
 ## When it happens
 
-**What the reader last chose.** An article opens on what its feed sent until the reader asks for the whole one, and asking is also saying so for next time : somebody who wants whole articles is not making a remark about one article. The choice is kept in the iCloud key-value store, so it follows them to their other devices — not in CloudKit, whose three-thousand-record budget is spent on subscriptions, kept articles and read states, and has no business holding a preference.
+**What the reader last chose.** An article opens on what its feed sent until the reader asks for the whole one, and asking is also saying so for next time : somebody who wants whole articles is not making a remark about one article. The choice is kept in the iCloud key-value store, so it follows them to their other devices, and not in CloudKit, whose three-thousand-record budget is spent on subscriptions, kept articles and read states, and has no business holding a preference.
 
 Once they have chosen the whole article, opening one fetches it : that is no longer speculation, it is what they asked for. Until then nothing is fetched, since a page asked for on opening is a request made to a publisher for something nobody is going to look at.
 

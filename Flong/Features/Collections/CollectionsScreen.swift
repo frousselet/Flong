@@ -283,12 +283,16 @@ struct CollectionSquare: View {
             VStack(alignment: .leading, spacing: 1) {
                 Self.name(of: collection.kind)
                     .font(.system(compact ? .caption : .subheadline, weight: .medium))
-                    // Two lines in the small square : `Favourite newsmakers`
-                    // does not fit on one at this width. The room for the
-                    // second is not held open when it goes unused, since the
-                    // line hangs its squares from the top and a gap under
-                    // every short name would be paid for by all of them.
-                    .lineLimit(compact ? 2 : 1)
+                    // **Two lines in the small square, and the room for both is
+                    // held open.** `Personnalités favorites` does not fit on one
+                    // at this width and its neighbours do, so leaving the second
+                    // line out when it went unused put every count in the row on
+                    // a different baseline : `30 articles`, then `25 articles`
+                    // half a line lower, then `276 auteurs` back up again. A row
+                    // read across is a row whose lines are level. The gap under
+                    // a short name is what that costs, and it costs less than a
+                    // row nobody can read across.
+                    .lineLimit(compact ? 2 : 1, reservesSpace: compact)
                 Self.count(of: collection)
                     .font(compact ? .caption2 : theme.metadata)
                     .foregroundStyle(.secondary)
