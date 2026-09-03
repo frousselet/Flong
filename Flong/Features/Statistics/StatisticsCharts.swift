@@ -34,6 +34,22 @@ nonisolated enum Figures {
     /// The air inside one.
     static let padding: CGFloat = 16
 
+    /// The air between one block and the next, everywhere on the page.
+    ///
+    /// **One number and not five.** The figures were sixteen apart in their
+    /// grid, fourteen apart across it and twenty-two apart from the cards
+    /// below, which reads as three different kinds of relationship between
+    /// things that have one : they are all blocks on one page. Said once, the
+    /// column has a rhythm ; said at each call site, it has a history.
+    static let gap: CGFloat = 18
+
+    /// The air above and below the row of windows.
+    ///
+    /// The row floats over the page and the page runs under it, so what it is
+    /// standing in is the only thing separating it from the cards passing
+    /// behind : too little and a pill reads as stuck to the card under it.
+    static let brim: CGFloat = 13
+
     /// The shortest a bar is ever drawn.
     ///
     /// Something that happened once is something that happened, and a bar too
@@ -70,6 +86,7 @@ struct FlowChart: View {
 
     @Environment(\.theme) private var theme
     @Environment(\.calendar) private var calendar
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var chosen: Date?
 
     /// Whether the reader has read anything at all in the window, which is
@@ -150,6 +167,12 @@ struct FlowChart: View {
             }
         }
         .chartYAxis(.hidden)
+        // **The dates go when the type outgrows the chart.** Four of them
+        // across a phone at an accessibility size is two of them hanging off
+        // the ends, and the line above the chart already names the mark the
+        // reader is on and how much fell in it. The shape survives ; the
+        // labels are what there is no room for.
+        .chartXAxis(typeSize.isAccessibilitySize ? .hidden : .automatic)
         .chartXAxis {
             // Three or four dates along the bottom and nothing else. A tick per
             // mark is a row of hairlines under a row of bars, and neither can

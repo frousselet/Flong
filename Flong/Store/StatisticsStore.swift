@@ -192,6 +192,43 @@ nonisolated struct BodyLength: Identifiable, Hashable, Sendable {
     let articles: Int
 
     var id: String { domain ?? name }
+
+    /// Which of the three kinds of feed this is.
+    ///
+    /// **The verdict is the figure, and the character count is not shown.**
+    /// `3 461 caractères` is a true number and a question rather than an
+    /// answer : characters of what, and is that a lot ? The reader's question
+    /// is whether they can read this source here or will be tapping through to
+    /// the site, and three words answer it.
+    var kind: Kind {
+        if median >= StatisticsStore.wholePiece { return .whole }
+        if median >= StatisticsStore.excerpt { return .excerpt }
+        return .headline
+    }
+
+    /// What a feed puts in front of the reader.
+    ///
+    /// **Thresholds and not a ranking.** The card cut the list in two and
+    /// called the top half whole articles and the bottom half headlines, which
+    /// is a verdict about a position rather than about a feed : a reader
+    /// following eight generous sources had the bottom four of them accused of
+    /// sending nothing. A length is measured against a length.
+    enum Kind: Hashable, Sendable {
+        /// The piece itself.
+        case whole
+        /// A paragraph or two, and the rest on the site.
+        case excerpt
+        /// A line and a link.
+        case headline
+
+        var name: LocalizedStringResource {
+            switch self {
+            case .whole: "Full article"
+            case .excerpt: "Excerpt"
+            case .headline: "Headline only"
+            }
+        }
+    }
 }
 
 /// How many articles fell in one mark of the chart.
@@ -347,6 +384,15 @@ nonisolated struct StatisticsStore: Sendable {
     /// body in a real corpus sits under two hundred characters, and one paper
     /// here stores a median of six.
     static let wholePiece = 1_200
+
+    /// How long it has to be before it is an excerpt rather than a headline.
+    ///
+    /// Three hundred characters, which is a sentence or two : enough to know
+    /// whether the piece is worth opening, and nowhere near enough to be the
+    /// piece. Measured against a real corpus this puts `theguardian.com` at
+    /// seven hundred and thirty in the middle band where it belongs, and
+    /// leaves `bbc.co.uk` at a hundred and nine with the headlines.
+    static let excerpt = 300
 
     private let database: AppDatabase
 

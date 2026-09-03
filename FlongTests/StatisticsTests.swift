@@ -323,6 +323,28 @@ struct StatisticsTests {
 
     // MARK: - What a source puts in its feed
 
+    @Test("A feed is judged against a length and never against its place in a list")
+    func theVerdictIsAThreshold() {
+        func kind(_ median: Int) -> BodyLength.Kind {
+            BodyLength(domain: "a.example.com", name: "A", median: median, articles: 20).kind
+        }
+
+        // The card used to call the top half of the ranking whole articles and
+        // the bottom half headlines, so a reader following eight generous
+        // sources had the bottom four accused of sending nothing. Measured on a
+        // real corpus : `theguardian.com` sits at 730 and is an excerpt whoever
+        // else is in the list, and `Le Monde` stores a median of six.
+        #expect(kind(3_461) == .whole)
+        #expect(kind(1_745) == .whole)
+        #expect(kind(StatisticsStore.wholePiece) == .whole)
+        #expect(kind(StatisticsStore.wholePiece - 1) == .excerpt)
+        #expect(kind(730) == .excerpt)
+        #expect(kind(StatisticsStore.excerpt) == .excerpt)
+        #expect(kind(StatisticsStore.excerpt - 1) == .headline)
+        #expect(kind(109) == .headline)
+        #expect(kind(6) == .headline)
+    }
+
     @Test("A source that gives a headline is told from one that gives the article")
     func bodyLengthsSeparateTheTwoKinds() async throws {
         let full = try await subscribe("https://full.example.com/f.xml", "Full", site: "https://full.example.com")
@@ -339,7 +361,9 @@ struct StatisticsTests {
         #expect(report.bodies.count == 2)
         #expect(report.bodies.first?.domain == "full.example.com")
         #expect(report.bodies.first?.median == 3_000)
+        #expect(report.bodies.first?.kind == .whole)
         #expect(report.bodies.last?.domain == "tease.example.com")
+        #expect(report.bodies.last?.kind == .headline)
     }
 
     @Test("A source that has barely published is left out of the lengths")
