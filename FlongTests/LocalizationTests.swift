@@ -303,6 +303,36 @@ struct LocalizationTests {
         #expect(String(localized: "\(1) ignored", locale: french) == "1 ignoré")
     }
 
+    @Test("The reader's own panel names its pages in French")
+    func readerPages() {
+        // The panel shows and its pages set, so the six rows are the whole of
+        // how anybody finds a setting : a name that fell back to English would
+        // be a subject a French reader cannot look for.
+        #expect(inFrench(ReaderPage.profile.title) == "Profil")
+        #expect(inFrench(ReaderPage.appearance.title) == "Apparence")
+        #expect(inFrench(ReaderPage.popular.title) == "Flux populaires")
+        #expect(inFrench(ReaderPage.sites.title) == "Sites abonnés")
+        #expect(inFrench(ReaderPage.data.title) == "Vos données")
+        #expect(inFrench(ReaderPage.about.title) == "À propos")
+    }
+
+    @Test("What the application says about itself is in French too")
+    func about() {
+        #expect(String(localized: "Source code", locale: french) == "Code source")
+        #expect(String(localized: "License", locale: french) == "Licence")
+
+        // The two sentences that say what Flong does without, which are the
+        // only claim the page makes.
+        let claim = String(
+            localized: """
+                A feed reader with no server, no account and nothing to sign in to. Every device collects \
+                the feeds itself and keeps them in a database of its own.
+                """,
+            locale: french
+        )
+        #expect(claim.hasPrefix("Un lecteur de flux sans serveur"))
+    }
+
     @Test("The two directories of people are named apart in French too")
     func directories() {
         // One is who signed a piece, the other who it is about, and a reader

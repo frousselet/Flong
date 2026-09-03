@@ -73,7 +73,7 @@ The popular feeds are the one thing you may publish to other readers, and only a
 
 Feed credentials and secret feed addresses live in the keychain only. Where you say you read from is the name of a town and the code of a country, never a coordinate.
 
-There is no account to close, so the reader's panel deletes everything instead : the database, the keychain, the preferences, the Spotlight index, the CloudKit zone, the archive, and the list of addresses you were offering the other readers.
+There is no account to close, so the reader's panel deletes everything instead, from the page it keeps for what this device and your iCloud hold : the database, the keychain, the preferences, the Spotlight index, the CloudKit zone, the archive, and the list of addresses you were offering the other readers.
 
 ## Other services
 
