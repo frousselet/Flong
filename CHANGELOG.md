@@ -26,6 +26,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The line of collections reads across again : `Personnalités favorites` takes two lines where its neighbours take one, and the room for the second was not held open, so every count in the row sat on a different baseline.
+
 - A story's headline and standfirst are written from the articles the reader is looking at, and written again when those articles change: a story briefed on a protest kept that headline over the photography that joined the group a week later.
 - A story the model declined to file, or filed before its headline was written, is asked about again, and the filing waits for the writing so the rubric is chosen from the written headline rather than from a raw one.
 - A standfirst the model did not write is no longer attributed to it, and an article's excerpt is no longer shown as one: a release note went out as a summary with its ticket numbers and its `Tags:` footer.

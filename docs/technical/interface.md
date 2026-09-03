@@ -174,7 +174,7 @@ Nothing is asked for until a row is on screen, and what comes back is kept on di
 
 **Never a byline.** What Flong knows is the article the picture arrived with, and nothing else : the publisher may have credited an agency, a photographer or nobody at all, and none of that reaches a feed. A credit reading `Photo Le Monde` would attribute the picture to whoever happened to run it, which is a thing nobody here knows.
 
-**Two sizes, and not one scaled down.** A credit is set against the picture it belongs to and not against the page : the pill that reads as a caption in the corner of a lead running the whole measure is a label stuck across the corner of a ninety-six point thumbnail. What stays constant is the share of the picture it takes, so the pill and the type inside it come down together — eleven points and nine, and the air around the name with them.
+**Two sizes, and not one scaled down.** A credit is set against the picture it belongs to and not against the page : the pill that reads as a caption in the corner of a lead running the whole measure is a label stuck across the corner of a ninety-six point thumbnail. What stays constant is the share of the picture it takes, so the pill and the type inside it come down together : eleven points and nine, and the air around the name with them.
 
 The lead's is a text style and grows with the reader's type size like everything else on the page. The thumbnail's is a fixed nine points, and that is the one place a fixed size is right : the picture is ninety-six points wide whatever the type size, so a pill that grew inside it would end up being the picture. What a reader who cannot read nine points needs there is the name read out, and the accessibility label is where it is.
 
