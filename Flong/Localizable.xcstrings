@@ -2393,6 +2393,17 @@
         }
       }
     },
+    "Last refreshed in the background %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dernière actualisation en arrière-plan %@"
+          }
+        }
+      }
+    },
     "Last worked %@": {
       "localizations": {
         "fr": {
@@ -2444,13 +2455,13 @@
         }
       }
     },
-    "Low Power Mode is on, so Flong is not fetching in the background. Opening it still refreshes.": {
+    "Low Power Mode is on, so Flong is not fetching in the background.": {
       "extractionState": "manual",
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Le mode économie d’énergie est activé, donc Flong ne récupère rien en arrière-plan. Ouvrir Flong actualise quand même."
+            "value": "Le mode économie d’énergie est activé, donc Flong ne récupère rien en arrière-plan."
           }
         }
       }
@@ -4058,6 +4069,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Les abonnements n'ont pas pu être enregistrés."
+          }
+        }
+      }
+    },
+    "The system has not granted a background refresh yet. Opening Flong always refreshes.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le système n’a pas encore accordé d’actualisation en arrière-plan. Ouvrir Flong actualise toujours."
           }
         }
       }

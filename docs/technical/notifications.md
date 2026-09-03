@@ -34,6 +34,8 @@ A story is several articles, from several newsrooms, about one thing : the unit 
 
 **A cluster of one is not a story**, so this is not a notice per article. Two articles have to be close enough in vocabulary to be about the same thing before anything is opened at all.
 
+**All three questions are asked in the statement.** The third of them, that a story stands on more than one article, was asked in Swift over rows the statement had already capped : a pass could take twenty rows, drop eighteen of them for standing on a single article and return two, so the cap counted clusters rather than stories and the real ones behind them waited for a pass with room.
+
 **What counts as new** is a story row opened since this device last said anything, **and that the front page will actually show**. The identifier answers the first half : every technical key is a UUIDv7 and carries the moment it was made, so the question is a range on the primary key rather than a scan. Nothing else records it, `first_at` being the date of the story's earliest article, which may be days older than the story.
 
 The second half was missing, and the two questions came apart. The page holds a story to the three-day window and to having more than one article left inside it ; the announcement asked the key and nothing else. A pass that grouped a quiet feed's week-old backlog into stories announced every one of them and put none of them on the page, so the reader was told about news they then could not find : a notification about a page that had, as far as they could see, not changed at all. The announcement asks the same three questions the page asks.
@@ -124,7 +126,9 @@ The notifications panel lists the writers beside the sources, in one list and no
 
 **Nothing is said about what the reader filed themselves**, and the muted collections are left out of the query rather than filtered after it, so that a muted collection cannot move the watermark past one that is not.
 
-**When a thing arrived is not changed by somebody editing their list.** A participant's list is rewritten whole every time any of it changes, so the moment a row turned up here has to survive that rewrite : without it, an article that had been here a week would be stamped as new the moment its filer added something else, and announced all over again. `SharedEntryStore.replace` reads the existing arrival times and keeps them.
+**When a thing arrived is not changed by somebody editing their list.** A participant's list is rewritten whole every time any of it changes, so the moment a row turned up here has to survive that rewrite : without it, an article that had been here a week would be stamped as new the moment its filer added something else, and announced all over again. `SharedEntryStore.replace` reads the existing arrival times and keeps them, **asked of the zone and not of the list**, because that is what a row is unique by : two people filing the same piece is one row and the first to arrive keeps it, so a piece whose row belonged to somebody else who then removed it came back stamped as new.
+
+**And the answer is bounded, like the arrivals from a feed.** Accepting a share, or a zone re-synchronizing after a repair, brings a whole collection at once. The muted collections are left out in the statement rather than after it, so they cannot spend the answer's room on rows nobody will be told about ; it said so and did the opposite.
 
 ## The picture
 

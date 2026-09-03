@@ -94,7 +94,7 @@ struct NotificationsPanel: View {
         // pull the panel up to see the rest at once.
         let rows = min(announcing, Self.shownSources)
         let announced: CGFloat = rows == 0 ? 0 : 40 + CGFloat(rows) * 62
-        return (isRefused ? 312 : 194) + switches + announced
+        return (isRefused ? 330 : 226) + switches + announced
     }
 
     /// What the panel may be pulled to.
@@ -197,8 +197,8 @@ struct NotificationsPanel: View {
 
             if isRefused {
                 refusal
-            } else if isSaving {
-                saving
+            } else {
+                standing
             }
         }
         .padding(.horizontal, 20)
@@ -304,6 +304,32 @@ struct NotificationsPanel: View {
         }
     }
 
+    /// Whether the background refresh is alive, as plainly as it can be put.
+    ///
+    /// **Because nothing else in the application says anything about it.**
+    /// `BGTaskScheduler` gives an application no way to ask how it is doing, so
+    /// a reader whose system grants Flong no time and a reader whose system
+    /// grants it plenty see exactly the same panel : one switch, on, and no
+    /// notices. This is the one honest thing that can be said, which is when
+    /// the last one ran.
+    @ViewBuilder
+    private var standing: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if isSaving {
+                saving
+            }
+
+            if let last = BackgroundScheduler.lastRefresh() {
+                Text("Last refreshed in the background \(last, format: .relative(presentation: .named))")
+            } else {
+                Text("The system has not granted a background refresh yet. Opening Flong always refreshes.")
+            }
+        }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
     /// Why a reader with every switch on may still be hearing nothing.
     ///
     /// Low Power Mode is the reader telling the system, in so many words, to
@@ -311,12 +337,7 @@ struct NotificationsPanel: View {
     /// Saying so is the difference between an application that obeys and one
     /// that looks broken.
     private var saving: some View {
-        Text(
-            "Low Power Mode is on, so Flong is not fetching in the background. Opening it still refreshes."
-        )
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
+        Text("Low Power Mode is on, so Flong is not fetching in the background.")
     }
 
     /// What a refusal leaves the reader able to do, which is go and undo it.

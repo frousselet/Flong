@@ -26,6 +26,11 @@ final class ReaderPanelUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+        // Portrait, whatever the simulator was left in. XCUITest reports an
+        // element's frame in the device's own space and taps in the screen's :
+        // in landscape the two come apart, so a tap aimed at one row of a sheet
+        // lands on another and the test fails somewhere it never went near.
+        XCUIDevice.shared.orientation = .portrait
     }
 
     @MainActor

@@ -98,6 +98,57 @@ struct StreamArchiveTests {
         #expect(article.bodyHTML == "<p>Un corps.</p>")
     }
 
+    /// An archive holds a fortnight, so the moment an article turns up on the
+    /// receiving device decides whether the reader is told about a fortnight of
+    /// somebody else's backlog as though it had all just broken.
+    @Test("An article taken from another device keeps the moment that device received it")
+    func theArrivalMomentTravels() async throws {
+        let first = try Device(named: "phone", root: root)
+        let second = try Device(named: "pad", root: root)
+
+        let feed = try await first.follow(address)
+        let old = now.addingTimeInterval(-9 * 24 * 60 * 60)
+        try await first.add("urn:old", to: feed, title: "Ancienne", at: old)
+        _ = try await second.follow(address)
+
+        try await first.archive.write()
+        // Ingested now, nine days after the first device received it.
+        #expect(try await second.archive.ingest(read: [], at: now) == 1)
+
+        let summaries = try await second.articles.summaries(.all, now: now)
+        let taken = try #require(summaries.first)
+        let stored = try await second.database.writer.read { db in try Entry.fetchOne(db, key: taken.id) }
+        let entry = try #require(stored)
+
+        #expect(entry.receivedAt < now.addingTimeInterval(-24 * 60 * 60))
+        // And so nothing announces it : a notice asks what arrived since a
+        // moment, and this did not arrive now.
+        let arrived = try await second.articles.arrived(
+            since: now.addingTimeInterval(-60), fromEveryFeed: true)
+        #expect(arrived.isEmpty)
+    }
+
+    /// The rule that decides a second copy lives in one place, and the archive
+    /// path did not ask it : those rows carried no key at all, so they were
+    /// exempt from cross-feed duplicate detection for ever.
+    @Test("An article taken from another device is keyed like one taken from a publisher")
+    func theKeyTravelsToo() async throws {
+        let first = try Device(named: "phone", root: root)
+        let second = try Device(named: "pad", root: root)
+
+        let feed = try await first.follow(address)
+        try await first.add("urn:1", to: feed, title: "Une réforme", at: now)
+        _ = try await second.follow(address)
+
+        try await first.archive.write()
+        #expect(try await second.archive.ingest(read: [], at: now) == 1)
+
+        let summaries = try await second.articles.summaries(.all, now: now)
+        let taken = try #require(summaries.first)
+        let stored = try await second.database.writer.read { db in try Entry.fetchOne(db, key: taken.id) }
+        #expect(try #require(stored).canonicalKey != nil)
+    }
+
     @Test("A device never reads its own folder back")
     func itsOwnFolderIsNotAnInbox() async throws {
         let first = try Device(named: "phone", root: root)

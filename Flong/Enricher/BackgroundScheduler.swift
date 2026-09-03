@@ -101,6 +101,22 @@ nonisolated enum BackgroundScheduler {
     /// this reason.
     static let fullPassJitter: TimeInterval = 45 * 60
 
+    /// Where the moment of the last opportunistic refresh is written down.
+    ///
+    /// **Because nothing else records that one ran.** `BGTaskScheduler` gives an
+    /// application no way to ask how it is doing : a reader whose system has
+    /// decided to grant Flong no time, or who has turned Background App Refresh
+    /// off, sees exactly what a reader with a working one sees, which is
+    /// nothing. The notifications panel says when the last one was, and says so
+    /// plainly when there has never been one.
+    private static let lastRefreshKey = "flong.last-refresh"
+
+    /// When the last opportunistic refresh ran, or `nil` if none ever has.
+    static func lastRefresh(in defaults: UserDefaults = .standard) -> Date? {
+        let stamp = defaults.double(forKey: lastRefreshKey)
+        return stamp > 0 ? Date(timeIntervalSince1970: stamp) : nil
+    }
+
     /// Where the moment of the last full pass is written down.
     ///
     /// **On disk, and not only in memory.** It was a static held for the life
@@ -174,6 +190,7 @@ nonisolated enum BackgroundScheduler {
     static func forgetTheLastFullPass(in defaults: UserDefaults = .standard) {
         lastFullPass.withLock { $0 = .distantPast }
         defaults.removeObject(forKey: lastFullPassKey)
+        defaults.removeObject(forKey: lastRefreshKey)
         isPassing.withLock { $0 = false }
     }
 
@@ -194,6 +211,9 @@ nonisolated enum BackgroundScheduler {
             return
         }
         await work()
+        // Written down after the work rather than before it, so what the panel
+        // shows is a refresh that happened and not one that was attempted.
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastRefreshKey)
     }
 
     #if os(macOS)

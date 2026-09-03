@@ -37,6 +37,18 @@ nonisolated enum StreamBlock {
         var language: String?
         /// The sanitized article, compressed.
         var body: Data?
+        /// When the sending device received it.
+        ///
+        /// **Carried, because the receiving device stamped `now` and that is a
+        /// lie about a backlog.** An archive holds a fortnight, so a first
+        /// exchange, or one after a repair, wrote a fortnight of articles all
+        /// dated this second : every notice that asks what arrived since a
+        /// moment then answers with the lot, and the reader is told a source's
+        /// back catalogue is breaking news.
+        ///
+        /// Optional, so a block written by a device that predates this still
+        /// decodes ; those fall back to the publication date.
+        var receivedAt: Date?
     }
 
     /// One feed's articles for one day.
@@ -97,6 +109,7 @@ nonisolated enum StreamBlock {
                         SELECT f.url AS feed_url, e.guid AS guid, e.title AS title, e.url AS url,
                                e.published_at AS published_at, e.author AS author, e.excerpt AS excerpt,
                                e.image_url AS image_url, e.has_media AS has_media, e.language AS language,
+                               e.received_at AS received_at,
                                b.sanitized_html AS body
                         FROM entry e
                         JOIN feed f ON f.id = e.feed_id
@@ -124,7 +137,8 @@ nonisolated enum StreamBlock {
                             imageURL: row["image_url"],
                             hasMedia: row["has_media"],
                             language: row["language"],
-                            body: SyncRecords.compressed(row["body"])
+                            body: SyncRecords.compressed(row["body"]),
+                            receivedAt: row["received_at"]
                         )
                     }
                 )
@@ -160,6 +174,18 @@ nonisolated enum StreamBlock {
                     .fetchCount(db) > 0
                 guard !exists else { continue }
 
+                // The same key a fetch computes, so an article that reached
+                // this device from a publisher and from another of the
+                // reader's own devices is one piece of news and not two. Left
+                // unset, these rows were exempt from cross-feed duplicate
+                // detection for ever, since the rule matches on the key.
+                let key = ArticleKey.of(
+                    url: header.url.flatMap(URL.init(string:)),
+                    title: header.title,
+                    publishedAt: header.publishedAt,
+                    room: FeedURL.room(of: feed.siteURL ?? feed.url)
+                )
+
                 var entry = Entry(
                     feedID: feed.id,
                     guid: header.guid,
@@ -169,11 +195,17 @@ nonisolated enum StreamBlock {
                     author: header.author,
                     language: header.language,
                     publishedAt: header.publishedAt,
-                    receivedAt: now,
-                    isRead: read.contains(ArticleFingerprint(feedURL: feedURL, guid: header.guid))
+                    // What the sending device recorded, and not this instant.
+                    // A block from a device that predates the field says
+                    // nothing, and the publication date is the closer of the
+                    // two remaining answers.
+                    receivedAt: header.receivedAt ?? header.publishedAt ?? now,
+                    isRead: read.contains(ArticleFingerprint(feedURL: feedURL, guid: header.guid)),
+                    canonicalKey: key
                 )
                 entry.hasMedia = header.hasMedia ?? false
                 entry.imageURL = header.imageURL.flatMap(URL.init(string:))
+                entry.duplicateOf = key.flatMap { try? ArticleKey.original(of: $0, in: db) }
                 try entry.insert(db)
                 // An article arriving from another device names its writers
                 // exactly as one arriving from a feed does.

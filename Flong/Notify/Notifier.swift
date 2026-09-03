@@ -70,6 +70,15 @@ struct Notifier: Announcing {
     /// publisher for a photograph nobody will be shown is a request for
     /// nothing. See ``NotificationPicture``.
     func post(_ announcement: Announcement) async {
+        // Asked before anything is built. A revoked permission is not an error
+        // to report to the reader, but it is a reason not to ask a publisher
+        // for a photograph nobody will ever be shown.
+        let allowed = await status()
+        guard allowed == .authorized || allowed == .provisional else {
+            Log.notify.info("A notice was not posted : this device may not interrupt the reader")
+            return
+        }
+
         // Asked for, and then never spent. The permission has carried `.sound`
         // since the beginning while nothing here ever set one, so every notice
         // Flong has ever posted arrived without a sound and without a tap on the

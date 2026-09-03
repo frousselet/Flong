@@ -1774,7 +1774,13 @@ final class AppModel {
             Log.notify.error("The filings could not be read : the watermark stays where it was")
             return
         }
-        preferences.collaborationsAnnouncedAt = Date()
+        // Past what was actually read, exactly as the arrivals from a feed are :
+        // accepting a share brings a whole collection at once, and the answer
+        // is capped, so a mark set to now would leave everything past the
+        // twentieth behind it for good.
+        preferences.collaborationsAnnouncedAt =
+            arrived.count < SharedEntryStore.mostBeforeAnnouncing
+            ? Date() : (arrived.last?.entry.receivedAt ?? Date())
 
         guard !isReading, !arrived.isEmpty else { return }
 

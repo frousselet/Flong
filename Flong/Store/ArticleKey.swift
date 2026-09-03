@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import GRDB
 
 /// What makes two articles the same article.
 ///
@@ -37,6 +38,28 @@ nonisolated enum ArticleKey {
     ]
 
     /// The key of an article, or `nil` when there is nothing stable to key it by.
+    /// The first copy of an article, wherever it came from.
+    ///
+    /// Whatever feed, this one included. A feed that gives its articles a fresh
+    /// identifier on every build hands the same piece over again and again, and
+    /// the identifier is exactly what stops the ordinary path from noticing.
+    /// The key notices.
+    ///
+    /// Never a duplicate itself, so a third copy points at the original rather
+    /// than at the second.
+    ///
+    /// **Here rather than beside one of its two callers.** An article reaches
+    /// the store two ways, from a publisher and from another of the reader's
+    /// own devices, and a second copy of this rule would be a second chance for
+    /// the two to disagree about what a duplicate is.
+    static func original(of key: String, in db: Database) throws -> UUID? {
+        try Entry
+            .filter(Column("canonical_key") == key && Column("duplicate_of") == nil)
+            .order(Column("received_at"))
+            .fetchOne(db)?
+            .id
+    }
+
     static func of(url: URL?, title: String, publishedAt: Date?, room: String?) -> String? {
         if let address = address(url) { return address }
         return spelling(title, publishedAt: publishedAt, room: room)

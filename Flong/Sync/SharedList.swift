@@ -121,6 +121,12 @@ nonisolated enum SharedList {
 
 /// The articles of the collections the reader shares or was invited to.
 nonisolated struct SharedEntryStore: Sendable {
+    /// How many filings one notice is ever built out of.
+    ///
+    /// The same bound, and for the same reason, as the arrivals from a feed :
+    /// see ``ArticleStore/mostBeforeAnnouncing``.
+    static let mostBeforeAnnouncing = 20
+
     private let database: AppDatabase
 
     init(_ database: AppDatabase) {
@@ -249,10 +255,15 @@ nonisolated struct SharedEntryStore: Sendable {
             // new the moment its filer added something else, and every notice
             // built on the stamp would announce it again. What was here keeps
             // the moment it turned up.
+            // **Asked of the zone and not of the list**, because that is what
+            // the row is unique by : two people filing the same piece is one
+            // row, and the first to arrive keeps it. Scoped to the list, a
+            // piece whose row belonged to somebody else and who then removed it
+            // came back stamped as new, and was announced a second time.
             let arrived = try Row.fetchAll(
                 db,
-                sql: "SELECT guid, received_at FROM shared_entry WHERE zone_name = ? AND list_key = ?",
-                arguments: [zoneName, listKey]
+                sql: "SELECT guid, received_at FROM shared_entry WHERE zone_name = ?",
+                arguments: [zoneName]
             )
             .reduce(into: [String: Date]()) { found, row in found[row["guid"] as String] = row["received_at"] as Date }
 
@@ -288,25 +299,37 @@ nonisolated struct SharedEntryStore: Sendable {
     /// about what you filed yourself is being told what you already know.
     ///
     /// `muted` are the collections the reader has asked to hear nothing about,
-    /// left out here rather than filtered afterwards so that a muted collection
-    /// cannot move the watermark past a collection that is not.
+    /// left out in the statement rather than filtered afterwards so that a
+    /// muted collection cannot spend the answer's room on rows nobody will be
+    /// told about. It said so and did the opposite.
+    ///
+    /// - Parameter limit: how many are read at most. Accepting a share, or a
+    ///   zone re-synchronizing after a repair, brings the whole of a collection
+    ///   at once, and one notification built out of four hundred filings is a
+    ///   notification about nothing. The caller stamps its watermark from the
+    ///   last row rather than from the clock, so the rest waits for the next
+    ///   pass instead of being lost.
     func arrived(
         since: Date,
         excluding listKey: String?,
-        muted: Set<String> = []
+        muted: Set<String> = [],
+        limit: Int = mostBeforeAnnouncing
     ) async throws -> [(zone: String, author: String, entry: SharedEntry)] {
         try await database.writer.read { db in
-            try Row.fetchAll(
+            let quiet = muted.sorted()
+            let holes = quiet.isEmpty ? "" : "AND zone_name NOT IN (\(databaseQuestionMarks(count: quiet.count)))"
+            return try Row.fetchAll(
                 db,
                 sql: """
                     SELECT * FROM shared_entry
                     WHERE received_at > ? AND (? IS NULL OR list_key <> ?)
+                    \(holes)
                     \(Self.notRemoved)
                     ORDER BY received_at
+                    LIMIT ?
                     """,
-                arguments: [since, listKey, listKey]
+                arguments: [since, listKey, listKey] + StatementArguments(quiet) + [limit]
             )
-            .filter { !muted.contains($0["zone_name"] as String) }
             .map { (zone: $0["zone_name"] as String, author: $0["author_name"] as String, entry: Self.entry(from: $0)) }
         }
     }

@@ -345,6 +345,24 @@ nonisolated struct DigestStore: Sendable {
                 // about a page that had, as far as they could see, not changed
                 // at all.
                 .filter(Story.Columns.lastAt >= since)
+                // **The third question, asked here rather than afterwards.**
+                // It was asked in Swift over the rows this statement had
+                // already capped, so a pass could take twenty rows, drop
+                // eighteen of them for standing on a single article, and
+                // return two : the cap counted clusters and not stories, and
+                // the eighteen real ones behind them waited for a pass that
+                // had room. Asked here, the cap counts what the reader will
+                // actually be told about.
+                .filter(
+                    sql: """
+                        (SELECT COUNT(*) FROM story_member m
+                         JOIN entry e ON e.id = m.entry_id
+                         WHERE m.story_id = story.id
+                           AND e.duplicate_of IS NULL
+                           AND COALESCE(e.published_at, e.received_at) >= ?) > 1
+                        """,
+                    arguments: [since]
+                )
                 .order(Column("id"))
                 .limit(limit)
                 .fetchAll(db)
