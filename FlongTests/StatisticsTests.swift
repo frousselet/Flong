@@ -321,62 +321,6 @@ struct StatisticsTests {
         #expect(report.languages.first?.count == 2)
     }
 
-    // MARK: - What a source puts in its feed
-
-    @Test("A feed is judged against a length and never against its place in a list")
-    func theVerdictIsAThreshold() {
-        func kind(_ median: Int) -> BodyLength.Kind {
-            BodyLength(domain: "a.example.com", name: "A", median: median, articles: 20).kind
-        }
-
-        // The card used to call the top half of the ranking whole articles and
-        // the bottom half headlines, so a reader following eight generous
-        // sources had the bottom four accused of sending nothing. Measured on a
-        // real corpus : `theguardian.com` sits at 730 and is an excerpt whoever
-        // else is in the list, and `Le Monde` stores a median of six.
-        #expect(kind(3_461) == .whole)
-        #expect(kind(1_745) == .whole)
-        #expect(kind(StatisticsStore.wholePiece) == .whole)
-        #expect(kind(StatisticsStore.wholePiece - 1) == .excerpt)
-        #expect(kind(730) == .excerpt)
-        #expect(kind(StatisticsStore.excerpt) == .excerpt)
-        #expect(kind(StatisticsStore.excerpt - 1) == .headline)
-        #expect(kind(109) == .headline)
-        #expect(kind(6) == .headline)
-    }
-
-    @Test("A source that gives a headline is told from one that gives the article")
-    func bodyLengthsSeparateTheTwoKinds() async throws {
-        let full = try await subscribe("https://full.example.com/f.xml", "Full", site: "https://full.example.com")
-        let teaser = try await subscribe("https://tease.example.com/f.xml", "Tease", site: "https://tease.example.com")
-
-        for index in 0..<10 {
-            try await add(
-                "Longue \(index)", to: full, published: hours(Double(index) + 1),
-                body: String(repeating: "a", count: 3_000))
-            try await add("Courte \(index)", to: teaser, published: hours(Double(index) + 1), body: "Lisez la suite")
-        }
-
-        let report = try await figures(.day)
-        #expect(report.bodies.count == 2)
-        #expect(report.bodies.first?.domain == "full.example.com")
-        #expect(report.bodies.first?.median == 3_000)
-        #expect(report.bodies.first?.kind == .whole)
-        #expect(report.bodies.last?.domain == "tease.example.com")
-        #expect(report.bodies.last?.kind == .headline)
-    }
-
-    @Test("A source that has barely published is left out of the lengths")
-    func aSourceWithTooLittleIsNotMeasured() async throws {
-        let feed = try await subscribe("https://a.example.com/f.xml", "A", site: "https://a.example.com")
-        // Under the floor : a median over two articles is one of those two.
-        try await add("Une", to: feed, published: hours(1), body: String(repeating: "a", count: 4_000))
-        try await add("Deux", to: feed, published: hours(2), body: "court")
-
-        let report = try await figures(.day)
-        #expect(report.bodies.isEmpty)
-    }
-
     // MARK: - The reading
 
     @Test("When the reader read is drawn only where most of it is known")
@@ -402,6 +346,34 @@ struct StatisticsTests {
         #expect(report.read == 10)
         #expect(report.datedReads == 0)
         #expect(!report.showsReading)
+    }
+
+    @Test("A dial is only drawn where its unit comes round more than once")
+    func aDialNeedsItsUnitToComeRound() {
+        // A dial is a comparison between the places on it, and a place that
+        // came round once over the whole window is being compared with nothing.
+        // Both of these were drawn and both were nonsense : the days of the
+        // week over twenty-four hours is one spoke and six empty ones, and the
+        // days of the month over a week is seven of thirty-one.
+        #expect(!StatisticsRange.day.turns(every: Cycle.week))
+        #expect(!StatisticsRange.week.turns(every: Cycle.week))
+        #expect(StatisticsRange.month.turns(every: Cycle.week))
+        #expect(StatisticsRange.year.turns(every: Cycle.week))
+
+        #expect(!StatisticsRange.day.turns(every: Cycle.month))
+        #expect(!StatisticsRange.week.turns(every: Cycle.month))
+        #expect(!StatisticsRange.month.turns(every: Cycle.month))
+        #expect(StatisticsRange.quarter.turns(every: Cycle.month))
+        #expect(StatisticsRange.year.turns(every: Cycle.month))
+
+        // Everything there is holds every unit there is.
+        #expect(StatisticsRange.all.turns(every: Cycle.week))
+        #expect(StatisticsRange.all.turns(every: Cycle.month))
+
+        // The hours of a day come round every day, so the clock is drawn on
+        // every window : a day of them is still twenty-four places compared
+        // with one another.
+        #expect(StatisticsRange.week.turns(every: Cycle.day))
     }
 
     @Test("A dial counts the hour, the weekday and the day of the month it belongs to")

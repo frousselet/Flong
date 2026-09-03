@@ -1870,37 +1870,6 @@
         }
       }
     },
-    "Excerpt" : {
-      "comment" : "What a feed carries : a paragraph or two, and the rest on the site.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Extrait"
-          }
-        }
-      }
-    },
-    "Full article" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Article complet"
-          }
-        }
-      }
-    },
-    "Headline only" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Titre seul"
-          }
-        }
-      }
-    },
     "Languages" : {
       "localizations" : {
         "fr" : {
@@ -2124,16 +2093,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Version %@"
-          }
-        }
-      }
-    },
-    "What the feeds send" : {
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ce que les flux envoient"
           }
         }
       }

@@ -47,6 +47,8 @@ Everything crosses back out of the read block as plain values. A `Row` is not `S
 
 The hours of a day, the days of a week and the days of a month, each round a dial of however many places the unit has. One view draws all three : they differ in how many places they have, what is written round the edge and what the hole in the middle says, and three drawings would be three things to keep in step.
 
+**A dial is only drawn where its unit comes round more than once in the window.** A dial is a comparison between the places on it, and a place that came round once is being compared with nothing : the days of the week over twenty-four hours is one spoke and six empty ones, and the days of the month over a week is seven of thirty-one. Both were drawn before `StatisticsRange.turns(every:)` existed, and both were nonsense. So the weekday dial wants a month and the day-of-month dial wants three ; the hours are on every window, a day of them being twenty-four places still worth comparing.
+
 A dial and not a row of bars because every one of these units is round. A day wraps at midnight, a week at Sunday and a month at its last day ; a row of bars says the thing has a beginning and an end and that the two are as far apart as they look.
 
 **SQLite counts a week from Sunday and a month from one.** `strftime('%w')` answers nought for Sunday whatever the reader's calendar says, and `strftime('%d')` answers one for the first. The store keeps the first convention and shifts the second so day one sits at index nought ; the weekday dial turns the array round to `Calendar.firstWeekday` when it draws it, which is the only thing that knows where a reader's week begins. A French reader's dial starts on Monday and an American one on Sunday.
@@ -74,26 +76,6 @@ Counting the articles underneath instead lets one runaway cluster carry a whole 
 
 Only the articles the digest grouped carry a subject at all, which on that corpus is 45 % of them. The card says so in the line under its title rather than passing the ranking off as a reading of the whole stream.
 
-## What a source puts in its feed
-
-The middle length of `entry_body.plain_text`, per feed, through a window function and never an average : one long read drags a mean across a whole publisher, and the question is what a typical article of theirs looks like.
-
-A feed has to have published at least eight articles in the window to be measured. A median over two articles is one of those two, and a ranking by it would open on whoever published one long piece this week.
-
-A median cannot be added to another median, so a publisher's three feeds cannot be folded the way their counts can. The busiest of them answers for the publisher, which is the one the reader mostly sees.
-
-**The reader is shown a verdict and never the length.** Three bands, from `StatisticsStore.wholePiece` and `StatisticsStore.excerpt` :
-
-| Median | Verdict |
-| --- | --- |
-| 1 200 characters and over | `Article complet` |
-| 300 to 1 199 | `Extrait` |
-| under 300 | `Titre seul` |
-
-Two things were wrong with drawing the number instead. `3 461 caractères` is a true figure and a question rather than an answer : characters of what, and is that a lot. And the card cut the ranking in two and called the top half whole articles and the bottom half headlines, which is a verdict about a position rather than about a feed : a reader following eight generous sources had the bottom four of them accused of sending nothing. A length is measured against a length.
-
-The bands are set against the corpus they were measured on : `theguardian.com` at 730 lands in the middle where it belongs, `bbc.co.uk` at 109 with the headlines, and `Le Monde` at six with them. `StatisticsTests.theVerdictIsAThreshold` pins the boundaries.
-
 ## What is deliberately not on the page
 
 **Words read, or time spent reading.** There is no word count in the schema and the only source for one is `entry_body.plain_text`, which is the publisher's feed body rather than the article. Measured on a real corpus, 3 252 of 5 956 bodies are under two hundred characters and one paper's median is **six**. A figure reading `vous avez lu 4 h 12` would be the length of teasers dressed up as articles. The honest half of the idea is the card above, which compares sources with each other instead.
@@ -101,6 +83,11 @@ The bands are set against the corpus they were measured on : `theguardian.com` a
 **A daily reading curve as the whole truth.** `read_at` is written by `ArticleStore.setRead` and `markRead` and by nothing else. A read state merged from another of the reader's devices arrives through `ReadStateStore.apply` as a month and a fingerprint, and sets `is_read` with no moment to attach. So the *counts* of what was read are whole and the shape of *when* it was read is not. The page draws the reading only where at least three fifths of it carries a date, which is `Statistics.showsReading` ; below that the arrivals are drawn alone. Drawing a line along the floor of a chart is worse than drawing no line.
 
 **A streak, or anything else that scores the reader.** Section 16 refuses the unread count as a debt nobody owes their feeds, and a run of consecutive days is the same idea with a nicer name. It would also be wrong for the reason above.
+
+**What each feed puts in its body.** The median length of `entry_body.plain_text` per source, drawn as `Article complet` / `Extrait` / `Titre seul`. It was built and then taken out again, and both halves of why are worth keeping :
+
+- **It makes an assertive claim about somebody else's publication from one number.** A publisher followed through several feeds has several medians and no way to add them, so the busiest feed was made to answer for the whole paper : Ars Technica's four feeds sit at 943, 1 063, 1 175 and 1 297, which straddles any threshold anybody picks. And a two-hundred-character chapô is a real summary, so calling Numerama and France Info `Titre seul` was simply wrong.
+- **A corpus can hold bodies that are not bodies.** Measured on a real database, a feed named `Le Monde` had three hundred articles with a median body of six characters, because they were fixtures : titles `Article 0`, bodies `Corps.`, excerpts `Un chapô qui tient sur une ligne.` A card that ranks publishers by body length reports that as a fact about Le Monde.
 
 **Sources that have gone quiet.** Measuring a feed against its own `observed_interval` is a good figure and it is not this page's : it is not a fact about a window, so it would be the one card on the page that ignores the control at the head of it. It belongs beside the feed health in the source editor.
 
@@ -116,7 +103,7 @@ The rule is in `CLAUDE.md` and it is worth repeating here because a page of figu
 
 The page is measured at the accessibility type sizes as well as at the default one, because three things on it break there and each breaks silently :
 
-- **The row of windows floats over the page**, so what separates it from the cards passing behind is the air it stands in and nothing else. `Figures.brim` is that air, and `Figures.gap` is the one rhythm every other block on the page keeps : the figures were sixteen apart in their grid, fourteen across it and twenty-two from the cards, which reads as three relationships between things that have one.
+- **The row of windows is a bar in the safe area and not a pinned header.** As a pinned header it kept its place in the scroll and drew no ground of its own, so the padding round the pills was space the cards were passing *through* rather than space between them : eight points, then thirteen, then twenty-two, and the card was against the pill every time, because what was under the pill was the card. An inset reserves the room, the page is laid out below it, and the soft scroll edge is what the cards go into as they pass. `Figures.gap` is the one rhythm every other block keeps : the figures were sixteen apart in their grid, fourteen across it and twenty-two from the cards, which reads as three relationships between things that have one.
 - **A source's sparkline goes at an accessibility size.** It holds sixty points whatever the type does, and holding them cut `news.ycombinator.com` down to `news.yc…`, which is the one thing in the row nobody can do without. The count beside it is the row's fact ; the shape is a picture of it.
 - **The dates under the flow chart go with it**, for the same reason : four of them across a phone at that size is two of them hanging off the ends. The line above the chart already names the mark and its count.
 
