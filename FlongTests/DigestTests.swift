@@ -166,6 +166,27 @@ struct DigestTests {
         #expect(stories.map(\.articleCount).sorted() == [2, 2, 4])
     }
 
+    /// A story moves between the two lists as it gains articles, keeping its
+    /// identifier. Derived in the view, the lead was a second answer that could
+    /// fall out of step with the page and stay wrong until the next launch.
+    @Test("The page names its own lead, and names exactly one")
+    func thePageNamesItsLead() async throws {
+        try await StoryBuilder(database).build(now: now)
+        let page = try await service.digest(now: now)
+
+        let lead = try #require(page.leadID)
+        #expect(lead == (page.live.first?.id ?? page.stories.first?.id))
+        #expect(page.all.filter { $0.id == lead }.count == 1)
+    }
+
+    @Test("An empty page leads on nothing")
+    func anEmptyPageLeadsOnNothing() async throws {
+        let empty = try await DigestService(try AppDatabase.inMemory()).digest(now: now)
+
+        #expect(empty.isEmpty)
+        #expect(empty.leadID == nil)
+    }
+
     @Test("A story keeps its identity as it grows")
     func stability() async throws {
         try await StoryBuilder(database).build(now: now)
@@ -290,9 +311,13 @@ struct DigestTests {
                 story.briefLocale = index == 0 ? "fr_FR" : "en_GB"
                 try story.update(db)
             }
+            // What the brief was written from, as `BriefStoriesJob.save` writes
+            // it : without it every story reads as one whose articles have
+            // changed, which is exactly what the predicate is now for.
+            try db.execute(sql: "UPDATE story SET brief_members = \(BriefStoriesJob.membersKey)")
         }
 
-        let work = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true)
+        let work = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true, since: .distantPast)
         let waiting = try await database.writer.read { db in
             try Int.fetchOne(
                 db,
@@ -319,9 +344,13 @@ struct DigestTests {
                 story.briefLocale = "fr_FR"
                 try story.update(db)
             }
+            // What the brief was written from, as `BriefStoriesJob.save` writes
+            // it : without it every story reads as one whose articles have
+            // changed, which is exactly what the predicate is now for.
+            try db.execute(sql: "UPDATE story SET brief_members = \(BriefStoriesJob.membersKey)")
         }
 
-        let work = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true)
+        let work = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true, since: .distantPast)
         let waiting = try await database.writer.read { db in
             try Int.fetchOne(
                 db,
@@ -347,10 +376,14 @@ struct DigestTests {
                 story.briefLocale = nil
                 try story.update(db)
             }
+            // What the brief was written from, as `BriefStoriesJob.save` writes
+            // it : without it every story reads as one whose articles have
+            // changed, which is exactly what the predicate is now for.
+            try db.execute(sql: "UPDATE story SET brief_members = \(BriefStoriesJob.membersKey)")
         }
 
-        let withModel = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true)
-        let without = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: false)
+        let withModel = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true, since: .distantPast)
+        let without = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: false, since: .distantPast)
 
         let counts = try await database.writer.read { db in
             (
@@ -404,9 +437,13 @@ struct DigestTests {
                 story.briefLocked = true
                 try story.update(db)
             }
+            // What the brief was written from, as `BriefStoriesJob.save` writes
+            // it : without it every story reads as one whose articles have
+            // changed, which is exactly what the predicate is now for.
+            try db.execute(sql: "UPDATE story SET brief_members = \(BriefStoriesJob.membersKey)")
         }
 
-        let work = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true)
+        let work = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true, since: .distantPast)
         let waiting = try await database.writer.read { db in
             try Int.fetchOne(
                 db,
@@ -416,6 +453,41 @@ struct DigestTests {
         }
 
         #expect(waiting == 0)
+    }
+
+    /// The excerpt is the top of the article body flattened and cut at three
+    /// hundred characters on the nearest space. A release note went out as a
+    /// standfirst, ticket numbers and `Tags:` footer included.
+    @Test("An article's body is not a standfirst, and a publisher's line is")
+    func whatCountsAsAStandfirst() {
+        // What the reader was shown.
+        #expect(
+            StorySummarizer.standfirst(
+                from: "Release: llm-gemini 0.34 New model gemini-3.8-flash for Gemini 3.8 Flash, with low, "
+                    + "medium and high thinking levels. #146 Fixed async responses failing to record the "
+                    + "resolved model version. Thanks, Charlie Tonneslan. #137 Tags: llm, gemini",
+                under: "llm-gemini 0.34"
+            ) == nil
+        )
+
+        // A line a publisher wrote, which is what the page is for.
+        #expect(
+            StorySummarizer.standfirst(
+                from: "Les trois académies pilotes seront désignées avant la fin du mois.",
+                under: "Une réforme du calendrier scolaire"
+            ) == "Les trois académies pilotes seront désignées avant la fin du mois."
+        )
+
+        // The footer goes and the sentence above it stays.
+        #expect(
+            StorySummarizer.standfirst(
+                from: "Le ministère précise son calendrier. Tags: éducation, réforme",
+                under: "Une réforme"
+            ) == "Le ministère précise son calendrier."
+        )
+
+        // A line that only says the headline again says nothing.
+        #expect(StorySummarizer.standfirst(from: "Une réforme du calendrier", under: "Une réforme") == nil)
     }
 
     @Test("Throwing away what the model wrote spares what the reader settled")
@@ -713,7 +785,7 @@ struct DigestTests {
             try db.execute(
                 sql: """
                     UPDATE story SET summary = 'Un résumé.', is_generated = 1, brief_locale = ?,
-                                     topics_asked_at = ?
+                                     topics_asked_at = ?, brief_members = \(BriefStoriesJob.membersKey)
                     """,
                 arguments: [Locale.current.identifier, now]
             )
@@ -723,7 +795,7 @@ struct DigestTests {
             }
         }
 
-        #expect(try await BriefStoriesJob(database).remaining() == 0)
+        #expect(try await BriefStoriesJob(database, now: now).remaining() == 0)
         #expect(try await FileStoriesJob(database, now: now).remaining() == 0)
 
         // This is what the repair rests on. Forgetting the change tokens
@@ -733,8 +805,85 @@ struct DigestTests {
         await service.discardWhatTheModelWrote()
 
         let stories = try await database.writer.read { db in try Story.fetchCount(db) }
-        #expect(try await BriefStoriesJob(database).remaining() == stories)
+        #expect(try await BriefStoriesJob(database, now: now).remaining() == stories)
         #expect(try await FileStoriesJob(database, now: now).remaining() == stories)
+    }
+
+    /// A story keeps one identity while its articles come and go, and the
+    /// brief used to be keyed to nothing but the story and the language : one
+    /// briefed on a protest kept that headline over the photography that joined
+    /// the group a week later.
+    @Test("A story whose articles changed is written about again")
+    func aBriefFollowsItsArticles() async throws {
+        try await StoryBuilder(database).build(now: now)
+
+        // A page as it stands after a night's work.
+        try await database.writer.write { db in
+            try db.execute(
+                sql: """
+                    UPDATE story SET summary = 'Ce qui est arrivé.', is_generated = 1, brief_locale = ?,
+                                     brief_members = \(BriefStoriesJob.membersKey)
+                    """,
+                arguments: [Locale(identifier: "fr_FR").identifier]
+            )
+        }
+
+        let settled = BriefStoriesJob.work(
+            locale: Locale(identifier: "fr_FR"), hasModel: true, since: .distantPast)
+        #expect(try await waiting(under: settled) == 0)
+
+        // Another newsroom picks one of them up.
+        let feed = try #require(feeds["Le Soir"])
+        var entry = Entry(
+            feedID: feed.id,
+            guid: "urn:example:late",
+            title: "Calendrier scolaire : le ministère précise son calendrier",
+            excerpt: "Les trois académies pilotes seront désignées avant la fin du mois.",
+            language: "fr",
+            publishedAt: now.addingTimeInterval(-600),
+            receivedAt: now.addingTimeInterval(-600)
+        )
+        entry.hasMedia = false
+        try await database.writer.write { db in try entry.insert(db) }
+        try await StoryBuilder(database).build(now: now)
+
+        // The one whose articles moved, and only that one.
+        #expect(try await waiting(under: settled) == 1)
+    }
+
+    /// The filing had no such rule at all : a story the model declined stood
+    /// under no rubric for life, and one filed before its headline was written
+    /// kept the rubric chosen from a raw article title.
+    @Test("A story whose headline changed is filed again")
+    func aFilingFollowsItsHeadline() async throws {
+        try await StoryBuilder(database).build(now: now)
+
+        try await database.writer.write { db in
+            try db.execute(
+                sql: """
+                    UPDATE story
+                    SET topics_asked_at = ?,
+                        topics_asked_for = title || char(10) || COALESCE(substr(summary, 1, 240), '')
+                    """,
+                arguments: [now]
+            )
+        }
+        #expect(try await FileStoriesJob(database, now: now).remaining() == 0)
+
+        // The model writes a headline, which is the whole of what the filing
+        // was asked about.
+        try await database.writer.write { db in
+            try db.execute(sql: "UPDATE story SET title = 'Une réforme du calendrier scolaire'")
+        }
+
+        let left = try await FileStoriesJob(database, now: now).remaining()
+        #expect(left > 0)
+    }
+
+    private func waiting(under work: (sql: String, arguments: StatementArguments)) async throws -> Int {
+        try await database.writer.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM story WHERE \(work.sql)", arguments: work.arguments) ?? 0
+        }
     }
 
     @Test("A story the model cannot file does not block the ones behind it")
@@ -752,6 +901,17 @@ struct DigestTests {
                 story.topicsAskedAt = self.now
                 try story.update(db)
             }
+            // What the brief was written from, and what the filing was asked
+            // about, as the two jobs write them : without either, every story
+            // reads as one whose question has changed, which is exactly what
+            // the two predicates are now for.
+            try db.execute(sql: "UPDATE story SET brief_members = \(BriefStoriesJob.membersKey)")
+            try db.execute(
+                sql: """
+                    UPDATE story
+                    SET topics_asked_for = title || char(10) || COALESCE(substr(summary, 1, 240), '')
+                    """
+            )
         }
 
         // The queue is empty because everything has been asked, not because
@@ -771,6 +931,10 @@ struct DigestTests {
                 story.topicsAskedAt = self.now
                 try story.update(db)
             }
+            // What the brief was written from, as `BriefStoriesJob.save` writes
+            // it : without it every story reads as one whose articles have
+            // changed, which is exactly what the predicate is now for.
+            try db.execute(sql: "UPDATE story SET brief_members = \(BriefStoriesJob.membersKey)")
         }
 
         await service.discardWhatTheModelWrote()

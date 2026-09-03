@@ -29,6 +29,8 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         case briefLocked = "brief_locked"
         case briefLocale = "brief_locale"
         case topicsAskedAt = "topics_asked_at"
+        case briefMembers = "brief_members"
+        case topicsAskedFor = "topics_asked_for"
         case signature
         case articleCount = "article_count"
         case feedCount = "feed_count"
@@ -59,6 +61,33 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
     /// stop everything behind it from being asked at all.
     var topicsAskedAt: Date?
 
+    /// What the story was called when it was filed.
+    ///
+    /// **What makes the filing answerable again.** A story the model declined,
+    /// or answered about with nothing, was stamped and never asked again : one
+    /// refusal on one border report and it stood under no rubric for life. And
+    /// the filing outruns the writing, so a story could be filed on the raw
+    /// headline of whichever article was nearest the middle of the group and
+    /// then keep that rubric under the headline the model wrote afterwards.
+    ///
+    /// The headline and the first lines of the standfirst, which is the whole
+    /// of what the model is asked.
+    var topicsAskedFor: String?
+
+    /// The articles the brief above was written from.
+    ///
+    /// **What makes the brief answerable again.** The question used to be `has
+    /// the model been asked about this story, in this language ?`, and a story
+    /// is a thing whose articles change : they join it as the press picks the
+    /// subject up, and they leave it as a purge takes them or as they fall out
+    /// of the window the page reads. Asked only once, a story kept a headline
+    /// written about pieces it no longer held.
+    ///
+    /// The identifiers of the ones the model is shown, sorted so the key is a
+    /// set : a reshuffle among them costs nothing, and a newcomer displacing
+    /// the oldest of them is a new question.
+    var briefMembers: String?
+
     /// The vocabulary its articles share, which is what a new article is
     /// compared against.
     var signature: TextSignature?
@@ -77,6 +106,8 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         briefLocked: Bool = false,
         briefLocale: String? = nil,
         topicsAskedAt: Date? = nil,
+        briefMembers: String? = nil,
+        topicsAskedFor: String? = nil,
         signature: TextSignature? = nil,
         articleCount: Int = 0,
         feedCount: Int = 0,
@@ -91,6 +122,8 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         self.briefLocked = briefLocked
         self.briefLocale = briefLocale
         self.topicsAskedAt = topicsAskedAt
+        self.briefMembers = briefMembers
+        self.topicsAskedFor = topicsAskedFor
         self.signature = signature
         self.articleCount = articleCount
         self.feedCount = feedCount

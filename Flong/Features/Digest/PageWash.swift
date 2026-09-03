@@ -45,6 +45,15 @@ struct PageWash: View {
     /// The picture the page is built around. No picture, no colour, no wash.
     let url: URL?
 
+    /// How far the page has been scrolled, so the colour goes up with the head
+    /// of the page it belongs to.
+    ///
+    /// **Given rather than taken.** The wash used to live inside the scrolling
+    /// content, which moved it for free ; that is also what put it inside a
+    /// rectangle narrower than the page and inside the scroll view's own clip.
+    /// See the note on the frame below.
+    var scrolled: CGFloat = 0
+
     @Environment(\.theme) private var theme
     @Environment(\.colorScheme) private var scheme
     @Environment(\.colorSchemeContrast) private var contrast
@@ -56,16 +65,39 @@ struct PageWash: View {
             if !theme.paints, contrast != .increased, let wash {
                 LinearGradient(stops: stops(of: wash), startPoint: .top, endPoint: .bottom)
                     .frame(height: Self.height)
-                    // The width of the window rather than of the column : the
-                    // page holds its type to a measure, and light is not held
-                    // to anything.
-                    .containerRelativeFrame(.horizontal)
+                    // **Wider than whatever holds it.** The width of the
+                    // window rather than of the column, since the page holds
+                    // its type to a measure and light is not held to anything,
+                    // and then ``overshoot`` past that on each side.
+                    //
+                    // A transition is what needs it. A push and the article
+                    // sheet both turn a screen into an inset, rounded card, and
+                    // a card is narrower than the container the wash sized
+                    // itself against : the wash's own vertical edge then falls
+                    // inside the card and reads as a band of colour stopping in
+                    // the middle of the page. Drawn past every edge there is no
+                    // edge of it left to see : the card crops it, the way a
+                    // window crops what is behind it.
+                    // **The width of the page, because it is the page's own
+                    // background now.** It used to be the background of the
+                    // column of type, which is held to a measure and inset by
+                    // its own margins : a rectangle narrower than the page,
+                    // inside a scroll view that clips. At rest the clip fell on
+                    // the edges of the screen and none of that showed. The
+                    // moment a transition turned the page into an inset card,
+                    // the clip moved inwards and the rectangle's own three
+                    // edges - top, left and right - came into view as hard
+                    // lines across a page they had no business being in.
+                    //
+                    // Drawn behind the scroll view and past every edge, the
+                    // only boundary left is the card's own.
+                    .containerRelativeFrame(.horizontal) { width, _ in width + Self.overshoot * 2 }
                     // Up under the bar and further. The wash is laid at the
                     // top of the page's own content, which begins below the
                     // bar : left there, it would draw a hard edge across the
                     // screen at exactly the height a fade exists to make
                     // invisible. See ``rise`` for how far above that, and why.
-                    .offset(y: -(Self.rise + Self.hold))
+                    .offset(y: -(Self.rise + Self.hold) - scrolled)
                     // One lead giving way to another is a dissolve and not a
                     // cut : the colour of the page is not news.
                     .transition(.opacity)
@@ -132,6 +164,13 @@ struct PageWash: View {
     private static let lift: Double = 2.2
     private static let floor: Double = 0.10
     private static let colourless: Double = 0.03
+
+    /// How far past each side of its container the wash is drawn.
+    ///
+    /// Enough to cover the inset of a card in transition on the widest window
+    /// Flong opens in. It costs nothing : the extra is gradient nobody ever
+    /// sees, which is exactly the point of it.
+    private static let overshoot: CGFloat = 220
 
     /// The whole of it, from the nothing above the bar to the nothing in the
     /// page.

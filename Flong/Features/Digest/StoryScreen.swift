@@ -25,6 +25,9 @@ struct StoryScreen: View {
     @Environment(\.theme) private var theme
     @State private var isExplaining = false
 
+    /// How far the page has been scrolled, which the wash behind it follows.
+    @State private var scrolled: CGFloat = 0
+
     private var story: DigestStory? {
         (model.digest.live + model.digest.stories).first { $0.id == storyID }
     }
@@ -52,12 +55,18 @@ struct StoryScreen: View {
             .editorialColumn()
             .padding(.horizontal, 22)
             .padding(.bottom, 90)
-            // The same light as the front page, from this story's own picture,
-            // which is the one the row that was tapped was carrying : the page
-            // opens in the colour the reader pressed rather than in white.
-            .background(alignment: .top) {
-                PageWash(url: story?.imageURL)
-            }
+        }
+        // The same light as the front page, from this story's own picture,
+        // which is the one the row that was tapped was carrying : the page
+        // opens in the colour the reader pressed rather than in white. Behind
+        // the scroll view for the reason set out in ``DigestScreen``.
+        .background(alignment: .top) {
+            PageWash(url: story?.imageURL, scrolled: scrolled)
+        }
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top
+        } action: { _, position in
+            scrolled = position
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         .navigationTitle(Text("Story"))

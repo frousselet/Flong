@@ -76,7 +76,15 @@ Without a model the story takes the title of its most central article, so it is 
 
 **The language a brief was written in is stored with it.** Nothing else about a story changes when a reader changes the language of their device, so nothing else would ever ask for the brief to be written again, and the page would stay in a language its reader no longer reads. A brief whose language is not the reader's current one goes back in the queue, exactly as one written without a model does when a model turns up.
 
-The rule for asking is one thing : **has the model been asked about this story, in this language?** A story it was never asked about is asked as soon as a model appears ; one it answered, refused, or answered in the wrong language has been asked, and asking again in the same language would get the same answer ; and a reader who changes language has changed the question. It is the language *asked in* rather than the language written in, because a refusal has no language, and counting a refusal as unanswered asked about it for ever.
+The rule for asking is two things : **has the model been asked about these articles, in this language?**
+
+**About these articles, and not about this story.** A story keeps one identity for life while its articles come and go : they join it as the press picks the subject up, and they leave it as a purge takes them or as they fall out of the three days the page reads. Nothing recorded which ones the model had been shown, so a story briefed on three articles about a protest kept that headline and that standfirst over the photography that had joined the group a week later, and a reader met a police headline above three pieces on lens choice. `story.brief_members` names the ones it was written from, sorted so the key is a set : the same articles in another order cost nothing, and a newcomer displacing the oldest of them is a new question.
+
+**And they are the articles the reader is looking at.** The model used to be shown the most central members while the page showed the newest, which are two different lists : the headline could honestly describe articles nobody could see under it. It is shown the same six, newest first, for the reason the picture is taken from the newest member that carries one : a story is shown for where it has got to rather than for where it started.
+
+**Whether there is a standfirst is not part of the question.** It was, and a brief may honestly have none : the model wrote a headline and its line came back a paragraph, or no article in the group carries a line a publisher wrote. Asked on the absence of a summary, every one of those came back at every pass for ever, and three of them in one batch stopped the whole phase.
+
+The rest of the rule stands : A story it was never asked about is asked as soon as a model appears ; one it answered, refused, or answered in the wrong language has been asked, and asking again in the same language would get the same answer ; and a reader who changes language has changed the question. It is the language *asked in* rather than the language written in, because a refusal has no language, and counting a refusal as unanswered asked about it for ever.
 
 **What comes back is checked against the language it was asked for**, by the system's own recognizer rather than by looking for words, and a brief in the wrong language is dropped for the article's own headline : better the language somebody chose to write in than a machine's wrong one. A headline too short to judge is taken at its word, since half the words in one are proper nouns that belong to no language at all.
 
@@ -87,6 +95,12 @@ Nothing in the ordinary interface asks the model to re-read a page it has alread
 `DigestService.discardWhatTheModelWrote()` survives as the primitive, sparing a headline the reader settled themselves, subject included. The one thing that calls it is the development repair of `docs/technical/sync.md`, which is meant to redo the whole of the work and would otherwise redo none of the model's half.
 
 The prompt is bounded before it is sent : six articles and two hundred and forty characters each, and where the system can count tokens exactly, a prompt that would leave no room for an answer is not sent at all. The cost of asking anyway is a refusal, and the cost of a refusal is a story with no headline.
+
+**A failure of the model is not an answer about the story.** A rate limit, an asset still downloading, a language this model does not write : none of them says anything about these articles, and stamping the story would leave it wearing its own headline for ever on a device that was busy for a second. A refusal is different : the model has read this and declined. The line was drawn in one of the three places a brief can fail and not in the other two, so a second call that hit a rate limit stamped what the first call would have left alone ; `StorySummarizer.outcome(of:keeping:in:)` is the one place it is drawn now.
+
+**A standfirst the model did not write is never attributed to it.** A line that came back repeating the headline, or running to a paragraph, used to be replaced by the article's own excerpt while the brief stayed marked as generated : the page draws that mark on the standfirst and nowhere else, and VoiceOver read `Written by the model` over a sentence it had not written. It is dropped instead. A headline the model wrote above no standfirst at all is the honest shape, and the page is a page of headlines.
+
+**And an excerpt is not a standfirst.** Where a publisher writes no summary, the excerpt is the top of the article body flattened and cut at three hundred characters on the nearest space : a sentence stopped in the middle with whatever the feed staples underneath. A release note went out as a standfirst, ticket numbers and a `Tags:` footer included. `StorySummarizer.standfirst(from:under:)` asks every article in the story for a line a publisher actually wrote, cuts the footers, and drops what only repeats the headline or reads as a body.
 
 ## Subjects
 
@@ -195,6 +209,12 @@ A model answers in the language of the words nearest its answer, and a sentence 
 The whole set is rewritten on each rebuild. A subject is a reading of the page as it stands, and a page that has changed deserves a fresh one rather than yesterday's with today's stories bolted on. They are stored as a column on the story, never a table : a story is under one subject, subjects are derived data that is never synchronized, and a table would be three joins to say what a string says.
 
 The front page looks back **three days**. Not a day, or a reader opening Flong on Monday morning would find a page emptied by the weekend ; not a month, since a front page is about what is current.
+
+## What the filing was asked about
+
+The same rule as the brief, for the same reason. A story the model declined, or answered about with nothing, was stamped as asked and never asked again : one refusal on one border report and it stood under no rubric for the rest of its life, invisible to every pill, with no gesture anywhere that could give it one. And the filing outruns the writing - a brief costs three model calls to a filing's one - so a story could be filed on the raw headline of whichever article was nearest the middle of the group, and then keep that rubric under the headline the model wrote afterwards.
+
+`story.topics_asked_for` holds the headline and the head of the standfirst, which is the whole of what the model is asked. A story whose question has changed is asked again. And the queue takes the briefed first, so the durable answer is decided on the written headline rather than on the raw one : deferred, never blocked, since a story that never gets a standfirst is still filed, behind the ones that have one.
 
 ## When the model will not
 

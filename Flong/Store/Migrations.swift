@@ -925,6 +925,44 @@ nonisolated extension AppDatabase {
             }
         }
 
+        /// What the brief was written from.
+        ///
+        /// A story keeps one identity for life while its articles come and go,
+        /// and nothing recorded which ones the model had been shown : once
+        /// briefed, a story was never asked about again whatever happened to
+        /// its members, so a headline written about a protest stayed over the
+        /// photography that joined the group a week later. Every existing brief
+        /// comes out `NULL` here, which asks about each story once.
+        migrator.registerMigration("v39.whatTheBriefWasWrittenFrom") { db in
+            try db.alter(table: "story") { table in
+                table.add(column: "brief_members", .text)
+            }
+        }
+
+        /// What the story was called when it was filed.
+        ///
+        /// A story the model declined, or answered about with nothing, was
+        /// stamped as asked and never asked again : one refusal on one ordinary
+        /// news story, and it wore no rubric for the rest of its life. And a
+        /// story filed before its headline was written kept the rubric chosen
+        /// from the headline of whichever article happened to be nearest the
+        /// middle of the group. The question is written down beside the answer
+        /// now, so a story whose headline changed is a story asked again.
+        ///
+        /// The second statement is the repair v22 already ships : it reopens
+        /// every story standing under no rubric at all, whatever put it there.
+        migrator.registerMigration("v40.askedAboutWhat") { db in
+            try db.alter(table: "story") { table in
+                table.add(column: "topics_asked_for", .text)
+            }
+            try db.execute(
+                sql: """
+                    UPDATE story SET topics_asked_at = NULL
+                    WHERE topics_asked_at IS NOT NULL AND id NOT IN (SELECT story_id FROM story_topic)
+                    """
+            )
+        }
+
         return migrator
     }
 

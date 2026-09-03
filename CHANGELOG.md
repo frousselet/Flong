@@ -23,6 +23,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- A story's headline and standfirst are written from the articles the reader is looking at, and written again when those articles change: a story briefed on a protest kept that headline over the photography that joined the group a week later.
+- A story the model declined to file, or filed before its headline was written, is asked about again, and the filing waits for the writing so the rubric is chosen from the written headline rather than from a raw one.
+- A standfirst the model did not write is no longer attributed to it, and an article's excerpt is no longer shown as one: a release note went out as a summary with its ticket numbers and its `Tags:` footer.
+- A model that is merely busy no longer counts as a model that has read the story and declined, wherever the failure happens.
+- The wash behind a page is the page's own background rather than the background of the column of type inside it, so a transition that turns the page into a card no longer shows the three edges of a rectangle narrower than the page.
+- The front page names its own lead, so the story wearing the large picture is the one leading the page rather than whichever row was the lead before the last refresh.
 - Flong actually notifies : a pass with no window, which is how iOS runs a background refresh once it has reclaimed the process, no longer believes the reader is looking at it and silences every notice while stamping the watermark past it.
 - Every notification carries a sound, and one arriving while Flong is open is shown rather than silently dropped.
 - A background refresh on cellular sends its requests instead of refusing the network and reporting success, and it holds eight seconds back out of its budget so the grouping and the notice that follow the fetching are not cancelled the moment it ends.
