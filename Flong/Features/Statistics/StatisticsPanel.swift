@@ -40,6 +40,7 @@ struct StatisticsPanel: View {
     @Environment(\.theme) private var theme
     @Environment(\.colorScheme) private var scheme
     @Environment(\.publishers) private var publishers
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     /// Carries a pill's glass from one window to the next.
     @Namespace private var pills
@@ -59,7 +60,6 @@ struct StatisticsPanel: View {
             }
             .editorialColumn()
             .padding(.horizontal, 20)
-            .padding(.top, 6)
             .padding(.bottom, 32)
         }
         #if os(macOS)
@@ -134,7 +134,7 @@ struct StatisticsPanel: View {
                         pill(range)
                     }
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, Figures.brim)
             }
         }
         .scrollIndicators(.hidden)
@@ -173,7 +173,7 @@ struct StatisticsPanel: View {
             if report.isEmpty {
                 nothing
             } else {
-                VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: Figures.gap) {
                     figures(report)
                     flow(report)
                     day(report)
@@ -184,7 +184,6 @@ struct StatisticsPanel: View {
                     bodies(report)
                     languages(report)
                 }
-                .padding(.top, 6)
             }
         } else if model.isCounting {
             ProgressView()
@@ -218,9 +217,12 @@ struct StatisticsPanel: View {
     /// makes a number mean anything : how it compares with the window before,
     /// or what share of the whole it is.
     private func figures(_ report: Statistics) -> some View {
-        let columns = [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)]
+        let columns = [
+            GridItem(.flexible(), spacing: Figures.gap),
+            GridItem(.flexible(), spacing: Figures.gap),
+        ]
 
-        return LazyVGrid(columns: columns, spacing: 16) {
+        return LazyVGrid(columns: columns, spacing: Figures.gap) {
             Figure(
                 value: Text(report.arrived.formatted()),
                 caption: Text("Articles"),
@@ -246,11 +248,24 @@ struct StatisticsPanel: View {
         }
     }
 
-    /// How much more or less than the window before, where there was one.
+    /// What the window before held, where there was one.
+    ///
+    /// **The count and not a change in per cent.** It read
+    /// `+915 % par rapport à la période précédente`, which is three problems in
+    /// one line : it does not fit, so at a large type size it truncated in the
+    /// middle of a word ; a device collecting for ten days makes a number like
+    /// that out of nothing ; and a percentage of a percentage is arithmetic the
+    /// reader has to undo to get at the fact. `Période précédente : 391` beside
+    /// `3 989` is the same comparison, made by the reader, in four words.
+    ///
+    /// **And it is two words rather than four.** `Période précédente` is itself
+    /// two lines in a tile at an accessibility size, which left the number it
+    /// was introducing off the end of the third. The window is named on the
+    /// pill at the top of the page, so `Avant` is the whole of what has to be
+    /// said here.
     private func change(from before: Int?, to now: Int) -> Text? {
-        guard let before, let change = Statistics.change(from: before, to: now) else { return nil }
-        let written = change.formatted(.percent.precision(.fractionLength(0)).sign(strategy: .always()))
-        return Text("\(written) on the stretch before")
+        guard let before, before > 0 else { return nil }
+        return Text("Before: \(before)")
     }
 
     /// One count as a share of another, written the way a share is read.
@@ -321,7 +336,12 @@ struct StatisticsPanel: View {
 
             Spacer(minLength: 6)
 
-            if !source.flow.isEmpty {
+            // **The shape goes when the type grows.** It is a picture of the
+            // row and the number beside it is the row's fact : holding sixty
+            // points for the picture at an accessibility size cut
+            // `news.ycombinator.com` down to `news.yc…`, which is the one thing
+            // in the row nobody can do without.
+            if !source.flow.isEmpty, !typeSize.isAccessibilitySize {
                 Sparkline(values: source.flow)
                     .frame(width: 62, height: 18)
             }
@@ -421,7 +441,7 @@ struct StatisticsPanel: View {
         Locale.current.localizedString(forLanguageCode: tag)?.localizedCapitalized ?? tag.uppercased()
     }
 
-    /// What each source actually puts in its feed.
+    /// What each source actually puts in front of the reader.
     ///
     /// **The one card here about the feeds rather than about the news.** A feed
     /// may carry the whole piece or a headline and a link, and nothing else in
@@ -430,56 +450,56 @@ struct StatisticsPanel: View {
     /// real corpus, more than half of every body stored is under two hundred
     /// characters and one paper's median is six.
     ///
-    /// **Two short lists rather than a ranking of forty.** The question is not
-    /// where a source places, it is which of the two kinds it is, and the
-    /// middle of the list is where a reader would have to decide that for
-    /// themselves. The ends say it.
+    /// **A verdict per source, and no character count.** It drew the middle
+    /// length of each feed's bodies, which is a true number and a question
+    /// rather than an answer : characters of what, and is that a lot. And it
+    /// cut the list in two and called the top half whole articles and the
+    /// bottom half headlines, so a reader following eight generous sources had
+    /// the bottom four of them accused of sending nothing. The length is
+    /// measured against a length now, and what the reader is shown is the
+    /// answer to the question they actually have, which is whether they can
+    /// read this source here : see ``BodyLength/Kind``.
     @ViewBuilder
     private func bodies(_ report: Statistics) -> some View {
-        if report.bodies.count >= 4 {
-            let generous = report.bodies.prefix(4)
-            let terse = report.bodies.suffix(4).reversed()
-
-            card(Text("What the feeds contain")) {
-                VStack(alignment: .leading, spacing: 16) {
-                    lengths(Text("Full article"), Array(generous))
-                    lengths(Text("Headline only"), Array(terse))
+        if !report.bodies.isEmpty {
+            card(Text("What the feeds send")) {
+                VStack(spacing: 0) {
+                    ForEach(Array(report.bodies.prefix(StatisticsStore.ranked).enumerated()), id: \.element.id) {
+                        index,
+                        source in
+                        if index > 0 {
+                            Divider().padding(.leading, 30)
+                        }
+                        length(source)
+                    }
                 }
             }
         }
     }
 
-    private func lengths(_ title: Text, _ sources: [BodyLength]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            title
-                .font(theme.metadata)
-                .foregroundStyle(.tertiary)
-                .textCase(.uppercase)
+    private func length(_ source: BodyLength) -> some View {
+        let identity = source.domain.flatMap { publishers[$0] }
 
-            ForEach(sources) { source in
-                let identity = source.domain.flatMap { publishers[$0] }
+        return HStack(spacing: 10) {
+            SourceIconView(identity: identity, side: 20)
 
-                HStack(spacing: 8) {
-                    SourceIconView(identity: identity, side: 16)
-                    Text(verbatim: identity?.name ?? source.name)
-                        .font(.subheadline)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    Spacer(minLength: 6)
-                    // Characters and not words : a language is not a number of
-                    // words per idea, and the two lists are read against each
-                    // other rather than against a reading speed.
-                    //
-                    // `caractères` and not `signes`, which is a printer's word
-                    // for the same thing and a word nobody outside a print shop
-                    // uses.
-                    Text("\(source.median) characters")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityElement(children: .combine)
-            }
+            Text(verbatim: identity?.name ?? source.name)
+                .font(.subheadline)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Spacer(minLength: 8)
+
+            // The verdict is the whole of what this row says, so the name is
+            // what gives way when there is not room for both.
+            Text(source.kind.name)
+                .font(.caption)
+                .foregroundStyle(source.kind == .whole ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.secondary))
+                .lineLimit(1)
+                .layoutPriority(1)
         }
+        .padding(.vertical, 9)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - The shape every card takes
@@ -535,7 +555,7 @@ struct Figure: View {
                 footnote
                     .font(theme.metadata)
                     .foregroundStyle(.tertiary)
-                    .lineLimit(2)
+                    .lineLimit(3)
                     .padding(.top, 2)
             }
         }

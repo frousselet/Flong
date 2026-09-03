@@ -67,6 +67,18 @@ A feed has to have published at least eight articles in the window to be measure
 
 A median cannot be added to another median, so a publisher's three feeds cannot be folded the way their counts can. The busiest of them answers for the publisher, which is the one the reader mostly sees.
 
+**The reader is shown a verdict and never the length.** Three bands, from `StatisticsStore.wholePiece` and `StatisticsStore.excerpt` :
+
+| Median | Verdict |
+| --- | --- |
+| 1 200 characters and over | `Article complet` |
+| 300 to 1 199 | `Extrait` |
+| under 300 | `Titre seul` |
+
+Two things were wrong with drawing the number instead. `3 461 caractères` is a true figure and a question rather than an answer : characters of what, and is that a lot. And the card cut the ranking in two and called the top half whole articles and the bottom half headlines, which is a verdict about a position rather than about a feed : a reader following eight generous sources had the bottom four of them accused of sending nothing. A length is measured against a length.
+
+The bands are set against the corpus they were measured on : `theguardian.com` at 730 lands in the middle where it belongs, `bbc.co.uk` at 109 with the headlines, and `Le Monde` at six with them. `StatisticsTests.theVerdictIsAThreshold` pins the boundaries.
+
 ## What is deliberately not on the page
 
 **Words read, or time spent reading.** There is no word count in the schema and the only source for one is `entry_body.plain_text`, which is the publisher's feed body rather than the article. Measured on a real corpus, 3 252 of 5 956 bodies are under two hundred characters and one paper's median is **six**. A figure reading `vous avez lu 4 h 12` would be the length of teasers dressed up as articles. The honest half of the idea is the card above, which compares sources with each other instead.
@@ -84,6 +96,16 @@ Every label is a word the rest of the application already uses : `Sources`, `Aut
 The first cut of this page invented a synonym for each of them : `Qui publie` for the sources, `Signatures` for the authors, `Dans l'actualité` for the newsmakers, `Dit deux fois` for the duplicates, `Ce qui arrive dans le flux` for the body lengths. Every one of those is a phrase describing what the card does instead of naming what it holds, and the effect is a reader carrying two names for one thing. It is the same mistake the sources list already corrected when it stopped naming three desks of one paper separately.
 
 The rule is in `CLAUDE.md` and it is worth repeating here because a page of figures is where it is easiest to break : say the thing that matters, then stop. `LocalizationTests.statisticsSpeakPlainly` is what notices if it drifts back.
+
+## What has to fit
+
+The page is measured at the accessibility type sizes as well as at the default one, because three things on it break there and each breaks silently :
+
+- **The row of windows floats over the page**, so what separates it from the cards passing behind is the air it stands in and nothing else. `Figures.brim` is that air, and `Figures.gap` is the one rhythm every other block on the page keeps : the figures were sixteen apart in their grid, fourteen across it and twenty-two from the cards, which reads as three relationships between things that have one.
+- **A source's sparkline goes at an accessibility size.** It holds sixty points whatever the type does, and holding them cut `news.ycombinator.com` down to `news.yc…`, which is the one thing in the row nobody can do without. The count beside it is the row's fact ; the shape is a picture of it.
+- **The dates under the flow chart go with it**, for the same reason : four of them across a phone at that size is two of them hanging off the ends. The line above the chart already names the mark and its count.
+
+The footnote under a figure is `Avant : 391` and not `+915 % par rapport à la période précédente`, which did not fit, made an absurd number out of a device that had been collecting for ten days, and asked the reader to undo a percentage to get at a fact.
 
 ## Cost
 

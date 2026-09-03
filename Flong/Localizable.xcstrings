@@ -32,17 +32,6 @@
         }
       }
     },
-    "%@ on the stretch before" : {
-      "comment" : "Under a figure : how it compares with the same length of time just before.",
-      "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ par rapport à la période précédente"
-          }
-        }
-      }
-    },
     "%@ · %lld results" : {
       "comment" : "Under a search read as a sentence. The first argument is what it was understood to ask for, the second how many articles answered.",
       "localizations" : {
@@ -321,46 +310,6 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld auteurs"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "%lld characters" : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld character"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld characters"
-                }
-              }
-            }
-          }
-        },
-        "fr" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld caractère"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld caractères"
                 }
               }
             }
@@ -1510,6 +1459,17 @@
         }
       }
     },
+    "Before: %lld" : {
+      "comment" : "Under a figure : how many there were over the same length of time just before. The window itself is named on the pill at the top of the page.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avant : %lld"
+          }
+        }
+      }
+    },
     "Books" : {
       "localizations" : {
         "fr" : {
@@ -1890,6 +1850,17 @@
         }
       }
     },
+    "Excerpt" : {
+      "comment" : "What a feed carries : a paragraph or two, and the rest on the site.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extrait"
+          }
+        }
+      }
+    },
     "Full article" : {
       "localizations" : {
         "fr" : {
@@ -1905,7 +1876,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Titre seulement"
+            "value" : "Titre seul"
           }
         }
       }
@@ -2126,12 +2097,12 @@
         }
       }
     },
-    "What the feeds contain" : {
+    "What the feeds send" : {
       "localizations" : {
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Contenu des flux"
+            "value" : "Ce que les flux envoient"
           }
         }
       }

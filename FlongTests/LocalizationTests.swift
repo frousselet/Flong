@@ -57,9 +57,10 @@ struct LocalizationTests {
         #expect(String(localized: "Duplicates", locale: french) == "Doublons")
         #expect(String(localized: "Articles received", locale: french) == "Articles reçus")
         #expect(String(localized: "Articles per hour", locale: french) == "Articles par heure")
-        #expect(String(localized: "What the feeds contain", locale: french) == "Contenu des flux")
+        #expect(String(localized: "What the feeds send", locale: french) == "Ce que les flux envoient")
         #expect(String(localized: "Full article", locale: french) == "Article complet")
-        #expect(String(localized: "Headline only", locale: french) == "Titre seulement")
+        #expect(String(localized: "Excerpt", locale: french) == "Extrait")
+        #expect(String(localized: "Headline only", locale: french) == "Titre seul")
         #expect(String(localized: "Peak hour", locale: french) == "Heure de pointe")
         #expect(String(localized: "No articles over this period", locale: french) == "Aucun article sur cette période")
 
@@ -72,8 +73,10 @@ struct LocalizationTests {
 
         // A feed is a `flux` here and nowhere a `fil`.
         #expect(inFrench("\(3) feeds") == "3 flux")
-        #expect(inFrench("\(1) characters") == "1 caractère")
-        #expect(inFrench("\(9) characters") == "9 caractères")
+
+        // Two words, because `Période précédente` is itself two lines in a tile
+        // at an accessibility size and left its own number off the end.
+        #expect(inFrench("Before: \(391)") == "Avant : 391")
     }
 
     @Test("The third way to find a source speaks French")
