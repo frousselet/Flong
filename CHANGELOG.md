@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The front page keeps its frame rate under the thumb : the scroll position it washes its head with was rebuilding the whole page on every frame, and it is held apart from the page now.
 - The line of collections reads across again : `Personnalités favorites` takes two lines where its neighbours take one, and the room for the second was not held open, so every count in the row sat on a different baseline.
 
 - A story's headline and standfirst are written from the articles the reader is looking at, and written again when those articles change: a story briefed on a protest kept that headline over the photography that joined the group a week later.

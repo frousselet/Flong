@@ -32,7 +32,10 @@ struct DigestScreen: View {
     @Namespace private var pills
 
     /// How far the page has been scrolled, which the wash behind it follows.
-    @State private var scrolled: CGFloat = 0
+    ///
+    /// An object rather than a number, so that a scroll moves the wash without
+    /// rebuilding the page it is behind. See ``PageOffset``.
+    @State private var offset = PageOffset()
 
     var body: some View {
         ScrollView {
@@ -68,12 +71,12 @@ struct DigestScreen: View {
         // It still scrolls away with the head of the page, from the offset
         // below rather than by being carried along.
         .background(alignment: .top) {
-            PageWash(url: model.digest.lead?.imageURL, scrolled: scrolled)
+            PageWash(url: model.digest.lead?.imageURL, offset: offset)
         }
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top
         } action: { _, position in
-            scrolled = position
+            offset.scrolled = position
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         // **The pull, on the front page and nowhere else.** The page does keep

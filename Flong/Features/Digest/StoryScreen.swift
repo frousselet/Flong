@@ -26,13 +26,29 @@ struct StoryScreen: View {
     @State private var isExplaining = false
 
     /// How far the page has been scrolled, which the wash behind it follows.
-    @State private var scrolled: CGFloat = 0
+    ///
+    /// An object rather than a number, so that a scroll moves the wash without
+    /// rebuilding the page it is behind. See ``PageOffset``.
+    @State private var offset = PageOffset()
 
+    /// The story this page is about, found among the ones the front page holds.
+    ///
+    /// **The two halves are searched, and never joined.** Joining them is a
+    /// third array of every story on the page, built to be looked through once
+    /// and thrown away, and the body asked for it once for the picture and once
+    /// more for every article under it.
     private var story: DigestStory? {
-        (model.digest.live + model.digest.stories).first { $0.id == storyID }
+        model.digest.live.first { $0.id == storyID }
+            ?? model.digest.stories.first { $0.id == storyID }
     }
 
     var body: some View {
+        // Read once for the whole page. It was a computed property called from
+        // the picture, from the head of the page and from every row under it,
+        // which is one search of the front page per article per pass of the
+        // body.
+        let story = self.story
+
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 if let story {
@@ -61,12 +77,12 @@ struct StoryScreen: View {
         // opens in the colour the reader pressed rather than in white. Behind
         // the scroll view for the reason set out in ``DigestScreen``.
         .background(alignment: .top) {
-            PageWash(url: story?.imageURL, scrolled: scrolled)
+            PageWash(url: story?.imageURL, offset: offset)
         }
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top
         } action: { _, position in
-            scrolled = position
+            offset.scrolled = position
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         .navigationTitle(Text("Story"))
