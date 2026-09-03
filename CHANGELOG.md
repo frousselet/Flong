@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added
 
 - An `À propos` page at the foot of the reader's own panel : the icon, the version and the build, what Flong does without, and links to the source, the licence and its one dependency.
+- A `Nouveaux articles` switch in the notifications panel, covering every source at once, with the per-source, per-writer and per-person switches kept underneath it.
 
 ### Changed
 
@@ -22,6 +23,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Flong actually notifies : a pass with no window, which is how iOS runs a background refresh once it has reclaimed the process, no longer believes the reader is looking at it and silences every notice while stamping the watermark past it.
+- Every notification carries a sound, and one arriving while Flong is open is shown rather than silently dropped.
+- A background refresh on cellular sends its requests instead of refusing the network and reporting success, and it holds eight seconds back out of its budget so the grouping and the notice that follow the fetching are not cancelled the moment it ends.
+- A new story and an addition to a shared collection are announced by the half-hourly refresh, and no longer only by the full pass that asks for the mains.
+- The watermark stays where it was when the read that feeds it failed, and stops at the last row read when a pass brought more than one notice can name, so nothing is marked as told that nobody was told.
+- Notification wording : what an article came from leads and the headline is the message, since a banner truncates the title and not the body, a body names three headlines rather than twenty, and a filing names the collection, then who added to it, then what they added.
+- The French for a story is `actualité` and no longer `fil`, which is the reader's own word for an RSS feed, and the two collaboration notices reach their French translation at all.
 - Opening one collection after another no longer shows a flash of the first one's rows in the second : a page is drawn before its own read has run, and what it is handed is now the rows read for it rather than whatever the model was holding.
 
 - Somebody invited to a shared collection who has not accepted yet is named from the reader's own address book, where they let Flong look, rather than drawn as the bare telephone number the invitation went to with a digit for an initial : it is asked for at the moment a collection holds somebody who cannot be named, refusing it costs the name and nothing else, and nothing found there ever leaves the device or enters anybody's card.

@@ -203,6 +203,16 @@ nonisolated enum ArticleFilter: Hashable, Sendable {
 
 /// Reads and writes articles.
 nonisolated struct ArticleStore: Sendable {
+    /// How many arrivals one notice is ever built out of.
+    ///
+    /// A notification has room for a title, a subtitle and about four lines,
+    /// and a reader who follows three hundred feeds can be brought two hundred
+    /// articles by one pass. Twenty is already more than the sentence can name ;
+    /// what it is really for is the watermark, which is stamped from the last
+    /// row read rather than from the clock, so the rest waits for the next pass
+    /// instead of being lost.
+    static let mostBeforeAnnouncing = 20
+
     private let database: AppDatabase
 
     init(_ database: AppDatabase) {
@@ -791,6 +801,13 @@ nonisolated struct ArticleStore: Sendable {
     nonisolated struct Arrival: Identifiable, Hashable, Sendable {
         let id: UUID
         let title: String
+        /// When this device received it.
+        ///
+        /// Carried out of the query so the watermark can be stamped past what
+        /// was actually read rather than past the moment of reading : the
+        /// answer is capped, and a pass that brought more than it returned
+        /// would otherwise leave the rest behind the mark for good.
+        let receivedAt: Date
         /// What the source is called.
         let source: String
         /// The picture that stands for the article, when it has one.
@@ -833,6 +850,7 @@ nonisolated struct ArticleStore: Sendable {
         init(
             id: UUID,
             title: String,
+            receivedAt: Date = Date(),
             source: String,
             picture: URL? = nil,
             author: String? = nil,
@@ -840,6 +858,7 @@ nonisolated struct ArticleStore: Sendable {
         ) {
             self.id = id
             self.title = title
+            self.receivedAt = receivedAt
             self.source = source
             self.picture = picture
             self.author = author
@@ -870,12 +889,27 @@ nonisolated struct ArticleStore: Sendable {
     /// same article arriving through two of one newsroom's feeds is one piece
     /// of news, and being told about what they read on the iPad an hour ago is
     /// worse than not being told.
-    func arrived(since moment: Date, limit: Int = 20) async throws -> [Arrival] {
+    ///
+    /// **Every feed, where the reader asked for every feed.** The switch on a
+    /// source is the finer instrument and stays exactly as it was ; the panel's
+    /// own switch says the same thing about all of them at once, and passing it
+    /// here is what keeps the two one question rather than two answers to
+    /// reconcile.
+    ///
+    /// - Parameter limit: how many are read at most. The caller stamps its
+    ///   watermark from the last row rather than from the clock, so what does
+    ///   not fit here is announced by the next pass instead of being lost.
+    func arrived(
+        since moment: Date,
+        fromEveryFeed everyFeed: Bool = false,
+        limit: Int = mostBeforeAnnouncing
+    ) async throws -> [Arrival] {
         try await database.writer.read { db in
             try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT e.id AS id, e.title AS title, f.title AS source,
+                    SELECT e.id AS id, e.title AS title, e.received_at AS received_at,
+                           f.title AS source,
                            e.image_url AS image_url,
                            (SELECT a.name FROM entry_author a
                             JOIN notified_author n ON n.name = a.name
@@ -893,7 +927,8 @@ nonisolated struct ArticleStore: Sendable {
                     WHERE e.received_at > ?
                       AND e.is_hidden = 0 AND e.duplicate_of IS NULL AND e.is_read = 0
                       AND (
-                            f.notifies_new_articles = 1
+                            ?
+                            OR f.notifies_new_articles = 1
                             OR EXISTS (
                                 SELECT 1 FROM entry_author a
                                 JOIN notified_author n ON n.name = a.name
@@ -908,12 +943,13 @@ nonisolated struct ArticleStore: Sendable {
                     ORDER BY e.received_at
                     LIMIT ?
                     """,
-                arguments: [moment, limit]
+                arguments: [moment, everyFeed, limit]
             )
             .map { row in
                 Arrival(
                     id: row["id"],
                     title: row["title"],
+                    receivedAt: row["received_at"],
                     source: row["source"] ?? "",
                     picture: (row["image_url"] as String?).flatMap(URL.init(string:)),
                     author: row["author"],

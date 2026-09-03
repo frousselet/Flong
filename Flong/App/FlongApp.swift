@@ -127,8 +127,17 @@ final class BackgroundWorkBox: @unchecked Sendable {
     /// The store is open by then either way, so the work is done against a
     /// model of its own. It is built once and kept, and it is used only while
     /// no window has offered anything better.
+    ///
+    /// **It is told there is no window, and given the two iCloud engines.**
+    /// Neither is a detail of the plumbing. A model is born believing the reader
+    /// is looking at it, which is what stops it interrupting somebody about a
+    /// page they have open ; here there is no page and nobody to interrupt, and
+    /// left alone it silenced every notice this pass exists to post. And the
+    /// engines are started from the window's own task, so a windowless pass
+    /// exchanged nothing with iCloud and could not tell the reader's own filings
+    /// from anybody else's.
     @MainActor
-    private func standInModel() -> AppModel? {
+    private func standInModel() async -> AppModel? {
         if let standIn = lock.withLock({ standIn }) { return standIn }
         guard let database = lock.withLock({ database }) else {
             Log.enrich.error("A background task had neither a window nor a store to work with")
@@ -137,6 +146,8 @@ final class BackgroundWorkBox: @unchecked Sendable {
 
         Log.enrich.notice("A background task ran without a window, against a model of its own")
         let model = AppModel(database: database)
+        model.isReading = false
+        await model.startSyncEngines()
         lock.withLock { standIn = model }
         return model
     }

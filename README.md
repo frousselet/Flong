@@ -20,7 +20,7 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 **And you can follow whoever the news is about.** No feed says who an article is about, so Flong reads the people out of the headline and the prose itself, on your device and without Apple Intelligence. Look somebody up and you get every paper writing about them, whoever signed it.
 
-**A source, a writer or a newsmaker can tell you when there is something.** Ask it of a newsletter, a blog or a colleague and every article they put out is announced as it arrives ; ask it of a person you read about and you hear whenever anybody writes about them. The front page is the press covering one thing ; this is the one voice, or the one name, you did not want to miss. Asking several ways about the same article still tells you once.
+**It tells you when there is something new.** One switch covers every source you follow. Under it, the finer instrument : ask it of a newsletter, a blog or a colleague and every article they put out is announced as it arrives ; ask it of a person you read about and you hear whenever anybody writes about them. The front page is the press covering one thing ; this is the one voice, or the one name, you did not want to miss. Asking several ways about the same article still tells you once.
 
 **What you mark stays.** Star an article, write on it, file it in a collection : the mark rides on the article itself, follows you to your other devices, and no purge ever touches it.
 

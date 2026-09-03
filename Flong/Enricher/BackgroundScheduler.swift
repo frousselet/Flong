@@ -39,6 +39,21 @@ nonisolated enum BackgroundScheduler {
     /// About what a refresh is given, and all it should count on.
     static let refreshBudget: TimeInterval = 25
 
+    /// What is kept back out of that budget for everything after the fetching.
+    ///
+    /// The watchdog below cancels the whole task when the budget runs out, and
+    /// the fetching honours its own deadline between feeds while letting what is
+    /// already in flight finish. Given the same instant to work to, the fetching
+    /// therefore always returned at or after the watchdog fired, and the
+    /// grouping, the reading and the one notice a refresh exists to post all ran
+    /// inside a cancelled task : GRDB throws `CancellationError` from every read,
+    /// so the pass fetched the articles and then could not say a word about
+    /// them. The two clocks must not be the same clock.
+    static let refreshTail: TimeInterval = 8
+
+    /// What the fetching itself is given, which is the budget less the tail.
+    static var fetchBudget: TimeInterval { refreshBudget - refreshTail }
+
     /// What the model's own work is given inside a full pass.
     ///
     /// The pass has minutes rather than seconds, and nothing here is urgent :

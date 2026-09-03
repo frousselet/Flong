@@ -168,10 +168,6 @@ nonisolated enum CatchUp: Hashable, Sendable {
     /// nothing when they asked.
     var isAskedFor: Bool { self == .reader || self == .pull }
 
-    /// Whether nobody is waiting, and the reader's data plan is therefore not
-    /// to be spent.
-    var sparingly: Bool { self == .background }
-
     /// Whether this is a moment to run the on-device model.
     ///
     /// **Not in the twenty-five seconds of a background refresh.** The system
@@ -383,6 +379,13 @@ final class AppModel {
     /// since turning it on has to ask the system first and may be refused.
     private(set) var wantsNewStoryNotices = false
 
+    /// Whether the reader wants to hear about every article any of their
+    /// sources publishes.
+    ///
+    /// Set through ``setWantsNewArticleNotices(_:)``, for the same reason as
+    /// the switch above it.
+    private(set) var wantsNewArticleNotices = false
+
     /// What the system last said about this device, for the screen to explain
     /// a switch that will not stay on.
     private(set) var notificationStatus = UNAuthorizationStatus.notDetermined
@@ -432,7 +435,16 @@ final class AppModel {
     /// Nothing is announced while they are : a story appears on the page they
     /// are already reading, and a notice about something they watched happen
     /// is a notice to dismiss for nothing.
-    var isReading = true
+    ///
+    /// **False until a window says otherwise, and not the other way round.** It
+    /// started true, and the window is the only thing that ever wrote it : a
+    /// model built for a launch the system made into the background, which is
+    /// the ordinary way a refresh runs once iOS has reclaimed the process, kept
+    /// the true it was born with and suppressed every notice it existed to
+    /// post. It stamped the watermark on the way out, so those articles could
+    /// never be announced by any later pass either. A model with no window is
+    /// interrupting nobody's reading.
+    var isReading = false
 
     // MARK: - Who is reading
 
@@ -1106,6 +1118,7 @@ final class AppModel {
         self.articleBody = preferences.articleBody
         self.theme = preferences.theme
         self.wantsNewStoryNotices = preferences.wantsNewStoryNotices
+        self.wantsNewArticleNotices = preferences.wantsNewArticleNotices
         self.wantsCollaborationNotices = preferences.wantsCollaborationNotices
         self.mutedSharedCollections = preferences.mutedSharedCollections
         self.firstName = preferences.firstName
@@ -1420,6 +1433,32 @@ final class AppModel {
         wantsNewStoryNotices = true
     }
 
+    /// Says whether the reader wants to hear about every article, asking the
+    /// system when they do.
+    ///
+    /// The same shape as the story switch, and the same reasons : the switch is
+    /// the request, a refusal at the system level cannot be talked round from
+    /// here, and the clock starts now so that the back catalogue of thirty
+    /// feeds is not announced as though it had all just arrived.
+    func setWantsNewArticleNotices(_ wanted: Bool) async {
+        guard wanted else {
+            preferences.wantsNewArticleNotices = false
+            wantsNewArticleNotices = false
+            return
+        }
+
+        let allowed = await announcer.authorize()
+        notificationStatus = await announcer.status()
+        guard allowed else {
+            wantsNewArticleNotices = false
+            return
+        }
+
+        startAnnouncingArticles()
+        preferences.wantsNewArticleNotices = true
+        wantsNewArticleNotices = true
+    }
+
     func refreshNotificationStatus() async {
         notificationStatus = await announcer.status()
     }
@@ -1462,7 +1501,7 @@ final class AppModel {
     func setNotifications(_ wanted: Bool, forSource id: UUID) async {
         if wanted {
             guard await authorizeNotifications() else { return }
-            preferences.articlesAnnouncedAt = Date()
+            startAnnouncingArticles()
         }
 
         do {
@@ -1503,7 +1542,7 @@ final class AppModel {
     func setNotifications(_ wanted: Bool, forAuthor name: String) async {
         if wanted {
             guard await authorizeNotifications() else { return }
-            preferences.articlesAnnouncedAt = Date()
+            startAnnouncingArticles()
         }
 
         do {
@@ -1549,7 +1588,7 @@ final class AppModel {
     func setNotifications(_ wanted: Bool, forNewsmaker name: String) async {
         if wanted {
             guard await authorizeNotifications() else { return }
-            preferences.articlesAnnouncedAt = Date()
+            startAnnouncingArticles()
         }
 
         do {
@@ -1586,22 +1625,46 @@ final class AppModel {
         _ = try? await store.read(arrived)
     }
 
-    /// Tells the reader what the sources and the writers they asked about have
-    /// just published.
+    /// Starts the clock on the article notices, if it is not already running.
+    ///
+    /// **Only where there is no clock yet.** Every switch that can lead to an
+    /// article notice used to stamp this, so a reader turning six sources on
+    /// one after another threw away, five times over, what the sources they had
+    /// just turned on were already holding. What the stamp is for is that a
+    /// source's back catalogue is not announced as though it had just arrived,
+    /// and the first switch answers that for all of them.
+    private func startAnnouncingArticles() {
+        guard preferences.articlesAnnouncedAt == nil else { return }
+        preferences.articlesAnnouncedAt = Date()
+    }
+
+    /// Tells the reader what their sources, and the writers and people they
+    /// asked about, have just published.
     ///
     /// **The watermark moves whether anything was said or not**, exactly as it
     /// does for the stories and for the collaborations : what it records is
     /// that the articles reached this device, not that a notification was
     /// posted.
     ///
-    /// A reader who has asked about no source at all has no watermark either,
-    /// so that asking about their first one starts from that moment rather than
+    /// **It does not move past a read that failed, nor past a row nobody
+    /// read.** Those are the two ways a watermark silently eats the news it
+    /// exists to meter : a pass cut short by its own budget swallowed the
+    /// articles it had just fetched, and a pass that brought more than the
+    /// answer holds threw away everything past the twentieth. So a failure
+    /// leaves the mark where it was, and a full answer moves it only as far as
+    /// its last row.
+    ///
+    /// A reader who has asked for nothing at all has no watermark either, so
+    /// that asking for their first thing starts from that moment rather than
     /// from whatever a silent pass had stamped.
     func announceNewArticles() async {
-        let sources = (try? await subscriptions.announcing()) ?? []
-        let writers = (try? await authorStore.notified()) ?? []
-        let people = (try? await newsmakerStore.notified()) ?? []
-        guard !sources.isEmpty || !writers.isEmpty || !people.isEmpty else { return }
+        let everyFeed = wantsNewArticleNotices
+        if !everyFeed {
+            let sources = (try? await subscriptions.announcing()) ?? []
+            let writers = (try? await authorStore.notified()) ?? []
+            let people = (try? await newsmakerStore.notified()) ?? []
+            guard !sources.isEmpty || !writers.isEmpty || !people.isEmpty else { return }
+        }
 
         guard let since = preferences.articlesAnnouncedAt else {
             // A source, a writer or a person asked about on another device,
@@ -1612,8 +1675,14 @@ final class AppModel {
             return
         }
 
-        let arrived = (try? await articles.arrived(since: since)) ?? []
-        preferences.articlesAnnouncedAt = Date()
+        guard !Task.isCancelled else { return }
+        guard let arrived = try? await articles.arrived(since: since, fromEveryFeed: everyFeed) else {
+            Log.notify.error("The arrivals could not be read : the watermark stays where it was")
+            return
+        }
+        preferences.articlesAnnouncedAt =
+            arrived.count < ArticleStore.mostBeforeAnnouncing
+            ? Date() : (arrived.last?.receivedAt ?? Date())
 
         guard !isReading, let announcement = Announcement.newArticles(arrived) else { return }
         await announcer.post(announcement)
@@ -1684,14 +1753,27 @@ final class AppModel {
     ///
     /// Nothing about the reader's own filings, and nothing about a collection
     /// they have asked to be quiet.
+    ///
+    /// **Nothing at all where this device cannot tell whose filing is whose.**
+    /// The reader's own list is excluded by name, and the name is a round trip
+    /// to iCloud that an offline pass, or one running before the shared engine
+    /// has started, does not get. Left as `nil` it excludes nobody, so the
+    /// reader is told about the article they filed themselves a minute ago,
+    /// under somebody else's collection. Staying quiet for one pass is the
+    /// lesser of the two.
     func announceCollaborations() async {
         guard wantsCollaborationNotices, let since = preferences.collaborationsAnnouncedAt else { return }
+        guard let mine = await sharedCloud?.myListKey() else { return }
 
-        let mine = await sharedCloud?.myListKey()
-        let arrived =
-            (try? await sharedEntries.arrived(
+        guard !Task.isCancelled else { return }
+        guard
+            let arrived = try? await sharedEntries.arrived(
                 since: since, excluding: mine, muted: mutedSharedCollections
-            )) ?? []
+            )
+        else {
+            Log.notify.error("The filings could not be read : the watermark stays where it was")
+            return
+        }
         preferences.collaborationsAnnouncedAt = Date()
 
         guard !isReading, !arrived.isEmpty else { return }
@@ -1733,10 +1815,18 @@ final class AppModel {
     /// about ; keeping it for later would mean telling them tomorrow about
     /// something they saw today. What the watermark records is that the story
     /// reached them, not that a notification was posted.
+    ///
+    /// **A read that failed is not a pass that found nothing.** It leaves the
+    /// mark where it was : the alternative is a pass cut short by its budget
+    /// marking as told a page of stories nobody was ever told about.
     func announceNewStories() async {
         guard wantsNewStoryNotices, let since = preferences.storiesAnnouncedAt else { return }
 
-        let opened = (try? await DigestStore(database).opened(since: since)) ?? []
+        guard !Task.isCancelled else { return }
+        guard let opened = try? await DigestStore(database).opened(since: since) else {
+            Log.notify.error("The stories could not be read : the watermark stays where it was")
+            return
+        }
         preferences.storiesAnnouncedAt = Date()
 
         guard !isReading, let announcement = Announcement.newStories(opened) else { return }
@@ -1926,8 +2016,10 @@ final class AppModel {
     /// The read states go out first. They are a few bytes, the other devices
     /// are waiting for them, and a pass whose budget runs out during the
     /// fetching must not be a pass that swallowed them.
+    /// **The fetching stops short of the budget**, so that what follows it
+    /// happens at all. See ``BackgroundScheduler/refreshTail``.
     func backgroundRefresh() async {
-        let deadline = Date().addingTimeInterval(BackgroundScheduler.refreshBudget)
+        let deadline = Date().addingTimeInterval(BackgroundScheduler.fetchBudget)
         await cloud?.enqueueReadStates()
 
         await catchUp(.background, until: deadline)
@@ -1970,7 +2062,16 @@ final class AppModel {
         let summary = await refresher.refreshAll(onProgress: progress(of: .fetching))
         Log.fetch.notice("Full pass : \(summary.newArticles) new articles from \(summary.refreshed) feeds")
 
-        await doOutstandingWork()
+        // Who this pass brought, read here as the half-hourly refresh reads it,
+        // so a notice about somebody the reader follows does not depend on the
+        // unbounded backlog below having been got through first.
+        if summary.newArticles > 0 { await readWhoArrived(summary.newArticles) }
+
+        // **Bounded like the model's work below it.** Reading a hundred thousand
+        // articles for who they name is hours on a corpus that has just been
+        // imported, and everything a reader is told sits behind it : one night's
+        // pass spent the whole of its grant here and announced nothing.
+        await doOutstandingWork(until: Date().addingTimeInterval(BackgroundScheduler.fullPassBudget))
 
         moveWork(to: .grouping)
         await digestService.buildStories()
@@ -2014,21 +2115,7 @@ final class AppModel {
     /// No account is not an error : Flong is fully usable on one device without
     /// one, and the sidebar says nothing rather than complaining.
     func startSync() async {
-        guard cloud == nil else { return }
-
-        let cloud = CloudSync(database: database) { [weak self] status in
-            Task { @MainActor [weak self] in self?.report(status) }
-        }
-        self.cloud = cloud
-        await cloud.start()
-
-        // The collections other people shared, which are in a different
-        // database and therefore a different engine. Its failures are its own
-        // and do not colour the status the sidebar shows : a reader with no
-        // shared collections has nothing here that could go wrong.
-        let sharedCloud = SharedSync(database: database)
-        self.sharedCloud = sharedCloud
-        await sharedCloud.start()
+        await startSyncEngines()
 
         // What this reader offers the others, when they offer anything. Free
         // for a session that changed nothing, since the offer is compared
@@ -2046,6 +2133,34 @@ final class AppModel {
             await self?.loadCollections()
             await self?.loadShareMembers()
         }
+    }
+
+    /// The two engines, and nothing else.
+    ///
+    /// **Separated from the ceremony above so a pass with no window can have
+    /// them.** A background launch the system made after reclaiming the process
+    /// has no scene, so nothing ever called ``startSync()`` and both engines
+    /// stayed `nil` : the nightly pass that exists to exchange with iCloud
+    /// exchanged nothing, and the filings notice could not tell the reader's own
+    /// additions from anybody else's. What is left above is what a window needs
+    /// and a background pass does not : offering to the pool, publishing the
+    /// member cards, and hearing about an invitation.
+    func startSyncEngines() async {
+        guard cloud == nil else { return }
+
+        let cloud = CloudSync(database: database) { [weak self] status in
+            Task { @MainActor [weak self] in self?.report(status) }
+        }
+        self.cloud = cloud
+        await cloud.start()
+
+        // The collections other people shared, which are in a different
+        // database and therefore a different engine. Its failures are its own
+        // and do not colour the status the sidebar shows : a reader with no
+        // shared collections has nothing here that could go wrong.
+        let sharedCloud = SharedSync(database: database)
+        self.sharedCloud = sharedCloud
+        await sharedCloud.start()
     }
 
     /// Queues everything and exchanges it, whatever iCloud already has.
@@ -3659,11 +3774,28 @@ final class AppModel {
         let summary =
             reason.asksEveryFeed
             ? await refresher.refreshAll(until: deadline, onProgress: fetching)
-            : await refresher.refreshDue(sparingly: reason.sparingly, until: deadline, onProgress: fetching)
+            : await refresher.refreshDue(until: deadline, onProgress: fetching)
 
         if summary.newArticles > 0 {
             Log.fetch.info("\(summary.newArticles) new articles from \(summary.refreshed) feeds")
         }
+
+        // **Who this pass brought is read before anything is announced.** The
+        // watermark moves whether a notice was posted or not, so a person read
+        // out of an article a moment after it went by would be a notice the
+        // reader never gets, for ever. What a refresh brings is tens of
+        // articles and the queue hands over the newest first, so this is
+        // milliseconds ; the backlog behind them belongs to the job below.
+        if summary.newArticles > 0 { await readWhoArrived(summary.newArticles) }
+
+        // **First of everything that follows the fetching, and not last.** An
+        // article from a source the reader asked about is news the moment it
+        // lands : nothing has to be grouped, written or drawn for it to be
+        // said. It ran after the grouping and after reading the whole of what a
+        // window shows, which on a background launch is a page nobody is
+        // looking at ; a pass that used its budget fetching then spent what was
+        // left on that, and was cancelled before it ever got a word out.
+        await announceNewArticles()
 
         // Always, and not only when this pass brought something itself. What is
         // waiting to be grouped may have come from iCloud, from a shared
@@ -3687,20 +3819,16 @@ final class AppModel {
         // identifiers rather than over the texts.
         if summary.newArticles > 0 { await synchronizeSpotlight() }
 
-        // **Who this pass brought is read before anything is announced.** The
-        // watermark moves whether a notice was posted or not, so a person read
-        // out of an article a moment after it went by would be a notice the
-        // reader never gets, for ever. What a refresh brings is tens of
-        // articles and the queue hands over the newest first, so this is
-        // milliseconds ; the backlog behind them belongs to the job below.
-        if summary.newArticles > 0 { await readWhoArrived(summary.newArticles) }
-
-        // Before the model and outside its guard : an article from a source the
-        // reader asked about is news the moment it lands, and nothing has to be
-        // written or grouped for it to be said. The twenty-five seconds of a
-        // background refresh are where this matters most, since they are the
-        // moments the reader is not looking.
-        await announceNewArticles()
+        // **Outside the model's guard, because neither of them needs it.** The
+        // stories were grouped a few lines up and a filing is a plain read, so
+        // both can be said by a background refresh : the one moment the reader
+        // is not looking, and the only moment that runs often enough to catch a
+        // story the day it opens. They were reachable only from behind the
+        // guard below, which is to say only from a pass on the mains, so on a
+        // phone that is not left on charge the one switch a reader can find
+        // never said anything at all.
+        await announceNewStories()
+        await announceCollaborations()
 
         guard reason.mayRunTheModel else { return }
 
@@ -3788,8 +3916,11 @@ final class AppModel {
                 }
             )
             await loadDigest()
-            await announceNewStories()
-            await announceCollaborations()
+            // The two notices are said by the pass that started this, before it
+            // handed the model's work over : both are answered by the store and
+            // neither waits on a headline being written, and saying them twice
+            // in one pass would only be the second one finding a watermark the
+            // first had just moved.
 
             // **After the model and not before it, though it is not the
             // model.** Reading who an article is about asks `NLTagger` and runs
@@ -4292,7 +4423,7 @@ final class AppModel {
             if await authorizeNotifications() {
                 // From now : what the source published before the reader asked
                 // about it is not news.
-                preferences.articlesAnnouncedAt = Date()
+                startAnnouncingArticles()
             } else {
                 edit.notifiesNewArticles = false
             }

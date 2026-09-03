@@ -454,13 +454,12 @@ struct FeedRefreshTests {
     @Test("A request the system would not send is not held against the feed")
     func neverSent() async throws {
         let feed = try await subscribe()
-        // What a background pass gets when the only network is one the reader
-        // pays for by the megabyte, and what any pass gets with no network at
-        // all.
+        // What any pass gets with cellular data switched off for Flong, and
+        // what any pass gets with no network at all.
         server.install { _ in StubResponse.failing(.dataNotAllowed) }
         defer { server.reset() }
 
-        let result = await refresh.refresh(feed, sparingly: true)
+        let result = await refresh.refresh(feed)
 
         #expect(result == .skipped)
 

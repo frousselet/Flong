@@ -19,7 +19,21 @@ import Foundation
 /// is decided here, by a function that takes names and gives back a sentence,
 /// and all of it is testable without a bundle, an authorization or a device.
 nonisolated struct Announcement: Hashable, Sendable {
+    /// The name of the thing being announced, and never the news itself.
+    ///
+    /// **The shortest of the three, because it has the least room.** A banner
+    /// gives the title one bold line and cuts it at about forty characters,
+    /// while the body gets two lines collapsed and four expanded. A headline put
+    /// here is a headline the reader has to open the notification to finish
+    /// reading, under a body holding a source name eight characters long.
     var title: String
+    /// Where the news came from, when that is not already the title.
+    ///
+    /// One line between the two, which is exactly what an attribution wants :
+    /// the writer the reader follows leads, and the paper they wrote it for
+    /// goes here.
+    var subtitle: String?
+    /// The news itself.
     var body: String
     /// What the notifications of one kind are grouped under in Notification
     /// Centre, so a week of them is one stack and not a week of rows.
@@ -50,11 +64,15 @@ nonisolated struct Announcement: Hashable, Sendable {
     /// articles join a story that already exists, and a cluster of one is not a
     /// story at all.
     ///
-    /// **One story leads with its own headline.** The headline is the news, and
-    /// a notification titled `New story` with the headline underneath buries
-    /// the thing the reader is being told. The rooms covering it go in the body,
-    /// which is the digest's own signal that something is happening, unless the
-    /// model wrote a line saying what happened, which says more.
+    /// **One story leads with its own headline.** A story is several newsrooms
+    /// on one subject, so unlike an article it has no single name to lead with :
+    /// the headline is both the news and the only thing that identifies it. The
+    /// newsrooms covering it are an attribution and go on the line between,
+    /// which is what a subtitle is ; the line the model wrote saying what
+    /// happened is the body.
+    ///
+    /// Where the model wrote nothing, the newsrooms are the whole message and
+    /// take the body rather than being named twice.
     ///
     /// **Several are counted in the title and listed in the body**, so the two
     /// always agree.
@@ -66,7 +84,7 @@ nonisolated struct Announcement: Hashable, Sendable {
                 title: String(localized: "\(stories.count) new stories"),
                 // Not a comma list : a headline may hold commas of its own, and
                 // a list of them read as one sentence is unreadable.
-                body: stories.map(\.title).joined(separator: " · "),
+                body: joined(stories.map(\.title)),
                 thread: Thread.newStories,
                 // Several are not a place to go, and a tap that had to pick one
                 // of them would pick wrongly most of the time.
@@ -75,9 +93,11 @@ nonisolated struct Announcement: Hashable, Sendable {
         }
 
         let rooms = ListFormatter.localizedString(byJoining: first.rooms)
+        let summary = first.summary?.isEmpty == false ? first.summary : nil
         return Announcement(
             title: first.title,
-            body: first.summary?.isEmpty == false ? first.summary! : rooms,
+            subtitle: summary == nil ? nil : rooms,
+            body: summary ?? rooms,
             thread: Thread.newStories,
             // The picture of the latest article in it to carry one, which is
             // the picture the front page puts the story under.
@@ -109,32 +129,47 @@ nonisolated struct Announcement: Hashable, Sendable {
         let collections = Set(filings.map(\.collection))
         let people = Set(filings.compactMap(\.by))
 
-        // One filing, which is the case worth writing well : the headline is
-        // the news and everything else is where it came from.
+        // One filing, which is the case worth writing well : the collection is
+        // where it landed, the person is who put it there, and the headline is
+        // the news. Three lines, in the order a notification gives them room.
+        //
+        // The two names are said in their own right rather than woven into a
+        // sentence about them. `X added to Y` needs a verb, and a verb needs a
+        // preposition, and a preposition is where a translated sentence about
+        // two proper nouns goes wrong : it read `X a ajouté dans Y` in French,
+        // which is not a sentence anybody writes.
         if filings.count == 1 {
             return Announcement(
-                title: first.by.map { String(localized: "\($0) added to \(first.collection)") }
-                    ?? String(localized: "Added to \(first.collection)"),
+                title: first.collection,
+                subtitle: first.by.map { String(localized: "Added by \($0)") },
                 body: first.title,
                 thread: Thread.filings,
                 picture: first.picture
             )
         }
 
-        let title =
-            collections.count == 1
-            ? String(localized: "\(filings.count) added to \(first.collection)")
-            : String(localized: "\(filings.count) added to your shared collections")
-
         // Whoever did it, where the answer is short enough to be worth saying.
         // A list of every headline would be a paragraph ; the names are the
         // part a reader acts on.
         let body =
             people.isEmpty
-            ? filings.map(\.title).joined(separator: " · ")
+            ? joined(filings.map(\.title))
             : ListFormatter.localizedString(byJoining: people.sorted())
 
-        return Announcement(title: title, body: body, thread: Thread.filings)
+        guard collections.count == 1 else {
+            return Announcement(
+                title: String(localized: "\(filings.count) additions to your shared collections"),
+                body: body,
+                thread: Thread.filings
+            )
+        }
+
+        return Announcement(
+            title: first.collection,
+            subtitle: String(localized: "\(filings.count) additions"),
+            body: body,
+            thread: Thread.filings
+        )
     }
 
     /// What the sources and the writers the reader asked about have just
@@ -155,12 +190,18 @@ nonisolated struct Announcement: Hashable, Sendable {
     /// Nothing to say about none, which is the ordinary case : almost every
     /// pass brings articles nobody asked anything about.
     ///
-    /// **One article leads with its own headline**, for the same reason a lone
-    /// story does : the headline is the news. Underneath goes where it came
-    /// from, which is the source, and the person in front of it where it is
-    /// somebody the reader asked about : that is the byline the application
-    /// itself writes under every headline, and it is the answer to `why am I
-    /// being told this`. A tap opens it.
+    /// **What it came from leads, and the headline is the message.** It was the
+    /// other way round, and the other way round is the wrong way : a banner
+    /// gives the title one bold line and cuts it at about forty characters,
+    /// where the body has two lines and four when it is opened. So the headline,
+    /// which is routinely eighty characters, was the truncated part, and under
+    /// it sat a source name of eight. The name of whoever the reader asked about
+    /// goes first, the paper they wrote it for on the line between, and the
+    /// headline underneath with room to be read. A tap opens it.
+    ///
+    /// Whoever the reader asked about, be that the writer who signed it or the
+    /// person it is about : ``ArticleStore/Arrival/subject`` is the one place
+    /// that decides which, so the single notice and the several agree.
     ///
     /// **Several are counted under what was asked about**, the person where
     /// there was one and the source otherwise, since naming it once is shorter
@@ -173,17 +214,9 @@ nonisolated struct Announcement: Hashable, Sendable {
 
         guard arrivals.count > 1 else {
             return Announcement(
-                title: first.title,
-                // The person and where it was written, joined the way the
-                // application's own bylines are. Not `X in Y` : a preposition
-                // between two names is a sentence to translate, and it reads
-                // worse than the two names do.
-                //
-                // Whoever the reader asked about, be that the writer who signed
-                // it or the person it is about : ``Arrival/subject`` is the one
-                // place that decides which, so the single notice and the
-                // several agree.
-                body: first.subject == first.source ? first.source : "\(first.subject) · \(first.source)",
+                title: first.subject,
+                subtitle: first.subject == first.source ? nil : first.source,
+                body: first.title,
                 thread: Thread.newArticles,
                 picture: first.picture,
                 article: first.id
@@ -205,12 +238,32 @@ nonisolated struct Announcement: Hashable, Sendable {
         }
 
         return Announcement(
-            title: String(localized: "\(subject) : \(arrivals.count) new articles"),
+            title: subject,
+            subtitle: String(localized: "\(arrivals.count) new articles"),
             // A middle dot rather than commas, as the stories are joined : a
             // headline may hold commas of its own.
-            body: arrivals.map(\.title).joined(separator: " · "),
+            body: joined(arrivals.map(\.title)),
             thread: Thread.newArticles
         )
+    }
+
+    /// How many headlines a body ever names.
+    ///
+    /// A notification body is two lines collapsed and about four when it is
+    /// opened. Twenty headlines joined by a middle dot is a paragraph, and a
+    /// paragraph in a banner is a wall the reader's eye slides off : what they
+    /// take from it is the count in the title, which the title already gave
+    /// them. Three fit, and the count above says how many there are in all.
+    private static let mostNamed = 3
+
+    /// The headlines a body names, joined the way the interface joins them.
+    ///
+    /// A middle dot rather than commas : a headline may hold commas of its own,
+    /// and a comma list of them reads as one long broken sentence. What does
+    /// not fit is dropped rather than summarized, the count in the title being
+    /// where the reader learns there was more.
+    private static func joined(_ titles: [String]) -> String {
+        titles.prefix(mostNamed).joined(separator: " · ")
     }
 
     enum Thread {
