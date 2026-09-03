@@ -13,6 +13,18 @@
         }
       }
     },
+    "NSContactsUsageDescription" : {
+      "comment" : "Privacy - Contacts Usage Description",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Flong looks up the people you invite to a shared collection, so they show under the name and the face you have for them rather than as a phone number. It stays on this device and is never shared."
+          }
+        }
+      }
+    },
     "NSLocationWhenInUseUsageDescription" : {
       "comment" : "Shown by the system when the reader presses \"Use my location\" in their own panel.",
       "localizations" : {

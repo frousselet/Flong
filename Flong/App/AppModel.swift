@@ -270,6 +270,24 @@ final class AppModel {
     /// reader's own copy of the piece where they hold one.
     private(set) var collectionItems: [CollectionItem] = []
 
+    /// Which collection the rows in hand were read for.
+    ///
+    /// Nothing until one has been answered, and nothing again the moment a
+    /// different one is asked for : see ``loadCollection(_:)``.
+    private(set) var loadedCollection: ArticleCollection.Kind?
+
+    /// What is in one collection, for the page showing that collection.
+    ///
+    /// Empty for any other, including while its own read is still running :
+    /// a page is never handed the rows of the one before it.
+    func items(in kind: ArticleCollection.Kind) -> [CollectionItem] {
+        loadedCollection == kind ? collectionItems : []
+    }
+
+    /// Whether this collection has been read, which is what tells an empty
+    /// collection from one that has not answered yet.
+    func hasLoaded(_ kind: ArticleCollection.Kind) -> Bool { loadedCollection == kind }
+
     /// Which of the excerpts in the open collection this reader filed.
     ///
     /// Their own is the one they may always take back. Somebody else's is the
@@ -3354,6 +3372,22 @@ final class AppModel {
     }
 
     func loadCollection(_ kind: ArticleCollection.Kind) async {
+        // **What is in hand is about the collection it was read for.** Opening
+        // a second one draws its page before its own `task` has run, and the
+        // rows still in the model are the first one's : the reader saw a flash
+        // of what they had just left, in the page they had just opened. The
+        // rows are handed out against ``loadedCollection`` and cleared here, so
+        // a page that has not been answered yet shows nothing rather than
+        // somebody else's answer.
+        if loadedCollection != kind {
+            loadedCollection = nil
+            collectionItems = []
+            collectionArticles = []
+            sharedArticles = []
+            filedBy = [:]
+            myFilings = []
+        }
+
         do {
             // A shared one holds nothing of this device's : what is in it came
             // from feeds the reader does not follow, and there is no article
@@ -3364,6 +3398,7 @@ final class AppModel {
                 collectionArticles = []
                 myFilings = await sharedCloud?.filedGUIDs(inZone: zone) ?? []
                 collectionItems = try await merged(held: [], sent: sharedArticles)
+                loadedCollection = kind
                 return
             }
 
@@ -3393,6 +3428,7 @@ final class AppModel {
             // theirs, since `contributions(to:)` leaves their own list out.
             myFilings = []
             collectionItems = try await merged(held: collectionArticles, sent: sharedArticles)
+            loadedCollection = kind
         } catch {
             Log.store.error("A collection could not be read : \(error, privacy: .public)")
         }

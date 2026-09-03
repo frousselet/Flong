@@ -56,7 +56,9 @@ struct SharedCollectionScreen: View {
                     // with nobody's filings in it yet still has its members,
                     // and an empty state laid over the page would hide the one
                     // thing there is to see.
-                    if model.collectionItems.isEmpty {
+                    // Once it has answered, and not before : a collection
+                    // still being read is not a collection with nothing in it.
+                    if model.hasLoaded(kind), model.items(in: kind).isEmpty {
                         ContentUnavailableView {
                             Label("Nothing in it yet", systemImage: "folder.badge.person.crop")
                         } description: {

@@ -38,7 +38,7 @@ struct CollectionRows: View {
     @State private var removing: CollectionItem?
 
     var body: some View {
-        ForEach(model.collectionItems) { item in
+        ForEach(model.items(in: kind)) { item in
             row(item)
                 // A long press rather than a swipe : these rows are laid out
                 // in a stack and not in a list, and a swipe action belongs to

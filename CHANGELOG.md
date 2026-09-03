@@ -12,6 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Opening one collection after another no longer shows a flash of the first one's rows in the second : a page is drawn before its own read has run, and what it is handed is now the rows read for it rather than whatever the model was holding.
+
 - Somebody invited to a shared collection who has not accepted yet is named from the reader's own address book, where they let Flong look, rather than drawn as the bare telephone number the invitation went to with a digit for an initial : it is asked for at the moment a collection holds somebody who cannot be named, refusing it costs the name and nothing else, and nothing found there ever leaves the device or enters anybody's card.
 
 - The reader is themselves in their own shared collection : CloudKit does not name you to yourself and does not always call you by your own record, so the owner of a collection turned up in it as `Quelqu'un`, with the name and the face they wrote for themselves filed under a different key and dropped.
