@@ -341,6 +341,15 @@ struct DigestScreen: View {
         }
     }
 
+    /// The mark a pill wears.
+    ///
+    /// The front page is not a subject and is in no vocabulary, so its own is
+    /// written here : the paper itself, which is what that pill selects.
+    private func mark(of topic: DigestTopic) -> String {
+        guard let name = topic.name else { return "newspaper" }
+        return model.digest.symbols[name] ?? Topic.defaultSymbol
+    }
+
     /// The stories the page is showing, by identity.
     ///
     /// What the arrival of a row is animated against. The page itself is a
@@ -503,7 +512,17 @@ struct DigestScreen: View {
         let isCurrent = model.digestTopic == topic
         let score = topic.name.map { model.digest.scores[$0] ?? 0 } ?? 0
 
-        return HStack(spacing: 4) {
+        return HStack(spacing: 5) {
+            // **The mark leads, and it is the one thing on a pill that is not a
+            // word.** A row reading `Politique · Économie · Cinéma · Sport` is
+            // four words a reader has to read on every scroll ; the same row
+            // with a glyph in front of each is four shapes they recognize. It
+            // is hidden from VoiceOver, the name beside it saying the same
+            // thing and saying it better.
+            Image(systemName: mark(of: topic))
+                .font(.system(.caption, weight: .medium))
+                .accessibilityHidden(true)
+
             // Only when there is something to say : a row of arrows on every
             // pill would be a row of arrows nobody reads.
             if score != 0 {

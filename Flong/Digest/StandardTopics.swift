@@ -49,70 +49,114 @@ import Foundation
 /// for the model too, which would mean translating what it answers back. The
 /// cost is that a reader who changes language keeps the names they had.
 nonisolated enum StandardTopics {
+    /// One section : what it is called, and the mark it wears.
+    ///
+    /// **The two together and never two lists.** A name in one array and a
+    /// glyph at the same index in another is two places to forget one, and the
+    /// day somebody inserts a section into the middle of the first the whole of
+    /// the second is one out and nobody notices : every page is still drawn,
+    /// with `Cinéma` wearing a tractor.
+    nonisolated struct Section: Sendable {
+        let name: LocalizedStringResource
+        let symbol: String
+
+        init(_ name: LocalizedStringResource, _ symbol: String) {
+            self.name = name
+            self.symbol = symbol
+        }
+    }
+
     /// The list, in the order a page would print them.
-    static let all: [LocalizedStringResource] = [
+    ///
+    /// **The mark is the thing and never the word.** `Justice` wears a closed
+    /// book and not a pair of scales, `Immigration` somebody walking and not a
+    /// border : a glyph that illustrates the word rather than the subject is a
+    /// rebus, and a reader scanning a row of pills is reading shapes rather
+    /// than solving them. Where the subject has no thing, the section it
+    /// belongs to lends one.
+    ///
+    /// Every one of them is checked against the system at test time, since a
+    /// symbol that does not exist draws nothing at all and a pill with a hole
+    /// in it is not something a build catches.
+    static let all: [Section] = [
         // Public life
-        "Politics",
-        "International",
-        "European Union",
-        "Elections",
-        "Defence",
-        "Justice",
-        "Immigration",
-        "Human rights",
-        "Local news",
+        Section("Politics", "building.columns"),
+        Section("International", "globe"),
+        Section("European Union", "flag"),
+        Section("Elections", "list.bullet.rectangle"),
+        Section("Defence", "shield"),
+        Section("Justice", "book.closed"),
+        Section("Immigration", "figure.walk"),
+        Section("Human rights", "hand.raised"),
+        Section("Local news", "mappin.and.ellipse"),
 
         // Money and work
-        "Economy",
-        "Business",
-        "Employment",
-        "Finance",
-        "Consumer",
-        "Housing",
-        "Agriculture",
-        "Industry",
-        "Energy",
-        "Transport",
+        Section("Economy", "chart.line.uptrend.xyaxis"),
+        Section("Business", "briefcase"),
+        Section("Employment", "hammer"),
+        Section("Finance", "banknote"),
+        Section("Consumer", "cart"),
+        Section("Housing", "house"),
+        Section("Agriculture", "leaf"),
+        Section("Industry", "gearshape.2"),
+        Section("Energy", "bolt"),
+        Section("Transport", "tram"),
 
         // Living
-        "Education",
-        "Health",
-        "Food",
-        "Religion",
-        "Crime",
-        "Environment",
-        "Climate",
-        "Weather",
+        Section("Education", "graduationcap"),
+        Section("Health", "heart"),
+        Section("Food", "fork.knife"),
+        Section("Religion", "hands.sparkles"),
+        Section("Crime", "exclamationmark.triangle"),
+        Section("Environment", "tree"),
+        Section("Climate", "thermometer"),
+        Section("Weather", "cloud.sun"),
 
         // Science and technology
-        "Science",
-        "Technology",
-        "Artificial intelligence",
-        "Software",
-        "Cybersecurity",
-        "Privacy",
-        "Social media",
-        "Telecoms",
-        "Space",
-        "Travel",
+        Section("Science", "atom"),
+        Section("Technology", "cpu"),
+        Section("Artificial intelligence", "brain"),
+        Section("Software", "chevron.left.forwardslash.chevron.right"),
+        Section("Cybersecurity", "lock.shield"),
+        Section("Privacy", "eye.slash"),
+        Section("Social media", "bubble.left.and.bubble.right"),
+        Section("Telecoms", "antenna.radiowaves.left.and.right"),
+        Section("Space", "moon.stars"),
+        Section("Travel", "airplane"),
 
         // Culture
-        "Media",
-        "Cinema",
-        "TV series",
-        "Music",
-        "Books",
-        "Art",
-        "Architecture",
-        "Fashion",
-        "Video games",
-        "History",
+        Section("Media", "newspaper"),
+        Section("Cinema", "film"),
+        Section("TV series", "tv"),
+        Section("Music", "music.note"),
+        Section("Books", "books.vertical"),
+        Section("Art", "paintpalette"),
+        Section("Architecture", "building.2"),
+        Section("Fashion", "tshirt"),
+        Section("Video games", "gamecontroller"),
+        Section("History", "hourglass"),
 
         // Sport, and the two that sort nothing
-        "Sport",
-        "Society",
-        "Culture",
+        Section("Sport", "figure.run"),
+        Section("Society", "person.3"),
+        Section("Culture", "theatermasks"),
     ]
+
+    /// The marks a reader may pick from for a subject of their own.
+    ///
+    /// **The catalogue's own, and nothing else.** A picker of every symbol the
+    /// system has is a thousand glyphs and a search field, which is a great deal
+    /// of interface for a decision that takes a second ; and a subject wearing
+    /// a mark from a different family would be the one pill on the row that
+    /// does not belong to the page. What the sections wear is what a reader may
+    /// wear, plus the tag everything falls back to.
+    ///
+    /// In the catalogue's order, so the picker reads as the page does : public
+    /// life, money, living, science, culture, sport.
+    static let palette: [String] = {
+        var seen = Set<String>()
+        return ([Topic.defaultSymbol] + all.map(\.symbol)).filter { seen.insert($0).inserted }
+    }()
 
     /// Sections that have been renamed, as the name they had and the name they
     /// have.
@@ -138,7 +182,14 @@ nonisolated enum StandardTopics {
 
     /// The names as this reader reads them.
     static func names(for locale: Locale = .current) -> [String] {
-        resolve(all, in: locale)
+        resolve(all.map(\.name), in: locale)
+    }
+
+    /// The mark each section wears, by the name this reader reads it under.
+    static func symbols(for locale: Locale = .current) -> [String: String] {
+        Dictionary(
+            uniqueKeysWithValues: zip(resolve(all.map(\.name), in: locale), all.map(\.symbol))
+        )
     }
 
     /// The renamings as this reader reads them, old name and new.

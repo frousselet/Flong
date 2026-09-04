@@ -127,6 +127,13 @@ nonisolated struct Digest: Hashable, Sendable {
     /// about at all.
     var scores: [String: Int] = [:]
 
+    /// The mark each subject wears, by name.
+    ///
+    /// Read with the page rather than looked up by each pill : a row of pills
+    /// is drawn on every frame of a scroll, and a store read per pill per frame
+    /// would be a page that stutters to say what one query answers.
+    var symbols: [String: String] = [:]
+
     /// **Stories, and only stories.** The page used to count the articles that
     /// grouped with nothing as content, since it showed them in a tail at the
     /// bottom. It does not show them any more, so a page of nothing but those
@@ -194,6 +201,7 @@ nonisolated struct DigestStore: Sendable {
         let preferences = TopicPreferences(database)
         let scores = try await preferences.scores()
         let own = try await preferences.ownNames()
+        let symbols = try await preferences.symbols()
 
         let (stories, topics, members) = try await database.writer.read { db in
             let stories =
@@ -251,7 +259,8 @@ nonisolated struct DigestStore: Sendable {
         // button that is no longer there.
         var digest = Digest(
             topics: Self.topics(of: all, scores: scores, own: own),
-            scores: scores
+            scores: scores,
+            symbols: symbols
         )
         let built = all.filter { topic.holds($0.topics) }
 

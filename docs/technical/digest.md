@@ -222,6 +222,24 @@ It extracts tags from a text rather than choosing among labels, so it answers wi
 
 **Private Cloud Compute is not on the list, because there is no list to be on.** The framework gives third-party applications the on-device model and nothing else : there is no cloud, server or remote option anywhere in its interface. Apple's own features route to Private Cloud Compute ; an application's own prompts cannot. Section 3 would not have it anyway.
 
+## The mark a subject wears
+
+A row of pills reading `Politique · Économie · Cinéma · Sport` is four words a reader has to read on every scroll. The same row with a glyph in front of each is four shapes they recognize, and the reading is over before it started. Every subject has one : the fifty sections take theirs from the catalogue, and one the reader writes takes the one they pick.
+
+**The name and the mark are one value and never two lists.** A name in one array and a glyph at the same index in another is two places to forget one, and the day somebody inserts a section into the middle of the first the whole of the second is one out : every page still draws, with `Cinéma` wearing a tractor, and nobody notices. `StandardTopics.Section` carries both.
+
+**The mark is the thing and never the word.** `Justice` wears a closed book and not a pair of scales, `Immigration` somebody walking and not a border. A glyph that illustrates the word rather than the subject is a rebus, and a reader scanning a row of pills is reading shapes rather than solving them. Where a subject has no thing of its own, the section it belongs to lends one.
+
+**Every one of them is checked against the system at test time.** `Image(systemName:)` takes any string at all and draws nothing where the system has no such symbol, so a typo in the catalogue is a pill with a hole in it, on every page, in every language, and the compiler is perfectly happy about it. `TopicSymbolTests` asks the system for each of the fifty and for each of the palette.
+
+**A reader picks from what the sections wear and from nothing else.** A picker of every symbol the system has is a thousand glyphs and a search field, which is a great deal of interface for a decision that takes a second ; and a subject wearing a mark from another family would be the one pill on the row that does not belong to the page. The palette is the catalogue's own marks, each once, in the catalogue's order, with the tag everything falls back to at its head.
+
+**The name and the mark are asked for together.** Adding a subject was an alert with a field in it, and an alert holds a field and two buttons and nothing else : a grid of fifty glyphs is not something the system will draw in one. It is a sheet now, and a subject added without a mark would have worn the tag until the reader found their way back. The same sheet changes a mark afterwards, opened from the glyph itself on the row, which is where a reader looks to see what a subject wears and therefore where they reach to change it.
+
+**A section's mark is not the reader's to change.** It comes from the catalogue and is the same on every device ; one they could change here would be one more thing to carry between them, for a glyph nobody chose in the first place.
+
+**The marks are filled in on a store that already has the sections.** Every reader who was using Flong before there were marks has all fifty and needs none of them inserted, so a seeding that only ever wrote new rows would have left every one of them wearing the tag for good. It is not a change to the vocabulary, so it renames nothing, adds nothing, and asks about no story again.
+
 ## Two natures of subject
 
 | Nature | Who decided | May the reader delete it |

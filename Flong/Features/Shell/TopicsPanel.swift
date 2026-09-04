@@ -46,6 +46,9 @@ struct TopicsPanel: View {
 
     @State private var isAdding = false
     @State private var name = ""
+    @State private var symbol = Topic.defaultSymbol
+    /// The subject whose mark is being changed, where one is.
+    @State private var marking: TopicPreferences.Known?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -58,12 +61,20 @@ struct TopicsPanel: View {
         // modifier applies to the enclosing presentation while this page is on
         // the stack and gives it back on the way out.
         .presentationDetents([.large])
-        .alert("Add a subject", isPresented: $isAdding) {
-            TextField("Subject", text: $name)
-            Button("Add") { Task { await model.addTopic(name) } }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("The model files stories under the subjects you have, and can write none of its own.")
+        // **A sheet and not an alert, now that there is a mark to pick.** An
+        // alert holds a field and two buttons and nothing else : a grid of
+        // fifty glyphs in one is not something the system will draw, and a
+        // subject added without a mark would wear the tag for ever unless the
+        // reader found their way back to change it.
+        .sheet(isPresented: $isAdding) {
+            TopicEditor(name: $name, symbol: $symbol, isNaming: true) {
+                Task { await model.addTopic(name, symbol: symbol) }
+            }
+        }
+        .sheet(item: $marking) { topic in
+            TopicEditor(name: .constant(topic.name), symbol: $symbol, isNaming: false) {
+                Task { await model.setTopicSymbol(symbol, of: topic.name) }
+            }
         }
         .task { await model.loadKnownTopics() }
     }
@@ -79,12 +90,17 @@ struct TopicsPanel: View {
 
             Button {
                 name = ""
+                symbol = Topic.defaultSymbol
                 isAdding = true
             } label: {
                 Label("Add a subject", systemImage: "plus")
                     .labelStyle(.iconOnly)
                     .font(.body.weight(.medium))
             }
+            // An identifier beside the name, because the name is translated and
+            // a test that looked for the English would pass here and fail on a
+            // device set to the reader's own language.
+            .accessibilityIdentifier("add-subject")
 
             PanelDismiss()
         }
@@ -159,6 +175,26 @@ struct TopicsPanel: View {
     @ViewBuilder
     private func row(_ topic: TopicPreferences.Known) -> some View {
         let content = HStack(spacing: 12) {
+            // **A button on the reader's own, and a mark on the rest.** The
+            // mark is where a reader looks to see what a subject wears, so it
+            // is where they reach to change it ; a section's comes from the
+            // catalogue and is the same on every device, so there is nothing to
+            // press.
+            Group {
+                if topic.kind == .own {
+                    Button {
+                        symbol = topic.symbol
+                        marking = topic
+                    } label: {
+                        mark(topic.symbol)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text("Change the mark of \(topic.name)"))
+                } else {
+                    mark(topic.symbol).accessibilityHidden(true)
+                }
+            }
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: topic.name)
                 // The band above says whose it is, so the line under the name
@@ -202,6 +238,14 @@ struct TopicsPanel: View {
         }
     }
 
+    /// One subject's mark, at the size a row wears it.
+    private func mark(_ symbol: String) -> some View {
+        Image(systemName: symbol)
+            .font(.system(.body, weight: .regular))
+            .foregroundStyle(.secondary)
+            .frame(width: 28)
+    }
+
     /// The direction, rather than the number.
     ///
     /// A reader pressing the pill can nudge a subject three deep ; here they are
@@ -214,5 +258,99 @@ struct TopicsPanel: View {
                 Task { await model.setPreference(of: topic.name, to: direction) }
             }
         )
+    }
+}
+
+/// Writing a subject, and picking the mark it wears.
+///
+/// **One sheet for both, because they are one decision.** A subject is a word
+/// and a glyph : added without the glyph it wears the tag until the reader
+/// finds their way back, and a reader who has just written `Typographie` is
+/// exactly the person who knows what it should look like.
+///
+/// It opens on the same sheet when only the mark is being changed, with the
+/// name shown and not offered : renaming a subject moves its stories and the
+/// reader's opinion of it, which is a different decision and not one a symbol
+/// picker may take by itself.
+struct TopicEditor: View {
+    @Binding var name: String
+    @Binding var symbol: String
+    /// Whether the name is being written, or only shown.
+    let isNaming: Bool
+    let done: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
+
+    /// Wide enough that the palette reads as a palette, narrow enough that no
+    /// glyph is a hand's width from the one beside it.
+    private static let columns = [GridItem(.adaptive(minimum: 54), spacing: 12)]
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Editorial.rhythm) {
+                    if isNaming {
+                        TextField("Subject", text: $name)
+                            .textFieldStyle(.roundedBorder)
+                            .submitLabel(.done)
+                    } else {
+                        Text(verbatim: name)
+                            .font(theme.headline(.title3))
+                    }
+
+                    Text("The model files stories under the subjects you have, and can write none of its own.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    palette
+                }
+                .padding(20)
+            }
+            .navigationTitle(isNaming ? Text("Add a subject") : Text("Mark"))
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        done()
+                        dismiss()
+                    } label: {
+                        isNaming ? Text("Add") : Text("Done")
+                    }
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", role: .cancel) { dismiss() }
+                        .accessibilityIdentifier("cancel")
+                }
+            }
+            .themed()
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .themed()
+    }
+
+    /// The marks a reader may pick from : what the sections wear, and nothing
+    /// else. See ``StandardTopics/palette``.
+    private var palette: some View {
+        LazyVGrid(columns: Self.columns, spacing: 12) {
+            ForEach(StandardTopics.palette, id: \.self) { mark in
+                Button {
+                    symbol = mark
+                } label: {
+                    Image(systemName: mark)
+                        .font(.system(.title3, weight: .regular))
+                        .frame(width: 54, height: 54)
+                        .foregroundStyle(mark == symbol ? Color.white : Color.primary)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(mark == symbol ? AnyShapeStyle(.tint) : AnyShapeStyle(.quaternary))
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(verbatim: mark))
+                .accessibilityAddTraits(mark == symbol ? [.isSelected] : [])
+            }
+        }
     }
 }

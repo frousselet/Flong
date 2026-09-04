@@ -37,6 +37,7 @@ nonisolated struct Topic: Hashable, StoredRecord {
         case name
         case isOwn = "is_own"
         case kind
+        case symbol
         case createdAt = "created_at"
     }
 
@@ -49,12 +50,33 @@ nonisolated struct Topic: Hashable, StoredRecord {
     /// disagree, and it stays true for anything still reading it.
     var isOwn: Bool
     var kind: TopicKind
+
+    /// The mark it wears, or `nil` where nothing has said one.
+    ///
+    /// A row of pills reading four words is four words a reader has to read ;
+    /// the same row with a glyph in front of each is four shapes they
+    /// recognize. The sections take theirs from the catalogue and a subject the
+    /// reader wrote takes the one they picked, which is why this is a column
+    /// and not a lookup : theirs is not in any catalogue.
+    var symbol: String?
+
     var createdAt: Date
 
-    init(name: String, kind: TopicKind, createdAt: Date = Date()) {
+    /// What a subject wears when nothing has said otherwise.
+    ///
+    /// A tag, which is what a subject is : a word somebody has attached to a
+    /// story. It stands for the reader's own subjects until they pick one, and
+    /// for anything in the store from before there were marks at all.
+    static let defaultSymbol = "tag"
+
+    /// The mark, or the one everything falls back to.
+    var mark: String { symbol ?? Self.defaultSymbol }
+
+    init(name: String, kind: TopicKind, symbol: String? = nil, createdAt: Date = Date()) {
         self.name = name
         self.kind = kind
         self.isOwn = kind == .own
+        self.symbol = symbol
         self.createdAt = createdAt
     }
 }
@@ -90,6 +112,8 @@ nonisolated struct TopicPreferences: Sendable {
         /// Whether the reader wrote it themselves.
         let isOwn: Bool
         let kind: TopicKind
+        /// The mark it wears, never empty : see ``Topic/defaultSymbol``.
+        let symbol: String
 
         var id: String { name }
     }
@@ -105,7 +129,7 @@ nonisolated struct TopicPreferences: Sendable {
             let rows = try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT t.name AS name, t.is_own AS is_own, t.kind AS kind,
+                    SELECT t.name AS name, t.is_own AS is_own, t.kind AS kind, t.symbol AS symbol,
                            (SELECT COUNT(*) FROM story_topic s WHERE s.name = t.name) AS stories,
                            COALESCE((SELECT p.score FROM topic_preference p WHERE p.name = t.name), 0) AS score
                     FROM topic t
@@ -117,7 +141,8 @@ nonisolated struct TopicPreferences: Sendable {
                     stories: $0["stories"] ?? 0,
                     score: $0["score"] ?? 0,
                     isOwn: $0["is_own"] ?? false,
-                    kind: TopicKind(rawValue: $0["kind"] ?? "") ?? .standard
+                    kind: TopicKind(rawValue: $0["kind"] ?? "") ?? .standard,
+                    symbol: ($0["symbol"] as String?) ?? Topic.defaultSymbol
                 )
             }
 
@@ -169,6 +194,7 @@ nonisolated struct TopicPreferences: Sendable {
     func seedStandards(
         _ names: [String] = StandardTopics.names(),
         renaming renamings: [(String, String)] = StandardTopics.renamings(),
+        marks symbols: [String: String] = StandardTopics.symbols(),
         at date: Date = Date()
     ) async throws -> Bool {
         try await database.writer.write { db in
@@ -179,8 +205,22 @@ nonisolated struct TopicPreferences: Sendable {
             }
 
             for name in names where try Self.folded(name, in: db) == nil {
-                try Topic(name: name, kind: .standard, createdAt: date).insert(db)
+                try Topic(name: name, kind: .standard, symbol: symbols[name], createdAt: date).insert(db)
                 changed = true
+            }
+
+            // **The marks are filled in on a store that already has the
+            // sections.** Every reader who was using Flong before there were
+            // marks has all fifty and needs none of them inserted, so a seeding
+            // that only ever wrote new rows would leave every one of them
+            // wearing the default for good. It is not a change to the
+            // vocabulary : nothing is renamed, nothing is added, and no story
+            // is asked about again, so it does not set `changed`.
+            for (name, symbol) in symbols {
+                try db.execute(
+                    sql: "UPDATE topic SET symbol = ? WHERE name = ? AND symbol IS NULL",
+                    arguments: [symbol, name]
+                )
             }
 
             guard changed else { return false }
@@ -266,14 +306,41 @@ nonisolated struct TopicPreferences: Sendable {
     /// Folded against what is already there : a reader writing `cybersécurité`
     /// where `Cybersécurité` exists meant the one that exists.
     @discardableResult
-    func add(_ name: String, at date: Date = Date()) async throws -> String? {
+    func add(_ name: String, symbol: String? = nil, at date: Date = Date()) async throws -> String? {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return nil }
 
         return try await database.writer.write { db in
             if let existing = try Self.folded(name, in: db) { return existing }
-            try Topic(name: name, kind: .own, createdAt: date).insert(db)
+            try Topic(name: name, kind: .own, symbol: symbol, createdAt: date).insert(db)
             return name
+        }
+    }
+
+    /// Changes the mark a subject the reader wrote wears.
+    ///
+    /// Theirs only. A section's mark comes from the catalogue and is the same
+    /// on every device : one the reader could change here would be one more
+    /// thing to carry between them, for a glyph nobody chose in the first place.
+    func setSymbol(_ symbol: String, of name: String) async throws {
+        try await database.writer.write { db in
+            try db.execute(
+                sql: "UPDATE topic SET symbol = ? WHERE name = ? AND kind = 'own'",
+                arguments: [symbol, name]
+            )
+        }
+    }
+
+    /// The mark each subject wears, by name.
+    ///
+    /// What the pills are drawn from. One read of a table of fifty rows, beside
+    /// the scores the page already reads.
+    func symbols() async throws -> [String: String] {
+        try await database.writer.read { db in
+            try Row.fetchAll(db, sql: "SELECT name, symbol FROM topic")
+                .reduce(into: [String: String]()) { found, row in
+                    found[row["name"]] = (row["symbol"] as String?) ?? Topic.defaultSymbol
+                }
         }
     }
 
