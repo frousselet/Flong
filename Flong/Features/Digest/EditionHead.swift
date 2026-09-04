@@ -133,6 +133,52 @@ struct NoEdition: View {
     }
 }
 
+/// A block of type, before the words are there.
+///
+/// **Bars, drawn as bars.** The first version redacted real `Text`, which is
+/// the shorthand SwiftUI offers and gives a bar the full height of a line of
+/// type : chunky slabs the height of the words, one per point, with a stub
+/// under each. What a skeleton is is thin, even rules of varying width, light
+/// enough to read as an absence rather than as content. So the shapes are drawn
+/// rather than borrowed, which also puts the widths under this file's control
+/// instead of the string lengths of a sentence nobody will read.
+///
+/// The last line of a block is short, because the last line of a paragraph is.
+struct TextPlaceholder: View {
+    /// How many lines the block stands for.
+    var lines = 2
+    /// What share of the column the last of them fills.
+    var last: CGFloat = 0.55
+    /// The bar itself. Thin next to the space around it, which is what makes a
+    /// skeleton read as ruled paper rather than as a wall.
+    var height: CGFloat = 9
+    var spacing: CGFloat = 11
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: spacing) {
+            ForEach(0..<max(lines, 1), id: \.self) { line in
+                bar(isLast: line == lines - 1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private func bar(isLast: Bool) -> some View {
+        let shape = RoundedRectangle(cornerRadius: height / 2, style: .continuous).fill(.quaternary)
+
+        if isLast, lines > 1 {
+            shape
+                .frame(height: height)
+                .containerRelativeFrame(.horizontal, alignment: .leading) { width, _ in width * last }
+        } else {
+            shape.frame(height: height)
+        }
+    }
+}
+
+/// The shape of an edition, before there is one.
 /// The shape of an edition, before there is one.
 ///
 /// **A page that fills in rather than one that appears.** An edition is not
@@ -152,39 +198,36 @@ struct NoEdition: View {
 /// ever has, so the page only ever grows into it.
 struct EditionPlaceholder: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ForEach(Self.bars, id: \.self) { bar in
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
+        VStack(alignment: .leading, spacing: 18) {
+            ForEach(Self.points, id: \.self) { lines in
+                HStack(alignment: .top, spacing: 10) {
                     Rectangle()
                         .frame(width: 14, height: 1)
-                        .foregroundStyle(.tertiary)
-                        .offset(y: -5)
-                    Text(verbatim: bar)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(.quaternary)
+                        .padding(.top, 5)
+                    TextPlaceholder(lines: lines, last: lines > 1 ? 0.5 : 0.8)
                 }
             }
         }
-        // The same size and the same room the words will take, or the page
-        // still moves when they arrive.
-        .font(.title3)
-        .foregroundStyle(.primary)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 4)
+        .padding(.top, 6)
         .padding(.bottom, Editorial.rhythm)
-        .redacted(reason: .placeholder)
-        // One thing said once, rather than three bars read out as three
-        // sentences of nonsense.
+        // What tells a page that is filling in from a page that is broken.
+        .shimmering()
+        // One thing said once, rather than a set of bars read out as sentences
+        // of nonsense.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("The edition is being written"))
     }
 
-    /// Lines of about the length a point runs to, so the bars are the width the
-    /// words will be. They are never read : `redacted` draws over them.
-    private static let bars = [
-        String(repeating: "x", count: 46),
-        String(repeating: "x", count: 62),
-        String(repeating: "x", count: 38),
-    ]
+    /// How many lines each point stands for.
+    ///
+    /// **Three points and not five, deliberately.** A placeholder claiming the
+    /// exact shape of an answer nobody has yet is a second guess : the model
+    /// writes three as often as five, and a page settling from five bars to
+    /// three jumps exactly as far as one settling from nothing. Three is the
+    /// fewest a list ever has, so the page only ever grows into it.
+    private static let points = [2, 1, 2]
 }
 
 /// The shape of a story on the page, before there is one.
@@ -204,7 +247,7 @@ struct StoryPlaceholder: View {
     private static let thumbnailWidth: CGFloat = 96
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 16) {
             if isLead {
                 picture
                 lines
@@ -216,24 +259,29 @@ struct StoryPlaceholder: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 14)
-        .redacted(reason: .placeholder)
+        .padding(.vertical, 16)
+        .shimmering()
         .accessibilityHidden(true)
     }
 
+    /// **The lightest fill there is, and it was the second lightest.** A
+    /// photograph's worth of solid grey is the one thing on a skeleton that
+    /// stops reading as an absence and starts reading as content : the eye goes
+    /// to it and finds nothing there. It is still drawn, since leaving it out
+    /// would make the skeleton the wrong height and the page would move by
+    /// exactly the height of a photograph, which is what this exists to stop.
     private var picture: some View {
-        Rectangle()
-            .fill(.tertiary)
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(.quaternary)
             .aspectRatio(Editorial.pictureAspect, contentMode: .fit)
-            .clipShape(.rect(cornerRadius: 10))
     }
 
+    /// The headline, then the line under it, as two blocks with space between :
+    /// a skeleton of one run of bars says nothing about what the row is made of.
     private var lines: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(verbatim: String(repeating: "x", count: isLead ? 34 : 26))
-                .font(.system(isLead ? .title : .title3, design: .serif))
-            Text(verbatim: String(repeating: "x", count: isLead ? 52 : 30))
-                .font(isLead ? .body : .subheadline)
+        VStack(alignment: .leading, spacing: 12) {
+            TextPlaceholder(lines: 2, last: isLead ? 0.62 : 0.7, height: isLead ? 13 : 11)
+            TextPlaceholder(lines: isLead ? 2 : 1, last: 0.45, height: 8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
