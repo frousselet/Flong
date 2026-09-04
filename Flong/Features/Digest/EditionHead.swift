@@ -496,20 +496,19 @@ struct StoryPlaceholder: View {
     }
 }
 
-/// The surface the head of the page stands on : the material, drawn rather
-/// than resolved.
+/// The surface the head of the page stands on : white, a little of the page
+/// showing through it, and a hairline round it.
 ///
-/// **Everything the material was, and none of what it costs.** Liquid Glass is
-/// resolved against whatever is behind it every time it moves, and this pane
-/// moves on every frame of every scroll and is blurred on the way out. What it
-/// looks like, though, is three things that can be painted : a veil, a rim
-/// brighter at the top than at the foot, and a soft shadow under it.
+/// **Painted and not resolved.** Liquid Glass is worked out against whatever is
+/// behind it every time it moves, and this pane moves on every frame of every
+/// scroll and is blurred on the way out, which is one off-screen pass over
+/// another. A white veil is a colour : it lets the page through without asking
+/// what the page is, and it costs one composite.
 ///
-/// The values are read off the material rather than invented. Sampled from a
-/// screenshot of the real thing over this page, the veil lifts a dark page by a
-/// couple of points and a light one most of the way to white : the material
-/// barely tints what is already dark and all but covers what is already light,
-/// which is why one opacity cannot serve both.
+/// **White in both appearances, and not the same amount of it.** The same veil
+/// over a dark page and over a light one is either a slab or nothing at all :
+/// what is constant is the white, and what follows the appearance is how much
+/// of the page is left showing through it.
 struct PaneSurface: ViewModifier {
     @Environment(\.colorScheme) private var scheme
 
@@ -518,20 +517,21 @@ struct PaneSurface: ViewModifier {
 
         return
             content
-            .background(veil, in: shape)
-            // The rim, and it is what says glass more than the veil does : a
-            // bright hairline where the light would catch the top edge, fading
-            // round to almost nothing at the foot.
+            .background(Color.white.opacity(scheme == .dark ? 0.09 : 0.22), in: shape)
+            // The rim, and it is what says the material more than the veil
+            // does : a bright hairline where the light would catch the top
+            // edge, fading round to almost nothing at the foot.
             .overlay {
                 shape.strokeBorder(rim, lineWidth: 0.75)
             }
-            .shadow(color: .black.opacity(scheme == .dark ? 0.30 : 0.07), radius: 14, y: 5)
+            // And a shadow light enough to be a lift rather than a drop : it is
+            // what puts the pane above the page instead of in it, and the
+            // hairline is what draws its edge. Rasterized with the rest of the
+            // pane, so the parallax moves it rather than casting it again.
+            .shadow(color: .black.opacity(scheme == .dark ? 0.45 : 0.13), radius: 16, y: 6)
     }
 
-    private var veil: Color {
-        .white.opacity(scheme == .dark ? 0.04 : 0.62)
-    }
-
+    /// The line round it : lit at the top, gone by the foot.
     private var rim: LinearGradient {
         LinearGradient(
             colors: scheme == .dark
