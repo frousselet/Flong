@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Every subject wears a mark : the fifty sections have one apiece, and a subject you write takes the one you pick, from the same palette. The name and the mark are asked for together, and the mark is changed afterwards from the glyph on its own row.
+- Every subject wears a mark : the fifty sections have one apiece, and a subject you write takes the one you pick, from the same palette. The name and the mark are asked for together, and the mark is changed afterwards from the glyph on its own row. Each line of an edition wears the mark of the subject it is about, in place of the rule it used to.
 
 - One notification per new article, and never a condensed one : a reader who singles out a source, a writer or somebody in the news is told about each piece rather than about how many there were. The first of a burst sounds and the rest arrive quietly, and the stack is per source rather than one pile for the lot.
 - The digest comes out as editions : four a day at hours you set, ten stories apiece, each edition wearing a list of five points at most, written on the device over the whole page, in your language, under the day's date, which the edition and its hour stand beneath, and the page draws the shape of what it is about to hold, as ruled bars under a slow band of light, and fades into the page it becomes rather than arriving in one frame under whoever had started reading. The back numbers are a calendar in the corner of the digest. Past editions are kept in an archive, what did not fit stays in the wire, and a `Nouvelle veille` notice says when one has come out. Without Apple Intelligence there is no edition, and the page says which of the three reasons it is.

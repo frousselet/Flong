@@ -151,7 +151,7 @@ nonisolated struct EditionStore: Sendable {
                     .fetchOne(db)
             else { return nil }
 
-            return PublishedEdition(edition: edition, stories: try Self.stories(of: edition.id, in: db))
+            return try Self.published(edition, in: db)
         }
     }
 
@@ -162,8 +162,24 @@ nonisolated struct EditionStore: Sendable {
                 .filter(Edition.Columns.publishedAt != nil)
                 .order(Edition.Columns.openedAt.desc)
                 .fetchAll(db)
-                .map { PublishedEdition(edition: $0, stories: try Self.stories(of: $0.id, in: db)) }
+                .map { try Self.published($0, in: db) }
         }
+    }
+
+    /// One edition, its stories, and the mark each of its points wears.
+    private static func published(_ edition: Edition, in db: Database) throws -> PublishedEdition {
+        let stories = try Self.stories(of: edition.id, in: db)
+        let filings = try Self.filings(of: edition.id, in: db)
+        let symbols = try Row.fetchAll(db, sql: "SELECT name, symbol FROM topic")
+            .reduce(into: [String: String]()) { found, row in
+                found[row["name"]] = (row["symbol"] as String?) ?? Topic.defaultSymbol
+            }
+
+        return PublishedEdition(
+            edition: edition,
+            stories: stories,
+            marks: Self.marks(for: edition.points, over: stories, filedAs: filings, wearing: symbols)
+        )
     }
 
     private static func stories(of editionID: UUID, in db: Database) throws -> [EditionStory] {
@@ -171,5 +187,62 @@ nonisolated struct EditionStore: Sendable {
             .filter(Column("edition_id") == editionID)
             .order(Column("position"))
             .fetchAll(db)
+    }
+
+    /// The subjects each of an edition's stories was filed under.
+    private static func filings(of editionID: UUID, in db: Database) throws -> [UUID: [String]] {
+        try Row.fetchAll(
+            db,
+            sql: """
+                SELECT es.story_id AS story_id, st.name AS name
+                FROM edition_story es JOIN story_topic st ON st.story_id = es.story_id
+                WHERE es.edition_id = ?
+                """,
+            arguments: [editionID]
+        )
+        .reduce(into: [UUID: [String]]()) { found, row in
+            found[row["story_id"], default: []].append(row["name"])
+        }
+    }
+
+    /// The mark each point wears.
+    ///
+    /// **A point is matched to the story it is about, by the words they
+    /// share.** The model writes three to five sentences over ten stories and
+    /// nothing links one to the other : it is free to say one thing about two
+    /// of them, and asking it for a story identifier alongside each point would
+    /// be index bookkeeping, which a small model does badly and which the
+    /// filing already learnt not to ask for.
+    ///
+    /// So the two are compared rather than declared. It uses the grouping's own
+    /// notion of a term, folded, split and stripped of the words every article
+    /// uses, so what counts as a word here and what counts as one there cannot
+    /// come to differ. The story sharing the most of them is the one the point
+    /// is about, and the first subject it was filed under is the mark.
+    ///
+    /// **A point that matches nothing wears the tag.** Half a mark on a row of
+    /// marks would read worse than a neutral one, and a point about something
+    /// the filing never reached is an ordinary state rather than a fault.
+    static func marks(
+        for points: [String],
+        over stories: [EditionStory],
+        filedAs filings: [UUID: [String]],
+        wearing symbols: [String: String]
+    ) -> [String] {
+        let named = stories.map { (story: $0, terms: Set(TextSignatures.terms(of: $0.title))) }
+
+        return points.map { point in
+            let terms = Set(TextSignatures.terms(of: point))
+            let best =
+                named
+                .map { (story: $0.story, shared: $0.terms.intersection(terms).count) }
+                .filter { $0.shared > 0 }
+                .max { $0.shared < $1.shared }
+
+            guard let subject = best.flatMap({ filings[$0.story.storyID]?.first }) else {
+                return Topic.defaultSymbol
+            }
+            return symbols[subject] ?? Topic.defaultSymbol
+        }
     }
 }
