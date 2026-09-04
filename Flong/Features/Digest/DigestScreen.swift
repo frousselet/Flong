@@ -420,11 +420,35 @@ struct DigestScreen: View {
     /// saying nothing.
     private var dateline: String {
         let named: (slot: EditionSlot, opened: Date)? =
-            model.edition.map { (slot: $0.edition.slot, opened: $0.edition.openedAt) }
-            ?? (isWaitingForAnEdition ? model.editionSchedule.current() : nil)
+            model.edition.map { (slot: $0.edition.slot, opened: $0.edition.openedAt) } ?? scheduled
 
         guard let named else { return "" }
         return "\(String(localized: named.slot.title)) · \(named.opened.formatted(.dateTime.hour().minute()))"
+    }
+
+    /// Which edition the page is, read off the reader's own hours where the
+    /// edition itself has not arrived yet.
+    ///
+    /// **Decided at the first frame, and it has to be.** A navigation bar
+    /// measures the height of its title area once : a subtitle that appears
+    /// under the title later does not make it measure again, and the page
+    /// opened nineteen points short of where it belongs and stayed there until
+    /// the first scroll pushed the bar into laying itself out again. The reader
+    /// saw the page settle downwards the moment they touched it.
+    ///
+    /// So every term of this is known before anything is read : the hours come
+    /// from the preferences, which are held rather than fetched, and whether
+    /// there is a model to write an edition at all is a question about the
+    /// device. Waiting on the store, as this did, is what made the line arrive
+    /// a beat late. Empty only where no edition is coming, ever : no hours set,
+    /// or no model to write one.
+    private var scheduled: (slot: EditionSlot, opened: Date)? {
+        guard model.digestTopic == .frontPage,
+            !model.editionSchedule.slots.isEmpty,
+            OnDeviceModel.absence == nil
+        else { return nil }
+
+        return model.editionSchedule.current()
     }
 
     /// Today, spelled the way the reader's language spells it.
