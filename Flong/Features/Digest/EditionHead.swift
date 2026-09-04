@@ -30,11 +30,16 @@ import SwiftUI
 /// septembre` and `Édition du matin, 07:00` and then goes straight to the news.
 /// See ``DigestScreen``.
 ///
+/// **And the way to the back numbers is not here.** It was a line under the
+/// list, which put a way *out* of the page in the middle of the page : the
+/// reader met it between what this edition says and the first story it leads
+/// on. It stands in the corner now, beside the notices, and only in this
+/// section. See ``EditionsButton``.
+///
 /// The points are the model's own, in the reader's own language. An edition
 /// with none is not shown at all.
 struct EditionHead: View {
     let edition: Edition
-    let openArchive: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Editorial.tightRhythm) {
@@ -42,17 +47,6 @@ struct EditionHead: View {
                 points
             }
 
-            Button(action: openArchive) {
-                Label("Previous editions", systemImage: "clock.arrow.circlepath")
-                    .font(.footnote)
-            }
-            .buttonStyle(.plain)
-            // An identifier beside the name, because the name is translated and
-            // a test that looked for the English would pass here and fail on a
-            // device set to the reader's own language.
-            .accessibilityIdentifier("edition-archive")
-            .foregroundStyle(.tint)
-            .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, Editorial.rhythm)
@@ -91,11 +85,18 @@ struct EditionHead: View {
                 }
             }
         }
-        .font(.body)
-        .foregroundStyle(.secondary)
+        // **One step up from the body, and the page's own colour.** These are
+        // the news : they were set in the size and the grey a standfirst is set
+        // in, which is right for a line under a headline and wrong here, where
+        // there is no headline above them and they are the first thing the
+        // reader reads. The rules stay quiet, being marks and not words.
+        .font(.title3)
+        .foregroundStyle(.primary)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 4)
-        .padding(.bottom, 6)
+        // Room between what the edition says and the first story it leads on.
+        // They are two different things and were a few points apart.
+        .padding(.bottom, Editorial.rhythm)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text("Written by the model : \(edition.points.joined(separator: ". "))"))
     }
@@ -129,5 +130,111 @@ struct NoEdition: View {
                 Button("Edition times") { openSettings() }
             }
         }
+    }
+}
+
+/// The shape of an edition, before there is one.
+///
+/// **A page that fills in rather than one that appears.** An edition is not
+/// published until the model has written the whole of it, so the front page
+/// stood empty for the seconds or minutes that takes and then arrived all at
+/// once, pushing everything below it down the screen. A reader who had started
+/// reading lost their place to a page they had not asked to change.
+///
+/// So the page draws what it is about to hold : the dateline is already in the
+/// title, and here are the lines it will have. `redacted(reason: .placeholder)`
+/// draws them as bars, which is what says these are not words to read yet.
+///
+/// **Three of them, and not five.** A placeholder claiming the exact shape of
+/// an answer nobody has yet is a second guess : the model writes three points
+/// as often as five, and a page that settled from five bars to three would jump
+/// exactly as far as one that settled from nothing. Three is the fewest a list
+/// ever has, so the page only ever grows into it.
+struct EditionPlaceholder: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(Self.bars, id: \.self) { bar in
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Rectangle()
+                        .frame(width: 14, height: 1)
+                        .foregroundStyle(.tertiary)
+                        .offset(y: -5)
+                    Text(verbatim: bar)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        // The same size and the same room the words will take, or the page
+        // still moves when they arrive.
+        .font(.title3)
+        .foregroundStyle(.primary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 4)
+        .padding(.bottom, Editorial.rhythm)
+        .redacted(reason: .placeholder)
+        // One thing said once, rather than three bars read out as three
+        // sentences of nonsense.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("The edition is being written"))
+    }
+
+    /// Lines of about the length a point runs to, so the bars are the width the
+    /// words will be. They are never read : `redacted` draws over them.
+    private static let bars = [
+        String(repeating: "x", count: 46),
+        String(repeating: "x", count: 62),
+        String(repeating: "x", count: 38),
+    ]
+}
+
+/// The shape of a story on the page, before there is one.
+///
+/// **The head is not the whole of the jump.** An edition's ten stories arrive
+/// with it, so drawing the shape of the list above them and nothing below
+/// would move the same page the same distance a moment later. The lead carries
+/// a photograph across the column and the rest keep theirs to a square, so
+/// there are two shapes to draw and they are the two that take the room.
+///
+/// **The picture is drawn as a picture.** A skeleton that leaves it out is a
+/// skeleton the wrong height, which is the whole of what this exists to stop.
+struct StoryPlaceholder: View {
+    var isLead = false
+
+    /// The same width the rows that are not the lead keep their picture to.
+    private static let thumbnailWidth: CGFloat = 96
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if isLead {
+                picture
+                lines
+            } else {
+                HStack(alignment: .top, spacing: 14) {
+                    lines
+                    picture.frame(width: Self.thumbnailWidth)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 14)
+        .redacted(reason: .placeholder)
+        .accessibilityHidden(true)
+    }
+
+    private var picture: some View {
+        Rectangle()
+            .fill(.tertiary)
+            .aspectRatio(Editorial.pictureAspect, contentMode: .fit)
+            .clipShape(.rect(cornerRadius: 10))
+    }
+
+    private var lines: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(verbatim: String(repeating: "x", count: isLead ? 34 : 26))
+                .font(.system(isLead ? .title : .title3, design: .serif))
+            Text(verbatim: String(repeating: "x", count: isLead ? 52 : 30))
+                .font(isLead ? .body : .subheadline)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

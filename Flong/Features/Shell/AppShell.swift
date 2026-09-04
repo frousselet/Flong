@@ -17,12 +17,6 @@ import UniformTypeIdentifiers
 nonisolated enum Route: Hashable {
     case story(UUID)
     case article(UUID)
-    /// Every edition that has been published, newest first.
-    case editions
-    /// One of them, by the moment it opened : an edition is known by its
-    /// boundary and by nothing else, which is what lets two devices agree on
-    /// what `this morning` means without speaking.
-    case edition(UUID)
     case view(SidebarItem.Kind)
     case collection(ArticleCollection.Kind)
     /// One writer, by their byline : see ``Author`` for why the name is the
@@ -472,12 +466,6 @@ struct AppShell: View {
                 open: { reading = Reading(id: $0) },
                 read: { readingShared = ReadingShared(entry: $0) }
             )
-
-        case .editions:
-            EditionArchiveScreen(model: model) { path.wrappedValue.append(.edition($0)) }
-
-        case .edition(let id):
-            EditionScreen(model: model, id: id) { path.wrappedValue.append(.story($0)) }
 
         case .author(let name):
             AuthorScreen(model: model, name: name, zoom: zoom) { reading = Reading(id: $0) }

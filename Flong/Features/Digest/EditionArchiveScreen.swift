@@ -18,6 +18,37 @@ import SwiftUI
 /// with the name it was given and the ten stories it led on, and not the same
 /// stories folded back into today's ranking. So an edition here is exactly what
 /// it was, down to the headline over each story, frozen when it closed.
+/// The panel the calendar in the corner opens.
+///
+/// A short sheet over the page, like the sources, the subjects and the notices,
+/// and for the same reason : the reader picks a back number, reads it, and
+/// comes back to the edition they were on. It carries a stack of its own, since
+/// one of these does lead somewhere, and hands that stack the panel's own way
+/// out : a `DismissAction` read on a pushed page pops the page rather than
+/// closing the sheet it is in.
+struct EditionsPanel: View {
+    let model: AppModel
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var opened: [UUID] = []
+
+    var body: some View {
+        NavigationStack(path: $opened) {
+            EditionArchiveScreen(model: model) { opened.append($0) }
+                // What a test presses and reads, since every name here is
+                // translated.
+                .accessibilityIdentifier("edition-archive-list")
+                .navigationDestination(for: UUID.self) { id in
+                    EditionScreen(model: model, id: id) { _ in }
+                        .toolbar { PanelDismiss { dismiss() } }
+                }
+                .toolbar { PanelDismiss() }
+        }
+        .presentationDetents([.height(Panel.tall), .large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
 struct EditionArchiveScreen: View {
     let model: AppModel
     let open: (UUID) -> Void
@@ -56,6 +87,9 @@ struct EditionArchiveScreen: View {
                         row(published)
                     }
                     .buttonStyle(.plain)
+                    // What a test presses, since every name on the row is
+                    // either translated or whatever the model wrote that day.
+                    .accessibilityIdentifier("edition-row")
                 } header: {
                     HStack(spacing: 6) {
                         Text(published.edition.slot.title)
@@ -115,10 +149,11 @@ struct EditionScreen: View {
                                     }
                                 }
                             }
-                            .font(.body)
-                            .foregroundStyle(.secondary)
+                            .font(.title3)
+                            .foregroundStyle(.primary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 4)
+                            .padding(.bottom, Editorial.tightRhythm)
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel(
                                 Text("Written by the model : \(edition.points.joined(separator: ". "))"))
