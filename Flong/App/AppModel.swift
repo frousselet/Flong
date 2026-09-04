@@ -1547,6 +1547,20 @@ final class AppModel {
     /// model per story, and a page that waited for it would be a page that
     /// arrives a second late to say what it already knew.
     func rebuildDigest() async {
+        // **A pass of its own, so the reader can see it.** This is the whole of
+        // what happens when the schedule changes or the reader asks for the
+        // page to be built again : the grouping, and then the model writing the
+        // headlines and the few points over them. Started with no pass at all,
+        // it moved through its stages against a plan nobody had declared, and
+        // the ring in the corner said nothing for the minute the model takes.
+        // The reader saw a page that had not changed and no sign that anything
+        // was being done about it.
+        //
+        // `beginWork` answers nothing where a pass is already under way, which
+        // is what keeps this from claiming the corner from a fetch that is
+        // already running.
+        let pass = await beginWork([.grouping, .writing, .filing, .naming])
+
         moveWork(to: .grouping)
         await digestService.buildStories()
         await digestService.buildEditions(preferences.editionSchedule)
@@ -1554,8 +1568,10 @@ final class AppModel {
 
         // The headlines and the subjects, turn about and under a bound. They
         // ran one after the other and unbounded, which is how a page could
-        // arrive fully written and filed under nothing at all.
-        enrich()
+        // arrive fully written and filed under nothing at all. The pass is
+        // handed over with them : what closes it is the model finishing, not
+        // the grouping above, since the model is the part worth watching.
+        enrich(pass: pass)
     }
 
     // MARK: - Telling the reader
