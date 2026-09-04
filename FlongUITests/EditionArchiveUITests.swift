@@ -43,6 +43,8 @@ final class EditionArchiveUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
+        // In the digest and no other section : the three buttons beside it are
+        // everywhere, and a back number is about this page alone.
         let archive = app.buttons["edition-archive"].firstMatch
         guard archive.waitForExistence(timeout: 20) else {
             // No edition on this device, which is a legitimate state and one
@@ -56,11 +58,15 @@ final class EditionArchiveUITests: XCTestCase {
 
         archive.tap()
 
-        // The screen the line opens. Its being there at all is what says it
+        // The panel the calendar opens. Its being there at all is what says it
         // opened : what is on it depends on how many editions this device has
         // had, and a first launch has exactly the one it is looking at.
-        let back = app.navigationBars.firstMatch
-        XCTAssertTrue(back.waitForExistence(timeout: 10), "The back numbers open on a page of their own")
-        XCTAssertTrue(back.buttons.firstMatch.exists, "And there is a way back from it")
+        //
+        // A panel and not a page, so there is no back button to look for : it
+        // is a sheet over the page, flicked away like the other three in that
+        // corner, and the identifier is on the list it holds.
+        let back = app.buttons["edition-row"].firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 10), "The back numbers open in a panel over the page")
+        XCTAssertTrue(back.isHittable, "And one of them can be opened")
     }
 }

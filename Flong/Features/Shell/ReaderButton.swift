@@ -230,6 +230,43 @@ struct NotificationsButton: View {
     }
 }
 
+/// The way to the back numbers, beside the notices.
+///
+/// **In the corner rather than on the page.** It was a line under the
+/// edition's own list, `Éditions précédentes`, which put a way *out* of the
+/// page in the middle of the page : the reader met it between what this
+/// edition says and the first story it leads on, on the way down to the news.
+/// A masthead does not carry its own archive.
+///
+/// It stands only in the digest, and that is the point of it standing in a
+/// toolbar at all : the other three buttons are in every section a reader reads
+/// in, because the sources, the subjects and the notices are about all of them.
+/// A back number is about this section and no other.
+///
+/// It carries the panel itself rather than a route, like the notices and the
+/// subjects : the reader picks an edition, reads it, and comes back to the one
+/// they were on.
+struct EditionsButton: View {
+    let model: AppModel
+
+    @State private var isOpen = false
+
+    var body: some View {
+        Button {
+            isOpen = true
+        } label: {
+            Label("Editions", systemImage: "calendar")
+        }
+        // An identifier beside the name, because the name is translated and a
+        // test that looked for the English would pass here and fail on a device
+        // set to the reader's own language.
+        .accessibilityIdentifier("edition-archive")
+        .sheet(isPresented: $isOpen) {
+            EditionsPanel(model: model)
+        }
+    }
+}
+
 /// The way to every subject there is, beside the notices.
 ///
 /// **The pills are the other half of this.** A reader forms an opinion about a

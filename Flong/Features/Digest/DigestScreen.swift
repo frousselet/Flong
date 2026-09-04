@@ -74,7 +74,7 @@ struct DigestScreen: View {
         // It still scrolls away with the head of the page, from the offset
         // below rather than by being carried along.
         .background(alignment: .top) {
-            PageWash(url: model.digest.lead?.imageURL, offset: offset)
+            PageWash(url: leadPicture, offset: offset)
         }
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top
@@ -140,6 +140,13 @@ struct DigestScreen: View {
             ToolbarItem(placement: .sectionLeading) {
                 NotificationsButton(model: model)
             }
+            // **In this section and no other.** The three above are in every
+            // section a reader reads in, because the sources, the subjects and
+            // the notices are about all of them. A back number is about this
+            // page and nowhere else.
+            ToolbarItem(placement: .sectionLeading) {
+                EditionsButton(model: model)
+            }
             ReaderCorner(model: model, work: model.currentWork)
         }
         // Not while something is being brought in. `Nothing has come in yet`
@@ -149,11 +156,16 @@ struct DigestScreen: View {
         .overlay {
             // Three pages that look identical and are not : one with no feeds,
             // one narrowed to a subject holding nothing, and one whose edition
-            // has not been written. The last is the new one, and it is the one
+            // will never be written. The last is the new one, and it is the one
             // that most looks like a fault when it is not : a device with no
             // model will never have an edition, and saying so is the whole of
             // section 14's no-model path here.
-            if model.digestTopic == .frontPage, model.edition == nil, model.currentWork == nil {
+            //
+            // **Said only where the absence is permanent.** An edition that is
+            // merely being written is a page that is about to arrive, and
+            // telling the reader there is none would be untrue for the minute
+            // it takes. That case draws the shape of the page instead, above.
+            if model.digestTopic == .frontPage, model.edition == nil, !isWaitingForAnEdition {
                 NoEdition(hasSchedule: !model.editionSchedule.slots.isEmpty) {
                     open(.view(.unread))
                 }
@@ -187,12 +199,22 @@ struct DigestScreen: View {
         // answer badly. So the cap belongs to the page and not to the store,
         // and a pill still reads the whole of the three days.
         if model.digestTopic == .frontPage, let published = model.edition {
-            EditionHead(edition: published.edition) { open(.editions) }
+            EditionHead(edition: published.edition)
 
             let shown = published.stories.compactMap { held in page.all.first { $0.id == held.storyID } }
             ForEach(shown) { story in
                 row(story, isLead: story.id == shown.first?.id)
             }
+        } else if isWaitingForAnEdition {
+            // **The shape of the page, before there is one.** An edition is not
+            // published until the model has written the whole of it, so the
+            // front page stood empty for as long as that takes and then arrived
+            // all at once, pushing everything below it down the screen. A
+            // reader who had started reading lost their place to a page they
+            // had not asked to change.
+            EditionPlaceholder()
+            StoryPlaceholder(isLead: true)
+            StoryPlaceholder()
         } else {
             if !live.isEmpty {
                 header {
@@ -295,15 +317,66 @@ struct DigestScreen: View {
         }
     }
 
+    /// The picture the head of the page is washed in the colours of.
+    ///
+    /// **The one the page actually leads on, which is not what `Digest.lead`
+    /// answers any more.** That is the lead of the whole three-day page, worked
+    /// out from the front page's own ranking ; what the reader sees at the top
+    /// is the first story of the *edition*, in the edition's order. The two are
+    /// usually different stories, so the head was washed in the colours of a
+    /// photograph further down the page or not on it at all.
+    ///
+    /// Off the edition where there is one, and off the page's own lead where
+    /// there is not, which is a subject narrowed to a pill and the wire behind
+    /// a device with no model.
+    private var leadPicture: URL? {
+        guard model.digestTopic == .frontPage, let published = model.edition else {
+            return model.digest.lead?.imageURL
+        }
+
+        let page = model.digest
+        return
+            published.stories
+            .lazy
+            .compactMap { held in page.all.first { $0.id == held.storyID } }
+            .first?
+            .imageURL
+    }
+
+    /// Whether an edition is on its way rather than absent for good.
+    ///
+    /// The two look identical on screen and are not : a device with no model
+    /// will never have one, a reader who switched every edition off asked for
+    /// none, and a reader who follows nothing has nothing to make one from. Any
+    /// of those is a page that has to say so. Everything else is a page about
+    /// to arrive, and the shape of it is drawn while it does.
+    private var isWaitingForAnEdition: Bool {
+        model.digestTopic == .frontPage
+            && model.edition == nil
+            && !model.isEmpty
+            && !model.editionSchedule.slots.isEmpty
+            && OnDeviceModel.absence == nil
+    }
+
     /// Which edition the page is showing, and when it came out.
     ///
-    /// Empty where there is none : a device with no model never has one, and a
-    /// subtitle about a page that does not exist is a line saying nothing.
+    /// **The moment comes from the schedule where no edition has been published
+    /// yet.** The boundary is known from the clock and the reader's own hours,
+    /// long before the model has written a word, so the line can be right from
+    /// the moment the page opens rather than appearing when the edition lands.
+    /// A subtitle that arrives is one more thing moving on a page that has just
+    /// been asked to stop moving.
+    ///
+    /// Empty where there is no edition to come at all : a device with no model
+    /// never has one, and a subtitle about a page that will not exist is a line
+    /// saying nothing.
     private var dateline: String {
-        guard let edition = model.edition?.edition else { return "" }
+        let named: (slot: EditionSlot, opened: Date)? =
+            model.edition.map { (slot: $0.edition.slot, opened: $0.edition.openedAt) }
+            ?? (isWaitingForAnEdition ? model.editionSchedule.current() : nil)
 
-        let hour = edition.openedAt.formatted(.dateTime.hour().minute())
-        return "\(String(localized: edition.slot.title)) · \(hour)"
+        guard let named else { return "" }
+        return "\(String(localized: named.slot.title)) · \(named.opened.formatted(.dateTime.hour().minute()))"
     }
 
     /// Today, spelled the way the reader's language spells it.
