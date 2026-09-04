@@ -438,7 +438,7 @@ struct NewsmakerStoreTests {
         try await readEverything()
         try await newsmakers.setNotifies("Donald Trump", true)
 
-        let arrived = try await articles.arrived(since: now.addingTimeInterval(-60))
+        let arrived = try await articles.unannounced()
         #expect(arrived.map(\.title) == ["Une rencontre"])
         // The person and not the paper : asking about somebody is the most
         // particular of the requests, so it is what the notice is headed with.

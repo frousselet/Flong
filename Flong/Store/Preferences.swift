@@ -321,21 +321,24 @@ nonisolated final class Preferences: @unchecked Sendable {
         }
     }
 
-    /// The last moment this device said anything about an article one of the
-    /// reader's own sources published.
+    /// Whether this device has begun telling the reader about articles, and
+    /// when it started.
     ///
-    /// Local and never carried, like the other two watermarks and for the same
-    /// reason : each device tells its own reader, and one that travelled would
-    /// have the second device stay silent about what only the first announced.
+    /// **No longer a watermark, and it used to be one.** How far this device
+    /// has got is written on the articles themselves now, in
+    /// `entry.announced_at` : a notice is per article, and a clock cannot meter
+    /// that, since the read behind it is bounded and a mark moved past what the
+    /// bound left behind loses the rest for good.
     ///
-    /// **Which sources those are is not here.** That is written on the sources
-    /// themselves, where a decision about a publisher belongs, and it travels
-    /// with them ; this is only how far this device has got through telling the
-    /// reader about them.
+    /// What is left here is the one thing an article cannot answer : whether
+    /// this device has ever listened at all. The switch on a source travels and
+    /// this does not, so a device meeting a source already switched on has to
+    /// be able to tell `the reader asked here` from `the reader asked on the
+    /// iPad, and this is that source's back catalogue`. Nothing at all is the
+    /// second, and what is waiting is emptied without a word.
     ///
-    /// Nothing at all means nothing to announce. It is stamped the moment the
-    /// reader asks about their first source, so what that source published
-    /// before they asked is not news.
+    /// Local and never carried, like the other watermarks and for the same
+    /// reason : each device tells its own reader.
     var articlesAnnouncedAt: Date? {
         get { local.object(forKey: Key.articlesAnnouncedAt) as? Date }
         set {

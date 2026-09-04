@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- One notification per new article, and never a condensed one : a reader who singles out a source, a writer or somebody in the news is told about each piece rather than about how many there were. The first of a burst sounds and the rest arrive quietly, and the stack is per source rather than one pile for the lot.
 - The digest comes out as editions : four a day at hours you set, ten stories apiece, each edition wearing a headline and a few lines written on the device over the whole page, in your language. Past editions are kept in an archive, what did not fit stays in the wire, and a `Nouvelle veille` notice says when one has come out. Without Apple Intelligence there is no edition, and the page says which of the three reasons it is.
 - An import from a FreshRSS account, chosen subscription by subscription, bringing the history of each source picked and the favourites, merging a source already followed rather than duplicating it, resumable across launches and carried on by the system when the reader leaves.
 - A `Statistiques` page, opened from a chart beside the reader's own face : the articles received, how many were read, the sources, the stories the digest made of them, the hours, the days of the week and of the month, the subjects, the personalities, the authors and the languages, over everything by default and down to a day. Every card is a sheet of Liquid Glass over a wash the page scrolls across. There is something under the last card for whoever scrolls that far.
@@ -30,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Nothing waiting to be announced is lost : the article notices were metered by a clock and the read behind it was capped at two hundred, so the two hundred and first article of a pass was never announced and never would be. It is written on the article now.
 - The per-device fetch stagger is derived by a digest rather than by `Hasher`, whose seed changes at every launch : a device landed on a different side of every interval each time it started, and two devices of one reader could still ask a publisher at the same second. The backoff after a failure is exact for the same reason, and carries the stagger it used to drop.
 - The digest asks the model a second time, as the condensing of published headlines it is, where the first ask is refused for sensitive content, asks again for a single field rather than for the whole brief where one comes back wrong, cuts a standfirst that ran to a paragraph back to its first whole sentences, and takes the headline and the line of a story it could not write from one and the same article, preferring one already in the reader's language, and translates the publisher's own head on the device where no article in the group is written in the reader's language, marked with the translate glyph rather than the summary one so the two cannot be read as one : measured over thirty real stories, twenty-four are written instead of twenty and twenty-nine read in the reader's language instead of twenty-three.
 

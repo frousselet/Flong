@@ -429,6 +429,11 @@ nonisolated struct ServiceImport: Sendable {
                         feed: feed,
                         at: now,
                         read: [],
+                        // An account brought over is a history the reader
+                        // already had, whatever this device's clock makes of
+                        // its arrival. A notice per article would be thousands
+                        // of interruptions about pieces they have already seen.
+                        isBacklog: true,
                         in: db
                     )
                 else { continue }

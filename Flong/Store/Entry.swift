@@ -53,6 +53,7 @@ nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
         case vectorRevision = "vector_revision"
         case duplicateOf = "duplicate_of"
         case newsmakersAt = "newsmakers_at"
+        case announcedAt = "announced_at"
     }
 
     var id: UUID
@@ -116,6 +117,26 @@ nonisolated struct Entry: Identifiable, Hashable, StoredRecord {
     /// It is set back to `nil` when a publisher rewrites the piece, which is
     /// what makes the people follow the prose.
     var newsmakersAt: Date?
+
+    /// When the reader was told about this article, or `nil` where they have
+    /// not been and may still be.
+    ///
+    /// **Per article, because a notice is per article.** It was a watermark on
+    /// the device, which is the right shape for one sentence about everything
+    /// that arrived and the wrong one for one sentence apiece : the read behind
+    /// it is bounded at two hundred against absurdity, and a mark moved past
+    /// what the bound left behind loses the rest for good.
+    ///
+    /// It is stamped whether a notice was posted or not. A reader looking at
+    /// the page an article lands on has seen it, and being told tomorrow about
+    /// what they read today is worse than not being told ; what this records is
+    /// that the article reached them and not that a notification went out.
+    ///
+    /// And it is stamped on the way in for everything that is a backlog rather
+    /// than news : an import, and the first fetch of a feed nobody has fetched
+    /// before. Both of those are a reader receiving a history, and a history is
+    /// not something to be interrupted about a thousand times.
+    var announcedAt: Date?
 
     init(
         id: UUID = .v7(),
