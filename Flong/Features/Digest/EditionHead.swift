@@ -96,7 +96,12 @@ struct EditionHead: View {
                     // before the line is read.
                     Image(systemName: mark(at: index))
                         .font(.system(.footnote, weight: .medium))
-                        .foregroundStyle(.tertiary)
+                        // The page's own colour, like the line beside it. A
+                        // mark set quieter than the words it stands in front of
+                        // reads as furniture ; this one says what kind of news
+                        // the line is, which is as much a part of the line as
+                        // the sentence.
+                        .foregroundStyle(.primary)
                         .frame(width: Self.markWidth)
                         .accessibilityHidden(true)
                     Text(verbatim: point)

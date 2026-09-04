@@ -178,6 +178,8 @@ Three bars and not five, deliberately. A placeholder claiming the exact shape of
 
 **The point and the story are compared rather than declared.** The model writes three to five sentences over ten stories and nothing links one to the other : it is free to say one thing about two of them. Asking it for a story identifier beside each point would be index bookkeeping, which a small model does badly and which the filing already learnt not to ask for. So the two are matched by the words they share, using the grouping's own notion of a term, folded and stripped of the words every article uses, and the story sharing the most of them is the one the point is about.
 
+The mark is set in the page's own colour, like the line beside it. One set quieter than the words it stands in front of reads as furniture ; this one says what kind of news the line is, which is as much a part of the line as the sentence.
+
 **A point that matches nothing wears the tag.** Half a mark on a row of marks reads worse than a neutral one, and a point about a story the filing never reached is an ordinary state rather than a fault. The skeleton holds the room a mark takes and draws none : one claiming a subject before anything has been filed under one would be a promise, and the page would change shape twice.
 
 **And no mark saying the model wrote it.** A story row carries one and there it says something : a story's line is the model's or its publisher's, and it is how a reader tells which. Nothing on an edition's head is ever anybody else's, an edition existing only where the model wrote the whole of it, so a mark there answers a question nobody can ask. It is still said to VoiceOver, where a statement costs no ink.
