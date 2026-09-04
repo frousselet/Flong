@@ -82,9 +82,6 @@ struct CollectionsScreen: View {
         .scrollEdgeEffectStyle(.soft, for: .top)
         .navigationTitle(Text("Collections"))
         .toolbar {
-            ToolbarItem(placement: .sectionLeading) {
-                StatisticsButton(model: model)
-            }
             // Beside the figures rather than opposite them : the leading corner
             // is where this page is acted on, and the trailing one belongs to
             // the reader's own menu in every section.

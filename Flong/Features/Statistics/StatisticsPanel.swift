@@ -75,8 +75,12 @@ struct StatisticsPanel: View {
         .background { wash }
         .safeAreaInset(edge: .top, spacing: 0) { windows }
         .scrollEdgeEffectStyle(.soft, for: .top)
+        // The reader's panel opens the whole way for this : it holds rows and
+        // opens at the height of those, and a page of charts in a sheet that
+        // tall is a page nobody can read. The modifier applies to the enclosing
+        // presentation while this page is on the stack and gives it back on the
+        // way out.
         .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
         .themed()
         // Read when the page opens and whenever the window changes, and put
         // down on the way out : see ``AppModel/statistics``.

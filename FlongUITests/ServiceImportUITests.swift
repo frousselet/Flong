@@ -36,9 +36,16 @@ final class ServiceImportUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        let sources = app.buttons["sources"].firstMatch
+        // **Through the reader's own menu**, where the sources are a row now.
+        // They were a button in the leading corner beside three others, which
+        // is four glyphs before the page has said anything.
+        let face = app.buttons["reader"].firstMatch
         XCTAssertTrue(
-            sources.waitForExistence(timeout: 20), "The sources are one press from every section a reader reads in")
+            face.waitForExistence(timeout: 20), "The reader's own button is in the corner of every section")
+        face.tap()
+
+        let sources = app.buttons["sources"].firstMatch
+        XCTAssertTrue(sources.waitForExistence(timeout: 5), "The menu leads to what the reader follows")
         sources.tap()
 
         // The three ways to add a source stand under one menu, and this is the

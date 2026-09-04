@@ -506,11 +506,11 @@ It carries a navigation stack of its own, for the bar the controls hang off. Tha
 
 **The three panels came out of the leading corner and are rows in the reader's own menu.** They are described below as three buttons standing there, which is what they were, and the argument for it was good : a reader who says one thing about the page they are looking at should not have to go through a menu and come back. What it cost was the corner. Four glyphs stood there before the page had said anything, and a reader looking for the notices was reading pictures : a toolbar is not a menu, and a stack of cards, a grid of squares and a bell say very little about which is which. They are rows now, named in words, in the one place a reader already looks for what is theirs, and they stand at the top of it, above the reader themselves.
 
-**The figures moved the other way.** They stood beside the face, on the argument that what a reader's stream adds up to is about the person rather than about the page. That still holds, and the corner opposite is empty now, so the argument no longer decides anything : what does is that the figures are the one thing left that belongs in every section, and one glyph in a corner is a corner a reader can read.
+**The figures went with them**, and they stood beside the face rather than in that corner. They were moved into the corner first, on the argument that they were the one control left that belongs in every section ; a reader looked at that and said the menu was where they belonged too, which is right for the reason the other three are : a menu names things in words, and what the figures are is a page you open, look at, and close.
 
-**And the calendar stands in the digest alone.** Every other control in that corner is about the whole of what a reader reads ; a back number is about one page. It is the one argument for a fourth thing in a toolbar rather than a row in the menu.
+**What is left is the calendar, in the digest alone.** Every other control that stood there was about the whole of what a reader reads. A back number is about one page, and that is the whole argument for a glyph in a toolbar rather than a row in a menu.
 
-So a section carries the figures on the left, the reader's face on the right, and the digest carries the calendar between the figures and the title. What the sections themselves add is their own : the `+` on the collections, `Mark all as read` on a feed.
+So a section carries nothing on the left and the reader's face on the right, the digest carries the calendar, and what the sections themselves add is their own : the `+` on the collections, `Mark all as read` on a feed.
 
 ## The panels, in the leading corner
 

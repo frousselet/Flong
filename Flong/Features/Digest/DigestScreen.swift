@@ -149,17 +149,14 @@ struct DigestScreen: View {
         // The sources in one corner, the reader's own menu in the other, the
         // same way round in every section.
         .toolbar {
-            // **What the reader looks at leads, and what they tend does not.**
-            // This corner held the sources, the subjects and the notices, which
-            // is three glyphs before the page has said anything : a toolbar is
-            // not a menu, and a reader looking for one of them was reading
-            // glyphs. Those are rows in the reader's own menu now.
-            ToolbarItem(placement: .sectionLeading) {
-                StatisticsButton(model: model)
-            }
-            // **In this section and no other.** The figures beside it are in
-            // every section, being about the whole of what a reader reads. A
-            // back number is about this page and nowhere else.
+            // **One thing in this corner, and it is about this page.** It
+            // held the sources, the subjects, the notices and then the figures,
+            // which is four glyphs before the page has said anything : a
+            // toolbar is not a menu, and a reader looking for one of them was
+            // reading pictures. All four are rows in the reader's own menu now,
+            // named in words. A back number is the one control left that is
+            // about this page rather than about the whole of what a reader
+            // reads, which is the whole argument for its being here.
             ToolbarItem(placement: .sectionLeading) {
                 EditionsButton(model: model)
             }
