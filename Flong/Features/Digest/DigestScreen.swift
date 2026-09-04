@@ -119,6 +119,15 @@ struct DigestScreen: View {
         // A large title like every other section's, so it shrinks into the bar
         // as the reader scrolls into the page.
         .navigationTitle(Text(verbatim: Self.today()))
+        // **Which edition, under the date the page is titled with.** It stood
+        // over the list, which put a second heading under the date : two lines
+        // saying when, one above the other, and the reader had read the day
+        // before reaching either. A masthead puts the edition under the
+        // dateline, and so does this.
+        //
+        // Empty where there is no edition, since a subtitle about a page that
+        // does not exist is a line saying nothing.
+        .navigationSubtitle(Text(verbatim: dateline))
         // The sources in one corner, the reader's own menu in the other, the
         // same way round in every section.
         .toolbar {
@@ -284,6 +293,17 @@ struct DigestScreen: View {
                 Button("Group now") { Task { await model.rebuildDigest() } }
             }
         }
+    }
+
+    /// Which edition the page is showing, and when it came out.
+    ///
+    /// Empty where there is none : a device with no model never has one, and a
+    /// subtitle about a page that does not exist is a line saying nothing.
+    private var dateline: String {
+        guard let edition = model.edition?.edition else { return "" }
+
+        let hour = edition.openedAt.formatted(.dateTime.hour().minute())
+        return "\(String(localized: edition.slot.title)) · \(hour)"
     }
 
     /// Today, spelled the way the reader's language spells it.

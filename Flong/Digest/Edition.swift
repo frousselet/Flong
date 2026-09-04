@@ -26,7 +26,7 @@ nonisolated enum EditionSlot: String, Codable, Hashable, Sendable, CaseIterable 
     case evening
     case night
 
-    /// What the reader sees over the page and in the archive.
+    /// What the reader sees under the date and in the archive.
     var title: LocalizedStringResource {
         switch self {
         case .morning: "Morning edition"
