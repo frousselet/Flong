@@ -28,7 +28,7 @@ nonisolated struct EditionBrief: Hashable, Sendable {
 nonisolated struct GeneratedEditionPoints {
     @Guide(
         description:
-            "The two or three things worth knowing, one short sentence of at most 95 characters each, no numbering",
+            "The two or three things worth knowing, one short sentence of at most 100 characters each, no numbering",
         .maximumCount(EditionSummarizer.mostPoints)
     )
     var points: [String]
@@ -84,7 +84,7 @@ nonisolated struct EditionSummarizer: Sendable {
     /// It is the model that is held to it rather than the page : a page that
     /// cut a point to fit would be a page throwing away the end of a sentence,
     /// and one that set it smaller to fit would be a page whispering the news.
-    static let maximumPointCharacters = 95
+    static let maximumPointCharacters = 100
 
     /// What is kept for the answer, whatever the prompt costs.
     static let reservedTokens = 500
@@ -324,6 +324,7 @@ nonisolated struct EditionSummarizer: Sendable {
             }
             .prefix(mostPoints)
             .map { $0 }
+            .withinTheBound()
     }
 
     /// What the model is shown : the ten heads, in the order the page shows
@@ -384,4 +385,20 @@ nonisolated struct EditionSummarizer: Sendable {
         speaker only where the speaking is itself the news. No numbering and no bullet characters. Never \
         say more than these headlines say. Never give a date, a year or a day.
         """
+}
+
+nonisolated extension Array where Element == String {
+    /// The points that fit, unless dropping the rest would leave no list.
+    ///
+    /// **The page holds a point to three lines and never cuts one**, so a point
+    /// the model would not shorten is better left out than drawn with its last
+    /// words missing. Better, that is, until leaving it out empties the page :
+    /// a bound set a few characters too tight took every point of an edition
+    /// out at once and the reader was shown a pane with nothing on it. So the
+    /// rule gives way rather than the page : where what fits is not a list any
+    /// more, what came back stands as it came back.
+    func withinTheBound() -> [String] {
+        let fitting = filter(EditionSummarizer.isBrief)
+        return fitting.count >= EditionSummarizer.leastPoints ? fitting : self
+    }
 }

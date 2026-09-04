@@ -40,6 +40,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The credit over a picture is a material rather than glass. It is the one place the material multiplied with the content : ten stories on a page carry ten of them, all moving at once, and a device rendering the real thing pays for every one.
 - An edition no longer says one thing twice : two points about the same story are refused, and dropped if the model insists, and a point is bounded to what three lines of the pane actually hold rather than to what the column held before the pane.
 - Building the page again shows in the ring in the corner. It ran with no pass declared, so the minute the model takes to write the headlines and the points passed with nothing on screen to say so.
 
