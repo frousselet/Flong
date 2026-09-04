@@ -502,6 +502,16 @@ It carries a navigation stack of its own, for the bar the controls hang off. Tha
 
 `Route.article` stays a route, since an article is a place a reader can be ; it is simply not a place on a stack. One function in the window decides which of the two a route is, so no screen has to know what its own rows do.
 
+## The corners, and what went back into the menu
+
+**The three panels came out of the leading corner and are rows in the reader's own menu.** They are described below as three buttons standing there, which is what they were, and the argument for it was good : a reader who says one thing about the page they are looking at should not have to go through a menu and come back. What it cost was the corner. Four glyphs stood there before the page had said anything, and a reader looking for the notices was reading pictures : a toolbar is not a menu, and a stack of cards, a grid of squares and a bell say very little about which is which. They are rows now, named in words, in the one place a reader already looks for what is theirs, and they stand at the top of it, above the reader themselves.
+
+**The figures moved the other way.** They stood beside the face, on the argument that what a reader's stream adds up to is about the person rather than about the page. That still holds, and the corner opposite is empty now, so the argument no longer decides anything : what does is that the figures are the one thing left that belongs in every section, and one glyph in a corner is a corner a reader can read.
+
+**And the calendar stands in the digest alone.** Every other control in that corner is about the whole of what a reader reads ; a back number is about one page. It is the one argument for a fourth thing in a toolbar rather than a row in the menu.
+
+So a section carries the figures on the left, the reader's face on the right, and the digest carries the calendar between the figures and the title. What the sections themselves add is their own : the `+` on the collections, `Mark all as read` on a feed.
+
 ## The panels, in the leading corner
 
 **Short sheets from the bottom, and no longer pages.** The sources, the subjects and the notices were a screen apiece, two of them behind a line in the reader's menu, which is two presses and a way back for what a reader does in a moment. None of them is a place to be : one answers a question about being interrupted, one nudges a subject and watches the page take it, one picks a feed and reads it. In all three the page they were reading is still behind the panel, and a panel goes with a flick.

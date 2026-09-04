@@ -31,6 +31,8 @@ import SwiftUI
 /// the page rather than to the person, and they have a corner of their own.
 struct ReaderButton: View {
     let model: AppModel
+    /// Where a source leads, once the panel is out of the way.
+    var open: ((SidebarItem.Kind) -> Void)?
 
     @State private var isOpen = false
 
@@ -47,7 +49,7 @@ struct ReaderButton: View {
         // ever sees and is not in the catalogue.
         .accessibilityIdentifier("reader")
         .sheet(isPresented: $isOpen) {
-            ReaderPanel(model: model)
+            ReaderPanel(model: model, open: open)
         }
     }
 }
@@ -71,6 +73,8 @@ struct ReaderCorner: ToolbarContent {
     let model: AppModel
     /// The pass as it stands, or nothing at all when nothing is running.
     let work: WorkPlan?
+    /// Where a source leads, once the reader's panel is out of the way.
+    var open: ((SidebarItem.Kind) -> Void)?
 
     var body: some ToolbarContent {
         if let work {
@@ -89,21 +93,19 @@ struct ReaderCorner: ToolbarContent {
             }
         }
         ToolbarItem(placement: .primaryAction) {
-            StatisticsButton(model: model)
-        }
-        ToolbarItem(placement: .primaryAction) {
-            ReaderButton(model: model)
+            ReaderButton(model: model, open: open)
         }
     }
 }
 
-/// The way to what the reader's stream adds up to, beside the reader themselves.
+/// The way to what the reader's stream adds up to.
 ///
-/// **In this corner rather than the other one.** The corner opposite holds what
-/// a reader tends : the sources they follow, the subjects they nudge, what
-/// Flong may interrupt them for. Nothing here is tended. It is a page about the
-/// person and their reading, in the same sense as the face beside it, and it
-/// belongs where the rest of what is theirs already is.
+/// **In the leading corner, and it was beside the face.** It stood there while
+/// the opposite corner held three buttons for the sources, the subjects and the
+/// notices ; those are rows in the reader's own menu now, so that corner is
+/// empty and this is the one thing in it that belongs in every section. A
+/// figure is not something a reader tends, which is what the menu is for : it
+/// is a page they open, look at, and close.
 ///
 /// A chart for a mark, since what it opens is chart-shaped and there is no
 /// glyph for arithmetic. Beside the face and not behind it : a figure nobody
@@ -165,87 +167,19 @@ struct ReaderMark: View {
     }
 }
 
-/// The way to the sources, in the corner opposite the reader's own menu.
+/// The way to the back numbers, in the corner of the digest.
 ///
-/// One press rather than two. Everything else the menu holds is opened once in
-/// a while and reasoned about ; the sources are opened to add a feed, to read
-/// one on its own, or to see what the machinery is doing, which is often
-/// enough to be worth a corner of its own.
+/// **It was a line under the edition's own list**, `Éditions précédentes`,
+/// which put a way *out* of the page in the middle of the page : the reader met
+/// it between what this edition says and the first story it leads on, on the
+/// way down to the news. A masthead does not carry its own archive.
 ///
-/// It opens a panel like the two beside it. A reader who picks a source is
-/// going somewhere, so the panel goes and the page they asked for arrives
-/// behind it : a screen that stayed on the stack behind every feed they opened
-/// would be a way back nobody asked for.
+/// It stands in the digest and nowhere else, which is the whole argument for
+/// its being in a toolbar rather than in the reader's menu : that menu holds
+/// what a reader tends everywhere, and a back number is about this page alone.
 ///
-/// The three sections a reader reads in carry it. Search does not : its bar
-/// belongs to the field, and a reader who is searching is not organizing.
-struct SourcesButton: View {
-    let model: AppModel
-    let open: (Route) -> Void
-
-    @State private var isOpen = false
-
-    var body: some View {
-        Button {
-            isOpen = true
-        } label: {
-            Label("Sources", systemImage: "square.stack")
-        }
-        // An identifier beside the label, because the label is translated and
-        // a test that looked for `Sources` would pass in English and fail on
-        // the reader's own device.
-        .accessibilityIdentifier("sources")
-        .sheet(isPresented: $isOpen) {
-            SourcesPanel(model: model) { kind in open(.view(kind)) }
-        }
-    }
-}
-
-/// The way to what Flong may interrupt the reader for, beside the sources.
-///
-/// **It was a line in the reader's menu and is a button now.** Not because it
-/// is opened often, which it is not, but because of the shape of what a reader
-/// does there : they answer one question about being interrupted and go back to
-/// reading. Two presses to reach a whole screen with a way back on it is the
-/// wrong shape for that, however rarely it is done.
-///
-/// It carries the panel itself rather than a route. Everything else in the
-/// leading corner leads somewhere and comes back ; this opens over the page and
-/// closes onto it, so there is nothing for a navigation stack to hold.
-struct NotificationsButton: View {
-    let model: AppModel
-
-    @State private var isOpen = false
-
-    var body: some View {
-        Button {
-            isOpen = true
-        } label: {
-            Label("Notifications", systemImage: "bell")
-        }
-        .accessibilityIdentifier("notifications")
-        .sheet(isPresented: $isOpen) {
-            NotificationsPanel(model: model)
-        }
-    }
-}
-
-/// The way to the back numbers, beside the notices.
-///
-/// **In the corner rather than on the page.** It was a line under the
-/// edition's own list, `Éditions précédentes`, which put a way *out* of the
-/// page in the middle of the page : the reader met it between what this
-/// edition says and the first story it leads on, on the way down to the news.
-/// A masthead does not carry its own archive.
-///
-/// It stands only in the digest, and that is the point of it standing in a
-/// toolbar at all : the other three buttons are in every section a reader reads
-/// in, because the sources, the subjects and the notices are about all of them.
-/// A back number is about this section and no other.
-///
-/// It carries the panel itself rather than a route, like the notices and the
-/// subjects : the reader picks an edition, reads it, and comes back to the one
-/// they were on.
+/// It carries the panel itself rather than a route : the reader picks an
+/// edition, reads it, and comes back to the one they were on.
 struct EditionsButton: View {
     let model: AppModel
 
@@ -263,34 +197,6 @@ struct EditionsButton: View {
         .accessibilityIdentifier("edition-archive")
         .sheet(isPresented: $isOpen) {
             EditionsPanel(model: model)
-        }
-    }
-}
-
-/// The way to every subject there is, beside the notices.
-///
-/// **The pills are the other half of this.** A reader forms an opinion about a
-/// subject while they are looking at the page it sorted, and saying it there
-/// costs one press. What the pills cannot hold is the subjects that have fallen
-/// off the page, and a preference nobody can find is a preference nobody can
-/// undo : this is where the whole list lives.
-///
-/// So it opens over the page rather than in place of it. Nudging a subject is
-/// said about the page behind the panel, and a screen pushed onto a stack put
-/// that page out of sight for the whole of it.
-struct TopicsButton: View {
-    let model: AppModel
-
-    @State private var isOpen = false
-
-    var body: some View {
-        Button {
-            isOpen = true
-        } label: {
-            Label("Subjects", systemImage: "circle.grid.2x2")
-        }
-        .sheet(isPresented: $isOpen) {
-            TopicsPanel(model: model)
         }
     }
 }

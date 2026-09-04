@@ -41,6 +41,11 @@ import SwiftUI
 /// row that belongs to a different subject does not belong in the same card.
 struct ReaderPanel: View {
     let model: AppModel
+    /// Where a source leads, once the panel is out of the way.
+    ///
+    /// `nil` where there is nowhere to go : a feed opened from inside a feed
+    /// has no sidebar to send the reader back to, and the row is not offered.
+    var open: ((SidebarItem.Kind) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
@@ -63,11 +68,11 @@ struct ReaderPanel: View {
 
     /// How tall it opens.
     ///
-    /// Taller than the three panels in the other corner, and for a reason of
-    /// its own : those hold a list to scroll and open at a height a reader
-    /// pulls from, this holds six rows and nothing else. A menu whose last row
-    /// is under the fold is a menu hiding the one row nobody thinks to look
-    /// for, and `About` is exactly that row.
+    /// Taller than a panel holding a list, and for a reason of its own : one
+    /// of those opens at a height a reader pulls from, and this holds rows and
+    /// nothing else. A menu whose last row is under the fold is a menu hiding
+    /// the one row nobody thinks to look for, and `À propos` is exactly that
+    /// row.
     ///
     /// **It counts what is actually drawn.** Everything above the six rows is
     /// optional : the picture, the name, the town, and the one line about
@@ -76,8 +81,9 @@ struct ReaderPanel: View {
     /// none of them, and one that stood at the height of none would put `À
     /// propos` under the fold for the reader who has them all.
     private var height: CGFloat {
-        /// The rows themselves, and the air around them.
-        var height: CGFloat = 452
+        /// The rows themselves, and the air around them. Ten of them now, and
+        /// the four cards' worth of air between them.
+        var height: CGFloat = 452 + 4 * 56 + 16
         if model.picture != nil { height += 126 }
         if model.name != nil { height += 32 }
         if model.place != nil { height += 28 }
@@ -211,13 +217,27 @@ struct ReaderPanel: View {
 
     /// The subjects, grouped by what they are about.
     ///
-    /// Three cards and not one list : the reader themselves, then what they
-    /// offer and are offered outside this device, then what the device and the
-    /// iCloud behind it hold. A group of two is a group, and a rule between two
-    /// rows that have nothing to do with each other is a rule saying nothing.
+    /// Cards and not one list : what the reader tends, then the reader
+    /// themselves, then what they offer and are offered outside this device,
+    /// then what the device and the iCloud behind it hold. A group of two is a
+    /// group, and a rule between two rows that have nothing to do with each
+    /// other is a rule saying nothing.
+    ///
+    /// **What they tend comes first, and it used to be three buttons in the
+    /// opposite corner.** The sources, the subjects and the notices each had a
+    /// glyph of their own beside the page, which is four controls in a corner
+    /// before the page has said anything : a toolbar is not a menu, and a
+    /// reader looking for one of them was reading glyphs. They are rows here,
+    /// named in words, in the one place a reader already looks for what is
+    /// theirs.
+    ///
+    /// The sources row is offered only where there is somewhere for a source to
+    /// lead. A feed opened from inside a feed has no sidebar to send the reader
+    /// back to.
     private var cards: some View {
         VStack(spacing: 16) {
-            card([.profile, .appearance])
+            card(open == nil ? [.subjects, .notifications] : [.sources, .subjects, .notifications])
+            card([.profile, .appearance, .editions])
             card([.popular, .sites])
             card([.data])
             card([.about])
@@ -280,6 +300,12 @@ struct ReaderPanel: View {
     @ViewBuilder
     private func destination(_ page: ReaderPage) -> some View {
         switch page {
+        case .sources:
+            SourcesPanel(model: model, open: open ?? { _ in }, close: close)
+        case .subjects:
+            TopicsPanel(model: model)
+        case .notifications:
+            NotificationsPanel(model: model)
         case .profile: ProfileSettings(model: model, close: close)
         case .appearance: AppearanceSettings(model: model, close: close)
         case .editions: EditionSettings(model: model)
@@ -301,6 +327,12 @@ struct ReaderPanel: View {
 /// a line and an identifier are four facts about one subject, and four facts
 /// written at four call sites are four places to forget one.
 enum ReaderPage: Hashable, CaseIterable {
+    /// What they follow, and what the machinery is doing about it.
+    case sources
+    /// Every subject there is, and what they have said about each.
+    case subjects
+    /// Everything Flong may interrupt them for.
+    case notifications
     /// The reader's own face, name and town.
     case profile
     /// The face the page is set in, and the paper it is printed on.
@@ -320,6 +352,9 @@ enum ReaderPage: Hashable, CaseIterable {
 
     var title: LocalizedStringResource {
         switch self {
+        case .sources: "Sources"
+        case .subjects: "Subjects"
+        case .notifications: "Notifications"
         case .profile: "Profile"
         case .appearance: "Appearance"
         case .editions: "Editions"
@@ -332,6 +367,9 @@ enum ReaderPage: Hashable, CaseIterable {
 
     var mark: String {
         switch self {
+        case .sources: "square.stack"
+        case .subjects: "circle.grid.2x2"
+        case .notifications: "bell"
         case .profile: "person.crop.circle"
         case .appearance: "paintpalette"
         case .editions: "newspaper"
@@ -345,6 +383,9 @@ enum ReaderPage: Hashable, CaseIterable {
     /// What a test presses, which is never a translated name.
     var identifier: String {
         switch self {
+        case .sources: "sources"
+        case .subjects: "subjects"
+        case .notifications: "notifications"
         case .profile: "reader-profile"
         case .appearance: "reader-appearance"
         case .editions: "reader-editions"

@@ -98,7 +98,14 @@ final class ReaderPanelUITests: XCTestCase {
         XCTAssertTrue(face.waitForExistence(timeout: 20))
         face.tap()
 
-        for identifier in ["reader-profile", "reader-appearance", "reader-popular", "reader-sites", "reader-about"] {
+        // The three that moved here out of the opposite corner stand first,
+        // then the reader themselves, then what is theirs beyond this device.
+        let rows = [
+            "sources", "subjects", "notifications",
+            "reader-profile", "reader-appearance", "reader-editions",
+            "reader-popular", "reader-sites", "reader-about",
+        ]
+        for identifier in rows {
             let row = app.buttons[identifier].firstMatch
             XCTAssertTrue(row.waitForExistence(timeout: 5), "\(identifier) stands in the panel")
             row.tap()

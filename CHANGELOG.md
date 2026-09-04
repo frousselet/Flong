@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- The sources, the subjects and the notices are rows in the reader's own menu rather than three buttons in the corner, and the figures moved into that corner in their place. The digest keeps a calendar of its back numbers beside them.
+
 - Indexing always happens behind : the system index, the vectors and the people every article names are one background lane now, asked for and never waited on. The system index was written from the read behind every render and awaited by six gestures, and the backlog of people ran at the tail of the command that wrote the headlines.
 - Collection is continuous : the clock sleeps until the moment a feed is due rather than asking every five minutes whether one is, and the background grant is asked for at that same moment rather than at a flat fifteen minutes.
 - iCloud receives what a pass changed at the end of that pass rather than at the next run on the mains, and sends only the read-state blocks that moved and the days something arrived in since the last push.

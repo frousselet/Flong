@@ -145,17 +145,11 @@ struct ArticleFeedScreen: View {
         .toolbar {
             if let menu {
                 ToolbarItem(placement: .sectionLeading) {
-                    SourcesButton(model: model, open: menu)
-                }
-                ToolbarItem(placement: .sectionLeading) {
-                    TopicsButton(model: model)
-                }
-                ToolbarItem(placement: .sectionLeading) {
-                    NotificationsButton(model: model)
+                    StatisticsButton(model: model)
                 }
             }
             if menu != nil {
-                ReaderCorner(model: model, work: model.currentWork)
+                ReaderCorner(model: model, work: model.currentWork) { menu?(.view($0)) }
             } else {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
