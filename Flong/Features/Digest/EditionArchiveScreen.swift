@@ -137,6 +137,12 @@ struct EditionScreen: View {
         return published.marks[index]
     }
 
+    /// What an edition says, and never more than the bound : a back number
+    /// published before it came down carries five points. See ``EditionHead``.
+    private func said(of edition: Edition) -> [String] {
+        Array(edition.points.prefix(EditionSummarizer.mostPoints))
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
@@ -144,7 +150,7 @@ struct EditionScreen: View {
                     VStack(alignment: .leading, spacing: Editorial.tightRhythm) {
                         if !edition.points.isEmpty {
                             VStack(alignment: .leading, spacing: 18) {
-                                ForEach(Array(edition.points.enumerated()), id: \.offset) { index, point in
+                                ForEach(Array(said(of: edition).enumerated()), id: \.offset) { index, point in
                                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                                         Image(systemName: mark(of: published, at: index))
                                             .font(.system(.footnote, weight: .medium))
@@ -167,7 +173,7 @@ struct EditionScreen: View {
                             .padding(.bottom, Editorial.tightRhythm)
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel(
-                                Text("Written by the model : \(edition.points.joined(separator: ". "))"))
+                                Text("Written by the model : \(said(of: edition).joined(separator: ". "))"))
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

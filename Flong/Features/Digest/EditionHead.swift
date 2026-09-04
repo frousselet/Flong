@@ -69,6 +69,15 @@ struct EditionHead: View {
     /// same room before there is a mark at all.
     static let markWidth: CGFloat = 20
 
+    /// What this edition says, and never more than the bound.
+    ///
+    /// Read here as well as written : an edition published before the bound
+    /// came down carries five points, and the page it is drawn on has one
+    /// rule about how many it shows.
+    private var said: [String] {
+        Array(edition.points.prefix(EditionSummarizer.mostPoints))
+    }
+
     /// The mark one point wears, or the tag where nothing was matched.
     private func mark(at index: Int) -> String {
         guard index < published.marks.count else { return Topic.defaultSymbol }
@@ -93,7 +102,7 @@ struct EditionHead: View {
     /// paragraph is a block, and a block is the thing this replaced.
     private var points: some View {
         VStack(alignment: .leading, spacing: 18) {
-            ForEach(Array(edition.points.enumerated()), id: \.offset) { index, point in
+            ForEach(Array(said.enumerated()), id: \.offset) { index, point in
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     // **The subject's own mark, and it was a rule.** A rule is
                     // what a page uses where there is nothing to say about an
@@ -138,7 +147,7 @@ struct EditionHead: View {
         // They are two different things and were a few points apart.
         .padding(.bottom, Editorial.rhythm)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text("Written by the model : \(edition.points.joined(separator: ". "))"))
+        .accessibilityLabel(Text("Written by the model : \(said.joined(separator: ". "))"))
     }
 }
 
