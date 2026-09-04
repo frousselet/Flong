@@ -55,6 +55,20 @@ On macOS there is no moment to name, `NSBackgroundActivityScheduler` finding an 
 
 **On macOS the power question is asked by hand.** `NSBackgroundActivityScheduler` finds an idle moment and has no opinion about the power source, so `IOPSGetProvidingPowerSourceType` is consulted and a pass on battery is deferred rather than run. A machine that will not answer counts as on the mains : a desktop has no battery to report, and refusing to work on one for want of an answer would be refusing to work at all.
 
+## The indexing lane
+
+**It always happens behind, and it did not.** Three things are indexed : the system index of what the reader chose and of the front page, the vectors of the marked articles, and the people every article names. All three were reachable from the foreground, and two of them were awaited there.
+
+The system index was the worst of it. It was written from `loadDigest`, which is the read behind every render and every store tick, and almost none of those changes are the page : an article marked read is a reason to read the digest again and no reason at all to write sixty items into Spotlight while the reader is scrolling. Six foreground gestures awaited it as well, so favouriting a writer held the gesture open while the whole of the chosen corpus was described. And the backlog of people ran at the tail of the task that writes the headlines, which is the task a reader's own command waits behind.
+
+They are one lane now. It is asked for and never awaited, runs at background priority, and takes the three in the order that costs least : the system index first, since it is the one whose effect the reader can see ; then the vectors ; then the people, which is the longest of the three and the one a pass most often stops in the middle of. All three are resumable, so stopping between two batches loses nothing.
+
+**One at a time, and a second request is remembered rather than queued.** What the lane does is bring the index up to what the store says now, so two requests and one are the same request. It is stopped and awaited before an erasure, being the other long task that runs outside the gate.
+
+**The lexical index is the exception and stays exactly where it is.** It is six SQL triggers inside the transaction that stores the article, it costs microseconds, and an index that lagged the rows would make a search answer with articles that are gone. It is not scheduled work and never was.
+
+**And the hand-over to Spotlight claims before it suspends.** The mark saying what the index already holds was written after the `await`, so two callers both passed the guard, and writing the stories begins by emptying the whole stories domain : the interleaving is `empty, empty, write, write`, and the domain ends up holding one page's stories or none at all. It is claimed first and put back on a failure, which is the ordinary shape.
+
 ## The resume point is the data
 
 Section 15 asks for idempotent batches, a persisted resume point and automatic resumption at the next launch. Flong has the first and the third, and deliberately not the second.

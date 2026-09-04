@@ -1340,6 +1340,7 @@ final class AppModel {
         enriching?.cancel()
         showingWork?.cancel()
         clearingWork?.cancel()
+        indexingLane?.cancel()
         serviceTask?.cancel()
     }
 
@@ -1467,12 +1468,15 @@ final class AppModel {
             // is worked out where the page is read and nowhere else.
             searchSubjects = SearchSubjects.subjects(in: fetched.all.map(\.title))
 
-            // **The front page, and only the front page.** What Spotlight holds
-            // is what a reader would find on the digest, no more and no less,
-            // and narrowing to one subject is a question about the window they
-            // are looking at rather than about what the system search should be
-            // able to find.
-            if digestTopic == .frontPage { await handToSpotlight(fetched.all) }
+            // **The system index hears about the page from the indexing lane,
+            // not from here.** What Spotlight holds is what a reader would find
+            // on the digest, no more and no less, and that is still true ; what
+            // changed is who says so. This function is the read behind every
+            // render and every store tick, and almost none of those changes are
+            // the page : an article marked read is a reason to read the digest
+            // again and no reason at all to write sixty items to the system
+            // index, on the main path, while the reader is scrolling.
+            if digestTopic == .frontPage { index() }
 
             // The editions are read from the same call, since they are the same
             // page asked for at a different grain : the reader looks at one
@@ -1498,13 +1502,21 @@ final class AppModel {
     /// none of those changes are the page : an article marked read is a reason
     /// to read the digest again and no reason at all to write sixty items to
     /// the system index.
+    /// **Claimed before the suspension and put back on a failure**, which is
+    /// the ordinary shape and was not what this did. The mark was written after
+    /// the `await`, so two callers both passed the guard, and
+    /// `SpotlightIndex.index(stories:)` begins by emptying the whole stories
+    /// domain : the interleaving is `empty, empty, write, write`, and the
+    /// domain ends up holding one page's stories or none at all.
     private func handToSpotlight(_ stories: [DigestStory]) async {
         guard stories != indexedStories else { return }
+        let held = indexedStories
+        indexedStories = stories
 
         do {
             try await spotlight.index(stories: stories)
-            indexedStories = stories
         } catch {
+            indexedStories = held
             Log.index.error("The stories could not be handed to Spotlight : \(error, privacy: .public)")
         }
     }
@@ -2702,6 +2714,13 @@ final class AppModel {
         // would only watch its tables be dropped.
         enriching?.cancel()
         await enriching?.value
+        // And the indexing lane, which is the other long task that runs without
+        // the gate. It reads and writes the tables that are about to go, and
+        // one still running would either write into a store that no longer
+        // exists or hand Spotlight a page nobody has any more.
+        indexingIsWanted = false
+        indexingLane?.cancel()
+        await indexingLane?.value
         search?.cancel()
         watching?.cancel()
         await watching?.value
@@ -2852,6 +2871,67 @@ final class AppModel {
         } catch {
             Log.index.error("What the reader chose could not reach Spotlight : \(error, privacy: .public)")
         }
+    }
+
+    // MARK: - The indexing lane
+
+    /// The lane, when it is running.
+    private var indexingLane: Task<Void, Never>?
+    /// Whether something has happened since the lane last looked.
+    private var indexingIsWanted = false
+
+    /// Says there is indexing to do, and never waits for it.
+    ///
+    /// **Indexing always happens behind, and never on a path the reader is
+    /// waiting on.** It did not : the system index was written from
+    /// ``loadDigest()``, which is the read behind every render and every store
+    /// tick, and from six foreground gestures that each awaited it. So marking
+    /// an article read could rewrite sixty items into Spotlight while the
+    /// reader was scrolling, and favouriting a writer held the gesture open
+    /// while the whole of the chosen corpus was described.
+    ///
+    /// None of it is urgent. The lexical index is the one exception and stays
+    /// exactly where it is, inside the transaction that stores the article :
+    /// it is written by six SQL triggers, costs microseconds, and an index that
+    /// lagged the rows would make a search answer with articles that are gone.
+    ///
+    /// One lane at a time, and a request arriving while it runs is remembered
+    /// rather than queued : what the lane does is bring the index up to what
+    /// the store says now, so two requests and one are the same request.
+    func index() {
+        indexingIsWanted = true
+        guard indexingLane == nil else { return }
+
+        indexingLane = Task(priority: .background) { [weak self] in
+            defer { self?.indexingLane = nil }
+
+            while self?.indexingIsWanted == true, !Task.isCancelled {
+                self?.indexingIsWanted = false
+                await self?.indexWhatIsWaiting()
+            }
+        }
+    }
+
+    /// Everything the system indexes, in the order that costs least.
+    ///
+    /// The system index first, since it is what the reader can see the effect
+    /// of ; then the vectors, which is what search by meaning needs ; then the
+    /// people, which is the longest of the three and the one a pass most often
+    /// stops in the middle of. All three are resumable, so stopping between two
+    /// batches loses nothing.
+    private func indexWhatIsWaiting(until deadline: Date? = nil) async {
+        index()
+
+        if digestTopic == .frontPage, let page = try? await digestService.digest(.frontPage) {
+            await handToSpotlight(page.all)
+        }
+
+        let vectorize = VectorizeJob(database) { [weak self] items in
+            await self?.enqueueVectors(for: items)
+        }
+        await JobRunner(vectorize).run(until: deadline)
+        await JobRunner(NewsmakersJob(database)).run(until: deadline)
+        await countOutstandingWork()
     }
 
     /// Tells Spotlight and the other devices that the reader marked something.
@@ -3782,7 +3862,7 @@ final class AppModel {
             await loadCollections()
             // Everything this writer signed, as a favourite source does for
             // everything a publisher served.
-            await synchronizeSpotlight()
+            index()
         } catch {
             failure = .notSaved
             Log.store.error("The author could not be marked : \(error, privacy: .public)")
@@ -3844,7 +3924,7 @@ final class AppModel {
             await loadCollections()
             // Everything written about them, as a favourite writer does for
             // everything they signed.
-            await synchronizeSpotlight()
+            index()
         } catch {
             failure = .notSaved
             Log.store.error("The newsmaker could not be marked : \(error, privacy: .public)")
@@ -4193,7 +4273,7 @@ final class AppModel {
         // brought something is where the system index hears about it. Nothing
         // arrived means nothing to tell it, and the check costs a pass over the
         // identifiers rather than over the texts.
-        if summary.newArticles > 0 { await synchronizeSpotlight() }
+        if summary.newArticles > 0 { index() }
 
         // **Outside the model's guard, because neither of them needs it.** The
         // stories were grouped a few lines up and a filing is a plain read, so
@@ -4330,17 +4410,15 @@ final class AppModel {
             // in one pass would only be the second one finding a watermark the
             // first had just moved.
 
-            // **After the model and not before it, though it is not the
-            // model.** Reading who an article is about asks `NLTagger` and runs
-            // on every device, where the headlines and the subjects ask a model
-            // that may not be there at all ; but the headlines are what the
-            // reader is looking at while this runs, and a backlog of a hundred
-            // thousand articles put first would hold them behind it. What this
-            // pass brought has already been read, above.
-            moveWork(to: .reading)
-            await JobRunner(NewsmakersJob(database)).run(until: deadline, onProgress: progress(of: .reading))
+            // **The backlog belongs to the indexing lane and not to here.**
+            // Reading who a hundred thousand articles are about is a pass of
+            // `NLTagger` over every one of them, and it ran at the tail of the
+            // gesture that wrote the headlines, on a task the reader's own
+            // command is waiting behind. What this pass brought has already
+            // been read, up where the notices needed it ; the rest is indexing,
+            // and indexing always happens behind.
+            index()
             await loadCollections()
-            await countOutstandingWork()
         }
     }
 
@@ -4955,7 +5033,7 @@ final class AppModel {
         // The name of a publisher is on every article of theirs the index
         // holds, and a favourite source is what put those articles in it at
         // all, so one line typed here is a decision about thousands of rows.
-        await synchronizeSpotlight()
+        index()
 
         // An address nothing has ever asked, edited by somebody who is watching
         // to see whether it works. Everything else can wait for the clock.
@@ -4987,7 +5065,7 @@ final class AppModel {
             // the reader chose, or stopped being it. The system index is where
             // one decision about a source turns into thousands of articles
             // found or no longer found.
-            await synchronizeSpotlight()
+            index()
         } catch {
             failure = .notSaved
             Log.store.error("The source could not be marked : \(error, privacy: .public)")
@@ -5184,7 +5262,7 @@ final class AppModel {
         // writer had chosen is not : it was never a mark, and it left with the
         // rows rather than through a decision anybody made. The index and the
         // store disagree now, which is exactly the question this asks.
-        await synchronizeSpotlight()
+        index()
 
         // An article of a source that has gone is not an article any more, and
         // a page still holding it would be a page reading from nothing.

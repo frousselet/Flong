@@ -291,7 +291,10 @@ struct AppShell: View {
             model.keepUp()
 
             await model.startSync()
-            await model.synchronizeSpotlight()
+            // Behind, and never awaited : indexing is not something a launch
+            // waits on, and describing a chosen corpus to Spotlight is seconds
+            // of work the reader has no reason to watch.
+            model.index()
         }
         .onChange(of: scenePhase) { _, phase in
             // What the reader is looking at decides whether Flong may
