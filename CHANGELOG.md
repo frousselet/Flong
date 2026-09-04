@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- What an edition says stands on a pane of glass at the head of the page, the points separated by a hairline : three at most, set at the size the page reads in, three lines apiece : the model is held to a hundred and twenty characters a point so nothing is ever cut or shrunk to fit, and it is told to say what happened rather than who said it.
+- What an edition says stands on a pane of glass at the head of the page, which sinks away behind the news as the page is scrolled rather than sliding off the top of it, the points separated by a hairline : three at most, set at the size the page reads in, three lines apiece : the model is held to a hundred and twenty characters a point so nothing is ever cut or shrunk to fit, and it is told to say what happened rather than who said it.
 
 - The sources, the subjects, the notices and the figures are rows in the reader's own menu rather than four buttons in the corner. What is left there is a calendar of the digest's back numbers, in the digest alone.
 
