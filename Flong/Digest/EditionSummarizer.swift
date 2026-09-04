@@ -28,7 +28,7 @@ nonisolated struct EditionBrief: Hashable, Sendable {
 nonisolated struct GeneratedEditionPoints {
     @Guide(
         description:
-            "The two or three things worth knowing, one short sentence of at most 120 characters each, no numbering",
+            "The two or three things worth knowing, one short sentence of at most 95 characters each, no numbering",
         .maximumCount(EditionSummarizer.mostPoints)
     )
     var points: [String]
@@ -84,7 +84,7 @@ nonisolated struct EditionSummarizer: Sendable {
     /// It is the model that is held to it rather than the page : a page that
     /// cut a point to fit would be a page throwing away the end of a sentence,
     /// and one that set it smaller to fit would be a page whispering the news.
-    static let maximumPointCharacters = 120
+    static let maximumPointCharacters = 95
 
     /// What is kept for the answer, whatever the prompt costs.
     static let reservedTokens = 500
@@ -239,6 +239,10 @@ nonisolated struct EditionSummarizer: Sendable {
         if points.count < leastPoints {
             return "That is not a list. Write two or three things worth knowing, one short sentence each."
         }
+        if repeated(points) {
+            return
+                "Two of those points say the same thing. Write them again, one thing to a point, with nothing said twice."
+        }
         if let long = points.first(where: { !isBrief($0) }) {
             return
                 "This point is too long : \(long). Write every point again in one sentence of at most \(maximumPointCharacters) characters."
@@ -252,6 +256,37 @@ nonisolated struct EditionSummarizer: Sendable {
         let written = StorySummarizer.isWritten(in: locale, title: "", summary: points.joined(separator: " "))
         return written ? nil : OnDeviceModel.languageReminder(for: locale)
     }
+
+    /// Whether two points are about the same thing.
+    ///
+    /// **It happens, and it is the worst thing a list of three can do.** A page
+    /// led by one story big enough to be written about twice came back with
+    /// `Une attaque russe a frappé le siège du SBU à Kiev` and, under it, the
+    /// same sentence in other words : a third of the edition spent saying one
+    /// thing, and a reader who has to compare two lines to notice they are one.
+    ///
+    /// Compared by the words they are made of rather than by their letters,
+    /// since the model rephrases rather than repeats. Two points sharing most
+    /// of what either of them is about are one point.
+    static func repeated(_ points: [String]) -> Bool {
+        let spoken = points.map { Set(TextSignatures.terms(of: $0)) }
+
+        for (index, terms) in spoken.enumerated() where terms.count >= 2 {
+            for other in spoken[(index + 1)...] where other.count >= 2 {
+                let shared = terms.intersection(other).count
+                if Double(shared) / Double(min(terms.count, other.count)) >= sameThing { return true }
+            }
+        }
+        return false
+    }
+
+    /// What share of the smaller point's words two points may share before they
+    /// are the same point.
+    ///
+    /// Two thirds. Below that, two points about one subject still say two
+    /// things : a strike and the arrests that followed it share the place and
+    /// nothing else.
+    static let sameThing = 0.66
 
     /// Whether one point has stayed one thing worth knowing.
     static func isBrief(_ point: String) -> Bool {
@@ -278,6 +313,15 @@ nonisolated struct EditionSummarizer: Sendable {
                 return text
             }
             .filter { !$0.isEmpty }
+            .reduce(into: [String]()) { kept, point in
+                // **Asked for again, and dropped if it comes back.** The model
+                // is told when two of its points say one thing, and it usually
+                // writes them again ; when it does not, the page shows what is
+                // left rather than the same news twice. Two points is still a
+                // list, and one thing said twice is not.
+                guard !repeated(kept + [point]) else { return }
+                kept.append(point)
+            }
             .prefix(mostPoints)
             .map { $0 }
     }

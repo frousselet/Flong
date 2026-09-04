@@ -40,6 +40,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- An edition no longer says one thing twice : two points about the same story are refused, and dropped if the model insists, and a point is bounded to what three lines of the pane actually hold rather than to what the column held before the pane.
+- Building the page again shows in the ring in the corner. It ran with no pass declared, so the minute the model takes to write the headlines and the points passed with nothing on screen to say so.
+
 - The front page no longer holds the processor: the indexing lane armed itself from inside its own work, so once started it ran until the application was killed, a dozen database round trips at a time with no pause. Measured on a store of four feeds, it was ninety per cent of a core at rest; on a telephone it was a warm telephone and a page that would not scroll.
 - The lane is asked for where work is made rather than from the read behind every render, and one turn of it is bounded: reading who a hundred thousand articles are about is minutes of work, and it used to run to the end.
 - Scrolling the digest no longer animates every row: three animations sat on the lazy stack itself, where they were inherited by every row and by the pinned header, so one story arriving interpolated the whole page's layout while the reader's thumb was on it. What swaps is the head, and that is where the animation is now.

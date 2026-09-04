@@ -68,7 +68,7 @@ final class DigestScrollPerformanceTests: XCTestCase {
         XCTAssertTrue(page.waitForExistence(timeout: 30), "The front page is there")
         try XCTSkipUnless(app.images.count > 0, "This device has nothing on its front page to scroll")
 
-        measure(metrics: [XCTCPUMetric(), XCTOSSignpostMetric.scrollingAndDecelerationMetric]) {
+        measure(metrics: [XCTCPUMetric(application: app), XCTOSSignpostMetric.scrollingAndDecelerationMetric]) {
             page.swipeUp(velocity: .fast)
             page.swipeDown(velocity: .fast)
         }
