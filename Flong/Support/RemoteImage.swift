@@ -524,7 +524,18 @@ struct PictureCredit: View {
                 .minimumScaleFactor(0.6)
                 .padding(.horizontal, size.padding.horizontal)
                 .padding(.vertical, size.padding.vertical)
-                .glassEffect(.regular, in: .capsule)
+                // **A material and not glass, because there is one of these
+                // per picture.** Glass samples what is behind it every frame,
+                // and a page of ten stories carries ten of these : one on the
+                // lead's photograph and one on every thumbnail, all of them
+                // moving at once under the reader's thumb. It is the one place
+                // in the application where the material multiplies with the
+                // content rather than standing once on the page, and a device
+                // rendering the real thing rather than a simulator's cheap
+                // approximation pays for every one of them. A thin material
+                // over a photograph reads the same way at this size and costs
+                // one composite.
+                .background(.thinMaterial, in: .capsule)
                 .padding(size.inset)
                 .accessibilityLabel(Text("Picture via \(name)"))
         }
