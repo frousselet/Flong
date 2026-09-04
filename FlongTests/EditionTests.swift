@@ -368,3 +368,74 @@ struct EditionNoticeTests {
         #expect(Announcement.newEdition(edition(title: "", summary: "Une ligne.")) == nil)
     }
 }
+
+/// **Indexing always happens behind, and never on a path the reader waits on.**
+///
+/// It did not. The system index was written from the read behind every render
+/// and every store tick, and from six foreground gestures that each awaited it,
+/// and the backlog of people to read out of a hundred thousand articles ran at
+/// the tail of the gesture that wrote the headlines.
+@Suite("The indexing lane", .serialized)
+@MainActor
+struct IndexingLaneTests {
+    private let database: AppDatabase
+    private let model: AppModel
+
+    init() throws {
+        database = try AppDatabase.inMemory()
+        model = AppModel(database: database)
+    }
+
+    /// A feed and an article that names somebody, which is what the queue the
+    /// lane drains is made of.
+    private func article(named title: String, about person: String) async throws {
+        var feed = Feed(url: URL(string: "https://lane.example.com/atom.xml")!, title: "Le Monde")
+        feed.siteURL = URL(string: "https://lane.example.com")
+
+        var entry = Entry(
+            feedID: feed.id,
+            guid: "urn:\(title)",
+            title: title,
+            excerpt: "\(person) a parlé ce matin.",
+            receivedAt: Date()
+        )
+        entry.hasMedia = false
+
+        try await database.writer.write { db in
+            try feed.insert(db)
+            try entry.insert(db)
+        }
+    }
+
+    /// The point of the lane, said as plainly as a test can say it : asking for
+    /// indexing returns at once, and the work happens behind.
+    @Test("Asking for indexing does not wait for it")
+    func doesNotWait() async throws {
+        try await article(named: "Une réforme", about: "Claire Ancelin")
+
+        model.index()
+
+        // Nothing has been awaited, so the queue is still exactly as it was :
+        // whatever the lane does, it does not do it before returning.
+        #expect(try await NewsmakerStore(database).outstandingCount() > 0)
+    }
+
+    /// What the lane does is bring the index up to what the store says now, so
+    /// two requests and one are the same request. A second while the first runs
+    /// is remembered rather than queued.
+    @Test("The lane drains the queue, and asking twice is asking once")
+    func drains() async throws {
+        try await article(named: "Une réforme", about: "Claire Ancelin")
+
+        model.index()
+        model.index()
+
+        // The lane runs at background priority behind the caller, so a test
+        // waits for the queue rather than for the task.
+        for _ in 0..<200 {
+            if try await NewsmakerStore(database).outstandingCount() == 0 { break }
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        #expect(try await NewsmakerStore(database).outstandingCount() == 0)
+    }
+}
