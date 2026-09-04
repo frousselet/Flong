@@ -18,10 +18,17 @@ import SwiftUI
 /// in an order that shifted under the reader. An edition is made at an hour, so
 /// it can say what is in it before the reader has read a headline.
 ///
-/// **The dateline and a list, and nothing over them.** An edition carried a
-/// name of its own and every real page showed the same thing : the name was the
-/// list said again in fewer words. A front page has never had a name, and the
-/// three attempts at one are recorded in `docs/technical/digest.md`.
+/// **A list, and nothing over it.** An edition carried a name of its own and
+/// every real page showed the same thing : the name was the list said again in
+/// fewer words. A front page has never had a name, and the three attempts at
+/// one are recorded in `docs/technical/digest.md`.
+///
+/// **And the dateline is the page's own.** It said which edition this is, over
+/// the list, which put a second heading under the date the page is already
+/// titled with : two lines saying when, one above the other. It stands under
+/// the date now, where a masthead puts it, so the page opens on `Vendredi 4
+/// septembre` and `Édition du matin, 07:00` and then goes straight to the news.
+/// See ``DigestScreen``.
 ///
 /// The points are the model's own, in the reader's own language. An edition
 /// with none is not shown at all.
@@ -29,20 +36,8 @@ struct EditionHead: View {
     let edition: Edition
     let openArchive: () -> Void
 
-    @Environment(\.theme) private var theme
-
     var body: some View {
         VStack(alignment: .leading, spacing: Editorial.tightRhythm) {
-            HStack(spacing: 6) {
-                Text(edition.slot.title)
-                Text(verbatim: "·")
-                Text(edition.openedAt, format: .dateTime.hour().minute())
-            }
-            .font(.system(.footnote, weight: .semibold))
-            .textCase(.uppercase)
-            .kerning(0.6)
-            .foregroundStyle(.secondary)
-
             if !edition.points.isEmpty {
                 points
             }
