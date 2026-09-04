@@ -27,7 +27,8 @@ nonisolated struct EditionBrief: Hashable, Sendable {
 @Generable
 nonisolated struct GeneratedEditionPoints {
     @Guide(
-        description: "The three to five things worth knowing, one short sentence each, no numbering",
+        description:
+            "The three to five things worth knowing, one short sentence of at most 120 characters each, no numbering",
         .maximumCount(EditionSummarizer.mostPoints)
     )
     var points: [String]
@@ -70,12 +71,20 @@ nonisolated struct EditionSummarizer: Sendable {
     /// page that came back with one is a page to ask about again.
     static let leastPoints = 2
 
-    /// How many words one point may run to.
+    /// How many characters one point may run to.
     ///
-    /// A point is one thing worth knowing, said once : about the length of a
-    /// story's own standfirst and no longer, since five of them stand together
-    /// and five sentences of forty words is the paragraph this replaced.
-    static let maximumPointWords = 25
+    /// **Characters and not words, because the page is measured in lines.** A
+    /// point stands on three lines at most, and what fills a line is letters :
+    /// asked in words, the model wrote twenty-five short ones or twenty-five
+    /// long ones and the page had no way of knowing which was coming. Three
+    /// lines of body across this column hold about a hundred and thirty
+    /// characters, and the bound is set under that so a point never reaches
+    /// the end of the third line.
+    ///
+    /// It is the model that is held to it rather than the page : a page that
+    /// cut a point to fit would be a page throwing away the end of a sentence,
+    /// and one that set it smaller to fit would be a page whispering the news.
+    static let maximumPointCharacters = 120
 
     /// What is kept for the answer, whatever the prompt costs.
     static let reservedTokens = 500
@@ -231,7 +240,8 @@ nonisolated struct EditionSummarizer: Sendable {
             return "That is not a list. Write three to five things worth knowing, one short sentence each."
         }
         if let long = points.first(where: { !isBrief($0) }) {
-            return "This point is too long : \(long). Write every point again in one short sentence."
+            return
+                "This point is too long : \(long). Write every point again in one sentence of at most \(maximumPointCharacters) characters."
         }
         return nil
     }
@@ -245,7 +255,7 @@ nonisolated struct EditionSummarizer: Sendable {
 
     /// Whether one point has stayed one thing worth knowing.
     static func isBrief(_ point: String) -> Bool {
-        point.split(whereSeparator: \.isWhitespace).count <= maximumPointWords
+        point.count <= maximumPointCharacters
     }
 
     /// What comes back, put in the shape the page draws.

@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- What an edition says is set at the size the page reads in, three lines a point at most, and the model is held to a hundred and twenty characters a point so nothing is ever cut or shrunk to fit.
+
 - The sources, the subjects, the notices and the figures are rows in the reader's own menu rather than four buttons in the corner. What is left there is a calendar of the digest's back numbers, in the digest alone.
 
 - Indexing always happens behind : the system index, the vectors and the people every article names are one background lane now, asked for and never waited on. The system index was written from the read behind every render and awaited by six gestures, and the backlog of people ran at the tail of the command that wrote the headlines.
