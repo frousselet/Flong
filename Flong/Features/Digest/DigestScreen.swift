@@ -149,23 +149,21 @@ struct DigestScreen: View {
         // The sources in one corner, the reader's own menu in the other, the
         // same way round in every section.
         .toolbar {
+            // **What the reader looks at leads, and what they tend does not.**
+            // This corner held the sources, the subjects and the notices, which
+            // is three glyphs before the page has said anything : a toolbar is
+            // not a menu, and a reader looking for one of them was reading
+            // glyphs. Those are rows in the reader's own menu now.
             ToolbarItem(placement: .sectionLeading) {
-                SourcesButton(model: model, open: open)
+                StatisticsButton(model: model)
             }
-            ToolbarItem(placement: .sectionLeading) {
-                TopicsButton(model: model)
-            }
-            ToolbarItem(placement: .sectionLeading) {
-                NotificationsButton(model: model)
-            }
-            // **In this section and no other.** The three above are in every
-            // section a reader reads in, because the sources, the subjects and
-            // the notices are about all of them. A back number is about this
-            // page and nowhere else.
+            // **In this section and no other.** The figures beside it are in
+            // every section, being about the whole of what a reader reads. A
+            // back number is about this page and nowhere else.
             ToolbarItem(placement: .sectionLeading) {
                 EditionsButton(model: model)
             }
-            ReaderCorner(model: model, work: model.currentWork)
+            ReaderCorner(model: model, work: model.currentWork) { open(.view($0)) }
         }
         // Not while something is being brought in. `Nothing has come in yet`
         // over a page that is at that moment fetching sixty feeds is untrue,

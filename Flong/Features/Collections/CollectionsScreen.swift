@@ -83,15 +83,9 @@ struct CollectionsScreen: View {
         .navigationTitle(Text("Collections"))
         .toolbar {
             ToolbarItem(placement: .sectionLeading) {
-                SourcesButton(model: model, open: menu)
+                StatisticsButton(model: model)
             }
-            ToolbarItem(placement: .sectionLeading) {
-                TopicsButton(model: model)
-            }
-            ToolbarItem(placement: .sectionLeading) {
-                NotificationsButton(model: model)
-            }
-            // Beside the sources rather than opposite them : the leading corner
+            // Beside the figures rather than opposite them : the leading corner
             // is where this page is acted on, and the trailing one belongs to
             // the reader's own menu in every section.
             // Two kinds to make, so a menu rather than a button : one the
@@ -116,7 +110,7 @@ struct CollectionsScreen: View {
                     Label("New collection", systemImage: "plus")
                 }
             }
-            ReaderCorner(model: model, work: model.currentWork)
+            ReaderCorner(model: model, work: model.currentWork) { menu(.view($0)) }
         }
         .overlay {
             if model.collections.isEmpty {

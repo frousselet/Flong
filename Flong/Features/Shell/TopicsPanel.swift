@@ -53,8 +53,11 @@ struct TopicsPanel: View {
             subjects
         }
         .themed()
-        .presentationDetents([.height(Panel.tall), .large])
-        .presentationDragIndicator(.visible)
+        // The reader's panel opens the whole way for this, holding as it does
+        // a handful of rows against a list of every subject there is. The
+        // modifier applies to the enclosing presentation while this page is on
+        // the stack and gives it back on the way out.
+        .presentationDetents([.large])
         .alert("Add a subject", isPresented: $isAdding) {
             TextField("Subject", text: $name)
             Button("Add") { Task { await model.addTopic(name) } }

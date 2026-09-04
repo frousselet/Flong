@@ -44,6 +44,12 @@ struct SourcesPanel: View {
     let model: AppModel
     /// Where a row leads, once the panel is out of the way.
     let open: (SidebarItem.Kind) -> Void
+    /// What closing means, where the environment's own answer is the wrong one.
+    ///
+    /// A `DismissAction` read on a page pushed inside a sheet pops the page
+    /// rather than closing the sheet it is in. This is pushed inside the
+    /// reader's own panel now, so the way out is handed down from there.
+    var close: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
@@ -149,8 +155,13 @@ struct SourcesPanel: View {
                 }
             }
         }
-        .presentationDetents([.height(Panel.tall), .large])
-        .presentationDragIndicator(.visible)
+        // **The sheet this is pushed into opens the whole way for it.** The
+        // reader's panel holds a handful of rows and opens at the height of
+        // those ; a list of every source somebody follows in a sheet that tall
+        // is a list nobody can read. The modifier applies to the enclosing
+        // presentation while this page is on the stack and gives it back on the
+        // way out, which is exactly the behaviour wanted.
+        .presentationDetents([.large])
         .alert(
             Text("Rename"),
             isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } }),
@@ -272,7 +283,11 @@ struct SourcesPanel: View {
     /// Where a row leads : the panel goes first, and the page it asked for
     /// arrives behind it.
     private func go(to kind: SidebarItem.Kind) {
-        dismiss()
+        if let close {
+            close()
+        } else {
+            dismiss()
+        }
         open(kind)
     }
 

@@ -110,15 +110,9 @@ struct SearchScreen: View {
         .toolbar {
             if let menu {
                 ToolbarItem(placement: .sectionLeading) {
-                    SourcesButton(model: model, open: menu)
+                    StatisticsButton(model: model)
                 }
-                ToolbarItem(placement: .sectionLeading) {
-                    TopicsButton(model: model)
-                }
-                ToolbarItem(placement: .sectionLeading) {
-                    NotificationsButton(model: model)
-                }
-                ReaderCorner(model: model, work: model.currentWork)
+                ReaderCorner(model: model, work: model.currentWork) { menu(.view($0)) }
             }
         }
         .searchable(

@@ -493,30 +493,32 @@ struct IndexingLaneTests {
     /// **The point of the lane is in the call and not in the timing.**
     /// `index()` is not `async` : there is no `await` at any of its call sites,
     /// so no gesture, no render and no store tick can wait on it, which is the
-    /// whole of what `indexing always happens behind` means. A test that
-    /// asserted the queue was still full a line later would be asserting that
-    /// the lane is slow, which is neither true nor wanted.
+    /// whole of what `indexing always happens behind` means.
     ///
-    /// What is worth pinning is the other half : it does get done, and asking
-    /// twice is asking once, since what the lane does is bring the index up to
-    /// what the store says now.
-    @Test("The lane is never waited on, and drains the queue all the same")
+    /// What is asserted is that it does the work, and it is asked for directly
+    /// rather than through the scheduling. A test that started the lane and
+    /// then waited for the queue to empty failed whenever the machine was busy,
+    /// which is exactly when a task at background priority is least likely to
+    /// be served : it was asserting that the system is prompt, which is neither
+    /// true nor anything this code decides.
+    @Test("The lane does the work it is asked for")
     func drains() async throws {
         try await article(named: "Une réforme", about: "Claire Ancelin")
         #expect(try await NewsmakerStore(database).outstandingCount() > 0)
 
-        // No `await` : that is the property.
-        model.index()
-        model.index()
+        await model.indexWhatIsWaiting()
 
-        // The lane runs behind the caller and at background priority, so a test
-        // waits for the queue rather than for the task, and waits generously :
-        // under a full suite the lane is competing with everything else, and a
-        // test that failed for being impatient would be a test nobody trusts.
-        for _ in 0..<600 {
-            if try await NewsmakerStore(database).outstandingCount() == 0 { break }
-            try await Task.sleep(for: .milliseconds(50))
-        }
         #expect(try await NewsmakerStore(database).outstandingCount() == 0)
+    }
+
+    /// And asking for it is a call that returns : no `await` here is the
+    /// property, and asking twice is asking once, since what the lane does is
+    /// bring the index up to what the store says now.
+    @Test("Asking for indexing is never waited on")
+    func neverWaitedOn() async throws {
+        try await article(named: "Un procès", about: "Paul Rey")
+
+        model.index()
+        model.index()
     }
 }

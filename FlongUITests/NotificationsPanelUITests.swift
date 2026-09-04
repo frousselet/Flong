@@ -41,8 +41,16 @@ final class NotificationsPanelUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
+        // **In the reader's own menu now, and it was a bell in the corner.**
+        // That corner carried the sources, the subjects and the notices, which
+        // is three glyphs before the page has said anything : they are rows in
+        // the one place a reader already looks for what is theirs.
+        let face = app.buttons["reader"].firstMatch
+        XCTAssertTrue(face.waitForExistence(timeout: 20), "The reader's own button is in the corner of every section")
+        face.tap()
+
         let bell = app.buttons["notifications"].firstMatch
-        XCTAssertTrue(bell.waitForExistence(timeout: 20), "The bell stands in the corner of every section")
+        XCTAssertTrue(bell.waitForExistence(timeout: 5), "The menu leads to what Flong may interrupt them for")
         bell.tap()
 
         // The one a reader arrives looking for. It covers every source they

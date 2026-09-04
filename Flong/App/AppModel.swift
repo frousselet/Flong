@@ -2925,7 +2925,14 @@ final class AppModel {
     /// people, which is the longest of the three and the one a pass most often
     /// stops in the middle of. All three are resumable, so stopping between two
     /// batches loses nothing.
-    private func indexWhatIsWaiting(until deadline: Date? = nil) async {
+    ///
+    /// **Not private, so a test can put the question without the scheduling.**
+    /// What the lane is for is that this happens behind ; whether a background
+    /// task has been given a slice in the next second is the system's business
+    /// and not a property worth asserting. A test that waited on it failed
+    /// whenever the machine was busy, which is exactly when a background
+    /// priority is least likely to be served.
+    func indexWhatIsWaiting(until deadline: Date? = nil) async {
         index()
 
         if digestTopic == .frontPage, let page = try? await digestService.digest(.frontPage) {
