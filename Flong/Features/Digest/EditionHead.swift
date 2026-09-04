@@ -188,6 +188,9 @@ struct EditionHead: View {
     /// How far the pane shrinks on its way out.
     static let shrink: CGFloat = 0.14
 
+    /// How much room the shadow needs round the pane when it is rasterized.
+    static let shadowRoom: CGFloat = 30
+
     /// How far out of focus the pane goes on its way out.
     ///
     /// Affordable now that the pane is a fill : a blur is one pass off screen
@@ -267,7 +270,15 @@ struct EditionSinking: ViewModifier {
         // over a pass, which is why the pane is a fill now and not glass.
         return AnyView(
             content
+                // **Room round it before it is rasterized.** `drawingGroup`
+                // draws into a bitmap the size of what it is given, and a
+                // shadow falls outside that : rasterized flush, the pane came
+                // out with its shadow cut off at its own edge. The padding
+                // makes the bitmap big enough to hold it and is taken straight
+                // back, so the layout is what it was.
+                .padding(EditionHead.shadowRoom)
                 .drawingGroup()
+                .padding(-EditionHead.shadowRoom)
                 // Held back against the scroll, so it falls behind the page
                 // rather than travelling with it.
                 .offset(y: travelled * EditionHead.lag)
