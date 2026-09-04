@@ -95,12 +95,15 @@ struct EditionHead: View {
     /// it was three sentences of body type above ten stories of body type,
     /// separated from the news by a hairline and by nothing else : a reader
     /// coming to the page met a wall of grey and had to work out where the
-    /// edition stopped and the news began. The pane says it in one move. It is
-    /// the third place in the application that draws its own glass, and it
-    /// earns it the way the credit on a photograph does rather than the way a
-    /// control does : it is not floating over the page to be pressed, it is the
-    /// edition's own voice laid on the page, and what is under it goes on
-    /// showing through. See `docs/technical/interface.md`.
+    /// edition stopped and the news began. The pane says it in one move.
+    ///
+    /// **A fill and not glass.** It was the material first, and the material is
+    /// resolved against whatever is behind it on every frame the pane moves :
+    /// this one moves on every frame of every scroll, and it is blurred on the
+    /// way out, which is a second pass off screen over the first. A fill is a
+    /// colour. It reads as the same object, it holds the words apart from the
+    /// news exactly as well, and it costs one composite. See
+    /// `docs/technical/interface.md`.
     ///
     /// **One pane and not three.** A card per point was the other way, and
     /// three panes of glass with three shadows at the head of a page is three
@@ -108,7 +111,7 @@ struct EditionHead: View {
     /// inside it by a hairline, which is the vocabulary the rest of the page
     /// already uses between rows.
     private var points: some View {
-        GlassEffectContainer {
+        Group {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(said.enumerated()), id: \.offset) { index, point in
                     if index > 0 {
@@ -161,7 +164,7 @@ struct EditionHead: View {
             .padding(.horizontal, Self.paneInset)
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(.regular, in: .rect(cornerRadius: Self.paneCorner))
+            .modifier(PaneSurface())
         }
         // Room between what the edition says and the first story it leads on.
         // They are two different things and were a few points apart.
@@ -184,6 +187,13 @@ struct EditionHead: View {
 
     /// How far the pane shrinks on its way out.
     static let shrink: CGFloat = 0.14
+
+    /// How far out of focus the pane goes on its way out.
+    ///
+    /// Affordable now that the pane is a fill : a blur is one pass off screen
+    /// over a bitmap rasterized once, rather than a pass over a material being
+    /// resolved again on every frame.
+    static let softening: CGFloat = 6
 
     /// The gap between a mark and the words it stands in front of.
     static let columnGap: CGFloat = 12
@@ -244,18 +254,25 @@ struct EditionSinking: ViewModifier {
             return AnyView(content.hidden())
         }
 
-        // **And it is not blurred on the way out.** A blur over glass is two
-        // passes off screen for every frame of the first two hundred points of
-        // every scroll : the material is resolved, the result is drawn into a
-        // buffer and blurred, then composited. It is the one effect here that
-        // cost more than it said, and the shrinking and the fading say the same
-        // thing between them.
+        // **Drawn once, then moved as a picture of itself.** Everything below
+        // this line is a transform : a shift, a scale, a blur and a fade, all
+        // of them changing on every frame of a scroll and none of them changing
+        // what the pane says. `drawingGroup` rasterizes the pane the once and
+        // hands the four of them a bitmap, so a frame of the parallax is a
+        // texture being moved rather than a rounded rectangle, three lines of
+        // type and a rule being laid out and drawn again.
+        //
+        // It is also what makes the blur affordable. A blur is an off-screen
+        // pass over whatever it is given ; given a live material it is a pass
+        // over a pass, which is why the pane is a fill now and not glass.
         return AnyView(
             content
+                .drawingGroup()
                 // Held back against the scroll, so it falls behind the page
                 // rather than travelling with it.
                 .offset(y: travelled * EditionHead.lag)
                 .scaleEffect(1 - gone * EditionHead.shrink, anchor: .top)
+                .blur(radius: gone * EditionHead.softening)
                 .opacity(1 - gone)
         )
     }
@@ -357,7 +374,7 @@ struct TextPlaceholder: View {
 /// ever has, so the page only ever grows into it.
 struct EditionPlaceholder: View {
     var body: some View {
-        GlassEffectContainer {
+        Group {
             VStack(alignment: .leading, spacing: 0) {
                 // **Keyed by where it stands and not by what it holds.** These
                 // are three points of two, one and two lines, and `id: \.self`
@@ -402,7 +419,7 @@ struct EditionPlaceholder: View {
             .padding(.horizontal, EditionHead.paneInset)
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(.regular, in: .rect(cornerRadius: EditionHead.paneCorner))
+            .modifier(PaneSurface())
         }
         .padding(.bottom, Editorial.rhythm)
         // What tells a page that is filling in from a page that is broken.
@@ -476,5 +493,52 @@ struct StoryPlaceholder: View {
             TextPlaceholder(lines: isLead ? 2 : 1, last: 0.45, height: 8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// The surface the head of the page stands on : the material, drawn rather
+/// than resolved.
+///
+/// **Everything the material was, and none of what it costs.** Liquid Glass is
+/// resolved against whatever is behind it every time it moves, and this pane
+/// moves on every frame of every scroll and is blurred on the way out. What it
+/// looks like, though, is three things that can be painted : a veil, a rim
+/// brighter at the top than at the foot, and a soft shadow under it.
+///
+/// The values are read off the material rather than invented. Sampled from a
+/// screenshot of the real thing over this page, the veil lifts a dark page by a
+/// couple of points and a light one most of the way to white : the material
+/// barely tints what is already dark and all but covers what is already light,
+/// which is why one opacity cannot serve both.
+struct PaneSurface: ViewModifier {
+    @Environment(\.colorScheme) private var scheme
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: EditionHead.paneCorner, style: .continuous)
+
+        return
+            content
+            .background(veil, in: shape)
+            // The rim, and it is what says glass more than the veil does : a
+            // bright hairline where the light would catch the top edge, fading
+            // round to almost nothing at the foot.
+            .overlay {
+                shape.strokeBorder(rim, lineWidth: 0.75)
+            }
+            .shadow(color: .black.opacity(scheme == .dark ? 0.30 : 0.07), radius: 14, y: 5)
+    }
+
+    private var veil: Color {
+        .white.opacity(scheme == .dark ? 0.04 : 0.62)
+    }
+
+    private var rim: LinearGradient {
+        LinearGradient(
+            colors: scheme == .dark
+                ? [.white.opacity(0.26), .white.opacity(0.05)]
+                : [.white.opacity(0.95), .white.opacity(0.25)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 }
