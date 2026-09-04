@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- Collection is continuous : the clock sleeps until the moment a feed is due rather than asking every five minutes whether one is, and the background grant is asked for at that same moment rather than at a flat fifteen minutes.
+- iCloud receives what a pass changed at the end of that pass rather than at the next run on the mains, and sends only the read-state blocks that moved and the days something arrived in since the last push.
 - `Tout resynchroniser` ships : the repair for a device whose iCloud has drifted was behind a build flag, and it stands in `Vos données` now, with what it costs said under it. It runs without an iCloud account too, where it asks every source again and builds the page again.
 
 - The reader's own panel shows rather than sets : it opens on their face, their name, where they read from and what this device follows, and every setting stands behind one of six rows leading to a page of its own, with the danger zone at the foot of `Vos données`.
@@ -27,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The per-device fetch stagger is derived by a digest rather than by `Hasher`, whose seed changes at every launch : a device landed on a different side of every interval each time it started, and two devices of one reader could still ask a publisher at the same second. The backoff after a failure is exact for the same reason, and carries the stagger it used to drop.
 - The digest asks the model a second time, as the condensing of published headlines it is, where the first ask is refused for sensitive content, asks again for a single field rather than for the whole brief where one comes back wrong, cuts a standfirst that ran to a paragraph back to its first whole sentences, and takes the headline and the line of a story it could not write from one and the same article, preferring one already in the reader's language, and translates the publisher's own head on the device where no article in the group is written in the reader's language, marked with the translate glyph rather than the summary one so the two cannot be read as one : measured over thirty real stories, twenty-four are written instead of twenty and twenty-nine read in the reader's language instead of twenty-three.
 
 - The front page keeps its frame rate under the thumb : the scroll position it washes its head with was rebuilding the whole page on every frame, and it is held apart from the page now.

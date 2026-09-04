@@ -198,8 +198,19 @@ nonisolated struct SyncPayload: Sendable {
     /// already right. The whole history goes out once, through ``everything()``.
     static let recent: TimeInterval = 3 * 24 * 60 * 60
 
-    func catchUpChanges(now: Date = Date()) async throws -> (records: [CKRecord], expired: [String]) {
-        let since = now.addingTimeInterval(-Self.recent)
+    /// - Parameter since: the moment this device last pushed its headers. Only
+    ///   the days touched after it are rebuilt, which is the whole difference
+    ///   between an exchange every six hours and one at the water's edge : the
+    ///   window below rebuilt every day of the last three on every call, so a
+    ///   reader following three hundred feeds queued the better part of a
+    ///   thousand records each time. Section 7's budget is a count of records
+    ///   and a rate, not a volume of bytes, and that is a design constraint and
+    ///   not a detail. `nil` is a device that has never pushed, which takes the
+    ///   window.
+    func catchUpChanges(now: Date = Date(), since pushed: Date? = nil) async throws -> (
+        records: [CKRecord], expired: [String]
+    ) {
+        let since = max(pushed ?? .distantPast, now.addingTimeInterval(-Self.recent))
         return (
             try await CatchUpHeaders.records(in: database, since: since, zone: zone),
             try await CatchUpHeaders.expiredNames(in: database, now: now)

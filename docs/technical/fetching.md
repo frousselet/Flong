@@ -57,6 +57,22 @@ The interval comes from the feed's own history : the **median** gap between publ
 
 A pseudo-random stagger, derived from the feed and from a stable identifier for the installation, keeps a reader's several devices from asking together. Without it they multiply the traffic reaching a publisher by the number of devices on the account, for no benefit at all.
 
+**Derived by a digest, and it used to be derived by nothing.** It was a `Hasher` over the feed and the device, and `Hasher` is seeded afresh in every process : the offset was drawn again at every launch, so a device landed on a different side of its interval each time it started, two devices could still ask together, and the value the test asserted was stable was only stable for as long as the test ran. It is a SHA-256 over the two identifiers now. The system index records the same mistake found the same way, which is the argument for looking for it wherever a value is called derived.
+
+**And the backoff after a failure took a fresh jitter on every call.** A feed that had failed three times answered a different next moment every time it was asked, minutes apart, which is fine for a question asked as `is it due yet` and useless for one asked as `when`. The doubling is exact now and the spread comes from the same stagger, which is applied on the failure path where it used to be dropped altogether : two devices of one reader backed off a failing publisher in lockstep.
+
+## Sleeping until a feed is due
+
+The clock inside an open window ticked every five minutes and asked the store whether anything was due. Most ticks were answered `no` and cost a query for nothing, and a feed that became due a moment after a tick waited most of five minutes to be asked. That delay is not politeness and it is not the system's : it is the application's own, added on top of an interval that already says how often a publisher may be asked.
+
+So the store is asked for the moment rather than for a yes or a no. `RefreshSchedule.due(_:stagger:)` gives back when a feed is next worth asking, `FeedRefresh.nextDue()` gives back the earliest of those, and the clock sleeps until it. It is the same arithmetic `refreshDue` does and goes through the same function, so a clock cannot wake a moment before the feed it woke for is due.
+
+**Bounded at both ends, and both bounds earn their place.** Half a minute below, or a store where every feed is overdue, which is every store during a first fetch, would answer `now` for ever and turn the clock into a spin against empty token buckets. Five minutes above, which is what the interval used to be : a feed is not the only thing that puts articles in the store, and a device whose feeds are all daily still has to look at what iCloud and the shared archives brought while it was asleep.
+
+**The background grant is asked for at the same moment.** `BGAppRefreshTaskRequest.earliestBeginDate` is what the system reads as the earliest moment worth waking for, and it was a flat fifteen minutes : a reader whose feeds are all daily woke the system every quarter of an hour to find nothing due, and one following an hourly wire was told a quarter of an hour after the fact. The request is submitted twice, which is how the two facts are told with what each knows : the handler asks for the floor before anything has read the store, and the pass replaces it with the true moment once it has. A second submission under one identifier replaces the pending request rather than adding to it, and a refusal to run, in Low Power Mode for instance, still leaves the floor standing.
+
+**There is no push for a feed, and there is not going to be one.** WebSub is the only thing that would make one, and it needs an address a hub can call, which needs a server, which section 3 refuses outright. What is left is the whole of what an application without one can do : ask at the moment it is worth asking, and let the reader's other devices hear about it through iCloud rather than by asking the publisher again.
+
 ## What a failure means
 
 | Answer | Treatment |

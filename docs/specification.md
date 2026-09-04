@@ -40,6 +40,8 @@ The product rests on three commitments.
 - Receiving e-mail, full read-it-later of the Wallabag kind.
 - Remote access by an agent from another machine.
 
+**Amended : freshness is a goal now, and a notice on publication with it.** This list ruled out *permanent freshness and notification on publication*, on the reasoning that an application with no server has nothing to be told by and that promising freshness is promising what the system alone decides. Half of that still holds, and section 15 still says so : nothing here promises that a backgrounded application will be given time. What changes is that everything the application does control is now spent on being prompt. The collection sleeps until the moment a feed is due rather than asking every five minutes whether one is ; the opportunistic grant is asked for at that same moment rather than at a flat floor ; and what one device fetches reaches the others through the silent push of section 7 within seconds rather than at the next pass on the mains. A reader who asks to be told about a source, a writer or somebody in the news is told about each article, one notice apiece. There is still no push for a feed and no server of ours to subscribe to one on the reader's behalf, which section 3 refuses and this does not reopen : `docs/technical/fetching.md` records what the platform allows and what it does not.
+
 **Amended : the readers may suggest sources to each other.** The list above rules out *server, account, multi-user*, and the pool of section 8 brushes against the third of those. What holds is what held for a shared collection : there is still no server, no account of ours and no backend service, the addresses travel through the public database Apple already gives the container, and none of it reaches us. What changes is one sentence : a reader who says yes publishes the addresses of the sources they follow, and nobody publishes anything before saying yes. `docs/technical/popular-feeds.md` says how.
 
 **Amended : a collection may be shared.** This list ruled out social sharing and collaborative annotation, and both are now in scope for collections, through Apple's own sharing rather than through anything of ours. The rest of the line holds and is what makes it possible : there is still no server, no account of ours and no backend service, the data moves between iCloud accounts and none of it reaches us, and section 20 stays true because we still collect nothing. What travels is the excerpt the feed published and never the article. Section 7 says how, and `docs/technical/collaboration.md` says why.
@@ -173,6 +175,8 @@ This is the dominant design constraint. CloudKit degrades on record count and ch
 | **target total** | **around 3,000** | |
 
 For comparison, one record per article would mean more than a hundred thousand records over the same period.
+
+**Amended : the exchange happens at the water's edge, and the budget is what makes that safe.** The read states and the catch-up headers were queued only by the pass that runs at rest on the mains, six hours apart, so an article read on the phone reached the iPad the following night at best. They are queued at the end of every pass that changed anything now, and `CKSyncEngine` sends on its own from there. What makes that affordable is not the byte volume, which was never the constraint, but that each half sends only what moved : the read states are compacted first and only the blocks that changed are queued, and the headers are only the days something arrived in since the last push, written down per device beside the engine's own state. The window rebuilt every day of the last three on every call, which was a few hundred records at six hours apart and would have been a few hundred every few minutes here.
 
 ### Read-state compaction
 
@@ -308,9 +312,15 @@ Every device collects on its own behalf.
 
 **Device stagger** : several devices of the same user polling the same feeds multiply the traffic reaching publishers. A pseudo-random stagger derived from the device identifier answers it, together with skipping the automatic refresh on a device brought to the foreground for less than a few seconds.
 
+**Amended : the stagger is derived by a digest, and it was not derived at all.** It is written above as derived from the device identifier, and it was a `Hasher`, whose seed is drawn afresh in every process. So a device landed on a different side of every interval each time it started, two devices of one reader could still ask a publisher together, and a feed's next moment was a different answer after every relaunch. It is a SHA-256 over the feed and the installation now, which is what a derived value has to be if anything is to sleep until a moment it produces. The same correction applies to the backoff after a failure, which drew a fresh jitter on every call and now takes the same stagger.
+
 **Network** : an option to restrict to Wi-Fi, an option to suspend in Low Power Mode, a configurable monthly cellular data cap.
 
 **Actual triggers** : on return to the foreground, on a refresh gesture, and opportunistically in the background when the system allows it.
+
+**Amended : the automatic trigger is the moment a feed becomes due.** Returning to the foreground and the refresh gesture are unchanged. What was a five-minute clock asking the store whether anything was due is a clock that asks the store for the moment itself and sleeps until it, held at half a minute below so that a store where everything is overdue does not spin, and at those same five minutes above so that what iCloud and the archives brought is still looked at. The opportunistic grant is asked for at that moment too, rather than at a flat fifteen minutes : `BGAppRefreshTaskRequest.earliestBeginDate` is read by the system as the earliest moment worth waking for, and a grant that lands on nothing is a grant spent.
+
+Nothing about what reaches a publisher changes. The per-feed interval, its bounds, the token bucket and the stagger are the same, and a feed asked the moment it is due is asked no more often than the same feed asked five minutes later. What is bought is the delay the application was adding on top of its own politeness.
 
 ---
 
@@ -578,7 +588,7 @@ Reading who an article is about is the third, and it is the one that runs over *
 
 | API | Use |
 | --- | --- |
-| `BGAppRefreshTask` | opportunistic feed refresh and grouping, never critical, about twenty-five seconds, spent on the most overdue feeds first |
+| `BGAppRefreshTask` | opportunistic feed refresh and grouping, never critical, about twenty-five seconds, spent on the most overdue feeds first, asked for at the moment a feed is due |
 | `BGProcessingTask` | the full pass, with `requiresExternalPower` and `requiresNetworkConnectivity` |
 | `BGContinuedProcessingTask` | first import and full reindex, triggered by the user |
 | `NSBackgroundActivityScheduler` | the macOS equivalent |

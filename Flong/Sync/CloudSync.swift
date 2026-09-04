@@ -142,6 +142,10 @@ actor CloudSync {
         do {
             try await state.setEngineState(nil)
             try await state.forgetEveryRecord()
+            // And what this device thinks it has already pushed, or a repair
+            // would rebuild the tags and skip the very headers it exists to
+            // send again.
+            try await state.setValue(nil, for: Self.catchUpPushedKey)
             try await payload.forgetEveryArchiveRead()
         } catch {
             Log.sync.error("Nothing could be forgotten : \(error.localizedDescription, privacy: .public)")
@@ -191,6 +195,7 @@ actor CloudSync {
         self.engine = nil
         try? await state.setEngineState(nil)
         try? await state.forgetEveryRecord()
+        try? await state.setValue(nil, for: Self.catchUpPushedKey)
         // Nothing left to delete one record at a time : the zone holding them
         // has gone, and an intention outliving it would be a deletion queued
         // for ever against a zone that answers `zoneNotFound`.
@@ -293,13 +298,36 @@ actor CloudSync {
         Log.sync.notice("Queued \(names.count) records for deletion with a source")
     }
 
+    /// Where the moment of the last push of the headers is written down.
+    ///
+    /// A local fact about this device's own exchanges, kept beside the engine's
+    /// state so that erasing everything, and starting again from nothing, both
+    /// take it with them. Nothing about it travels : another device's idea of
+    /// what it has pushed says nothing about what this one has.
+    private static let catchUpPushedKey = "cloudkit.catch-up-pushed"
+
     /// Queues what this device saw lately, so a device that was switched off
     /// learns what it missed, and drops what has fallen out of the window.
+    ///
+    /// **Only the days something arrived in since the last push.** It rebuilt
+    /// every day of the last three on every call, which was affordable at six
+    /// hours apart and is not at the water's edge : a reader following three
+    /// hundred feeds would have queued hundreds of records every few minutes,
+    /// against a budget of about three thousand in all and a server that
+    /// rate-limits on change throughput. A day nothing arrived in is a day
+    /// whose record is already right.
+    ///
+    /// The moment is written down after the records are queued and not before :
+    /// a call that threw would otherwise mark as pushed the very days it
+    /// failed to build.
     func enqueueCatchUp(now: Date = Date()) async {
         do {
-            let changes = try await payload.catchUpChanges(now: now)
+            let pushed = try await state.value(for: Self.catchUpPushedKey)
+                .flatMap { try? JSONDecoder().decode(Date.self, from: $0) }
+            let changes = try await payload.catchUpChanges(now: now, since: pushed)
             await enqueue(recordNames: changes.records.map(\.recordID.recordName))
             await enqueue(deletions: changes.expired)
+            try await state.setValue(JSONEncoder().encode(now), for: Self.catchUpPushedKey)
         } catch {
             Log.sync.error("The catch up headers failed : \(error.localizedDescription, privacy: .public)")
         }

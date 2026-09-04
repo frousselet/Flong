@@ -334,13 +334,25 @@ nonisolated enum BackgroundScheduler {
         /// the pass was permanently starved and only ever ran after a night
         /// untouched. The pass asks for itself now, from its own handler and
         /// once at launch, against a moment written to disk.
-        static func schedule() {
+        static func schedule(earliest: Date? = nil) {
             let request = BGAppRefreshTaskRequest(identifier: refreshIdentifier)
-            // The floor a feed is held to anyway. Asking for more often than
-            // this would be asking for time the politeness of section 8 has
-            // nothing to spend, and asking for less often throws away an
-            // opportunity the system had already decided to offer.
-            request.earliestBeginDate = Date(timeIntervalSinceNow: RefreshSchedule.minimumInterval)
+            // **The moment a feed is actually due, where the store has been
+            // asked**, and the floor a feed is held to anyway where it has not.
+            // A flat fifteen minutes asked for time nobody could spend when
+            // every feed was daily, and asked too late when one was hourly and
+            // had just become due : the system reads this as the earliest
+            // moment worth waking for, and telling it the truth is what makes
+            // an opportunistic grant land on something.
+            //
+            // Never sooner than a minute, so a store where everything is
+            // overdue asks for now rather than for the past, and never later
+            // than the feed floor plus a day : a request nothing ever replaces
+            // is how background refresh stops for good.
+            let wanted = earliest ?? Date(timeIntervalSinceNow: RefreshSchedule.minimumInterval)
+            request.earliestBeginDate = min(
+                max(wanted, Date(timeIntervalSinceNow: 60)),
+                Date(timeIntervalSinceNow: RefreshSchedule.maximumInterval)
+            )
             submit(request)
         }
 
@@ -450,7 +462,7 @@ nonisolated enum BackgroundScheduler {
             }
         }
 
-        static func schedule() {}
+        static func schedule(earliest: Date? = nil) {}
 
         /// `NSBackgroundActivityScheduler` repeats on its own, so there is
         /// nothing to ask for a second time.

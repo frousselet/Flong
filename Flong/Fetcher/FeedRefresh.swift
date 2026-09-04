@@ -110,7 +110,7 @@ nonisolated struct FeedRefresh: Sendable {
         let due =
             feeds
             .compactMap { feed -> (Feed, Double)? in
-                let interval = feed.refreshInterval ?? feed.observedInterval ?? RefreshSchedule.defaultInterval
+                let interval = RefreshSchedule.interval(of: feed)
                 let stagger = DeviceStagger.offset(for: feed.id, interval: interval, device: device)
                 guard RefreshSchedule.isDue(feed, now: now, stagger: stagger) else { return nil }
                 return (feed, RefreshSchedule.lateness(feed, now: now, stagger: stagger))
@@ -119,6 +119,34 @@ nonisolated struct FeedRefresh: Sendable {
             .map(\.0)
 
         return await refresh(due, until: deadline, onProgress: onProgress)
+    }
+
+    /// The moment the earliest feed becomes due, or `nil` where none ever will.
+    ///
+    /// **What the collection sleeps until.** The clock used to tick every five
+    /// minutes and ask the store whether anything was due, which is a question
+    /// answered `no` almost every time and a feed asked up to five minutes
+    /// after it was worth asking. Asking the store once for the moment itself
+    /// costs the same query, wakes the device fewer times, and closes the only
+    /// part of the delay the application controls.
+    ///
+    /// It is the same arithmetic ``refreshDue(now:until:onProgress:)`` does,
+    /// through ``RefreshSchedule/due(_:stagger:)`` so the two cannot disagree :
+    /// a clock that woke a moment before the feed was due would find nothing
+    /// and sleep again.
+    ///
+    /// A quarantined feed is never due, and a reader with nothing but
+    /// quarantined feeds has nothing to wake for.
+    func nextDue() async -> Date? {
+        let device = DeviceStagger.deviceIdentifier()
+        let feeds = (try? await allFeeds()) ?? []
+
+        return feeds.compactMap { feed -> Date? in
+            let interval = RefreshSchedule.interval(of: feed)
+            let stagger = DeviceStagger.offset(for: feed.id, interval: interval, device: device)
+            return RefreshSchedule.due(feed, stagger: stagger)
+        }
+        .min()
     }
 
     /// Refreshes every feed, due or not, which is what asking for a refresh

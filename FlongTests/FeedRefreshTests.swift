@@ -507,6 +507,44 @@ struct FeedRefreshTests {
         // the pass did reach is fully written down.
         #expect(summary.unchanged == FeedRefresh.concurrency)
     }
+
+    // MARK: - Sleeping until a feed is due
+
+    @Test("A feed nobody has fetched is due now, so nothing waits for it")
+    func nextDueOnAFreshStore() async throws {
+        _ = try await subscribe()
+
+        let due = try #require(await refresh.nextDue())
+        #expect(due <= Date())
+    }
+
+    @Test("The moment the earliest feed is due is what the clock sleeps until")
+    func nextDueIsTheEarliest() async throws {
+        try serve("rss2.xml")
+        let feed = try await subscribe()
+        _ = await refresh.refresh([feed])
+
+        let fetched = try await self.feed(feed.id)
+        let expected = try #require(RefreshSchedule.due(fetched, stagger: 0))
+
+        let due = try #require(await refresh.nextDue())
+        // The stagger is a share of the interval and is added on top, so the
+        // moment can only be later than the bare one, never earlier.
+        #expect(due >= expected)
+        #expect(due <= expected.addingTimeInterval(RefreshSchedule.interval(of: fetched) / 3))
+    }
+
+    @Test("A store of nothing but quarantined feeds has no moment to wake for")
+    func nextDueWithNothingToAsk() async throws {
+        let feed = try await subscribe()
+        try await database.writer.write { db in
+            var stored = try #require(try Feed.fetchOne(db, key: feed.id))
+            stored.quarantinedAt = Date()
+            try stored.update(db)
+        }
+
+        #expect(await refresh.nextDue() == nil)
+    }
 }
 
 @Suite("What a fetch counts as never having been sent")

@@ -267,4 +267,47 @@ struct RefreshScheduleTests {
         #expect(offset >= 0 && offset <= 1200)
         #expect(offset != DeviceStagger.offset(for: feedID, interval: 3600, device: second))
     }
+
+    /// **The one thing the test above cannot say.** It asks the same process
+    /// twice and was answered consistently by a `Hasher` seeded once per
+    /// process : the offset was drawn afresh at every launch, so a device
+    /// landed on a different side of its interval every time it started and a
+    /// feed's next moment moved when nothing about the feed had. Pinning the
+    /// value is the only way a test says `and again tomorrow`.
+    @Test("The stagger is the same after a relaunch, which is what makes a due moment a moment")
+    func staggerSurvivesTheProcess() {
+        let feedID = UUID(uuidString: "00000000-0000-7000-8000-000000000001")!
+        let device = UUID(uuidString: "00000000-0000-4000-8000-0000000000ff")!
+
+        #expect(abs(DeviceStagger.offset(for: feedID, interval: 3600, device: device) - 297.6) < 0.001)
+    }
+
+    @Test("A feed's next moment is a moment, and the same one each time it is asked for")
+    func dueIsAMoment() {
+        var feed = Feed(url: URL(string: "https://feeds.example.com/1.xml")!, title: "Example")
+
+        // Never fetched is due, and has been since it was subscribed to.
+        #expect(RefreshSchedule.due(feed) == .distantPast)
+
+        feed.lastFetchAt = now
+        feed.observedInterval = 3600
+        #expect(RefreshSchedule.due(feed) == now.addingTimeInterval(3600))
+
+        // Asked twice, the same answer. It was not : the backoff drew a fresh
+        // jitter on every call, so a failing feed's moment moved by minutes
+        // between two evaluations a second apart.
+        feed.failureCount = 3
+        #expect(RefreshSchedule.due(feed) == RefreshSchedule.due(feed))
+        #expect(RefreshSchedule.due(feed) == now.addingTimeInterval(RefreshSchedule.minimumInterval * 4))
+
+        // And a quarantined feed has no moment at all.
+        feed.quarantinedAt = now
+        #expect(RefreshSchedule.due(feed) == nil)
+    }
+
+    @Test("A feed that is failing is staggered too, so two devices do not back off in lockstep")
+    func staggerOnTheFailurePath() {
+        let backedOff = RefreshSchedule.nextRefresh(after: now, interval: 3600, failures: 2, stagger: 90)
+        #expect(backedOff == now.addingTimeInterval(RefreshSchedule.minimumInterval * 2 + 90))
+    }
 }
