@@ -111,17 +111,21 @@ struct EditionHead: View {
                         .foregroundStyle(.primary)
                         .frame(width: Self.markWidth)
                         .accessibilityHidden(true)
+                    // **Three lines, and never a truncated one.** The bound
+                    // is kept where the words are written rather than where
+                    // they are drawn : the model is held to a hundred and
+                    // twenty characters a point, which is under what three
+                    // lines hold here, so nothing reaches this and needs
+                    // cutting. Setting a long point smaller until it fitted
+                    // was the other way, and it is a page whispering the
+                    // news. See ``EditionSummarizer/maximumPointCharacters``.
                     Text(verbatim: point)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(3)
                 }
             }
         }
-        // **One step up from the body, and the page's own colour.** These are
-        // the news : they were set in the size and the grey a standfirst is set
-        // in, which is right for a line under a headline and wrong here, where
-        // there is no headline above them and they are the first thing the
-        // reader reads.
-        .font(.title3)
+        // The page's own colour, at the size the rest of the page reads in.
+        .font(.body)
         // **Set open, because each of these is a paragraph of its own.** A
         // point runs to two or three lines and the next one is a different
         // subject : set solid, the three ran together into a block the eye
@@ -256,8 +260,8 @@ struct EditionPlaceholder: View {
                     // the air after it come to the height of a line of type
                     // plus its leading, or the page moves when the words land.
                     TextPlaceholder(
-                        lines: lines, last: lines > 1 ? 0.5 : 0.8, height: 10,
-                        spacing: EditionHead.leading + 15)
+                        lines: lines, last: lines > 1 ? 0.5 : 0.8, height: 9,
+                        spacing: EditionHead.leading + 11)
                 }
             }
         }

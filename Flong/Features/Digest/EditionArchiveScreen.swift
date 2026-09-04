@@ -151,12 +151,15 @@ struct EditionScreen: View {
                                             .foregroundStyle(.primary)
                                             .frame(width: EditionHead.markWidth)
                                             .accessibilityHidden(true)
+                                        // Three lines, and never cut : the
+                                        // bound is on what the model writes.
+                                        // See ``EditionHead``.
                                         Text(verbatim: point)
-                                            .fixedSize(horizontal: false, vertical: true)
+                                            .lineLimit(3)
                                     }
                                 }
                             }
-                            .font(.title3)
+                            .font(.body)
                             .lineSpacing(EditionHead.leading)
                             .foregroundStyle(.primary)
                             .frame(maxWidth: .infinity, alignment: .leading)
