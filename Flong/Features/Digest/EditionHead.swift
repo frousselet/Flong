@@ -193,7 +193,7 @@ struct EditionHead: View {
     /// Over what the shadow reaches, since what the bitmap does not hold is
     /// cut off at the pane's own edge and the page shows a shadow that stops in
     /// a straight line.
-    static let shadowRoom: CGFloat = 34
+    static let shadowRoom: CGFloat = 44
 
     /// How far out of focus the pane goes on its way out.
     ///
@@ -547,30 +547,38 @@ struct PaneSurface: ViewModifier {
             .background {
                 shape
                     .fill(veil)
-                    .shadow(color: .black.opacity(scheme == .dark ? 0.55 : 0.45), radius: 12, y: 4)
+                    .shadow(color: .black.opacity(scheme == .dark ? 0.45 : 0.30), radius: 22, y: 6)
             }
             // The rim, and it is what says the material more than the veil
             // does : a bright hairline where the light would catch the top
             // edge, fading round to almost nothing at the foot.
             .overlay {
-                shape.strokeBorder(rim, lineWidth: 0.75)
+                shape.strokeBorder(rim, lineWidth: 1)
             }
     }
 
     /// The white the page shows through.
     private var veil: Color {
-        .white.opacity(scheme == .dark ? 0.09 : 0.22)
+        .white.opacity(scheme == .dark ? 0.10 : 0.34)
     }
 
-    /// The line round it : lit at the top, gone by the foot.
+    /// The line round it : all the way round, and brightest at the top.
+    ///
+    /// **Lit and never drawn.** The foot was a dark hairline for a while, on
+    /// the reasoning that a white line at the bottom of a pane on a light page
+    /// is no line at all. What that produced was a grey rule under the box, and
+    /// the box does not need one : the shadow says where it ends.
+    ///
+    /// **And it does not fade away.** Graded to nothing at the foot, the pane
+    /// had an edge along its top and none anywhere else, which is a lit corner
+    /// rather than a lit object. The material's rim runs the whole way round :
+    /// brighter where the light would fall and never absent, which is what
+    /// makes the shape read as one thing lifted off the page.
     private var rim: LinearGradient {
         LinearGradient(
             colors: scheme == .dark
-                ? [.white.opacity(0.26), .white.opacity(0.05)]
-                // A white line at the foot of a pane on a light page is no
-                // line at all : the bottom edge is where the light would not
-                // reach, so it is drawn rather than lit.
-                : [.white.opacity(0.95), .black.opacity(0.12)],
+                ? [.white.opacity(0.40), .white.opacity(0.16)]
+                : [.white, .white.opacity(0.70)],
             startPoint: .top,
             endPoint: .bottom
         )
