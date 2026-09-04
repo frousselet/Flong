@@ -539,7 +539,7 @@ struct PaneSurface: ViewModifier {
             // what puts the pane above the page instead of in it, and the
             // hairline is what draws its edge. Rasterized with the rest of the
             // pane, so the parallax moves it rather than casting it again.
-            .shadow(color: .black.opacity(scheme == .dark ? 0.45 : 0.13), radius: 16, y: 6)
+            .shadow(color: .black.opacity(scheme == .dark ? 0.45 : 0.18), radius: 16, y: 8)
     }
 
     /// The line round it : lit at the top, gone by the foot.
@@ -547,7 +547,10 @@ struct PaneSurface: ViewModifier {
         LinearGradient(
             colors: scheme == .dark
                 ? [.white.opacity(0.26), .white.opacity(0.05)]
-                : [.white.opacity(0.95), .white.opacity(0.25)],
+                // A white line at the foot of a pane on a light page is no
+                // line at all : the bottom edge is where the light would not
+                // reach, so it is drawn rather than lit.
+                : [.white.opacity(0.95), .black.opacity(0.12)],
             startPoint: .top,
             endPoint: .bottom
         )
