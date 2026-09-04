@@ -1751,24 +1751,28 @@ final class AppModel {
 
     /// Starts the clock on the article notices, if it is not already running.
     ///
-    /// **Only where there is no clock yet.** Every switch that can lead to an
-    /// article notice used to stamp this, so a reader turning six sources on
-    /// one after another threw away, five times over, what the sources they had
-    /// just turned on were already holding. What the stamp is for is that a
-    /// source's back catalogue is not announced as though it had just arrived,
-    /// and the first switch answers that for all of them.
+    /// **Only where nothing was asking yet.** Every switch that can lead to an
+    /// article notice used to empty the queue, so a reader turning six sources
+    /// on one after another threw away, five times over, what the sources they
+    /// had just turned on were already holding. What emptying it is for is that
+    /// a source's back catalogue is not announced as though it had just
+    /// arrived, and the first switch answers that for all of them.
     private func startAnnouncingArticles() async {
-        // Nothing has ever asked : the clock starts, and this pass says nothing.
+        // Nothing has ever asked : the queue is emptied, the clock starts, and
+        // this pass says nothing. It is read before the state below, since a
+        // switch is sometimes already written by the time this is called.
         guard preferences.articlesAnnouncedAt != nil else {
+            try? await articles.markEverythingAnnounced()
             preferences.articlesAnnouncedAt = Date()
             return
         }
-        // Something is already asking, so the mark is live and moving : leaving
-        // it alone is the whole point, since jumping it forward would swallow
+        // Something is already asking, so the queue is live and draining :
+        // leaving it alone is the whole point, since emptying it would swallow
         // whatever the sources already on have published since the last pass.
         guard !(await isAnnouncingArticles) else { return }
-        // Everything was off, so the mark has been standing still since the
-        // reader last listened. Starting from it would announce months.
+        // Nothing was asking, so nothing has drained the queue since the reader
+        // last listened. Announcing from it would announce months.
+        try? await articles.markEverythingAnnounced()
         preferences.articlesAnnouncedAt = Date()
     }
 
@@ -1780,8 +1784,8 @@ final class AppModel {
         get async {
             if wantsNewArticleNotices { return true }
             // A read that failed answers `yes`, which is the conservative way
-            // round : it leaves the mark alone, and the worst that costs is one
-            // stale mark, which the pass below puts right.
+            // round : it leaves the queue alone, and the worst that costs is a
+            // notice or two about a source already on.
             guard
                 let sources = try? await subscriptions.announcing(),
                 let writers = try? await authorStore.notified(),
@@ -1792,63 +1796,75 @@ final class AppModel {
     }
 
     /// Tells the reader what their sources, and the writers and people they
-    /// asked about, have just published.
+    /// asked about, have just published : one notice apiece.
     ///
-    /// **The watermark moves whether anything was said or not**, exactly as it
-    /// does for the stories and for the collaborations : what it records is
-    /// that the articles reached this device, not that a notification was
-    /// posted.
+    /// **Every article is stamped as told, whether a notice went out or not.**
+    /// That is what the watermark did and it is now said per row, which is the
+    /// only shape that works one article at a time : the read is bounded, and a
+    /// mark moved past what the bound left behind would lose the rest for good.
+    /// What the stamp records is that the article reached the reader, not that
+    /// a notification was posted, so a page they were looking at is not
+    /// announced to them tomorrow.
     ///
-    /// **It does not move past a read that failed.** That is how a watermark
-    /// silently eats the news it exists to meter : a pass cut short by its own
-    /// budget swallowed the articles it had just fetched and marked them told.
-    /// A failure leaves the mark exactly where it was.
+    /// **A read that failed stamps nothing.** Under cancellation every one of
+    /// these throws, and taking that for `nobody is asking` would swallow what
+    /// the pass had just fetched.
     ///
-    /// A reader who has asked for nothing at all has no watermark either, so
-    /// that asking for their first thing starts from that moment rather than
-    /// from whatever a silent pass had stamped.
+    /// **And a burst sounds once.** A reader who asked about every source may
+    /// get eight banners from one pass ; eight of them are eight pieces of news
+    /// and eight sounds are a device put face down.
     func announceNewArticles() async {
         guard !Task.isCancelled else { return }
 
         let everyFeed = wantsNewArticleNotices
         if !everyFeed {
-            // **A read that failed is not an answer.** Under cancellation every
-            // one of these throws, and taking that for `nobody is asking` would
-            // move the mark below on a pass that learnt nothing at all.
             guard
                 let sources = try? await subscriptions.announcing(),
                 let writers = try? await authorStore.notified(),
                 let people = try? await newsmakerStore.notified()
             else { return }
 
+            // Nothing is being asked about, so nothing is being metered. The
+            // queue is emptied rather than left to grow : starting from a mark
+            // nothing had moved for months is what announced a back catalogue,
+            // and the same is true of a queue nothing had drained.
             guard !sources.isEmpty || !writers.isEmpty || !people.isEmpty else {
-                // Nothing is being announced, so nothing is being metered. The
-                // mark is kept at now rather than left to rot, and never
-                // created, since having none is how a first switch starts from
-                // the moment it was thrown.
-                if preferences.articlesAnnouncedAt != nil { preferences.articlesAnnouncedAt = Date() }
+                try? await articles.markEverythingAnnounced()
                 return
             }
         }
 
-        guard let since = preferences.articlesAnnouncedAt else {
-            // A source, a writer or a person asked about on another device,
-            // whose decision has just arrived here. What was published before
-            // this device heard about it is not news, so the clock starts now
-            // and this pass says nothing.
+        // **Something is asking and this device has never listened.** The
+        // decision arrived from another device : the switch travels and this
+        // stamp does not, so what the source published before this device heard
+        // about it is not news. The queue is emptied, the stamp is set, and the
+        // next pass is the first that can say anything.
+        guard preferences.articlesAnnouncedAt != nil else {
+            try? await articles.markEverythingAnnounced()
             preferences.articlesAnnouncedAt = Date()
             return
         }
 
         guard !Task.isCancelled else { return }
-        guard let arrived = try? await articles.arrived(since: since, fromEveryFeed: everyFeed) else {
-            Log.notify.error("The arrivals could not be read : the watermark stays where it was")
+        guard let arrived = try? await articles.unannounced(fromEveryFeed: everyFeed), !arrived.isEmpty
+        else { return }
+
+        // Stamped first and in one write : a notice posted between the read and
+        // the stamp would be a notice posted twice if anything failed in
+        // between, and the store is the only thing that can say `told` once.
+        do {
+            try await articles.markAnnounced(arrived.map(\.id))
+        } catch {
+            Log.notify.error("The arrivals could not be marked told : nothing is announced")
             return
         }
-        preferences.articlesAnnouncedAt = Date()
 
-        guard !isReading, let announcement = Announcement.newArticles(arrived) else { return }
-        await announcer.post(announcement)
+        guard !isReading else { return }
+        for (index, arrival) in arrived.enumerated() {
+            var announcement = Announcement.newArticle(arrival)
+            announcement.isQuiet = index > 0
+            await announcer.post(announcement)
+        }
     }
 
     // MARK: - When somebody adds to a shared collection

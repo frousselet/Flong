@@ -91,7 +91,11 @@ struct Notifier: Announcing {
         content.title = announcement.title
         if let subtitle = announcement.subtitle { content.subtitle = subtitle }
         content.body = announcement.body
-        content.sound = .default
+        // The first of a burst sounds ; the rest arrive quietly, in the same
+        // stack. Eight sounds in a row is not eight pieces of news, it is a
+        // device somebody puts face down. See ``Announcement/isQuiet``.
+        content.sound = announcement.isQuiet ? nil : .default
+        if announcement.isQuiet { content.interruptionLevel = .passive }
         content.threadIdentifier = announcement.thread
         // Held until the request has been added, and thrown out after : the
         // system copies an attachment into its own store rather than taking
@@ -115,8 +119,14 @@ struct Notifier: Announcing {
 
         // No trigger : a trigger of nil is delivered immediately, and there is
         // nothing here worth scheduling for later.
+        // **The article's own identifier where there is one.** A notice about
+        // one article is about one article for ever, so posting it twice should
+        // replace it rather than stack a second copy : the system keys on this,
+        // and a fresh `UUID` every time meant nothing could ever be corrected
+        // or de-duplicated. Everything else keeps a new one, having nothing
+        // stable to be known by.
         let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
+            identifier: announcement.article?.uuidString ?? UUID().uuidString,
             content: content,
             trigger: nil
         )

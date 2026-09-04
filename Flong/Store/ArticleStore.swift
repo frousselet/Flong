@@ -903,10 +903,18 @@ nonisolated struct ArticleStore: Sendable {
     /// here is what keeps the two one question rather than two answers to
     /// reconcile.
     ///
-    /// - Parameter limit: how many are read at most, which is a bound on the
-    ///   work and not on the sentence. See ``mostBeforeAnnouncing``.
-    func arrived(
-        since moment: Date,
+    /// **What has not been told yet, and never what arrived after a moment.**
+    /// The watermark was right for one sentence about everything a pass
+    /// brought : the pass read the arrivals, said one thing, and moved the
+    /// mark. Said one at a time it cannot be : the read is bounded against
+    /// absurdity, and a mark moved past what the bound left behind loses the
+    /// rest for good. `entry.announced_at` is the queue, so nothing is lost
+    /// and nothing is said twice by construction rather than by arithmetic.
+    ///
+    /// - Parameter limit: how many are posted at most in one go. A bound on the
+    ///   burst rather than on the news : what it does not reach stays in the
+    ///   queue and is said by the next pass, which is seconds away.
+    func unannounced(
         fromEveryFeed everyFeed: Bool = false,
         limit: Int = mostBeforeAnnouncing
     ) async throws -> [Arrival] {
@@ -929,7 +937,7 @@ nonisolated struct ArticleStore: Sendable {
                             ORDER BY m.mentions DESC, m.name LIMIT 1) AS newsmaker
                     FROM entry e
                     JOIN feed f ON f.id = e.feed_id
-                    WHERE e.received_at > ?
+                    WHERE e.announced_at IS NULL
                       AND e.is_hidden = 0 AND e.duplicate_of IS NULL AND e.is_read = 0
                       AND (
                             ?
@@ -948,7 +956,7 @@ nonisolated struct ArticleStore: Sendable {
                     ORDER BY e.received_at
                     LIMIT ?
                     """,
-                arguments: [moment, everyFeed, limit]
+                arguments: [everyFeed, limit]
             )
             .map { row in
                 Arrival(
@@ -964,6 +972,42 @@ nonisolated struct ArticleStore: Sendable {
     }
 
     // MARK: - Writing
+
+    /// Says the reader has been told about these, whether a notice went out or
+    /// not.
+    ///
+    /// **Whether or not**, exactly as the watermark it replaces moved either
+    /// way. A reader looking at the page an article lands on has seen it, and
+    /// being told tomorrow about what they read today is worse than not being
+    /// told at all.
+    func markAnnounced(_ ids: [UUID], at date: Date = Date()) async throws {
+        guard !ids.isEmpty else { return }
+
+        try await database.writer.write { db in
+            try db.execute(
+                sql: """
+                    UPDATE entry SET announced_at = ?
+                    WHERE id IN (\(databaseQuestionMarks(count: ids.count)))
+                    """,
+                arguments: StatementArguments([date] + ids.map { $0.databaseValue })
+            )
+        }
+    }
+
+    /// Says the reader has been told about everything waiting, without saying
+    /// anything.
+    ///
+    /// What a switch turned on for the first time does : a source's back
+    /// catalogue is not news, and the reader asking to hear about a publisher
+    /// is asking about what that publisher does next.
+    func markEverythingAnnounced(at date: Date = Date()) async throws {
+        try await database.writer.write { db in
+            try db.execute(
+                sql: "UPDATE entry SET announced_at = ? WHERE announced_at IS NULL",
+                arguments: [date]
+            )
+        }
+    }
 
     /// Marks articles read or unread.
     ///

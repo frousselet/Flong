@@ -58,6 +58,19 @@ nonisolated struct Announcement: Hashable, Sendable {
     /// several, and a tap has one place to land.
     var article: UUID?
 
+    /// Whether this one arrives without a sound.
+    ///
+    /// **What one notice per article costs, and what pays for it.** A reader
+    /// who asks to hear about every source they follow may get eight banners
+    /// from one pass, and eight sounds in a row is not eight pieces of news, it
+    /// is a device somebody puts face down. The first of a burst sounds and the
+    /// rest arrive quietly, which is what the system's own `passive` level is
+    /// for : they are all there, in the stack, and the reader was interrupted
+    /// once.
+    ///
+    /// It is decided where the burst is known, which is the pass, and not here.
+    var isQuiet = false
+
     /// Stories that have just been opened.
     ///
     /// Nothing to say about none, which is the ordinary case : most passes have
@@ -196,78 +209,52 @@ nonisolated struct Announcement: Hashable, Sendable {
         )
     }
 
-    /// What the sources and the writers the reader asked about have just
-    /// published.
+    /// One article a source, a writer or a person the reader asked about has
+    /// just published.
     ///
-    /// **Every article, which is what the reader asked for.** The stories are a
-    /// calculation : several newsrooms, one subject, and an opening worth
-    /// interrupting somebody for. This is the opposite question, asked source
-    /// by source and writer by writer : a reader who follows one newsletter,
-    /// one blog or one colleague wants to know when *they* publish, and a piece
-    /// nobody else covers never becomes a story and would never be announced.
+    /// **One article, one notice, and never a condensed one.** It counted them
+    /// and named three of the headlines : `5 new articles`, and the reader had
+    /// to open Flong to learn what four of the five were. A reader who singles
+    /// out a newsletter, a colleague or somebody in the news is asking about
+    /// each piece, not about how many there were, and a count is the one thing
+    /// they can work out for themselves from a stack of banners.
+    ///
+    /// What made the condensing necessary is gone with it. The watermark is a
+    /// column on the article now, so a burst that runs past the bound is said
+    /// by the next pass rather than lost, and nothing needs a sentence that
+    /// stands for what did not fit.
     ///
     /// **One notice per article, however many ways it was asked for.** A writer
     /// the reader follows very often writes for a source they follow as well ;
-    /// the store answers the two questions at once, so an article that answers
-    /// both is here once, and it is here once in this sentence too.
+    /// the store answers the three questions at once, so an article that
+    /// answers two of them is one row and therefore one notice. The guarantee
+    /// is a property of the query and not of the wording.
     ///
-    /// Nothing to say about none, which is the ordinary case : almost every
-    /// pass brings articles nobody asked anything about.
-    ///
-    /// **What it came from leads, and the headline is the message.** It was the
-    /// other way round, and the other way round is the wrong way : a banner
+    /// **What it came from leads, and the headline is the message.** A banner
     /// gives the title one bold line and cuts it at about forty characters,
-    /// where the body has two lines and four when it is opened. So the headline,
-    /// which is routinely eighty characters, was the truncated part, and under
-    /// it sat a source name of eight. The name of whoever the reader asked about
-    /// goes first, the paper they wrote it for on the line between, and the
-    /// headline underneath with room to be read. A tap opens it.
+    /// where the body has two lines and four when it is opened. The headline is
+    /// routinely eighty, so it goes in the body with room to be read, and the
+    /// name of whoever the reader asked about goes first with the paper they
+    /// wrote it for on the line between. That is the answer to *why am I being
+    /// told this*.
     ///
-    /// Whoever the reader asked about, be that the writer who signed it or the
-    /// person it is about : ``ArticleStore/Arrival/subject`` is the one place
-    /// that decides which, so the single notice and the several agree.
-    ///
-    /// **Several are counted under what was asked about**, the person where
-    /// there was one and the source otherwise, since naming it once is shorter
-    /// than repeating it. **Several of those are counted and then listed**, the
-    /// headlines giving way to the names : a reader told `5 new articles` and
-    /// left to work out where from would have to open the application to learn
-    /// what they were just told.
-    static func newArticles(_ arrivals: [ArticleStore.Arrival]) -> Announcement? {
-        guard let first = arrivals.first else { return nil }
-
-        guard arrivals.count > 1 else {
-            return Announcement(
-                title: first.subject,
-                subtitle: first.subject == first.source ? nil : first.source,
-                body: first.title,
-                thread: Thread.newArticles,
-                picture: first.picture,
-                article: first.id
-            )
-        }
-
-        // In the order they arrived, and deduplicated : a source that served
-        // four articles in one pass is one name, and so is a writer who signed
-        // three of them.
-        var subjects: [String] = []
-        for arrival in arrivals where !subjects.contains(arrival.subject) { subjects.append(arrival.subject) }
-
-        guard subjects.count == 1, let subject = subjects.first else {
-            return Announcement(
-                title: String(localized: "\(arrivals.count) new articles"),
-                body: named(subjects),
-                thread: Thread.newArticles
-            )
-        }
-
-        return Announcement(
-            title: subject,
-            subtitle: String(localized: "\(arrivals.count) new articles"),
-            // A middle dot rather than commas, as the stories are joined : a
-            // headline may hold commas of its own.
-            body: joined(arrivals.map(\.title)),
-            thread: Thread.newArticles
+    /// The person leads where both apply, since asking about somebody is the
+    /// more particular of the requests :
+    /// ``ArticleStore/Arrival/subject`` is the one place that decides which.
+    static func newArticle(_ arrival: ArticleStore.Arrival) -> Announcement {
+        Announcement(
+            title: arrival.subject,
+            subtitle: arrival.subject == arrival.source ? nil : arrival.source,
+            body: arrival.title,
+            // **Threaded by what the reader asked about, and not by kind.** One
+            // thread for every article notice there is would stack a morning's
+            // five publishers into one pile the reader has to open to sort. The
+            // subject is what they asked about, so it is what the pile should
+            // be named after : five from one paper is one stack, and five
+            // papers are five.
+            thread: Thread.newArticle(about: arrival.subject),
+            picture: arrival.picture,
+            article: arrival.id
         )
     }
 
@@ -315,7 +302,17 @@ nonisolated struct Announcement: Hashable, Sendable {
     enum Thread {
         static let newStories = "new-stories"
         static let newEdition = "new-edition"
-        static let newArticles = "new-articles"
+
+        /// One stack per source, writer or person the reader asked about.
+        ///
+        /// It was one thread for every article notice there was, which stacked
+        /// a morning's five publishers into one pile. Said one article at a
+        /// time that matters far more : the stack is what a reader reads
+        /// instead of the individual banners, and a stack of unrelated things
+        /// says nothing.
+        static func newArticle(about subject: String) -> String {
+            "new-articles-\(subject)"
+        }
         static let filings = "shared-filings"
     }
 }

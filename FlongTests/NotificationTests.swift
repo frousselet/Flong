@@ -511,12 +511,14 @@ struct AnnouncingTests {
     }
 }
 
-/// What a notice about one source's own articles says.
+/// What a notice about one article says.
 ///
 /// The stories are a calculation and this is the opposite question, asked
-/// source by source : the wording has to work for one article, for four from
-/// one place, and for four from four.
-@Suite("What Flong says about a source's own articles")
+/// source by source, writer by writer and person by person. It is one article
+/// to one notice now : a reader who singles out a newsletter, a colleague or
+/// somebody in the news is asking about each piece, and a count is the one
+/// thing they can work out for themselves from a stack of banners.
+@Suite("What Flong says about one article")
 struct SourceAnnouncementTests {
     private func arrival(
         _ title: String,
@@ -526,17 +528,10 @@ struct SourceAnnouncementTests {
         ArticleStore.Arrival(id: .v7(), title: title, source: source, picture: picture, author: nil)
     }
 
-    @Test("A pass that brought nothing from those sources says nothing")
-    func silence() {
-        // The ordinary case : almost every pass brings articles from sources
-        // the reader asked nothing about.
-        #expect(Announcement.newArticles([]) == nil)
-    }
-
     @Test("One article leads with where it came from, and a tap opens it")
     func one() throws {
         let article = arrival("Une réforme du calendrier scolaire")
-        let announcement = try #require(Announcement.newArticles([article]))
+        let announcement = Announcement.newArticle(article)
 
         // The source in the one bold line a banner truncates at forty
         // characters, and the headline where there is room to read it.
@@ -549,64 +544,18 @@ struct SourceAnnouncementTests {
         #expect(announcement.story == nil)
     }
 
-    /// A picture where there is one article to show a picture of, and none
-    /// where there are several.
-    @Test("One article carries its picture, and several carry none")
+    /// Every one of these is about one thing now, so every one of them carries
+    /// the picture that stands for it. The rule that a notice about several
+    /// carries none is unchanged and no longer has a case here to apply to.
+    @Test("Each notice carries the picture of the article it is about")
     func picture() throws {
         let cover = URL(string: "https://feeds.example.com/reforme.jpg")!
-        let one = try #require(Announcement.newArticles([arrival("Une réforme", picture: cover)]))
-        #expect(one.picture == cover)
-
-        let several = try #require(
-            Announcement.newArticles([arrival("Une réforme", picture: cover), arrival("Un procès")])
-        )
-        #expect(several.picture == nil)
+        #expect(Announcement.newArticle(arrival("Une réforme", picture: cover)).picture == cover)
     }
 
     @Test("An article nobody illustrated is announced all the same")
     func pictureless() throws {
-        #expect(try #require(Announcement.newArticles([arrival("Une réforme")])).picture == nil)
-    }
-
-    @Test("Several from one source are counted under its name")
-    func severalFromOne() throws {
-        let articles = [arrival("Une réforme"), arrival("Les macros Swift"), arrival("Le procès")]
-        let announcement = try #require(Announcement.newArticles(articles))
-
-        #expect(announcement.title == "Le Monde")
-        #expect(try #require(announcement.subtitle).contains("3"))
-        for article in articles {
-            #expect(announcement.body.contains(article.title))
-        }
-        // Three articles are not a place to go.
-        #expect(announcement.article == nil)
-    }
-
-    @Test("Headlines are not run together as one sentence")
-    func headlinesAreSeparated() throws {
-        let announcement = try #require(
-            Announcement.newArticles([arrival("Réforme, acte II"), arrival("Procès, la suite")])
-        )
-
-        #expect(announcement.body == "Réforme, acte II · Procès, la suite")
-    }
-
-    @Test("Several sources are counted and then named")
-    func severalSources() throws {
-        let articles = [
-            arrival("Une réforme", from: "Le Monde"),
-            arrival("Les macros Swift", from: "Swift by Sundell"),
-            arrival("Le procès", from: "Le Monde"),
-        ]
-        let announcement = try #require(Announcement.newArticles(articles))
-
-        #expect(announcement.title.contains("3"))
-        // A reader told `3 new articles` and left to work out where from would
-        // have to open the application to learn what they were just told. Each
-        // source is named once, whatever it served.
-        #expect(announcement.body.contains("Le Monde"))
-        #expect(announcement.body.contains("Swift by Sundell"))
-        #expect(!announcement.body.contains("Une réforme"))
+        #expect(Announcement.newArticle(arrival("Une réforme")).picture == nil)
     }
 
     @Test("An article by a writer the reader asked about names them under the headline")
@@ -617,7 +566,7 @@ struct SourceAnnouncementTests {
             source: "Le Monde",
             author: "Claire Ancelin"
         )
-        let announcement = try #require(Announcement.newArticles([article]))
+        let announcement = Announcement.newArticle(article)
 
         // The person the reader asked about leads, the paper they wrote it for
         // is the line between, and the headline is the message : that is the
@@ -629,47 +578,33 @@ struct SourceAnnouncementTests {
         #expect(announcement.article == article.id)
     }
 
-    @Test("Several by one writer are counted under their name, not their papers")
-    func severalByOnePerson() throws {
-        // The whole point of asking of a person : they are followed wherever
-        // they write, so two papers in one notice is the notice working.
-        let articles = [
-            ArticleStore.Arrival(id: .v7(), title: "Une réforme", source: "Le Monde", author: "Claire Ancelin"),
-            ArticleStore.Arrival(id: .v7(), title: "Un procès", source: "Libération", author: "Claire Ancelin"),
-        ]
-        let announcement = try #require(Announcement.newArticles(articles))
-
-        #expect(announcement.title == "Claire Ancelin")
-        #expect(try #require(announcement.subtitle).contains("2"))
-        #expect(announcement.body == "Une réforme · Un procès")
-    }
-
-    @Test("A writer and a source in one pass are listed as the two things asked about")
-    func peopleAndPapers() throws {
-        let articles = [
-            arrival("Une réforme"),
-            ArticleStore.Arrival(id: .v7(), title: "Un procès", source: "Libération", author: "Claire Ancelin"),
-        ]
-        let announcement = try #require(Announcement.newArticles(articles))
-
-        #expect(announcement.title.contains("2"))
-        // What the reader asked about is what they are told : the paper for the
-        // one, the person for the other.
-        #expect(announcement.body.contains("Le Monde"))
-        #expect(announcement.body.contains("Claire Ancelin"))
-        #expect(!announcement.body.contains("Libération"))
-    }
-
-    @Test("These notices are grouped under a thread of their own")
-    func grouped() throws {
-        let first = try #require(Announcement.newArticles([arrival("Une réforme")]))
-        let second = try #require(Announcement.newArticles([arrival("Un procès")]))
+    /// **One stack per thing the reader asked about, and not one for the lot.**
+    /// The stack is what a reader actually reads when several arrive at once,
+    /// and a morning's five publishers folded into one pile says nothing.
+    @Test("Two from one source are one stack, and two sources are two")
+    func stacked() throws {
+        let first = Announcement.newArticle(arrival("Une réforme"))
+        let second = Announcement.newArticle(arrival("Un procès"))
+        let elsewhere = Announcement.newArticle(arrival("Les macros Swift", from: "Swift by Sundell"))
 
         #expect(first.thread == second.thread)
-        #expect(first.thread == Announcement.Thread.newArticles)
+        #expect(first.thread != elsewhere.thread)
         // Not the stack the stories are in : one is a calculation about the
         // press and the other is one source publishing.
         #expect(first.thread != Announcement.Thread.newStories)
+        #expect(first.thread != Announcement.Thread.newEdition)
+    }
+
+    /// A reader who asked about every source may get eight banners from one
+    /// pass. Eight of them are eight pieces of news ; eight sounds are a device
+    /// somebody puts face down.
+    @Test("A notice arrives silently by request, and says so to the system")
+    func quiet() throws {
+        var announcement = Announcement.newArticle(arrival("Une réforme"))
+        #expect(!announcement.isQuiet)
+
+        announcement.isQuiet = true
+        #expect(announcement.isQuiet)
     }
 }
 
@@ -729,7 +664,7 @@ struct ArrivedArticleTests {
         try await article("Une réforme", of: feed, receivedAt: now.addingTimeInterval(60), picture: cover)
         try await article("Un procès", of: feed, receivedAt: now.addingTimeInterval(120))
 
-        let arrived = try await articles.arrived(since: now)
+        let arrived = try await articles.unannounced()
         // The same address the row in the list carries : a notice showing one
         // picture and the article it opens showing another would be two
         // articles as far as the reader can tell.
@@ -743,21 +678,67 @@ struct ArrivedArticleTests {
         try await article("Une réforme", of: asked, receivedAt: now.addingTimeInterval(60))
         try await article("Un procès", of: other, receivedAt: now.addingTimeInterval(60))
 
-        let arrived = try await articles.arrived(since: now)
+        let arrived = try await articles.unannounced()
         #expect(arrived.map(\.title) == ["Une réforme"])
         #expect(arrived.map(\.source) == ["Le Monde"])
     }
 
-    @Test("When it arrived here, and not when it was published")
-    func whenItArrived() async throws {
+    /// **What has not been told yet, and never what arrived after a moment.**
+    /// The watermark was right for one sentence about everything a pass
+    /// brought ; said one article at a time it cannot be, since the read is
+    /// bounded and a mark moved past what the bound left behind loses the rest
+    /// for good. So the question is asked of the article and the answer is
+    /// written on it.
+    @Test("What has not been told yet is the queue, whenever it arrived")
+    func theQueueIsTheQuestion() async throws {
         let feed = try await source("Le Monde", at: "lemonde.example.com", announcing: true)
         // A source backfilling a month of articles published them a month ago
-        // and served them tonight. A notice about what is dated today would be
-        // silent about everything the reader actually just received.
-        try await article("Ancien", of: feed, receivedAt: now.addingTimeInterval(-3600))
+        // and served them tonight. Both of these arrived and neither has been
+        // told : a clock would have swallowed the first.
+        let old = try await article("Ancien", of: feed, receivedAt: now.addingTimeInterval(-3600))
         try await article("Nouveau", of: feed, receivedAt: now.addingTimeInterval(60))
 
-        #expect(try await articles.arrived(since: now).map(\.title) == ["Nouveau"])
+        #expect(try await articles.unannounced().map(\.title) == ["Ancien", "Nouveau"])
+
+        // Told once and never again, whether a notice went out or not.
+        try await articles.markAnnounced([old])
+        #expect(try await articles.unannounced().map(\.title) == ["Nouveau"])
+    }
+
+    /// A first fetch brings a feed's whole back catalogue and an import brings
+    /// a whole account. Both are a reader receiving a history they already had,
+    /// and one notice apiece would be hundreds of interruptions about it.
+    @Test("A backlog is written down as already told")
+    func aBacklogIsNotNews() async throws {
+        let feed = try await source("Le Monde", at: "lemonde.example.com", announcing: true)
+
+        try await database.writer.write { db in
+            let item = ParsedItem(guid: "urn:backlog", title: "Une vieille histoire")
+            _ = try FeedRefresh.store(
+                item, of: ParsedFeed(format: .rss), feed: feed, at: self.now, read: [],
+                isBacklog: true, in: db)
+
+            let fresh = ParsedItem(guid: "urn:fresh", title: "Ce qui vient d'arriver")
+            _ = try FeedRefresh.store(
+                fresh, of: ParsedFeed(format: .rss), feed: feed, at: self.now, read: [],
+                isBacklog: false, in: db)
+        }
+
+        #expect(try await articles.unannounced().map(\.title) == ["Ce qui vient d'arriver"])
+    }
+
+    /// Turning the first switch on empties the queue rather than announcing
+    /// what the source published before the reader asked about it.
+    @Test("A source's back catalogue is not announced when the reader first asks")
+    func askingDoesNotAnnounceTheBackCatalogue() async throws {
+        let feed = try await source("Le Monde", at: "lemonde.example.com", announcing: true)
+        try await article("Avant", of: feed, receivedAt: now.addingTimeInterval(-3600))
+
+        try await articles.markEverythingAnnounced()
+        #expect(try await articles.unannounced().isEmpty)
+
+        try await article("Après", of: feed, receivedAt: now.addingTimeInterval(60))
+        #expect(try await articles.unannounced().map(\.title) == ["Après"])
     }
 
     @Test("They arrive in the order they landed")
@@ -767,7 +748,7 @@ struct ArrivedArticleTests {
             try await article(title, of: feed, receivedAt: now.addingTimeInterval(Double(index + 1) * 60))
         }
 
-        #expect(try await articles.arrived(since: now).map(\.title) == ["Premier", "Deuxième", "Troisième"])
+        #expect(try await articles.unannounced().map(\.title) == ["Premier", "Deuxième", "Troisième"])
     }
 
     @Test("What is read, hidden or a second copy is left out")
@@ -781,7 +762,7 @@ struct ArrivedArticleTests {
         try await article("Masqué", of: feed, receivedAt: now.addingTimeInterval(60), isHidden: true)
         try await article("Copie", of: feed, receivedAt: now.addingTimeInterval(60), duplicateOf: first)
 
-        #expect(try await articles.arrived(since: now).map(\.title) == ["Une réforme"])
+        #expect(try await articles.unannounced().map(\.title) == ["Une réforme"])
     }
 
     /// A writer the reader asked about, and an article they signed.
@@ -816,7 +797,7 @@ struct ArrivedArticleTests {
 
         // The source says nothing and is not meant to : what was asked about is
         // the person, and they are followed into whichever paper carries them.
-        let arrived = try await articles.arrived(since: now)
+        let arrived = try await articles.unannounced()
         #expect(arrived.map(\.title) == ["Un procès"])
         #expect(arrived.first?.author == "Claire Ancelin")
         #expect(arrived.first?.source == "Libération")
@@ -833,7 +814,7 @@ struct ArrivedArticleTests {
         try await AuthorStore(database).setNotifies("Claire Ancelin", true)
         try await signed("Une réforme", by: "Claire Ancelin", of: loud, receivedAt: now.addingTimeInterval(60))
 
-        let arrived = try await articles.arrived(since: now)
+        let arrived = try await articles.unannounced()
         #expect(arrived.count == 1)
         // And the person leads the wording, since asking about somebody is the
         // more particular of the two requests.
@@ -854,7 +835,7 @@ struct ArrivedArticleTests {
 
         // A piece signed by two people where the reader asked about one is news
         // about that one, and the notice names them rather than the byline.
-        let arrived = try await articles.arrived(since: now)
+        let arrived = try await articles.unannounced()
         #expect(arrived.count == 1)
         #expect(arrived.first?.author == "Paul Rey")
     }
@@ -1349,16 +1330,16 @@ struct AnnouncingSourceTests {
     }
 
     /// **A feed's articles all carry one arrival moment**, to the millisecond :
-    /// they are written in one go. So a watermark stamped from the last row a
-    /// capped answer returned would skip every sibling that did not fit, and
-    /// one stamped just below it would announce the whole group again for ever.
-    /// The mark is the clock, the read is bounded only against absurdity, and
-    /// what the notice *names* is what is bounded.
-    @Test("A pass brings every article of a feed at one moment, and none is skipped")
+    /// they are written in one go. A watermark stamped from the last row a
+    /// capped answer returned skipped every sibling that did not fit, and one
+    /// stamped just below it announced the whole group again for ever. Neither
+    /// is possible now : the question is asked of the article and the answer is
+    /// written on it, so twenty-five that landed in one millisecond are
+    /// twenty-five notices and none of them is said twice.
+    @Test("A pass brings every article of a feed at one moment, and each gets its own notice")
     func onePassOneMoment() async throws {
         let feed = try await source()
         await model.setWantsNewArticleNotices(true)
-        preferences.articlesAnnouncedAt = now
         model.isReading = false
 
         // One moment for all of them, which is what a refresh actually writes.
@@ -1369,13 +1350,36 @@ struct AnnouncingSourceTests {
 
         await model.announceNewArticles()
 
-        let notice = try #require(announcer.posted.first)
-        // The count is the whole truth ; the body names what fits.
-        #expect(try #require(notice.subtitle).contains("25"))
+        #expect(announcer.posted.count == 25)
+        let bodies = announcer.posted.map(\.body)
+        #expect(bodies.contains("Article 24"))
+        // The first of a burst sounds and the rest arrive quietly : twenty-five
+        // sounds in a row is not twenty-five pieces of news.
+        #expect(announcer.posted.first?.isQuiet == false)
+        let quiet = announcer.posted.dropFirst().map(\.isQuiet)
+        #expect(!quiet.contains(false))
 
-        // And the pass is over : nothing is left behind the mark to be said
-        // again by the next one.
+        // And the pass is over : nothing is left in the queue to be said again
+        // by the next one.
         await model.announceNewArticles()
-        #expect(announcer.posted.count == 1)
+        #expect(announcer.posted.count == 25)
+    }
+
+    /// Nothing is announced while the reader is looking at the page it would be
+    /// about, and it is not saved up for later either : what the stamp records
+    /// is that the article reached them.
+    @Test("A reader who is looking is not interrupted, and is not told tomorrow either")
+    func nothingWhileReading() async throws {
+        let feed = try await source()
+        await model.setWantsNewArticleNotices(true)
+        model.isReading = true
+
+        try await article("Une réforme", of: feed, at: Date().addingTimeInterval(1))
+        await model.announceNewArticles()
+        #expect(announcer.posted.isEmpty)
+
+        model.isReading = false
+        await model.announceNewArticles()
+        #expect(announcer.posted.isEmpty)
     }
 }

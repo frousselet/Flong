@@ -315,11 +315,17 @@ nonisolated struct FeedRefresh: Sendable {
             stored.lastFailureReason = nil
             stored.quarantinedAt = nil
 
+            // A feed nobody has ever fetched successfully is about to hand
+            // over its whole back catalogue. That is a history and not news :
+            // read before the success above is written down, since that is what
+            // it is being read about.
+            let isBacklog = feed.lastSuccessAt == nil
+
             var newArticles = 0
             for item in parsed.items {
-                if try Self.store(item, of: parsed, feed: stored, at: now, read: read, in: db)?.isNew == true {
-                    newArticles += 1
-                }
+                let write = try Self.store(
+                    item, of: parsed, feed: stored, at: now, read: read, isBacklog: isBacklog, in: db)
+                if write?.isNew == true { newArticles += 1 }
             }
 
             // The interval a feed suggests is read from what it just served,
@@ -343,12 +349,20 @@ nonisolated struct FeedRefresh: Sendable {
     /// and which picture stands for a piece. What an import knows and a refresh
     /// does not, the read and starred state its account holds, is applied on top
     /// of what this writes. See ``ServiceImport``.
+    /// - Parameter isBacklog: whether what is being written is a history
+    ///   rather than news. The first fetch of a feed nobody has fetched before
+    ///   brings its whole back catalogue, and an import brings a whole account ;
+    ///   both are a reader receiving something they already had, and a notice
+    ///   per article would be hundreds of interruptions about it. What is
+    ///   written is stamped as already told, which is the same thing the reader
+    ///   would have got from the old watermark and is now said per row.
     static func store(
         _ item: ParsedItem,
         of parsed: ParsedFeed,
         feed: Feed,
         at now: Date,
         read: Set<ArticleFingerprint>,
+        isBacklog: Bool = false,
         in db: Database
     ) throws -> ArticleWrite? {
         guard let identity = item.identity else { return nil }
@@ -457,6 +471,9 @@ nonisolated struct FeedRefresh: Sendable {
             canonicalKey: key
         )
         entry.hasMedia = !item.enclosures.isEmpty
+        // A history rather than news, so the reader is not interrupted about
+        // every line of it. See the parameter above.
+        if isBacklog { entry.announcedAt = now }
 
         // The same article reaching the reader through a second feed of the
         // same newsroom. It keeps its row, since it belongs to a feed they

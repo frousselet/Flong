@@ -536,6 +536,14 @@ What the reader wants travels between their devices, through the key-value store
 
 `docs/technical/notifications.md` carries the rules and what each is for.
 
+**Amended : an article is one notice, and an edition is a fifth kind.** The section above rules out a notice per article, on the argument that a cluster of one is not a story. That argument holds for the *stories*, which are unchanged. It never applied to the other question the panel asks : a reader who singles out a newsletter, a colleague or somebody in the news is asking about each piece they publish, and `5 new articles` with three of the headlines under it left them to open the application to learn what the other two were. One article is one notice now, and the count and the list of three go with the condensing.
+
+What made the condensing necessary goes with it. The watermark was a clock on the device, which is right for one sentence about everything a pass brought and cannot work said one at a time : the read behind it is bounded against absurdity, and a mark moved past what the bound left behind lost the rest for good. It is a column on the article, `entry.announced_at`, so nothing is lost and nothing is said twice by construction. Two things are written down as already told on the way in, because they are a history and not news : an import, and the first fetch of a feed nobody has fetched before.
+
+Two rules keep a burst humane without touching the one-to-one. The stack is per source, writer or person asked about rather than one for every article notice there is, so five from one paper is one pile and five papers are five ; and the first of a burst sounds while the rest arrive at the system's `passive` level, since eight sounds in a row is not eight pieces of news.
+
+**And the fifth kind is a new edition.** The digest comes out four times a day now, and an edition arriving is the one thing the front page has to announce that the stories cannot. It is the only notice here whose words are already written : the headline and the lines the model wrote over the whole page are the notice, and a tap opens the digest, there being nowhere deeper to go. Its watermark is a boundary rather than a clock, an edition being the one thing here with an identity of its own.
+
 ### Retention
 
 **Amended : nothing is thrown away on its own.** Both bounds, age and volume, are optional and both are absent. The reader keeps every article that has ever arrived, on every device. The purge still exists and is still correct ; it is asked for, from the sources page, rather than run on a schedule.

@@ -126,8 +126,7 @@ struct StreamArchiveTests {
         // And it is announceable, since it is unread : what the other device
         // read is what keeps a synchronization quiet, and this the reader has
         // seen nowhere.
-        let arrived = try await second.articles.arrived(
-            since: now.addingTimeInterval(-60), fromEveryFeed: true)
+        let arrived = try await second.articles.unannounced(fromEveryFeed: true)
         #expect(arrived.map(\.title) == ["Ancienne"])
     }
 

@@ -1013,6 +1013,38 @@ nonisolated extension AppDatabase {
         /// section 7's budget to say what the other end already knows.
         migrator.registerMigration("v44.aPageMadeAtAnHour", migrate: createEditions)
 
+        /// Whether the reader has been told about this article.
+        ///
+        /// **A column and not a watermark, because a notice is per article
+        /// now.** A clock works for a condensed notice : the pass reads what
+        /// arrived since it last spoke, says one sentence about the lot, and
+        /// moves the mark. Said one at a time it cannot : the read is bounded
+        /// at two hundred against absurdity, and the mark moved past everything
+        /// the bound left behind, so the two hundred and first article was
+        /// never announced and never would be. A row per article is the only
+        /// shape where nothing is lost and nothing is said twice, and it is by
+        /// construction rather than by arithmetic.
+        ///
+        /// Everything already in the store is stamped as told. An upgrade is
+        /// not an occasion to announce a reader's back catalogue, and what was
+        /// worth saying about it was said under the old rule or was never going
+        /// to be.
+        migrator.registerMigration("v45.toldAboutThisOne") { db in
+            try db.alter(table: "entry") { table in
+                table.add(column: "announced_at", .datetime)
+            }
+            // The queue is `announced_at IS NULL`, which is a handful of rows
+            // out of a hundred thousand : a partial index is the whole of what
+            // makes asking cheap enough to ask on every pass.
+            try db.create(
+                index: "entry_unannounced",
+                on: "entry",
+                columns: ["received_at"],
+                condition: Column("announced_at") == nil
+            )
+            try db.execute(sql: "UPDATE entry SET announced_at = ?", arguments: [Date()])
+        }
+
         return migrator
     }
 
