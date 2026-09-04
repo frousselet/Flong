@@ -109,9 +109,6 @@ struct SearchScreen: View {
         .navigationTitle(Text("Search"))
         .toolbar {
             if let menu {
-                ToolbarItem(placement: .sectionLeading) {
-                    StatisticsButton(model: model)
-                }
                 ReaderCorner(model: model, work: model.currentWork) { menu(.view($0)) }
             }
         }

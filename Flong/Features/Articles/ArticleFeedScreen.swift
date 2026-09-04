@@ -143,11 +143,6 @@ struct ArticleFeedScreen: View {
         // where you are without ever saying it was worth a line.
         .navigationTitle(title)
         .toolbar {
-            if let menu {
-                ToolbarItem(placement: .sectionLeading) {
-                    StatisticsButton(model: model)
-                }
-            }
             if menu != nil {
                 ReaderCorner(model: model, work: model.currentWork) { menu?(.view($0)) }
             } else {

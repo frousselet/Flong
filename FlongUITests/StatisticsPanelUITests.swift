@@ -35,8 +35,16 @@ final class StatisticsPanelUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
+        // **In the reader's own menu now, and it was a chart in the corner.**
+        // That corner carried the sources, the subjects, the notices and then
+        // this, which is four glyphs before the page has said anything : they
+        // are rows in the one place a reader already looks for what is theirs.
+        let face = app.buttons["reader"].firstMatch
+        XCTAssertTrue(face.waitForExistence(timeout: 20), "The reader's own button is in the corner of every section")
+        face.tap()
+
         let mark = app.buttons["statistics"].firstMatch
-        XCTAssertTrue(mark.waitForExistence(timeout: 20), "The chart stands in the corner of every section")
+        XCTAssertTrue(mark.waitForExistence(timeout: 5), "The menu leads to what their reading adds up to")
         mark.tap()
 
         // The window the page opens on. Its being there at all is what says the
@@ -57,8 +65,12 @@ final class StatisticsPanelUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
+        let face = app.buttons["reader"].firstMatch
+        XCTAssertTrue(face.waitForExistence(timeout: 20))
+        face.tap()
+
         let mark = app.buttons["statistics"].firstMatch
-        XCTAssertTrue(mark.waitForExistence(timeout: 20))
+        XCTAssertTrue(mark.waitForExistence(timeout: 5))
         mark.tap()
 
         XCTAssertTrue(app.buttons["range-day"].firstMatch.waitForExistence(timeout: 10))
@@ -72,8 +84,20 @@ final class StatisticsPanelUITests: XCTestCase {
 
             // The row runs off the edge of a phone, so the last few have to be
             // brought into view before they can be pressed.
+            //
+            // **Swiped from whichever of them is on screen**, and it used to be
+            // swiped from the first. Once the row has scrolled, the first is
+            // off the edge, and XCUITest refuses to swipe an element whose
+            // visible frame is empty : the test failed on the window after the
+            // one that scrolled it.
             if !window.isHittable {
-                app.buttons["range-day"].firstMatch.swipeLeft()
+                let anchor = [
+                    "range-day", "range-week", "range-month", "range-quarter",
+                    "range-half", "range-threeQuarters", "range-year",
+                ]
+                .map { app.buttons[$0].firstMatch }
+                .first { $0.exists && $0.isHittable }
+                anchor?.swipeLeft()
             }
             guard window.isHittable else { continue }
             window.tap()

@@ -98,37 +98,6 @@ struct ReaderCorner: ToolbarContent {
     }
 }
 
-/// The way to what the reader's stream adds up to.
-///
-/// **In the leading corner, and it was beside the face.** It stood there while
-/// the opposite corner held three buttons for the sources, the subjects and the
-/// notices ; those are rows in the reader's own menu now, so that corner is
-/// empty and this is the one thing in it that belongs in every section. A
-/// figure is not something a reader tends, which is what the menu is for : it
-/// is a page they open, look at, and close.
-///
-/// A chart for a mark, since what it opens is chart-shaped and there is no
-/// glyph for arithmetic. Beside the face and not behind it : a figure nobody
-/// can find is a figure nobody reads, and two presses is where a page like this
-/// goes to be forgotten.
-struct StatisticsButton: View {
-    let model: AppModel
-
-    @State private var isOpen = false
-
-    var body: some View {
-        Button {
-            isOpen = true
-        } label: {
-            Label("Statistics", systemImage: "chart.pie")
-        }
-        .accessibilityIdentifier("statistics")
-        .sheet(isPresented: $isOpen) {
-            StatisticsPanel(model: model)
-        }
-    }
-}
-
 /// The reader, as one small round thing.
 ///
 /// Three states, in the order a reader arrives at them : the picture they

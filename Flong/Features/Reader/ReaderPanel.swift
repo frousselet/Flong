@@ -83,7 +83,7 @@ struct ReaderPanel: View {
     private var height: CGFloat {
         /// The rows themselves, and the air around them. Ten of them now, and
         /// the four cards' worth of air between them.
-        var height: CGFloat = 452 + 4 * 56 + 16
+        var height: CGFloat = 452 + 5 * 56 + 16
         if model.picture != nil { height += 126 }
         if model.name != nil { height += 32 }
         if model.place != nil { height += 28 }
@@ -237,7 +237,7 @@ struct ReaderPanel: View {
     private var cards: some View {
         VStack(spacing: 16) {
             card(open == nil ? [.subjects, .notifications] : [.sources, .subjects, .notifications])
-            card([.profile, .appearance, .editions])
+            card([.statistics, .profile, .appearance, .editions])
             card([.popular, .sites])
             card([.data])
             card([.about])
@@ -306,6 +306,7 @@ struct ReaderPanel: View {
             TopicsPanel(model: model)
         case .notifications:
             NotificationsPanel(model: model)
+        case .statistics: StatisticsPanel(model: model)
         case .profile: ProfileSettings(model: model, close: close)
         case .appearance: AppearanceSettings(model: model, close: close)
         case .editions: EditionSettings(model: model)
@@ -333,6 +334,8 @@ enum ReaderPage: Hashable, CaseIterable {
     case subjects
     /// Everything Flong may interrupt them for.
     case notifications
+    /// What their reading adds up to.
+    case statistics
     /// The reader's own face, name and town.
     case profile
     /// The face the page is set in, and the paper it is printed on.
@@ -355,6 +358,7 @@ enum ReaderPage: Hashable, CaseIterable {
         case .sources: "Sources"
         case .subjects: "Subjects"
         case .notifications: "Notifications"
+        case .statistics: "Statistics"
         case .profile: "Profile"
         case .appearance: "Appearance"
         case .editions: "Editions"
@@ -370,6 +374,7 @@ enum ReaderPage: Hashable, CaseIterable {
         case .sources: "square.stack"
         case .subjects: "circle.grid.2x2"
         case .notifications: "bell"
+        case .statistics: "chart.pie"
         case .profile: "person.crop.circle"
         case .appearance: "paintpalette"
         case .editions: "newspaper"
@@ -386,6 +391,7 @@ enum ReaderPage: Hashable, CaseIterable {
         case .sources: "sources"
         case .subjects: "subjects"
         case .notifications: "notifications"
+        case .statistics: "statistics"
         case .profile: "reader-profile"
         case .appearance: "reader-appearance"
         case .editions: "reader-editions"

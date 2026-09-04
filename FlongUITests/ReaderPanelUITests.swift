@@ -102,7 +102,7 @@ final class ReaderPanelUITests: XCTestCase {
         // then the reader themselves, then what is theirs beyond this device.
         let rows = [
             "sources", "subjects", "notifications",
-            "reader-profile", "reader-appearance", "reader-editions",
+            "statistics", "reader-profile", "reader-appearance", "reader-editions",
             "reader-popular", "reader-sites", "reader-about",
         ]
         for identifier in rows {
