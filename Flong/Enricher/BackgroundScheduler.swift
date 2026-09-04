@@ -422,15 +422,44 @@ nonisolated enum BackgroundScheduler {
             submit(request)
         }
 
+        /// Hands a request to the system, and says what a refusal means.
+        ///
+        /// **Only one of them is a fault.** `notPermitted` is the identifier
+        /// missing from the Info.plist, which is a build mistake and worth
+        /// shouting about. `unavailable` is a simulator, which supports none
+        /// of this, or a reader who has turned background refresh off ;
+        /// `tooManyPendingTaskRequests` is a queue already full. Neither of
+        /// those two loses anything : every job here is resumable, so the work
+        /// carries on in the application and again at the next launch, and a
+        /// line at the top of the log saying otherwise sends whoever reads it
+        /// looking for a bug that is not there.
         private static func submit(_ request: BGTaskRequest) {
             do {
                 try BGTaskScheduler.shared.submit(request)
-            } catch {
-                // `notPermitted` here means the identifier is missing from the
-                // Info.plist, which is a build mistake and not a runtime one.
+            } catch let error as BGTaskScheduler.Error where error.code == .notPermitted {
                 Log.enrich.error(
-                    "\(request.identifier, privacy: .public) was refused : \(error.localizedDescription, privacy: .public)"
+                    "\(request.identifier, privacy: .public) is not a permitted identifier : \(error.localizedDescription, privacy: .public)"
                 )
+            } catch {
+                Log.enrich.notice(
+                    "\(request.identifier, privacy: .public) was not taken : \(Self.reason(error), privacy: .public)"
+                )
+            }
+        }
+
+        /// Why the system would not take a request, in words.
+        ///
+        /// `localizedDescription` for this domain says the operation could not
+        /// be completed and gives a number, which tells whoever reads the
+        /// console nothing at all.
+        private static func reason(_ error: any Error) -> String {
+            guard let refusal = error as? BGTaskScheduler.Error else { return error.localizedDescription }
+
+            return switch refusal.code {
+            case .unavailable: "background refresh is off, or this is a simulator, which has none of it"
+            case .tooManyPendingTaskRequests: "too many requests of this kind are already waiting"
+            case .notPermitted: "the identifier is not one the Info.plist permits"
+            default: error.localizedDescription
             }
         }
 
