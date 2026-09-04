@@ -247,6 +247,12 @@ nonisolated struct ArticleStore: Sendable {
     /// the same word in a body, and a reader searching for something wants the
     /// article about it before the one that mentions it. Anything the index
     /// cannot answer whole is ordered by date, which is the honest fallback.
+    /// `@concurrent` for the reason ``DigestService/digest(_:now:)`` is : the
+    /// window awaits this, and under approachable concurrency a `nonisolated
+    /// async` function runs on the actor that called it. Five hundred rows
+    /// decoded on the main thread is a wire that stutters whenever anything
+    /// writes to the store underneath it.
+    @concurrent
     func summaries(
         _ filter: ArticleFilter,
         matching query: QueryNode? = nil,
