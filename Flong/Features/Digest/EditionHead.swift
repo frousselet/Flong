@@ -170,6 +170,24 @@ struct EditionHead: View {
         .accessibilityLabel(Text("Written by the model : \(said.joined(separator: ". "))"))
     }
 
+    /// How far the page scrolls before the pane has gone entirely.
+    ///
+    /// About the height of the pane itself : it is finished by the time the
+    /// first headline has reached where it stood.
+    static let sinking: CGFloat = 200
+
+    /// What share of the scroll the pane is held back by.
+    ///
+    /// Half, so it drifts up at half the speed of the news going past it,
+    /// which is what reads as depth rather than as a view that is stuck.
+    static let lag: CGFloat = 0.5
+
+    /// How far the pane shrinks on its way out.
+    static let shrink: CGFloat = 0.14
+
+    /// How far out of focus it goes on its way out.
+    static let softening: CGFloat = 6
+
     /// The gap between a mark and the words it stands in front of.
     static let columnGap: CGFloat = 12
 
@@ -185,6 +203,45 @@ struct EditionHead: View {
     /// corner on a shape this size reads as a dialog box, and the material is
     /// at its best on a shape a page could have been cut from.
     static let paneCorner: CGFloat = 28
+}
+
+/// What the head of the page does as the page is scrolled.
+///
+/// **It goes back rather than up.** Every other row leaves by the top edge,
+/// which is right for a story : it is one of forty and the next one takes its
+/// place. What the edition says is the page's own voice and there is one of it,
+/// so it holds its ground against the scroll, shrinks, softens and is gone by
+/// the time the first headline reaches where it stood.
+///
+/// **Read off the page's own offset and not off this view's geometry.** The
+/// first version measured the pane's position inside the scroll view, which is
+/// not nought at rest but the height of everything above it : the pane was
+/// pulled up under the subjects the moment the page opened, before anybody had
+/// scrolled anything. ``PageOffset/scrolled`` is nought at rest by
+/// construction, which is what this needs and what the wash behind the page
+/// already uses.
+///
+/// A modifier of its own, so what re-reads that offset on every frame of a
+/// scroll is this and not the front page : the head it is given is a value it
+/// passes through untouched, and the page is never invalidated.
+struct EditionSinking: ViewModifier {
+    let offset: PageOffset
+
+    func body(content: Content) -> some View {
+        // Never below nought : a page pulled past its own top is a page being
+        // refreshed, and the head has no business moving for that.
+        let travelled = max(offset.scrolled, 0)
+        let gone = min(travelled / EditionHead.sinking, 1)
+
+        return
+            content
+            // Held back against the scroll, so it falls behind the page rather
+            // than travelling with it.
+            .offset(y: travelled * EditionHead.lag)
+            .scaleEffect(1 - gone * EditionHead.shrink, anchor: .top)
+            .blur(radius: gone * EditionHead.softening)
+            .opacity(1 - gone)
+    }
 }
 
 /// What stands where an edition would, when there is not one.

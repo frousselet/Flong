@@ -210,6 +210,14 @@ struct DigestScreen: View {
                 // the rows nothing.
                 .transition(.opacity)
                 .animation(.smooth(duration: 0.35), value: published.edition.id)
+                // **It goes back rather than up.** Every other row of the
+                // page leaves by the top edge, which is right for a story : it
+                // is one of forty and the next one takes its place. What the
+                // edition says is the page's own voice and there is one of it,
+                // so it holds its ground, shrinks, softens and is gone by the
+                // time the first headline reaches where it stood, and the news
+                // slides over it.
+                .modifier(EditionSinking(offset: offset))
 
             let shown = stories(of: published, on: page)
             ForEach(shown) { story in
