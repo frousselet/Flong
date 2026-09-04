@@ -696,11 +696,21 @@ nonisolated struct DigestService: Sendable {
             .run(until: deadline, onProgress: onProgress).done
     }
 
+    /// **`@concurrent`, and it is the whole point of this line.** The target
+    /// builds with approachable concurrency, where a `nonisolated async`
+    /// function runs on the actor that called it : called from the window, as
+    /// this always is, the whole of reading a page ran on the main thread. The
+    /// SQL itself hops to the database's own queue, but the decoding, the
+    /// scoring and the sorting of sixty stories did not, and the store changes
+    /// on every batch a synchronization brings in. A reader scrolling while
+    /// iCloud caught up was scrolling against that.
+    @concurrent
     func digest(_ topic: DigestTopic = .frontPage, now: Date = Date()) async throws -> Digest {
         try await DigestStore(database).digest(topic, now: now)
     }
 
     /// The edition the front page shows, and every one the archive holds.
+    @concurrent
     func editions(now: Date = Date()) async throws -> (current: PublishedEdition?, archive: [PublishedEdition]) {
         let store = EditionStore(database)
         let archive = try await store.archive(now: now)

@@ -40,6 +40,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Reading the front page and the wire happens off the main thread. Both go through `nonisolated async` functions, which under approachable concurrency run on the actor that called them : the decoding, the scoring and the sorting ran in front of the reader, and the store changes with every batch a synchronization brings in.
 - The pane at the head of the page is the material painted rather than resolved : the same veil, the same rim, the same shadow, drawn once and moved as a picture of itself, so the parallax and the blur cost a texture rather than a pane of glass resolved again on every frame.
 - The head of the page stops being drawn once it has sunk out of sight, and is no longer blurred on its way there : faded to nothing it was still a pane of glass sampling the page behind it, on every frame of every scroll.
 - The credit over a picture is a material rather than glass. It is the one place the material multiplied with the content : ten stories on a page carry ten of them, all moving at once, and a device rendering the real thing pays for every one.
