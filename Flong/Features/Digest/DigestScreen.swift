@@ -213,7 +213,7 @@ struct DigestScreen: View {
 
             let shown = stories(of: published, on: page)
             ForEach(shown) { story in
-                row(story, isLead: story.id == shown.first?.id)
+                row(story, isLead: story.id == shown.first?.id, isFirst: story.id == shown.first?.id)
             }
         } else if isWaitingForAnEdition {
             // **The shape of the page, before there is one.** An edition is not
@@ -239,7 +239,7 @@ struct DigestScreen: View {
                     }
                 }
                 ForEach(live) { story in
-                    row(story, isLead: story.id == lead)
+                    row(story, isLead: story.id == lead, isFirst: story.id == lead)
                 }
             }
 
@@ -253,7 +253,7 @@ struct DigestScreen: View {
                     }
                 }
                 ForEach(rest) { story in
-                    row(story, isLead: story.id == lead)
+                    row(story, isLead: story.id == lead, isFirst: story.id == lead)
                 }
             }
         }
@@ -280,8 +280,8 @@ struct DigestScreen: View {
     /// here : ``stories`` reads the page and its lead in one go, and a row that
     /// asked the store again would be asking at a moment of the layout's
     /// choosing.
-    private func row(_ story: DigestStory, isLead: Bool) -> some View {
-        StoryRow(story: story, isLead: isLead, zoom: zoom) {
+    private func row(_ story: DigestStory, isLead: Bool, isFirst: Bool = false) -> some View {
+        StoryRow(story: story, isLead: isLead, isFirst: isFirst, zoom: zoom) {
             open(.story(story.id))
         }
     }
@@ -590,6 +590,9 @@ struct DigestScreen: View {
 struct StoryRow: View {
     let story: DigestStory
     var isLead = false
+    /// Whether this is the first row of the page, which is the one row that
+    /// carries no rule above it.
+    var isFirst = false
     let zoom: Namespace.ID
     let open: () -> Void
 
@@ -614,7 +617,12 @@ struct StoryRow: View {
         }
         .buttonStyle(.plain)
         .matchedTransitionSource(id: story.id, in: zoom)
-        .overlay(alignment: .top) { Divider() }
+        // **A rule between two rows, and none above the first.** The rule is
+        // what separates one story from the next ; over the first it is a
+        // border round the page, and it fell directly under what the edition
+        // says, which already stands on a pane of its own and needs nothing
+        // drawn under it to be told apart from the news.
+        .overlay(alignment: .top) { if !isFirst { Divider() } }
         .accessibilityElement(children: .combine)
     }
 
