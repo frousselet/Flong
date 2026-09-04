@@ -532,24 +532,34 @@ struct PaneSurface: ViewModifier {
 
         return
             content
-            .background(Color.white.opacity(scheme == .dark ? 0.09 : 0.22), in: shape)
+            // **The shadow belongs to the shape and not to the pane.** Put on
+            // the pane, `shadow` is a shadow of everything the pane draws :
+            // every letter of every point picked one up and the type came out
+            // soft and doubled. Put on the filled shape inside the background,
+            // it is the shape that casts and the words stand on it.
+            //
+            // The shadow itself is measured off the subject pills a few points
+            // above this on the same page : they are the system's own material,
+            // so what they throw is what a thing of that material at that
+            // height throws. Sampled under one on a light page, the paper drops
+            // about eight per cent directly under the edge and is back to
+            // itself twenty points down.
+            .background {
+                shape
+                    .fill(veil)
+                    .shadow(color: .black.opacity(scheme == .dark ? 0.55 : 0.45), radius: 12, y: 4)
+            }
             // The rim, and it is what says the material more than the veil
             // does : a bright hairline where the light would catch the top
             // edge, fading round to almost nothing at the foot.
             .overlay {
                 shape.strokeBorder(rim, lineWidth: 0.75)
             }
-            // **The one the subject pills cast, measured off them.** They are
-            // the system's own material a few points above this on the same
-            // page, so what they throw is what a thing of this material at this
-            // height throws : sampled under a pill on a light page, the paper
-            // drops about eight per cent directly under the edge and is back to
-            // itself twenty points down. Anything wider reads as smoke and
-            // anything tighter as a sticker.
-            //
-            // Rasterized with the rest of the pane, so the parallax moves it
-            // rather than casting it again on every frame.
-            .shadow(color: .black.opacity(scheme == .dark ? 0.55 : 0.45), radius: 12, y: 4)
+    }
+
+    /// The white the page shows through.
+    private var veil: Color {
+        .white.opacity(scheme == .dark ? 0.09 : 0.22)
     }
 
     /// The line round it : lit at the top, gone by the foot.
