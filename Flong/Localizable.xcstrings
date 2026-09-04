@@ -1,6 +1,28 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@  %@": {
+      "comment": "A headline, and the tick that says the article has been read",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@  %@"
+          }
+        }
+      }
+    },
+    "%@ %@": {
+      "comment": "A machine-written summary, behind the mark that says who wrote it",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ %@"
+          }
+        }
+      }
+    },
     "%@ and %lld others": {
       "extractionState": "manual",
       "localizations": {
@@ -723,40 +745,10 @@
     },
     "%lld of %lld": {
       "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld of %lld"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld of %lld"
-                }
-              }
-            }
-          }
-        },
         "fr": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld sur %lld"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld sur %lld"
-                }
-              }
-            }
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld sur %lld"
           }
         }
       }
@@ -4077,6 +4069,16 @@
         }
       }
     },
+    "Published on %@. Updated on %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Publié le %@. Modifié le %@"
+          }
+        }
+      }
+    },
     "Read": {
       "comment": "One thing a typed sentence was understood to ask for.",
       "localizations": {
@@ -4135,6 +4137,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reçu le %@"
+          }
+        }
+      }
+    },
+    "Received on %@. Updated on %@": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reçu le %@. Modifié le %@"
           }
         }
       }
