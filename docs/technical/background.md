@@ -102,7 +102,7 @@ A feed that refuses to be fetched does not hold the queue for ever : three refus
 | `BGContinuedProcessingTask` | the reader starts it and watches it finish | iOS only, and refused often |
 | `NSBackgroundActivityScheduler` | both of the first two, on macOS | |
 
-Every identifier is declared in `Config/Info.plist` under `BGTaskSchedulerPermittedIdentifiers`. Without that, `submit(_:)` throws `notPermitted` and nothing ever runs, which is a build mistake that looks exactly like a runtime one.
+Every identifier is declared in `Config/Info.plist` under `BGTaskSchedulerPermittedIdentifiers`. Without that, `submit(_:)` throws `notPermitted` and nothing ever runs, which is a build mistake that looks exactly like a runtime one. That one is logged as an error, and the other two refusals are not : `unavailable` is a simulator, which supports none of this, or a reader who has turned background refresh off, and `tooManyPendingTaskRequests` is a queue already full. Neither loses anything, since every job is resumable and the work carries on in the application and again at the next launch. The console says which of the three it was in words, because `localizedDescription` for that domain says only that the operation could not be completed, and gives a number.
 
 Registration happens in the application's initializer, before launching finishes, or the system refuses the identifiers for the whole run. The window fills in what the tasks should call once it exists, which is the one link between a task registered at launch and a model created later.
 
