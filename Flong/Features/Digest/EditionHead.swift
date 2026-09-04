@@ -185,9 +185,6 @@ struct EditionHead: View {
     /// How far the pane shrinks on its way out.
     static let shrink: CGFloat = 0.14
 
-    /// How far out of focus it goes on its way out.
-    static let softening: CGFloat = 6
-
     /// The gap between a mark and the words it stands in front of.
     static let columnGap: CGFloat = 12
 
@@ -233,14 +230,34 @@ struct EditionSinking: ViewModifier {
         let travelled = max(offset.scrolled, 0)
         let gone = min(travelled / EditionHead.sinking, 1)
 
-        return
+        // **Drawn only while it is there.** Once it has gone entirely the pane
+        // was still a pane : a shape of glass, faded to nothing, sampling what
+        // is behind it on every frame of the rest of the scroll, for a reader
+        // who cannot see it. And it is held back against the scroll, which is
+        // exactly what keeps it near the screen instead of letting the stack
+        // leave it behind. `hidden` keeps the room it takes and stops the
+        // drawing, so nothing moves and nothing is composited.
+        //
+        // A simulator draws glass cheaply and shows none of this ; a device
+        // draws the real thing.
+        if gone >= 1 {
+            return AnyView(content.hidden())
+        }
+
+        // **And it is not blurred on the way out.** A blur over glass is two
+        // passes off screen for every frame of the first two hundred points of
+        // every scroll : the material is resolved, the result is drawn into a
+        // buffer and blurred, then composited. It is the one effect here that
+        // cost more than it said, and the shrinking and the fading say the same
+        // thing between them.
+        return AnyView(
             content
-            // Held back against the scroll, so it falls behind the page rather
-            // than travelling with it.
-            .offset(y: travelled * EditionHead.lag)
-            .scaleEffect(1 - gone * EditionHead.shrink, anchor: .top)
-            .blur(radius: gone * EditionHead.softening)
-            .opacity(1 - gone)
+                // Held back against the scroll, so it falls behind the page
+                // rather than travelling with it.
+                .offset(y: travelled * EditionHead.lag)
+                .scaleEffect(1 - gone * EditionHead.shrink, anchor: .top)
+                .opacity(1 - gone)
+        )
     }
 }
 
