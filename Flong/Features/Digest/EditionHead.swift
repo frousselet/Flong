@@ -13,16 +13,18 @@ import SwiftUI
 
 /// What an edition says about itself, over the ten stories on it.
 ///
-/// **The masthead of the page, and it is written.** A front page that was
-/// rebuilt on every fetch had nothing to put here : there was no page, only the
-/// newest sixty stories in an order that shifted under the reader. An edition
-/// is made at an hour and named, so it can say what it is and what is in it
-/// before the reader has read a headline.
+/// **The masthead of the page.** A front page that was rebuilt on every fetch
+/// had nothing to put here : there was no page, only the newest sixty stories
+/// in an order that shifted under the reader. An edition is made at an hour, so
+/// it can say what is in it before the reader has read a headline.
 ///
-/// The two lines are the model's own, in the reader's own language, and they
-/// carry the same mark a story's line carries when a model wrote it. Nothing
-/// here is ever an editor's own words rearranged : an edition with no headline
-/// of its own is not shown at all, which is what makes the mark honest.
+/// **The dateline and a list, and nothing over them.** An edition carried a
+/// name of its own and every real page showed the same thing : the name was the
+/// list said again in fewer words. A front page has never had a name, and the
+/// three attempts at one are recorded in `docs/technical/digest.md`.
+///
+/// The points are the model's own, in the reader's own language. An edition
+/// with none is not shown at all.
 struct EditionHead: View {
     let edition: Edition
     let openArchive: () -> Void
@@ -41,24 +43,8 @@ struct EditionHead: View {
             .kerning(0.6)
             .foregroundStyle(.secondary)
 
-            if let title = edition.title {
-                Text(verbatim: title)
-                    .font(theme.headline(.title))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if let summary = edition.summary {
-                // The same mark a story's line wears, in the same place and for
-                // the same reason : section 14 asks that anything a model wrote
-                // says so, and the page says it in front of the sentence rather
-                // than in words beside it.
-                (Text(Image(systemName: "sparkles")).foregroundStyle(.secondary)
-                    + Text(verbatim: " ")
-                    + Text(verbatim: summary))
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityLabel(Text("Written by the model : \(summary)"))
+            if !edition.points.isEmpty {
+                points
             }
 
             Button(action: openArchive) {
@@ -76,6 +62,47 @@ struct EditionHead: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, Editorial.rhythm)
         .padding(.bottom, Editorial.tightRhythm)
+    }
+
+    /// The few things worth knowing, one per line.
+    ///
+    /// **A list and not a paragraph.** Asked for two or three sentences over
+    /// ten stories the model wrote one clause per story and joined them with
+    /// commas, and the line under the headline ran to seven items and eight
+    /// lines of type. A front page has always answered this the same way.
+    ///
+    /// **No glyph in front of it.** The story rows carry one, and there it says
+    /// something : a story's line is the model's or its publisher's, and the
+    /// mark is how a reader tells which. Nothing on an edition's head is ever
+    /// anybody else's, an edition existing only where the model wrote the whole
+    /// of it, so a mark here answers a question nobody can ask. It is still
+    /// said, to VoiceOver, where a statement costs no ink.
+    ///
+    /// The list is set with air around it. Five points at the spacing of a
+    /// paragraph is a block, and a block is the thing this replaced.
+    private var points: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(Array(edition.points.enumerated()), id: \.offset) { _, point in
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    // A rule rather than a bullet character : the page is set
+                    // as an editor would set it, and a round dot is a control
+                    // panel's mark.
+                    Rectangle()
+                        .frame(width: 14, height: 1)
+                        .foregroundStyle(.tertiary)
+                        .offset(y: -5)
+                    Text(verbatim: point)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .font(.body)
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 4)
+        .padding(.bottom, 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text("Written by the model : \(edition.points.joined(separator: ". "))"))
     }
 }
 

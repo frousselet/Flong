@@ -1045,6 +1045,53 @@ nonisolated extension AppDatabase {
             try db.execute(sql: "UPDATE entry SET announced_at = ?", arguments: [Date()])
         }
 
+        /// What an edition says, as a few points rather than a paragraph.
+        ///
+        /// Asked for two or three sentences over ten stories, the model wrote
+        /// one clause per story and joined them with commas : a line that ran
+        /// to seven items and eight lines of type under the headline, which is
+        /// the shape a reader's eye slides off. A front page has always
+        /// answered this the same way, with the few other things worth knowing
+        /// set one to a line.
+        ///
+        /// Every edition is asked about again, which is one call to the model
+        /// apiece over a three-day window. They are derived data : what is
+        /// thrown away here is worked out again from articles that are all
+        /// still there.
+        migrator.registerMigration("v46.aFewPointsRatherThanAParagraph") { db in
+            try db.alter(table: "edition") { table in
+                table.add(column: "points", .jsonText).notNull().defaults(to: "[]")
+                table.drop(column: "summary")
+            }
+            try db.execute(
+                sql: """
+                    UPDATE edition
+                    SET title = NULL, brief_locale = NULL, brief_members = NULL, published_at = NULL
+                    """
+            )
+        }
+
+        /// An edition has no name of its own, and it had one.
+        ///
+        /// Every real page showed the same thing : the name was the list said
+        /// again in fewer words. Asked to say what the stories added up to, the
+        /// model reached for an abstraction ; refused that, it welded two of
+        /// them into one sentence, which claims a connection the page does not
+        /// make ; refused that, it wrote the lead's own headline, which the
+        /// page then read twice. A front page has never had a name : the
+        /// dateline says which edition, and the list says the rest.
+        migrator.registerMigration("v47.aPageHasNoNameOfItsOwn") { db in
+            try db.alter(table: "edition") { table in
+                table.drop(column: "title")
+            }
+            try db.execute(
+                sql: """
+                    UPDATE edition
+                    SET brief_locale = NULL, brief_members = NULL, published_at = NULL
+                    """
+            )
+        }
+
         return migrator
     }
 
@@ -1121,6 +1168,11 @@ nonisolated extension AppDatabase {
 
             // Both null until the model has written them. An edition wears no
             // headline of its own until then and is not shown.
+            //
+            // `summary` is dropped by `v46` and `points` put in its place. It
+            // is left standing here because a migration that has shipped is
+            // never edited : what a later reader wants is the shape as it was,
+            // and the change that followed it.
             table.column("title", .text)
             table.column("summary", .text)
             table.column("brief_locale", .text)

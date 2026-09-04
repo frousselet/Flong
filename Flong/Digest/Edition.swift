@@ -127,8 +127,7 @@ nonisolated struct Edition: Identifiable, Hashable, StoredRecord {
         case slot
         case openedAt = "opened_at"
         case closedAt = "closed_at"
-        case title
-        case summary
+        case points
         case briefLocale = "brief_locale"
         case briefMembers = "brief_members"
         case publishedAt = "published_at"
@@ -144,14 +143,27 @@ nonisolated struct Edition: Identifiable, Hashable, StoredRecord {
     /// When the next boundary froze it. `nil` is the one being made.
     var closedAt: Date?
 
-    /// What the model called the edition, and the line under it.
+    /// What is on the page, as a few points rather than a paragraph.
     ///
-    /// Both `nil` until it has written them. An edition wears no headline of
-    /// its own until then and is not shown : section 14's rule that a page is
+    /// **A list, and it was a sentence.** Asked for two or three sentences over
+    /// ten stories the model wrote one clause per story and joined them with
+    /// commas, so the line under the headline ran to seven items and eight
+    /// lines of type : a paragraph of nothing but subjects, which is the shape
+    /// a reader's eye slides off. It is also what a front page has always
+    /// done : a headline, and under it the few other things worth knowing, one
+    /// per line.
+    ///
+    /// Five at most, which is what a person takes in at a glance and half of
+    /// what the page below holds. Empty until the model has written them, and
+    /// an edition with none is not shown : section 14's rule that a page is
     /// entire without a model is answered by saying there is no edition rather
     /// than by putting somebody else's words at the top of one.
-    var title: String?
-    var summary: String?
+    ///
+    /// **And there is nothing over them.** An edition carried a name of its own
+    /// and every real page showed the same thing : the name was this list said
+    /// again in fewer words. A front page has never had a name. The dateline
+    /// says which edition, and what is on the page is what is on the page.
+    var points: [String]
 
     /// The language the model was asked in, exactly as a story records it : a
     /// refusal has no language, and counting one as unanswered asks for ever.
@@ -183,8 +195,7 @@ nonisolated struct Edition: Identifiable, Hashable, StoredRecord {
         slot: EditionSlot,
         openedAt: Date,
         closedAt: Date? = nil,
-        title: String? = nil,
-        summary: String? = nil,
+        points: [String] = [],
         briefLocale: String? = nil,
         briefMembers: String? = nil,
         publishedAt: Date? = nil,
@@ -194,8 +205,7 @@ nonisolated struct Edition: Identifiable, Hashable, StoredRecord {
         self.slot = slot
         self.openedAt = openedAt
         self.closedAt = closedAt
-        self.title = title
-        self.summary = summary
+        self.points = points
         self.briefLocale = briefLocale
         self.briefMembers = briefMembers
         self.publishedAt = publishedAt

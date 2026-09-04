@@ -194,7 +194,7 @@ struct EditionStoreTests {
         let edition = try #require(await editions.build(.standard, now: now, calendar: calendar))
 
         #expect(try await rows(of: edition.id).isEmpty)
-        #expect(edition.title == nil)
+        #expect(edition.points.isEmpty)
         #expect(try await editions.current() == nil)
     }
 
@@ -244,7 +244,7 @@ struct EditionStoreTests {
         try await story("Hier soir encore", endingHoursAgo: 11)
 
         let evening = try #require(await editions.build(.standard, now: now, calendar: calendar))
-        try await publish(evening.id, titled: "Ce que dit la soirée")
+        try await publish(evening.id)
 
         let later = now.addingTimeInterval(6 * 3600)
         let next = try #require(await editions.build(.standard, now: later, calendar: calendar))
@@ -252,7 +252,7 @@ struct EditionStoreTests {
 
         let current = try #require(await editions.current(now: later))
         #expect(current.edition.id == evening.id)
-        #expect(current.edition.title == "Ce que dit la soirée")
+        #expect(current.edition.points.count == 2)
     }
 
     @Test("The archive holds what was published and nothing else")
@@ -263,7 +263,7 @@ struct EditionStoreTests {
         let edition = try #require(await editions.build(.standard, now: now, calendar: calendar))
         #expect(try await editions.archive(now: now).isEmpty)
 
-        try await publish(edition.id, titled: "Titrée")
+        try await publish(edition.id)
         #expect(try await editions.archive(now: now).map(\.edition.id) == [edition.id])
     }
 
@@ -276,7 +276,7 @@ struct EditionStoreTests {
         try await story("Deux", endingHoursAgo: 2)
 
         let edition = try #require(await editions.build(.standard, now: now, calendar: calendar))
-        try await publish(edition.id, titled: "Titrée")
+        try await publish(edition.id)
 
         let muchLater = now.addingTimeInterval(EditionStore.archived + 24 * 3600)
         _ = try await editions.purge(now: muchLater)
@@ -284,11 +284,10 @@ struct EditionStoreTests {
         #expect(try await editions.archive(now: muchLater).isEmpty)
     }
 
-    private func publish(_ id: UUID, titled title: String) async throws {
+    private func publish(_ id: UUID) async throws {
         try await database.writer.write { db in
             guard var edition = try Edition.fetchOne(db, key: id) else { return }
-            edition.title = title
-            edition.summary = "Trois choses, en trois phrases."
+            edition.points = ["Deux ouvriers sauvés au Népal.", "Gaël Monfils quitte l'US Open."]
             edition.briefLocale = Locale(identifier: "fr_FR").identifier
             edition.publishedAt = Date()
             try edition.update(db)
@@ -332,84 +331,93 @@ struct EditionBriefWorkTests {
     }
 }
 
-/// The checks an edition's own headline is held to, which are a story's checks
-/// asked over a page.
-@Suite("What an edition's headline is held to")
+/// The checks an edition's list is held to.
+///
+/// **There are three left, and there were seven.** An edition carried a name of
+/// its own, and every one of the checks that name needed went with it : that it
+/// is short, that it is not one of the headlines, that it is about something on
+/// the page, that it does not weld two stories together, and the mend by hand
+/// when the model would not stop doing that. A front page has never had a name,
+/// and `docs/technical/digest.md` records the three attempts at one.
+@Suite("What an edition's list is held to")
 struct EditionBriefChecksTests {
     private let french = Locale(identifier: "fr_FR")
     private let page: [(title: String, summary: String?)] = [
         ("Deux ouvriers sauvés au Népal", "Neuf jours après la catastrophe."),
         ("Gaël Monfils éliminé à l'US Open", "Au deuxième tour, en quatre sets."),
     ]
+    private let good = ["Deux ouvriers ont été sortis vivants d'un tunnel.", "Gaël Monfils quitte l'US Open."]
 
-    @Test("A name of twenty words is a sentence, and is asked for again")
-    func tooLong() {
-        let long = String(repeating: "mot ", count: 20)
-        #expect(EditionSummarizer.fault(title: long, summary: "Une phrase.", in: french, over: page) != nil)
+    /// **A list, and it was a paragraph.** Asked for two or three sentences
+    /// over ten stories the model wrote one clause per story and joined them
+    /// with commas : seven items and eight lines of type under the headline.
+    @Test("One point on its own is not a list")
+    func notAList() {
+        #expect(EditionSummarizer.fault(["Deux ouvriers sauvés au Népal."], over: page) != nil)
     }
 
-    /// **The one the first real page tripped over.** The model named a morning
-    /// `Deux ouvriers sauvés au Népal, Gaël Monfils éliminé, et plus` and wrote
-    /// the same sentence again underneath, word for word. The story briefs have
-    /// checked for exactly that from the beginning ; the edition did not.
-    @Test("A summary that repeats the name has said nothing, and is asked for again")
-    func repeatsTheName() {
-        let name = "Deux ouvriers sauvés au Népal, Gaël Monfils éliminé"
-        #expect(EditionSummarizer.fault(title: name, summary: name, in: french, over: page) != nil)
+    @Test("A point that runs to a paragraph is asked for again")
+    func aPointThatIsAParagraph() {
+        let long = String(repeating: "mot ", count: 40)
+        #expect(EditionSummarizer.fault([long, "Court."], over: page) != nil)
     }
 
-    /// **The page is not its lead.** Shown six headlines the model hands back
-    /// the first one, and the page then reads the same sentence twice : once as
-    /// the name of the edition and again as the headline directly under it.
-    /// Measured on a real morning, which is where it was found.
-    @Test("A name that is one of the headlines is asked for again")
-    func namedAfterItsLead() {
-        #expect(
-            EditionSummarizer.fault(
-                title: "Deux ouvriers sauvés au Népal",
-                summary: "Neuf jours après la catastrophe, deux hommes sont sortis vivants.",
-                in: french,
-                over: page
-            ) != nil
-        )
-    }
-
-    @Test("A name and a line that each say something are left alone")
-    func settled() {
-        #expect(
-            EditionSummarizer.fault(
-                title: "Sauvetage au Népal et sortie de Monfils",
-                summary: "Deux ouvriers ont été retrouvés vivants neuf jours après la catastrophe. "
-                    + "Gaël Monfils a quitté l'US Open au deuxième tour.",
-                in: french,
-                over: page
-            ) == nil
-        )
-    }
-
-    /// The page already says when every story on it arrived, and the model is
-    /// shown no dates at all, so a year in a name is a year it invented.
+    /// The model is shown headlines and standfirsts and nothing else, so it has
+    /// nothing to date anything by, and a model of this size fills that gap
+    /// rather than leaving it. The page already says when every story on it
+    /// arrived, to the minute.
     @Test("A year nothing on the page mentions is asked for again")
     func inventedYear() {
+        #expect(EditionSummarizer.fault(["Le bilan de 2019 est tombé.", "Court."], over: page) != nil)
+    }
+
+    @Test("A list that says something is left alone")
+    func settled() {
+        #expect(EditionSummarizer.fault(good, over: page) == nil)
+    }
+
+    /// The model writes `1. ` or `- ` in front of its own list items about half
+    /// the time, and the page draws its own marks.
+    @Test("The numbering a model puts in front of its list comes off")
+    func numberingComesOff() {
         #expect(
-            EditionSummarizer.fault(
-                title: "Le bilan de 2019",
-                summary: "Deux ouvriers ont été retrouvés vivants.",
-                in: french,
-                over: page
+            EditionSummarizer.tidied(["1. Deux ouvriers sauvés", "- Monfils éliminé", "  ", "3) Un jeu vidéo"])
+                == ["Deux ouvriers sauvés", "Monfils éliminé", "Un jeu vidéo"]
+        )
+    }
+
+    /// `maximumCount` guides the model and does not bind it, so the bound is
+    /// kept here as well : a page drawn from an answer that ignored the guide
+    /// would be the paragraph this replaced with rules in front of it.
+    @Test("A list longer than five is cut to five")
+    func boundedAtFive() {
+        let many = (1...9).map { "Point \($0)" }
+        #expect(EditionSummarizer.tidied(many).count == EditionSummarizer.mostPoints)
+    }
+
+    /// The one check that is not style. A page in a language the reader does
+    /// not read is not a page they can use, and there is no floor under it to
+    /// fall back to : an edition exists only where the model wrote it.
+    @Test("A list in the wrong language is not a page the reader can use")
+    func language() {
+        guard OnDeviceModel.writes(french) else { return }
+        #expect(
+            EditionSummarizer.languageFault(
+                ["Two workers were pulled alive from a tunnel in Nepal.", "Monfils is out of the US Open."],
+                in: french
             ) != nil
         )
+        #expect(EditionSummarizer.languageFault(good, in: french) == nil)
     }
 }
 
 @Suite("Telling the reader an edition has come out")
 struct EditionNoticeTests {
-    private func edition(title: String?, summary: String?) -> Edition {
+    private func edition(points: [String]) -> Edition {
         Edition(
             slot: .morning,
             openedAt: Date(timeIntervalSince1970: 1_788_000_000),
-            title: title,
-            summary: summary,
+            points: points,
             publishedAt: Date()
         )
     }
@@ -418,24 +426,29 @@ struct EditionNoticeTests {
     /// sentence assembled from names ; this arrives carrying a headline and a
     /// line the model wrote over the whole page, and writing anything of our
     /// own on top would be a third opinion about a page that already has one.
-    @Test("The notice is the edition's own headline and its own line")
+    @Test("The notice names the edition and says its own points")
     func wording() {
         let announcement = try? #require(
-            Announcement.newEdition(edition(title: "Budget rejeté", summary: "L'Assemblée a rejeté le texte.")))
+            Announcement.newEdition(
+                edition(points: ["L'Assemblée a rejeté le texte.", "La CGT reconduit la grève."])
+            )
+        )
 
-        #expect(announcement?.title == "Budget rejeté")
-        #expect(announcement?.body == "L'Assemblée a rejeté le texte.")
+        // The edition names itself in the one bold line a banner gives a title,
+        // which is where the dateline stands on the page for the same reason.
+        #expect(announcement?.title == String(localized: EditionSlot.morning.title))
+        // A middle dot rather than commas, as the headlines are joined
+        // everywhere else here : a point may hold commas of its own.
+        #expect(announcement?.body == "L'Assemblée a rejeté le texte. · La CGT reconduit la grève.")
         // A tap opens the digest, where the edition is. There is no deeper
         // place to go : the edition is the front page.
         #expect(announcement?.story == nil)
         #expect(announcement?.article == nil)
     }
 
-    @Test("A page with no headline of its own says nothing at all")
+    @Test("A page the model has not written says nothing at all")
     func nothingToSay() {
-        #expect(Announcement.newEdition(edition(title: nil, summary: nil)) == nil)
-        #expect(Announcement.newEdition(edition(title: "Titrée", summary: nil)) == nil)
-        #expect(Announcement.newEdition(edition(title: "", summary: "Une ligne.")) == nil)
+        #expect(Announcement.newEdition(edition(points: [])) == nil)
     }
 }
 

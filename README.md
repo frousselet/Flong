@@ -10,7 +10,7 @@ No server, no account, no hosting. Every device collects the feeds itself and ke
 
 ## What it does
 
-**The front page is an edition, not a list.** It comes out four times a day, at hours you set, and carries ten stories : several articles, from several rooms, about one thing. Each edition wears a headline and a few lines written on your device, over the whole page, in your language. An aggregator shows what arrived and leaves you to work out what matters. Past editions are kept, and what did not fit is in the wire next door.
+**The front page is an edition, not a list.** It comes out four times a day, at hours you set, and carries ten stories : several articles, from several rooms, about one thing. Each edition wears a list of five points at most, written on your device, over the whole page, in your language. An aggregator shows what arrived and leaves you to work out what matters. Past editions are kept, and what did not fit is in the wire next door.
 
 **The page is sorted into subjects.** Pills at its head narrow it to one of them, and a long press asks for more of this, or less of this.
 

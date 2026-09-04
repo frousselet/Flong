@@ -121,23 +121,32 @@ nonisolated struct Announcement: Hashable, Sendable {
 
     /// A new edition of the digest has been made.
     ///
-    /// **The one notice that already has its words written.** Everything else
-    /// here is a sentence assembled from names ; an edition arrives carrying a
-    /// headline and a line the model wrote over the whole page, in the reader's
-    /// own language, and the notice is those two with the edition named between
-    /// them. Writing anything of our own on top would be a third opinion about
-    /// a page that already has one.
+    /// **The one notice whose words are already written.** Everything else here
+    /// is a sentence assembled from names ; an edition arrives carrying a few
+    /// points the model wrote over the whole page, in the reader's own
+    /// language, and those are the notice. Writing anything of our own on top
+    /// would be a second opinion about a page that already has one.
+    ///
+    /// The edition names itself in the one bold line a banner gives a title,
+    /// which is where the dateline stands on the page for the same reason : an
+    /// edition has no name of its own, and `Édition du matin` is what a reader
+    /// would call it.
     ///
     /// A tap opens the digest, which is where the edition is. There is no
-    /// deeper place to go : the edition *is* the front page.
+    /// deeper place to go : the edition *is* the front page, so the notice
+    /// carries neither a story nor an article, and no picture either, the rule
+    /// that a picture belongs to a notice about one thing holding unchanged.
     static func newEdition(_ edition: Edition) -> Announcement? {
-        guard let title = edition.title, !title.isEmpty, let summary = edition.summary, !summary.isEmpty
-        else { return nil }
+        guard !edition.points.isEmpty else { return nil }
 
         return Announcement(
-            title: title,
-            subtitle: String(localized: edition.slot.title),
-            body: summary,
+            title: String(localized: edition.slot.title),
+            // The points joined by a middle dot rather than by commas, as the
+            // headlines are joined everywhere else here : a point may hold
+            // commas of its own, and a comma list of them reads as one broken
+            // sentence. A banner gives the body two lines, so what does not fit
+            // is what the reader opens the page for.
+            body: edition.points.joined(separator: " · "),
             thread: Thread.newEdition
         )
     }

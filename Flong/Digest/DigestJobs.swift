@@ -508,12 +508,12 @@ nonisolated struct BriefEditionsJob: ResumableJob {
             guard var edition = try Edition.fetchOne(db, key: editionID) else { return }
 
             if let brief {
-                edition.title = brief.title
-                edition.summary = brief.summary
+                edition.points = brief.points
                 edition.briefLocale = brief.askedIn.identifier
                 if edition.publishedAt == nil { edition.publishedAt = Date() }
             } else {
                 edition.briefLocale = summarizer.locale.identifier
+                edition.points = []
             }
             edition.updatedAt = Date()
             try edition.update(db)
