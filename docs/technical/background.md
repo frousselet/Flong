@@ -63,6 +63,12 @@ The system index was the worst of it. It was written from `loadDigest`, which is
 
 They are one lane now. It is asked for and never awaited, runs at background priority, and takes the three in the order that costs least : the system index first, since it is the one whose effect the reader can see ; then the vectors ; then the people, which is the longest of the three and the one a pass most often stops in the middle of. All three are resumable, so stopping between two batches loses nothing.
 
+**And the lane must be able to stop.** It could not : the work it runs ended by asking for the lane again, which is the call that arms it, so the loop cleared its flag and the work set it back before doing anything. Once started it ran until the application was killed, a dozen database round trips and a whole digest assembly at a time, with no sleep and no yield. Measured on a store of four feeds it was ninety per cent of a core at rest ; on a reader's telephone it was a warm telephone and a page that would not scroll. It arrived as a blanket replacement of one call by another across a file, and the one inside the lane's own work was written with the same indentation.
+
+**It is asked for where work is made, and not from a read.** It was asked for from the function that reads the page back, which runs on every render and every store tick : an article marked read started a pass over the system index, the vectors and the people. It is asked for at the end of a catch-up that brought something, at the end of the model's own turn, and once at launch.
+
+**And one turn of it is bounded.** Reading who a hundred thousand articles are about is minutes of `NLTagger`, and the turn ran to the end of the queue. The jobs are resumable, so a turn that stops between two batches loses nothing and the next trigger carries on ; what the bound buys is that a telephone is not warm for a quarter of an hour after a refresh.
+
 **One at a time, and a second request is remembered rather than queued.** What the lane does is bring the index up to what the store says now, so two requests and one are the same request. It is stopped and awaited before an erasure, being the other long task that runs outside the gate.
 
 **The lexical index is the exception and stays exactly where it is.** It is six SQL triggers inside the transaction that stores the article, it costs microseconds, and an index that lagged the rows would make a search answer with articles that are gone. It is not scheduled work and never was.

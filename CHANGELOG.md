@@ -36,6 +36,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The front page no longer holds the processor: the indexing lane armed itself from inside its own work, so once started it ran until the application was killed, a dozen database round trips at a time with no pause. Measured on a store of four feeds, it was ninety per cent of a core at rest; on a telephone it was a warm telephone and a page that would not scroll.
+- The lane is asked for where work is made rather than from the read behind every render, and one turn of it is bounded: reading who a hundred thousand articles are about is minutes of work, and it used to run to the end.
+- Scrolling the digest no longer animates every row: three animations sat on the lazy stack itself, where they were inherited by every row and by the pinned header, so one story arriving interpolated the whole page's layout while the reader's thumb was on it. What swaps is the head, and that is where the animation is now.
+- The reader's edition times are held rather than read: the getter opened the iCloud key-value store and decoded JSON on every access, up to three times per render.
+
 - The front page reaches Spotlight whole : the mark saying what the index already held was written after the write it guards, so two passes could both empty the stories domain and leave it holding one page or none.
 - Nothing waiting to be announced is lost : the article notices were metered by a clock and the read behind it was capped at two hundred, so the two hundred and first article of a pass was never announced and never would be. It is written on the article now.
 - The per-device fetch stagger is derived by a digest rather than by `Hasher`, whose seed changes at every launch : a device landed on a different side of every interval each time it started, and two devices of one reader could still ask a publisher at the same second. The backoff after a failure is exact for the same reason, and carries the stagger it used to drop.

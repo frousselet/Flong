@@ -61,24 +61,6 @@ struct DigestScreen: View {
                     topics
                 }
             }
-            // **The page changes shape smoothly or it flinches.** Everything
-            // here arrives from somewhere the reader cannot see : the model
-            // finishes an edition, a fetch brings a story, a purge takes one.
-            // Written straight into the view those are one frame apart, so the
-            // page jumped, and a page that jumps under somebody reading it is
-            // the least elegant thing an application does.
-            //
-            // Keyed on what actually changed rather than on the whole page :
-            // the edition being published is one animation, a row arriving or
-            // leaving is another, and the second is quicker because it is a
-            // smaller claim. A page read back identical changes neither value
-            // and animates nothing at all.
-            .animation(.smooth(duration: 0.45), value: model.edition?.id)
-            .animation(.smooth(duration: 0.3), value: shownStories)
-            // The pills are the third thing that arrives on its own : the model
-            // files a story under a subject and a pill appears in the middle of
-            // a row of them, moving every pill after it.
-            .animation(.smooth(duration: 0.3), value: model.digest.topics)
             .editorialColumn()
             .padding(.horizontal, 22)
             .padding(.bottom, 90)
@@ -213,18 +195,25 @@ struct DigestScreen: View {
         // and a pill still reads the whole of the three days.
         if model.digestTopic == .frontPage, let published = model.edition {
             EditionHead(published: published)
+                // **The animation is here and nowhere above.** It was three
+                // `.animation(_:value:)` on the `LazyVStack` itself, which is
+                // where it does the most harm : an animation attribute on a
+                // container is inherited by every descendant, so one story
+                // arriving animated the layout of every realized row and of the
+                // pinned header at once, the stack's height interpolated for
+                // three tenths of a second, and the scroll view re-derived its
+                // visible range against a moving geometry on every frame of it.
+                // Rows realized and de-realized under the reader's thumb.
+                //
+                // What actually swaps is the head : a skeleton becomes a page.
+                // That is one view, it is at the top, and animating it costs
+                // the rows nothing.
                 .transition(.opacity)
+                .animation(.smooth(duration: 0.35), value: published.edition.id)
 
-            let shown = published.stories.compactMap { held in page.all.first { $0.id == held.storyID } }
+            let shown = stories(of: published, on: page)
             ForEach(shown) { story in
                 row(story, isLead: story.id == shown.first?.id)
-                    // **Each row fades in where it stands.** A page that
-                    // gained ten rows at once did it in one frame, which reads
-                    // as the application flinching rather than as news
-                    // arriving. `move` and the rest are worse here : a row is
-                    // where it is because of what it is, and one that slid in
-                    // from an edge would be claiming it came from somewhere.
-                    .transition(.opacity)
             }
         } else if isWaitingForAnEdition {
             // **The shape of the page, before there is one.** An edition is not
@@ -236,9 +225,7 @@ struct DigestScreen: View {
             EditionPlaceholder()
                 .transition(.opacity)
             StoryPlaceholder(isLead: true)
-                .transition(.opacity)
             StoryPlaceholder()
-                .transition(.opacity)
         } else {
             if !live.isEmpty {
                 header {
@@ -350,6 +337,19 @@ struct DigestScreen: View {
         return model.digest.symbols[name] ?? Topic.defaultSymbol
     }
 
+    /// The edition's stories, in the edition's order, as the page holds them.
+    ///
+    /// **Resolved through a dictionary and once.** It was
+    /// `published.stories.compactMap { page.all.first { ... } }`, which is ten
+    /// linear scans of up to sixty stories, and `Digest.all` is
+    /// `live + stories` : a fresh array of the whole page allocated on each of
+    /// the ten. That is ten copies of the page to resolve ten identifiers,
+    /// every time the body is evaluated.
+    private func stories(of published: PublishedEdition, on page: Digest) -> [DigestStory] {
+        let byIdentity = Dictionary(page.all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return published.stories.compactMap { byIdentity[$0.storyID] }
+    }
+
     /// The stories the page is showing, by identity.
     ///
     /// What the arrival of a row is animated against. The page itself is a
@@ -380,13 +380,7 @@ struct DigestScreen: View {
             return model.digest.lead?.imageURL
         }
 
-        let page = model.digest
-        return
-            published.stories
-            .lazy
-            .compactMap { held in page.all.first { $0.id == held.storyID } }
-            .first?
-            .imageURL
+        return stories(of: published, on: model.digest).first?.imageURL
     }
 
     /// Whether an edition is on its way rather than absent for good.

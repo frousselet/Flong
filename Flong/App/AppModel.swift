@@ -1171,6 +1171,7 @@ final class AppModel {
         self.theme = preferences.theme
         self.wantsNewStoryNotices = preferences.wantsNewStoryNotices
         self.wantsNewEditionNotices = preferences.wantsNewEditionNotices
+        self.heldSchedule = preferences.editionSchedule
         self.wantsNewArticleNotices = preferences.wantsNewArticleNotices
         self.wantsCollaborationNotices = preferences.wantsCollaborationNotices
         self.mutedSharedCollections = preferences.mutedSharedCollections
@@ -1396,6 +1397,10 @@ final class AppModel {
         await loadCollections()
         // Another device may have changed them while this one was away.
         preferences.synchronize()
+        // Read here and held : another device may have moved an edition while
+        // this one was away, and this is the one place the reader's own choices
+        // are pulled back in.
+        heldSchedule = preferences.editionSchedule
         articleBody = preferences.articleBody
         theme = preferences.theme
         recentSearches = preferences.recentSearches
@@ -1431,14 +1436,27 @@ final class AppModel {
     private(set) var editionArchive: [PublishedEdition] = []
 
     /// When each of the four editions comes out, as the reader has it.
+    /// **Held rather than read.** The getter behind it opens the iCloud
+    /// key-value store, opens `UserDefaults`, builds a `JSONDecoder` and decodes
+    /// a dictionary, every single time. A view body read it up to three times
+    /// per evaluation, and a body is evaluated whenever anything on the page
+    /// moves : property-list reads and a JSON decode, on the main actor, under
+    /// the reader's thumb.
+    ///
+    /// It is a preference. It changes when the reader changes it and when
+    /// another of their devices does, and both of those go through here or
+    /// through ``load()``.
     var editionSchedule: EditionSchedule {
-        get { preferences.editionSchedule }
+        get { heldSchedule }
         set {
-            guard newValue != preferences.editionSchedule else { return }
+            guard newValue != heldSchedule else { return }
+            heldSchedule = newValue
             preferences.editionSchedule = newValue
             Task { await rebuildDigest() }
         }
     }
+
+    private var heldSchedule = EditionSchedule.standard
 
     /// The articles of the story the reader opened, and of that one only : a
     /// digest that loaded every article of every story would be the list it
@@ -1468,15 +1486,16 @@ final class AppModel {
             // is worked out where the page is read and nowhere else.
             searchSubjects = SearchSubjects.subjects(in: fetched.all.map(\.title))
 
-            // **The system index hears about the page from the indexing lane,
-            // not from here.** What Spotlight holds is what a reader would find
-            // on the digest, no more and no less, and that is still true ; what
-            // changed is who says so. This function is the read behind every
-            // render and every store tick, and almost none of those changes are
-            // the page : an article marked read is a reason to read the digest
-            // again and no reason at all to write sixty items to the system
-            // index, on the main path, while the reader is scrolling.
-            if digestTopic == .frontPage { index() }
+            // **And nothing is asked of the indexing lane from here.** This is
+            // the read behind every render and every store tick, and almost
+            // none of those changes are the page : an article marked read is a
+            // reason to read the digest again and no reason at all to start a
+            // pass over the vectors and the people. It did start one, which is
+            // a whole lane's work per store tick on top of the lane that could
+            // not stop. The lane is asked for where work is made : at the end
+            // of a catch-up that brought something, at the end of the model's
+            // own turn, and once at launch. The page reaches Spotlight from
+            // inside the lane, which reads it there.
 
             // The editions are read from the same call, since they are the same
             // page asked for at a different grain : the reader looks at one
@@ -2944,7 +2963,19 @@ final class AppModel {
     /// whenever the machine was busy, which is exactly when a background
     /// priority is least likely to be served.
     func indexWhatIsWaiting(until deadline: Date? = nil) async {
-        index()
+        // **`synchronizeSpotlight` and never `index`.** It said `index()` here,
+        // which is the call that arms the lane : the loop above cleared the
+        // flag, this set it again before doing any work, and the lane ran until
+        // the application was killed. Eleven database round trips and a whole
+        // digest assembly, back to back, with no sleep and no yield, from the
+        // first time the page was read. It is what a reader felt as a page that
+        // would not scroll and a telephone that grew hot in their hand.
+        //
+        // It arrived as a blanket replacement of `await synchronizeSpotlight()`
+        // by `index()` across the file, made when the six foreground gestures
+        // were moved onto the lane. The one inside the lane's own work was
+        // written with the same indentation and was replaced too.
+        await synchronizeSpotlight()
 
         if digestTopic == .frontPage, let page = try? await digestService.digest(.frontPage) {
             await handToSpotlight(page.all)
@@ -2953,10 +2984,21 @@ final class AppModel {
         let vectorize = VectorizeJob(database) { [weak self] items in
             await self?.enqueueVectors(for: items)
         }
-        await JobRunner(vectorize).run(until: deadline)
-        await JobRunner(NewsmakersJob(database)).run(until: deadline)
+        await JobRunner(vectorize).run(until: deadline ?? Date().addingTimeInterval(Self.indexingSlice))
+        await JobRunner(NewsmakersJob(database)).run(until: deadline ?? Date().addingTimeInterval(Self.indexingSlice))
         await countOutstandingWork()
     }
+
+    /// How long one turn of the lane works before it stands down.
+    ///
+    /// **Bounded, because the queue behind it is not.** Reading who a hundred
+    /// thousand articles are about is minutes of `NLTagger`, and a lane that
+    /// ran it to the end would hold a core for those minutes every time
+    /// anything asked. The jobs are resumable, so a turn that stops between two
+    /// batches loses nothing and the next trigger carries on : what the bound
+    /// buys is that a telephone in somebody's hand is not warm for a quarter of
+    /// an hour after a refresh.
+    static let indexingSlice: TimeInterval = 20
 
     /// Tells Spotlight and the other devices that the reader marked something.
     ///
