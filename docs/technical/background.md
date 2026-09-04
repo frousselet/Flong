@@ -22,6 +22,12 @@ The moment of the last pass is written to disk rather than held in a static. Hel
 
 **A pass that ran out of time is a success.** Every job here is resumable by construction, so a partial pass is the ordinary outcome and not a failure. Reporting one as a failure, which a cancelled task did on every budgeted run, teaches the scheduler to grant time less often. The watchdog races the work rather than outliving it : it was a detached sleep that held the job for its whole budget even when the work had returned in a second.
 
+**The edition is a third pass, and it asks for the least of the three.** A page made at an hour has to arrive at that hour, and the full pass cannot promise it : it wants the mains, comes round every six hours and jitters by three quarters of an hour on top, so a phone that is not left on charge would have had no morning paper. This one asks for a network and not for the mains, at the boundary itself, and fetches nothing at all : the collection has already brought the articles in, and what is left is to read the page, take the ten stories that matter most, put them to the model as one question and say so.
+
+Being idempotent is what makes it safe. An edition already made and already named is one query and no work, so the same pass runs on the hour, whenever a window opens, and after every catch-up, and only the first of those does anything. That matters more than the task does : section 25 says background time is a bonus and the foreground is the mechanism, and an edition that only arrived when `BGTaskScheduler` felt like it would be an edition most readers never saw.
+
+On macOS there is no moment to name, `NSBackgroundActivityScheduler` finding an idle one rather than a given one, so it is asked for every hour and the pass itself decides whether there is anything to do.
+
 ## What Photos does, and what of it is taken
 
 `photoanalysisd` does the same kind of thing for the same kind of reason and has had years to settle it. What its launch agent declares, per activity :
@@ -72,6 +78,7 @@ A feed that refuses to be fetched does not hold the queue for ever : three refus
 | --- | ------------ | ---------------- |
 | `BGAppRefreshTask` | refreshes what is due, announces it and groups it, about twenty-five seconds | opportunistic, never counted on, asked for at the moment a feed is due |
 | `BGProcessingTask` | vectorizes, purges, compacts, `requiresExternalPower` | minutes of work, on charge |
+| `BGProcessingTask` | makes and names the edition, a network and no mains | seconds of work, at the hour |
 | `BGContinuedProcessingTask` | the reader starts it and watches it finish | iOS only, and refused often |
 | `NSBackgroundActivityScheduler` | both of the first two, on macOS | |
 

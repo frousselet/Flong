@@ -63,13 +63,16 @@ nonisolated final class Preferences: @unchecked Sendable {
         static let recentSearches = "search.recent"
         static let poolContributes = "pool.contributes"
         static let poolIdentifier = "pool.identifier"
+        static let editionSchedule = "edition.schedule"
+        static let newEditionNotices = "notify.new-editions"
+        static let editionsAnnouncedAt = "notify.editions-announced-at"
 
         /// Every key, for the one operation that has to name all of them.
         static let all = [
             articleBody, theme, firstName, lastName, picture, city, country, countryCode, device,
             newStoryNotices, newArticleNotices, storiesAnnouncedAt, articlesAnnouncedAt, collaborationNotices,
             mutedCollections, collaborationsAnnouncedAt, recentSearches,
-            poolContributes, poolIdentifier,
+            poolContributes, poolIdentifier, editionSchedule, editionsAnnouncedAt, newEditionNotices,
         ]
     }
 
@@ -341,6 +344,58 @@ nonisolated final class Preferences: @unchecked Sendable {
                 return
             }
             local.set(newValue, forKey: Key.articlesAnnouncedAt)
+        }
+    }
+
+    /// Whether the reader wants to be told when an edition comes out.
+    ///
+    /// A choice about themselves, so it travels like the other three.
+    var wantsNewEditionNotices: Bool {
+        get { flag(for: Key.newEditionNotices) }
+        set { set(newValue, for: Key.newEditionNotices) }
+    }
+
+    /// The last edition this device said anything about.
+    ///
+    /// Local and never carried, like the other three watermarks and for the
+    /// same reason. It holds the moment an edition opened rather than the
+    /// moment it was announced : an edition is a thing with a name, so what is
+    /// recorded is which one was said and not when.
+    var editionsAnnouncedAt: Date? {
+        get { local.object(forKey: Key.editionsAnnouncedAt) as? Date }
+        set {
+            guard let newValue else {
+                local.removeObject(forKey: Key.editionsAnnouncedAt)
+                return
+            }
+            local.set(newValue, forKey: Key.editionsAnnouncedAt)
+        }
+    }
+
+    /// When the reader wants each of their four editions.
+    ///
+    /// **A choice, so it travels**, like the theme and the notices : a reader
+    /// who moves the morning edition to six on the phone did not mean only on
+    /// the phone. It also has to travel, in a way the others do not : the
+    /// boundary is what an edition is known by, so two devices working from two
+    /// schedules would build two editions for one morning and each of them
+    /// would be wrong about the other's.
+    ///
+    /// Nothing stored is the four standard hours rather than no editions at
+    /// all, since a reader who has never opened the setting has not asked for
+    /// an empty front page.
+    var editionSchedule: EditionSchedule {
+        get {
+            guard let data = cloud?.data(forKey: Key.editionSchedule) ?? local.data(forKey: Key.editionSchedule),
+                let stored = try? JSONDecoder().decode(EditionSchedule.self, from: data)
+            else { return .standard }
+            return stored
+        }
+        set {
+            guard let data = try? JSONEncoder().encode(newValue) else { return }
+            local.set(data, forKey: Key.editionSchedule)
+            cloud?.set(data, forKey: Key.editionSchedule)
+            cloud?.synchronize()
         }
     }
 

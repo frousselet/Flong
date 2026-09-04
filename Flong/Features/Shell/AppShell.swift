@@ -17,6 +17,12 @@ import UniformTypeIdentifiers
 nonisolated enum Route: Hashable {
     case story(UUID)
     case article(UUID)
+    /// Every edition that has been published, newest first.
+    case editions
+    /// One of them, by the moment it opened : an edition is known by its
+    /// boundary and by nothing else, which is what lets two devices agree on
+    /// what `this morning` means without speaking.
+    case edition(UUID)
     case view(SidebarItem.Kind)
     case collection(ArticleCollection.Kind)
     /// One writer, by their byline : see ``Author`` for why the name is the
@@ -253,7 +259,8 @@ struct AppShell: View {
             // call into nothing, which is what they had been doing.
             FlongApp.work.set(
                 refresh: { @MainActor in await model.backgroundRefresh() },
-                process: { @MainActor in await model.backgroundProcessing() }
+                process: { @MainActor in await model.backgroundProcessing() },
+                edition: { @MainActor in await model.backgroundEdition() }
             )
             await model.scheduleTheNextRefresh()
             // Asked for once per launch, and otherwise only by its own handler.
@@ -261,6 +268,10 @@ struct AppShell: View {
             // hours further out each time, so on a phone anyone actually uses
             // it never ran.
             BackgroundScheduler.scheduleFullPass()
+            // And the next edition, at the hour the reader asked for it. Only
+            // this side knows that hour : the handler is registered before
+            // there is a store to read a schedule out of.
+            model.scheduleTheNextEdition()
 
             // A window that opens in the background has no phase change to
             // learn from, and `onChange` only fires on a change.
@@ -458,6 +469,12 @@ struct AppShell: View {
                 open: { reading = Reading(id: $0) },
                 read: { readingShared = ReadingShared(entry: $0) }
             )
+
+        case .editions:
+            EditionArchiveScreen(model: model) { path.wrappedValue.append(.edition($0)) }
+
+        case .edition(let id):
+            EditionScreen(model: model, id: id) { path.wrappedValue.append(.story($0)) }
 
         case .author(let name):
             AuthorScreen(model: model, name: name, zoom: zoom) { reading = Reading(id: $0) }

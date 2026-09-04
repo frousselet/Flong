@@ -173,6 +173,20 @@ struct NotificationsPanel: View {
             // under the standard theme and a foreign one on warm paper.
             .background(theme.surface(in: scheme), in: .rect(cornerRadius: 14))
 
+            Toggle(
+                isOn: Binding(
+                    get: { model.wantsNewEditionNotices },
+                    set: { wanted in Task { await model.setWantsNewEditionNotices(wanted) } }
+                )
+            ) {
+                Label("New edition", systemImage: "newspaper")
+            }
+            .accessibilityIdentifier("notify-new-edition")
+            .disabled(isRefused)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(theme.surface(in: scheme), in: .rect(cornerRadius: 14))
+
             // **Only where there is somebody to collaborate with.** A switch
             // about shared collections, on a device that is in none, is a
             // question about something the reader has never seen : the panel

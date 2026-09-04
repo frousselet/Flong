@@ -55,7 +55,8 @@ struct FlongApp: App {
         // refuses the identifiers for the whole run.
         BackgroundScheduler.register(
             refresh: { await FlongApp.work.refresh() },
-            process: { await FlongApp.work.process() }
+            process: { await FlongApp.work.process() },
+            edition: { await FlongApp.work.edition() }
         )
 
         // Same deadline, different reason : a notification tapped from a cold
@@ -84,13 +85,19 @@ final class BackgroundWorkBox: @unchecked Sendable {
     private let lock = NSLock()
     private var refreshWork: (@Sendable () async -> Void)?
     private var processWork: (@Sendable () async -> Void)?
+    private var editionWork: (@Sendable () async -> Void)?
     private var database: AppDatabase?
     private var standIn: AppModel?
 
-    func set(refresh: @escaping @Sendable () async -> Void, process: @escaping @Sendable () async -> Void) {
+    func set(
+        refresh: @escaping @Sendable () async -> Void,
+        process: @escaping @Sendable () async -> Void,
+        edition: @escaping @Sendable () async -> Void
+    ) {
         lock.withLock {
             refreshWork = refresh
             processWork = process
+            editionWork = edition
         }
     }
 
@@ -114,6 +121,14 @@ final class BackgroundWorkBox: @unchecked Sendable {
     func process() async {
         guard let work = lock.withLock({ processWork }) else {
             await standInModel()?.backgroundProcessing()
+            return
+        }
+        await work()
+    }
+
+    func edition() async {
+        guard let work = lock.withLock({ editionWork }) else {
+            await standInModel()?.backgroundEdition()
             return
         }
         await work()

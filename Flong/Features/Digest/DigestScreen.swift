@@ -138,7 +138,17 @@ struct DigestScreen: View {
         // and it is untrue at the one moment the reader is most likely to be
         // looking : the first launch after an import.
         .overlay {
-            if model.digest.isEmpty, model.currentWork == nil {
+            // Three pages that look identical and are not : one with no feeds,
+            // one narrowed to a subject holding nothing, and one whose edition
+            // has not been written. The last is the new one, and it is the one
+            // that most looks like a fault when it is not : a device with no
+            // model will never have an edition, and saying so is the whole of
+            // section 14's no-model path here.
+            if model.digestTopic == .frontPage, model.edition == nil, model.currentWork == nil {
+                NoEdition(hasSchedule: !model.editionSchedule.slots.isEmpty) {
+                    open(.view(.unread))
+                }
+            } else if model.digest.isEmpty, model.currentWork == nil {
                 empty
             }
         }
@@ -161,35 +171,50 @@ struct DigestScreen: View {
         let rest = page.stories
         let lead = page.leadID
 
-        if !live.isEmpty {
-            header {
-                HStack(spacing: 7) {
-                    LiveDot()
-                    // The dot's own colour at the quiet end of its pulse : the
-                    // dot is the loud thing and the word is what it means, so
-                    // the pair reads as one mark rather than as two red things.
-                    Text("Live stories").foregroundStyle(LiveDot.quietTint(theme))
+        // **The front page is an edition, and a subject is a question about
+        // everything.** Ten stories is what a person reads over a coffee, and
+        // it is what an edition carries ; narrowing to a subject is the reader
+        // asking what there is about one thing, which ten of anything would
+        // answer badly. So the cap belongs to the page and not to the store,
+        // and a pill still reads the whole of the three days.
+        if model.digestTopic == .frontPage, let published = model.edition {
+            EditionHead(edition: published.edition) { open(.editions) }
+
+            let shown = published.stories.compactMap { held in page.all.first { $0.id == held.storyID } }
+            ForEach(shown) { story in
+                row(story, isLead: story.id == shown.first?.id)
+            }
+        } else {
+            if !live.isEmpty {
+                header {
+                    HStack(spacing: 7) {
+                        LiveDot()
+                        // The dot's own colour at the quiet end of its pulse :
+                        // the dot is the loud thing and the word is what it
+                        // means, so the pair reads as one mark rather than as
+                        // two red things.
+                        Text("Live stories").foregroundStyle(LiveDot.quietTint(theme))
+                    }
+                }
+                ForEach(live) { story in
+                    row(story, isLead: story.id == lead)
                 }
             }
-            ForEach(live) { story in
-                row(story, isLead: story.id == lead)
-            }
-        }
 
-        if !rest.isEmpty {
-            // Not "Front page" : that is what the pill above already says, and
-            // a page does not need to name itself twice.
-            header {
-                switch model.digestTopic {
-                case .frontPage: Text("Stories")
-                case .named(let topic): Text(verbatim: topic)
+            if !rest.isEmpty {
+                // Not "Front page" : that is what the pill above already says,
+                // and a page does not need to name itself twice.
+                header {
+                    switch model.digestTopic {
+                    case .frontPage: Text("Stories")
+                    case .named(let topic): Text(verbatim: topic)
+                    }
+                }
+                ForEach(rest) { story in
+                    row(story, isLead: story.id == lead)
                 }
             }
-            ForEach(rest) { story in
-                row(story, isLead: story.id == lead)
-            }
         }
-
     }
 
     private func header(@ViewBuilder _ content: () -> some View) -> some View {

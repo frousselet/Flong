@@ -106,6 +106,29 @@ nonisolated struct Announcement: Hashable, Sendable {
         )
     }
 
+    /// A new edition of the digest has been made.
+    ///
+    /// **The one notice that already has its words written.** Everything else
+    /// here is a sentence assembled from names ; an edition arrives carrying a
+    /// headline and a line the model wrote over the whole page, in the reader's
+    /// own language, and the notice is those two with the edition named between
+    /// them. Writing anything of our own on top would be a third opinion about
+    /// a page that already has one.
+    ///
+    /// A tap opens the digest, which is where the edition is. There is no
+    /// deeper place to go : the edition *is* the front page.
+    static func newEdition(_ edition: Edition) -> Announcement? {
+        guard let title = edition.title, !title.isEmpty, let summary = edition.summary, !summary.isEmpty
+        else { return nil }
+
+        return Announcement(
+            title: title,
+            subtitle: String(localized: edition.slot.title),
+            body: summary,
+            thread: Thread.newEdition
+        )
+    }
+
     /// Somebody has put something in a collection the reader is in.
     ///
     /// **The one notice here that is a person and not a calculation.** Every
@@ -291,6 +314,7 @@ nonisolated struct Announcement: Hashable, Sendable {
 
     enum Thread {
         static let newStories = "new-stories"
+        static let newEdition = "new-edition"
         static let newArticles = "new-articles"
         static let filings = "shared-filings"
     }

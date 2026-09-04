@@ -41,6 +41,7 @@ nonisolated enum StoreChanges {
     static let watched = [
         "entry", "entry_body", "feed",
         "story", "story_member", "story_topic",
+        "edition", "edition_story",
         "topic", "topic_preference",
         "tag", "tag_binding", "saved_query",
     ]
