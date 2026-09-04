@@ -502,6 +502,16 @@ It carries a navigation stack of its own, for the bar the controls hang off. Tha
 
 `Route.article` stays a route, since an article is a place a reader can be ; it is simply not a place on a stack. One function in the window decides which of the two a route is, so no screen has to know what its own rows do.
 
+## What a page costs while somebody is scrolling it
+
+**An animation on a container is inherited by everything in it.** The front page carried three `.animation(_:value:)` on its `LazyVStack`, one per thing that can arrive on its own : the edition, the stories, the pills. What that actually did was scope an animation over every realized row and over the pinned header, so one story arriving interpolated the height of the whole stack for three tenths of a second, the scroll view re-derived its visible range against a moving geometry on every frame of it, and rows realized and de-realized under the reader's thumb. Each row also carried a `.transition`, so every realization inside that window was an insertion fade with its own offscreen layer.
+
+What actually swaps is the head : a skeleton becomes a page. That is one view, at the top, and animating it costs the rows nothing. The rows arrive without a transition, which is the plainer answer and the one a reader cannot tell apart while scrolling.
+
+**A view body is not a place to read a preference.** The reader's edition times were decoded from the iCloud key-value store and from `UserDefaults`, through a fresh `JSONDecoder`, on every access, and the body read them up to three times per evaluation. They are held on the model now and read back where the reader's own choices are pulled in.
+
+**Nor a place to copy the page.** Resolving the edition's ten stories against the page was ten linear scans of `Digest.all`, which is a computed `live + stories` : ten fresh arrays of up to sixty stories allocated to resolve ten identifiers, every evaluation. One dictionary, once.
+
 ## The corners, and what went back into the menu
 
 **The three panels came out of the leading corner and are rows in the reader's own menu.** They are described below as three buttons standing there, which is what they were, and the argument for it was good : a reader who says one thing about the page they are looking at should not have to go through a menu and come back. What it cost was the corner. Four glyphs stood there before the page had said anything, and a reader looking for the notices was reading pictures : a toolbar is not a menu, and a stack of cards, a grid of squares and a bell say very little about which is which. They are rows now, named in words, in the one place a reader already looks for what is theirs, and they stand at the top of it, above the reader themselves.
