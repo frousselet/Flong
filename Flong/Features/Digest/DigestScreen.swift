@@ -61,6 +61,24 @@ struct DigestScreen: View {
                     topics
                 }
             }
+            // **The page changes shape smoothly or it flinches.** Everything
+            // here arrives from somewhere the reader cannot see : the model
+            // finishes an edition, a fetch brings a story, a purge takes one.
+            // Written straight into the view those are one frame apart, so the
+            // page jumped, and a page that jumps under somebody reading it is
+            // the least elegant thing an application does.
+            //
+            // Keyed on what actually changed rather than on the whole page :
+            // the edition being published is one animation, a row arriving or
+            // leaving is another, and the second is quicker because it is a
+            // smaller claim. A page read back identical changes neither value
+            // and animates nothing at all.
+            .animation(.smooth(duration: 0.45), value: model.edition?.id)
+            .animation(.smooth(duration: 0.3), value: shownStories)
+            // The pills are the third thing that arrives on its own : the model
+            // files a story under a subject and a pill appears in the middle of
+            // a row of them, moving every pill after it.
+            .animation(.smooth(duration: 0.3), value: model.digest.topics)
             .editorialColumn()
             .padding(.horizontal, 22)
             .padding(.bottom, 90)
@@ -200,10 +218,18 @@ struct DigestScreen: View {
         // and a pill still reads the whole of the three days.
         if model.digestTopic == .frontPage, let published = model.edition {
             EditionHead(edition: published.edition)
+                .transition(.opacity)
 
             let shown = published.stories.compactMap { held in page.all.first { $0.id == held.storyID } }
             ForEach(shown) { story in
                 row(story, isLead: story.id == shown.first?.id)
+                    // **Each row fades in where it stands.** A page that
+                    // gained ten rows at once did it in one frame, which reads
+                    // as the application flinching rather than as news
+                    // arriving. `move` and the rest are worse here : a row is
+                    // where it is because of what it is, and one that slid in
+                    // from an edge would be claiming it came from somewhere.
+                    .transition(.opacity)
             }
         } else if isWaitingForAnEdition {
             // **The shape of the page, before there is one.** An edition is not
@@ -213,8 +239,11 @@ struct DigestScreen: View {
             // reader who had started reading lost their place to a page they
             // had not asked to change.
             EditionPlaceholder()
+                .transition(.opacity)
             StoryPlaceholder(isLead: true)
+                .transition(.opacity)
             StoryPlaceholder()
+                .transition(.opacity)
         } else {
             if !live.isEmpty {
                 header {
@@ -315,6 +344,19 @@ struct DigestScreen: View {
                 Button("Group now") { Task { await model.rebuildDigest() } }
             }
         }
+    }
+
+    /// The stories the page is showing, by identity.
+    ///
+    /// What the arrival of a row is animated against. The page itself is a
+    /// large value that changes whenever anything about any story does, an
+    /// article marked read included, and animating on that would run a
+    /// transition every time somebody opened something.
+    private var shownStories: [UUID] {
+        guard model.digestTopic == .frontPage, let published = model.edition else {
+            return model.digest.all.map(\.id)
+        }
+        return published.stories.map(\.storyID)
     }
 
     /// The picture the head of the page is washed in the colours of.
