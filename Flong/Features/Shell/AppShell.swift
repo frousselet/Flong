@@ -255,7 +255,7 @@ struct AppShell: View {
                 refresh: { @MainActor in await model.backgroundRefresh() },
                 process: { @MainActor in await model.backgroundProcessing() }
             )
-            BackgroundScheduler.schedule()
+            await model.scheduleTheNextRefresh()
             // Asked for once per launch, and otherwise only by its own handler.
             // Asking for it again on every foreground return pushed it six
             // hours further out each time, so on a phone anyone actually uses
@@ -292,7 +292,13 @@ struct AppShell: View {
                 // is submitted for an application that has stopped, and the
                 // request is replaced rather than duplicated. The refresh only :
                 // the full pass keeps its own clock.
-                BackgroundScheduler.schedule()
+                //
+                // Asked of the store, so what is asked for is the moment a feed
+                // is due rather than a flat fifteen minutes : a reader whose
+                // feeds are all daily was waking the system every quarter of an
+                // hour to find nothing, and one following an hourly wire was
+                // told about it a quarter of an hour late.
+                Task { await model.scheduleTheNextRefresh() }
                 return
             }
             // A reader who has just switched Apple Intelligence on, or whose

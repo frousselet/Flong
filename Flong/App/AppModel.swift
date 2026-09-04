@@ -1299,11 +1299,34 @@ final class AppModel {
         ticking = Task { [weak self] in
             var reason = reason
             while !Task.isCancelled {
-                if let self, isReading { await catchUp(reason) }
+                guard let self else { return }
+                if isReading { await catchUp(reason) }
                 reason = .clock
-                try? await Task.sleep(for: .seconds(AppModel.foregroundInterval))
+                try? await Task.sleep(for: .seconds(await untilAFeedIsDue()))
             }
         }
+    }
+
+    /// How long to wait before asking anybody anything, which is however long
+    /// it is until the earliest feed is worth asking.
+    ///
+    /// **The store is asked for the moment rather than for a yes or a no.** The
+    /// clock slept a flat five minutes and then asked whether anything was due,
+    /// which is a question answered `no` on most ticks and a feed asked up to
+    /// five minutes after it was worth asking. The wait between a feed becoming
+    /// due and being asked is the only part of the delay the application
+    /// controls, and this is what closes it.
+    ///
+    /// Bounded at both ends, and both bounds earn their place. The floor keeps
+    /// a store full of overdue feeds, which is every store during the first
+    /// fetch, from turning the clock into a spin ; nothing is lost by it, since
+    /// what is overdue stays overdue. The ceiling is the five minutes this used
+    /// to be : a feed is not the only thing that puts articles in the store,
+    /// and a device whose feeds are all daily still has to look at what iCloud
+    /// and the archives brought while it was asleep.
+    private func untilAFeedIsDue(now: Date = Date()) async -> TimeInterval {
+        guard let due = await refresher.nextDue() else { return AppModel.foregroundInterval }
+        return min(max(due.timeIntervalSince(now), AppModel.shortestWait), AppModel.foregroundInterval)
     }
 
     /// Stops following, when the window that was following is gone.
@@ -1325,10 +1348,21 @@ final class AppModel {
     /// **Five minutes, and it costs the publishers nothing.** What a publisher
     /// sees is decided per feed by ``RefreshSchedule/isDue(_:now:stagger:)``,
     /// whose floor is fifteen minutes ; a tick is a question put to the store,
-    /// and most ticks find nothing due and send no request at all. What
-    /// halving the tick buys is the wait between a feed becoming due and being
-    /// asked, which is the only part of the delay the application controls.
+    /// and most ticks find nothing due and send no request at all.
+    ///
+    /// It is the ceiling now rather than the interval : the clock sleeps until
+    /// the earliest feed is due and never longer than this. See
+    /// ``untilAFeedIsDue(now:)``.
     static let foregroundInterval: TimeInterval = 5 * 60
+
+    /// The shortest the clock ever sleeps.
+    ///
+    /// A store where everything is overdue answers `now` for ever, and a clock
+    /// that believed it would fetch, find the token buckets empty, and ask
+    /// again immediately. Half a minute is short enough to be invisible and
+    /// long enough that a first fetch of a thousand feeds is a sequence of
+    /// passes rather than a spin.
+    static let shortestWait: TimeInterval = 30
 
     /// Reads back what the window is showing, after something changed it.
     ///
@@ -2165,6 +2199,22 @@ final class AppModel {
 
         await catchUp(.background, until: deadline)
         await JobRunner(FirstFetchJob(database)).run(until: deadline)
+
+        // The handler asked for the next grant before this ran, against the
+        // feed floor and nothing else. Now that the store has been asked, the
+        // request is replaced by one naming the moment a feed is actually due :
+        // the system reads it as the earliest moment worth waking for, and a
+        // grant that lands on nothing is a grant spent.
+        await scheduleTheNextRefresh()
+    }
+
+    /// Asks the system for the next opportunistic grant, at the moment the
+    /// store says one would be worth having.
+    ///
+    /// Submitting again replaces the pending request rather than adding to it,
+    /// so this can be said as often as anything learns something.
+    func scheduleTheNextRefresh() async {
+        BackgroundScheduler.schedule(earliest: await refresher.nextDue())
     }
 
     /// The whole of the work, at rest and on the mains.
@@ -3997,10 +4047,38 @@ final class AppModel {
         await announceNewStories()
         await announceCollaborations()
 
+        // **What this pass brought goes out now, and not at the next full
+        // pass.** The read states and the stream headers were queued only from
+        // the pass that runs at rest on the mains, six hours apart, so an
+        // article read on the phone at nine reached the iPad at three in the
+        // morning at best, and an article fetched here reached the other
+        // devices no sooner. `CKSyncEngine` synchronizes on its own once
+        // something is queued, and the other end is told by a silent push, so
+        // queueing at the water's edge is the whole of what it takes for the
+        // exchange to look like one.
+        //
+        // It costs what changed and nothing else : the read states are
+        // compacted and only the blocks that moved are queued, and the headers
+        // are only the days something arrived in since the last push. A pass
+        // that brought nothing and read nothing queues nothing at all.
+        await exchangeWhatThisPassBrought(articles: summary.newArticles)
+
         guard reason.mayRunTheModel else { return }
 
         handedOn = true
         enrich(until: deadline, pass: pass)
+    }
+
+    /// Queues for iCloud what a pass has just changed, and nothing more.
+    ///
+    /// Both halves are asked for on every pass rather than only where articles
+    /// arrived : an article marked read is a change the other devices are
+    /// waiting for and brings no article with it, and it is the commonest
+    /// change there is.
+    private func exchangeWhatThisPassBrought(articles: Int) async {
+        await cloud?.enqueueReadStates()
+        guard articles > 0 else { return }
+        await cloud?.enqueueCatchUp()
     }
 
     /// What a pull on the front page asks for.

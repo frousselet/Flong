@@ -130,6 +130,10 @@ The same is true of iCloud. The target carries `com.apple.developer.icloud-conta
 
 A build for a real device is what proves any of this. The simulator does not check the App ID, so a missing capability signs happily there and fails the moment it meets hardware : `xcodebuild build -destination 'generic/platform=iOS'` is the check worth running.
 
+**And the sending happens at the water's edge now.** The push above is what tells the other end ; what was missing was anything to tell it about. The read states and the catch-up headers were queued only by the pass that runs at rest on the mains, six hours apart, so an article read on the phone at nine reached the iPad at three in the morning at best and one fetched here reached it no sooner. Both are queued at the end of every pass that changed anything, and the engine synchronizes on its own from there.
+
+What makes that affordable is that each half sends only what moved. The read states are compacted first and only the blocks that changed are queued, which was already true. The headers were not : `catchUpChanges` rebuilt every day of the last three on every call, which is a few hundred records for a reader following three hundred feeds. Affordable every six hours, and a way to spend the whole budget of section 7 in an afternoon at this cadence. It takes the moment of the last push now, kept in `sync_state` under `cloudkit.catch-up-pushed`, and rebuilds only the days something arrived in since. The moment is written after the records are queued and never before, so a call that threw does not mark as pushed the days it failed to build ; and it is forgotten by both the repair and the erasure, or a device asked to send everything again would skip exactly what it was asked to send.
+
 Without the push the application still synchronizes : the engine sends what is pending and fetches what is waiting whenever it runs, which is at every launch, on returning to the foreground, and on a pull. What is lost is promptness, not correctness.
 
 ## Starting again from nothing

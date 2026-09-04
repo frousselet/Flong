@@ -4,7 +4,7 @@ Two things in Flong take longer than a moment : fetching a thousand feeds nobody
 
 ## Two passes, and what tells them apart
 
-**The opportunistic refresh** asks only the feeds that are due, within the politeness of `docs/technical/fetching.md`. It is what a phone in a pocket gets, and it is deliberately small : twenty-five seconds, a token bucket per host, and no promise that anything finishes. It asks for a floor of fifteen minutes, the same floor a feed is held to anyway, so it refuses none of the opportunities the system offers ; how many it actually gets is the system's decision and not this one's.
+**The opportunistic refresh** asks only the feeds that are due, within the politeness of `docs/technical/fetching.md`. It is what a phone in a pocket gets, and it is deliberately small : twenty-five seconds, a token bucket per host, and no promise that anything finishes. It asks for the moment a feed is actually due, which is what the system reads `earliestBeginDate` as ; how many opportunities it actually gets is the system's decision and not this one's.
 
 **It groups what it fetched.** It used to fetch and stop there, so a phone in a pocket collected articles all day and the front page gained nothing from any of it until the next full pass or the next cold launch. Grouping is plain SQL over what has just arrived and costs a fraction of the fetching that preceded it. What it does not do is run the model : a backgrounded application's sessions are rate-limited hard, and a handful of refusals there used to silence the model for the whole of the process that followed. That work belongs to the full pass and to a window somebody is looking at.
 
@@ -16,7 +16,7 @@ It did not refresh at all until it was asked to. It enriched, purged, indexed an
 
 The moment of the last pass is written to disk rather than held in a static. Held in a static it was forgotten at every relaunch, which on iOS is minutes, so the hundred-minute floor guarded nothing across exactly the launches it exists to guard across.
 
-**A refresh the reader asked for waits its turn ; one nobody watched stands aside.** Standing aside is right for a clock tick, which comes round again in five minutes and which nobody saw refused. It is wrong for the menu command and wrong for a pull : the reader made a deliberate movement, the control comes straight back out, and as far as they can tell the application did nothing when they asked. Those wait for the pass already running, up to half a minute, and then take their turn.
+**A refresh the reader asked for waits its turn ; one nobody watched stands aside.** Standing aside is right for a clock tick, which comes round again the moment a feed is due and which nobody saw refused. It is wrong for the menu command and wrong for a pull : the reader made a deliberate movement, the control comes straight back out, and as far as they can tell the application did nothing when they asked. Those wait for the pass already running, up to half a minute, and then take their turn.
 
 **One refresh at a time, whichever of the six triggers asked for it.** There were three ways in and two of them shared a flag : a clock tick took one, the full pass took nothing at all, and the long jobs took a flag of their own. So the nightly pass and the five-minute clock could ask three hundred publishers the same question at the same second, each unaware of the other, and the reader's own command could land in the middle of both. The scheduler already refuses to start two of its own passes at once ; the same rule now sits where the two halves actually meet, in the model, taken by the outermost entry point only. What runs inside a pass, the first fetch and the vectors and the model's own work, is that pass's business and asks nobody. Being observable, the same gate is what a pull waits its turn behind rather than being refused where the reader cannot see it.
 
@@ -70,7 +70,7 @@ A feed that refuses to be fetched does not hold the queue for ever : three refus
 
 | API | What it does | What it is worth |
 | --- | ------------ | ---------------- |
-| `BGAppRefreshTask` | refreshes what is due, announces it and groups it, about twenty-five seconds | opportunistic, never counted on |
+| `BGAppRefreshTask` | refreshes what is due, announces it and groups it, about twenty-five seconds | opportunistic, never counted on, asked for at the moment a feed is due |
 | `BGProcessingTask` | vectorizes, purges, compacts, `requiresExternalPower` | minutes of work, on charge |
 | `BGContinuedProcessingTask` | the reader starts it and watches it finish | iOS only, and refused often |
 | `NSBackgroundActivityScheduler` | both of the first two, on macOS | |
@@ -84,6 +84,8 @@ Registration happens in the application's initializer, before launching finishes
 **And a task that finds no window does the work anyway.** The window fills the box in from its own `.task`, which runs when a view appears. An application the system launches into the background for a processing task may never render one, and the task then awaited a closure nobody had set and did nothing at all, silently : the one pass that fetches every feed a reader follows, skipped on exactly the occasions it exists for, with no log line to say so. The store is open by the time anything is registered, so the box keeps it and builds a model of its own when no window has offered a better one.
 
 That model is told two things a window would have told it. It is not reading, since there is no window and nobody to interrupt : born believing otherwise, it suppressed every notification the pass existed to post. And it is given the two iCloud engines, which are started from the window's own task : without them the nightly pass that exists to exchange with iCloud exchanged nothing, and the filings notice could not tell the reader's own additions from anybody else's. What is left to the window is what only a window needs : offering to the pool, publishing the member cards, and hearing about an invitation.
+
+**It asks for the next grant at the moment a feed is due.** The request named a flat fifteen minutes, which is the floor a feed is held to and says nothing about this reader's feeds : a store of daily papers woke the system four times an hour to find nothing, and an hourly wire was fetched a quarter of an hour after it published. The handler still asks for the floor, before anything has read the store, and the pass replaces that request with one naming the moment `FeedRefresh.nextDue()` gives back. Submitting again under one identifier replaces rather than adds, so the floor is what stands whenever the pass did not run at all. `docs/technical/fetching.md` sets out how the moment is worked out and why it had to be made stable before anything could sleep until it.
 
 **Background refresh is opportunistic and is treated as a bonus.** Section 25 is explicit : the system decides alone according to activity, battery and expected consumption, and the reader can turn it off. Returning to the foreground is the mechanism that actually refreshes, and the interface never presents an unread count as though it were real time.
 
