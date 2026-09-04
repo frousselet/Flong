@@ -39,7 +39,9 @@ import SwiftUI
 /// The points are the model's own, in the reader's own language. An edition
 /// with none is not shown at all.
 struct EditionHead: View {
-    let edition: Edition
+    let published: PublishedEdition
+
+    private var edition: Edition { published.edition }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Editorial.tightRhythm) {
@@ -51,6 +53,19 @@ struct EditionHead: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, Editorial.rhythm)
         .padding(.bottom, Editorial.tightRhythm)
+    }
+
+    /// How wide the mark in front of a point is drawn.
+    ///
+    /// A frame rather than the glyph's own width, so every line of type starts
+    /// at the same place whatever its mark is, and so the skeleton can hold the
+    /// same room before there is a mark at all.
+    static let markWidth: CGFloat = 20
+
+    /// The mark one point wears, or the tag where nothing was matched.
+    private func mark(at index: Int) -> String {
+        guard index < published.marks.count else { return Topic.defaultSymbol }
+        return published.marks[index]
     }
 
     /// The few things worth knowing, one per line.
@@ -71,15 +86,19 @@ struct EditionHead: View {
     /// paragraph is a block, and a block is the thing this replaced.
     private var points: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ForEach(Array(edition.points.enumerated()), id: \.offset) { _, point in
+            ForEach(Array(edition.points.enumerated()), id: \.offset) { index, point in
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    // A rule rather than a bullet character : the page is set
-                    // as an editor would set it, and a round dot is a control
-                    // panel's mark.
-                    Rectangle()
-                        .frame(width: 14, height: 1)
+                    // **The subject's own mark, and it was a rule.** A rule is
+                    // what a page uses where there is nothing to say about an
+                    // item beyond that it is one of several ; here there is,
+                    // since a point is about a story and a story is filed under
+                    // a subject. The row says what kind of news each line is
+                    // before the line is read.
+                    Image(systemName: mark(at: index))
+                        .font(.system(.footnote, weight: .medium))
                         .foregroundStyle(.tertiary)
-                        .offset(y: -5)
+                        .frame(width: Self.markWidth)
+                        .accessibilityHidden(true)
                     Text(verbatim: point)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -208,10 +227,14 @@ struct EditionPlaceholder: View {
             // about it being its own.
             ForEach(Array(Self.points.enumerated()), id: \.offset) { _, lines in
                 HStack(alignment: .top, spacing: 10) {
-                    Rectangle()
-                        .frame(width: 14, height: 1)
-                        .foregroundStyle(.quaternary)
-                        .padding(.top, 5)
+                    // The room a mark takes, and no mark : a skeleton claiming
+                    // a subject before anything has been filed under one would
+                    // be a promise, and the page would change shape twice.
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(.quaternary)
+                        .frame(width: 14, height: 14)
+                        .frame(width: EditionHead.markWidth)
+                        .padding(.top, 2)
                     TextPlaceholder(lines: lines, last: lines > 1 ? 0.5 : 0.8)
                 }
             }

@@ -131,19 +131,26 @@ struct EditionScreen: View {
         model.editionArchive.first { $0.edition.id == id }
     }
 
+    /// The mark one point wears, or the tag where nothing was matched.
+    private func mark(of published: PublishedEdition, at index: Int) -> String {
+        guard index < published.marks.count else { return Topic.defaultSymbol }
+        return published.marks[index]
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                if let edition = published?.edition {
+                if let published, case let edition = published.edition {
                     VStack(alignment: .leading, spacing: Editorial.tightRhythm) {
                         if !edition.points.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
-                                ForEach(Array(edition.points.enumerated()), id: \.offset) { _, point in
+                                ForEach(Array(edition.points.enumerated()), id: \.offset) { index, point in
                                     HStack(alignment: .firstTextBaseline, spacing: 10) {
-                                        Rectangle()
-                                            .frame(width: 14, height: 1)
+                                        Image(systemName: mark(of: published, at: index))
+                                            .font(.system(.footnote, weight: .medium))
                                             .foregroundStyle(.tertiary)
-                                            .offset(y: -5)
+                                            .frame(width: EditionHead.markWidth)
+                                            .accessibilityHidden(true)
                                         Text(verbatim: point)
                                             .fixedSize(horizontal: false, vertical: true)
                                     }

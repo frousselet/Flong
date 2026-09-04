@@ -411,6 +411,87 @@ struct EditionBriefChecksTests {
     }
 }
 
+/// Which mark each of an edition's points wears.
+///
+/// The model writes three to five sentences over ten stories and nothing links
+/// one to the other : it is free to say one thing about two of them, and asking
+/// it for a story identifier alongside each point would be index bookkeeping,
+/// which a small model does badly and which the filing already learnt not to
+/// ask for. So the two are compared rather than declared.
+@Suite("The mark a point wears")
+struct EditionMarkTests {
+    private func story(_ title: String, _ id: UUID = .v7()) -> EditionStory {
+        EditionStory(
+            editionID: .v7(), position: 0, storyID: id, title: title,
+            summary: nil, isGenerated: true, isTranslated: false, imageURL: nil)
+    }
+
+    @Test("A point takes the subject of the story it shares the most words with")
+    func matched() {
+        let nepal = UUID.v7()
+        let tennis = UUID.v7()
+        let stories = [story("Deux ouvriers sauvés au Népal", nepal), story("Monfils éliminé à l'US Open", tennis)]
+        let filings = [nepal: ["International"], tennis: ["Sport"]]
+        let symbols = ["International": "globe", "Sport": "figure.run"]
+
+        let marks = EditionStore.marks(
+            for: [
+                "Gaël Monfils est éliminé à l'US Open.",
+                "Deux ouvriers ont été sauvés au Népal.",
+            ],
+            over: stories, filedAs: filings, wearing: symbols
+        )
+
+        #expect(marks == ["figure.run", "globe"])
+    }
+
+    /// A point about something the filing never reached is an ordinary state
+    /// rather than a fault : half a mark on a row of marks would read worse
+    /// than a neutral one.
+    @Test("A point that matches nothing wears the tag")
+    func unmatched() {
+        let marks = EditionStore.marks(
+            for: ["Il pleut sur la Bretagne."],
+            over: [story("Deux ouvriers sauvés au Népal")],
+            filedAs: [:],
+            wearing: [:]
+        )
+
+        #expect(marks == [Topic.defaultSymbol])
+    }
+
+    /// A story filed under nothing has no mark to lend, and a subject with no
+    /// mark of its own falls back the same way.
+    @Test("A story under no subject lends nothing, and neither does a subject with no mark")
+    func nothingToLend() {
+        let id = UUID.v7()
+        let stories = [story("Deux ouvriers sauvés au Népal", id)]
+
+        #expect(
+            EditionStore.marks(
+                for: ["Deux ouvriers sauvés au Népal."], over: stories, filedAs: [:], wearing: [:])
+                == [Topic.defaultSymbol]
+        )
+        #expect(
+            EditionStore.marks(
+                for: ["Deux ouvriers sauvés au Népal."], over: stories,
+                filedAs: [id: ["International"]], wearing: [:])
+                == [Topic.defaultSymbol]
+        )
+    }
+
+    /// One mark per point and in the same order, whatever the page holds : the
+    /// two lists are drawn side by side and a page with fewer marks than points
+    /// would put the wrong glyph on every line after the gap.
+    @Test("There is one mark per point, in the same order")
+    func oneEach() {
+        let points = ["Une chose.", "Une autre.", "Une troisième."]
+        let marks = EditionStore.marks(for: points, over: [], filedAs: [:], wearing: [:])
+
+        #expect(marks.count == points.count)
+    }
+}
+
 @Suite("Telling the reader an edition has come out")
 struct EditionNoticeTests {
     private func edition(points: [String]) -> Edition {

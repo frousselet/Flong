@@ -212,7 +212,7 @@ struct DigestScreen: View {
         // answer badly. So the cap belongs to the page and not to the store,
         // and a pill still reads the whole of the three days.
         if model.digestTopic == .frontPage, let published = model.edition {
-            EditionHead(edition: published.edition)
+            EditionHead(published: published)
                 .transition(.opacity)
 
             let shown = published.stories.compactMap { held in page.all.first { $0.id == held.storyID } }

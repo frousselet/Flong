@@ -232,6 +232,16 @@ nonisolated struct PublishedEdition: Hashable, Identifiable, Sendable {
     var edition: Edition
     var stories: [EditionStory]
 
+    /// The mark each point wears, one per point and in the same order.
+    ///
+    /// **Worked out where the page is read, not written down.** A point is a
+    /// sentence the model wrote over the whole page ; nothing links it to a
+    /// story, and nothing should, since the model is free to say one thing
+    /// about two of them. What can be said is which story a point is *about*,
+    /// by the words they share, and a story carries the subjects it was filed
+    /// under. See ``EditionStore/marks(for:over:filedAs:wearing:)``.
+    var marks: [String] = []
+
     var id: UUID { edition.id }
 }
 
