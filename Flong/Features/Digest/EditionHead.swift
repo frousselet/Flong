@@ -55,6 +55,13 @@ struct EditionHead: View {
         .padding(.bottom, Editorial.tightRhythm)
     }
 
+    /// How much air a point carries between its own lines.
+    ///
+    /// Set against the space between points, which is a little wider still :
+    /// two points set as openly as the lines inside one are two points a reader
+    /// cannot tell apart.
+    static let leading: CGFloat = 6
+
     /// How wide the mark in front of a point is drawn.
     ///
     /// A frame rather than the glyph's own width, so every line of type starts
@@ -85,7 +92,7 @@ struct EditionHead: View {
     /// The list is set with air around it. Five points at the spacing of a
     /// paragraph is a block, and a block is the thing this replaced.
     private var points: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 18) {
             ForEach(Array(edition.points.enumerated()), id: \.offset) { index, point in
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     // **The subject's own mark, and it was a rule.** A rule is
@@ -113,8 +120,13 @@ struct EditionHead: View {
         // the news : they were set in the size and the grey a standfirst is set
         // in, which is right for a line under a headline and wrong here, where
         // there is no headline above them and they are the first thing the
-        // reader reads. The rules stay quiet, being marks and not words.
+        // reader reads.
         .font(.title3)
+        // **Set open, because each of these is a paragraph of its own.** A
+        // point runs to two or three lines and the next one is a different
+        // subject : set solid, the three ran together into a block the eye
+        // reads as one. The air inside a point is what says where it ends.
+        .lineSpacing(Self.leading)
         .foregroundStyle(.primary)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 4)
@@ -240,7 +252,12 @@ struct EditionPlaceholder: View {
                         .frame(width: 14, height: 14)
                         .frame(width: EditionHead.markWidth)
                         .padding(.top, 2)
-                    TextPlaceholder(lines: lines, last: lines > 1 ? 0.5 : 0.8)
+                    // The same room a line of the real thing takes : a bar and
+                    // the air after it come to the height of a line of type
+                    // plus its leading, or the page moves when the words land.
+                    TextPlaceholder(
+                        lines: lines, last: lines > 1 ? 0.5 : 0.8, height: 10,
+                        spacing: EditionHead.leading + 15)
                 }
             }
         }
