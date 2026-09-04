@@ -73,6 +73,8 @@ struct StoreTests {
                 "v43.anImportThatSurvivesTheLaunch",
                 "v44.aPageMadeAtAnHour",
                 "v45.toldAboutThisOne",
+                "v46.aFewPointsRatherThanAParagraph",
+                "v47.aPageHasNoNameOfItsOwn",
             ]
         )
     }

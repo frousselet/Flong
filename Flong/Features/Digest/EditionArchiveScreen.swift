@@ -22,6 +22,30 @@ struct EditionArchiveScreen: View {
     let model: AppModel
     let open: (UUID) -> Void
 
+    /// One back number, as a row : the first two of its points, and how much it
+    /// carried.
+    ///
+    /// The whole list would be five lines apiece and the archive would be one
+    /// edition to a screenful. The first two are the ones the model put first,
+    /// which are the ones it thought mattered ; the section above the row says
+    /// which edition it is, so nothing here has to name it.
+    private func row(_ published: PublishedEdition) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(published.edition.points.prefix(2).enumerated()), id: \.offset) { index, point in
+                Text(verbatim: point)
+                    .font(index == 0 ? .headline : .subheadline)
+                    .foregroundStyle(index == 0 ? .primary : .secondary)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+            }
+            Text("\(published.stories.count) stories")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(.rect)
+    }
+
     var body: some View {
         List {
             ForEach(model.editionArchive) { published in
@@ -29,26 +53,7 @@ struct EditionArchiveScreen: View {
                     Button {
                         open(published.edition.id)
                     } label: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            if let title = published.edition.title {
-                                Text(verbatim: title)
-                                    .font(.headline)
-                                    .foregroundStyle(.primary)
-                                    .multilineTextAlignment(.leading)
-                            }
-                            if let summary = published.edition.summary {
-                                Text(verbatim: summary)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .multilineTextAlignment(.leading)
-                                    .lineLimit(3)
-                            }
-                            Text("\(published.stories.count) stories")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(.rect)
+                        row(published)
                     }
                     .buttonStyle(.plain)
                 } header: {
@@ -97,19 +102,26 @@ struct EditionScreen: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let edition = published?.edition {
                     VStack(alignment: .leading, spacing: Editorial.tightRhythm) {
-                        if let title = edition.title {
-                            Text(verbatim: title)
-                                .font(theme.headline(.title))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        if let summary = edition.summary {
-                            (Text(Image(systemName: "sparkles")).foregroundStyle(.secondary)
-                                + Text(verbatim: " ")
-                                + Text(verbatim: summary))
-                                .font(.body)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .accessibilityLabel(Text("Written by the model : \(summary)"))
+                        if !edition.points.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                ForEach(Array(edition.points.enumerated()), id: \.offset) { _, point in
+                                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                        Rectangle()
+                                            .frame(width: 14, height: 1)
+                                            .foregroundStyle(.tertiary)
+                                            .offset(y: -5)
+                                        Text(verbatim: point)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                }
+                            }
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 4)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel(
+                                Text("Written by the model : \(edition.points.joined(separator: ". "))"))
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
