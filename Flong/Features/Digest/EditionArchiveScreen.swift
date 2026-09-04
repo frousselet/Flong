@@ -148,7 +148,7 @@ struct EditionScreen: View {
                                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                                         Image(systemName: mark(of: published, at: index))
                                             .font(.system(.footnote, weight: .medium))
-                                            .foregroundStyle(.tertiary)
+                                            .foregroundStyle(.primary)
                                             .frame(width: EditionHead.markWidth)
                                             .accessibilityHidden(true)
                                         Text(verbatim: point)
