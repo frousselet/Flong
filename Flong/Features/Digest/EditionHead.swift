@@ -91,64 +91,100 @@ struct EditionHead: View {
     /// commas, and the line under the headline ran to seven items and eight
     /// lines of type. A front page has always answered this the same way.
     ///
-    /// **No glyph in front of it.** The story rows carry one, and there it says
-    /// something : a story's line is the model's or its publisher's, and the
-    /// mark is how a reader tells which. Nothing on an edition's head is ever
-    /// anybody else's, an edition existing only where the model wrote the whole
-    /// of it, so a mark here answers a question nobody can ask. It is still
-    /// said, to VoiceOver, where a statement costs no ink.
+    /// **And the list stands on a pane of its own.** Set straight on the page
+    /// it was three sentences of body type above ten stories of body type,
+    /// separated from the news by a hairline and by nothing else : a reader
+    /// coming to the page met a wall of grey and had to work out where the
+    /// edition stopped and the news began. The pane says it in one move. It is
+    /// the third place in the application that draws its own glass, and it
+    /// earns it the way the credit on a photograph does rather than the way a
+    /// control does : it is not floating over the page to be pressed, it is the
+    /// edition's own voice laid on the page, and what is under it goes on
+    /// showing through. See `docs/technical/interface.md`.
     ///
-    /// The list is set with air around it. Five points at the spacing of a
-    /// paragraph is a block, and a block is the thing this replaced.
+    /// **One pane and not three.** A card per point was the other way, and
+    /// three panes of glass with three shadows at the head of a page is three
+    /// objects where there is one thing being said. The points are told apart
+    /// inside it by a hairline, which is the vocabulary the rest of the page
+    /// already uses between rows.
     private var points: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            ForEach(Array(said.enumerated()), id: \.offset) { index, point in
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    // **The subject's own mark, and it was a rule.** A rule is
-                    // what a page uses where there is nothing to say about an
-                    // item beyond that it is one of several ; here there is,
-                    // since a point is about a story and a story is filed under
-                    // a subject. The row says what kind of news each line is
-                    // before the line is read.
-                    Image(systemName: mark(at: index))
-                        .font(.system(.footnote, weight: .medium))
+        GlassEffectContainer {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(said.enumerated()), id: \.offset) { index, point in
+                    if index > 0 {
+                        // Set in from the marks, so the rule runs under the
+                        // words and not under the column of glyphs : a rule
+                        // across the whole pane cuts it into boxes, and this
+                        // is one pane with three things on it.
+                        Divider()
+                            .padding(.leading, Self.markWidth + Self.columnGap)
+                    }
+
+                    HStack(alignment: .firstTextBaseline, spacing: Self.columnGap) {
+                        // **The subject's own mark, and it was a rule.** A rule
+                        // is what a page uses where there is nothing to say
+                        // about an item beyond that it is one of several ; here
+                        // there is, since a point is about a story and a story
+                        // is filed under a subject. The row says what kind of
+                        // news each line is before the line is read.
+                        //
                         // The page's own colour, like the line beside it. A
                         // mark set quieter than the words it stands in front of
                         // reads as furniture ; this one says what kind of news
                         // the line is, which is as much a part of the line as
                         // the sentence.
-                        .foregroundStyle(.primary)
-                        .frame(width: Self.markWidth)
-                        .accessibilityHidden(true)
-                    // **Three lines, and never a truncated one.** The bound
-                    // is kept where the words are written rather than where
-                    // they are drawn : the model is held to a hundred and
-                    // twenty characters a point, which is under what three
-                    // lines hold here, so nothing reaches this and needs
-                    // cutting. Setting a long point smaller until it fitted
-                    // was the other way, and it is a page whispering the
-                    // news. See ``EditionSummarizer/maximumPointCharacters``.
-                    Text(verbatim: point)
-                        .lineLimit(3)
+                        Image(systemName: mark(at: index))
+                            .font(.system(.footnote, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: Self.markWidth)
+                            .accessibilityHidden(true)
+
+                        // **Three lines, and never a truncated one.** The bound
+                        // is kept where the words are written rather than where
+                        // they are drawn : the model is held to a hundred and
+                        // twenty characters a point, which is under what three
+                        // lines hold here, so nothing reaches this and needs
+                        // cutting. Setting a long point smaller until it fitted
+                        // was the other way, and it is a page whispering the
+                        // news. See ``EditionSummarizer/maximumPointCharacters``.
+                        Text(verbatim: point)
+                            .lineLimit(3)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.vertical, Self.rowAir)
                 }
             }
+            // The page's own colour, at the size the rest of the page reads in.
+            .font(.body)
+            .lineSpacing(Self.leading)
+            .foregroundStyle(.primary)
+            .padding(.horizontal, Self.paneInset)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassEffect(.regular, in: .rect(cornerRadius: Self.paneCorner))
         }
-        // The page's own colour, at the size the rest of the page reads in.
-        .font(.body)
-        // **Set open, because each of these is a paragraph of its own.** A
-        // point runs to two or three lines and the next one is a different
-        // subject : set solid, the three ran together into a block the eye
-        // reads as one. The air inside a point is what says where it ends.
-        .lineSpacing(Self.leading)
-        .foregroundStyle(.primary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 4)
         // Room between what the edition says and the first story it leads on.
         // They are two different things and were a few points apart.
         .padding(.bottom, Editorial.rhythm)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text("Written by the model : \(said.joined(separator: ". "))"))
     }
+
+    /// The gap between a mark and the words it stands in front of.
+    static let columnGap: CGFloat = 12
+
+    /// The air above and below one point inside the pane.
+    static let rowAir: CGFloat = 13
+
+    /// How far the words stand in from the edge of the pane.
+    static let paneInset: CGFloat = 16
+
+    /// The corner of the pane.
+    ///
+    /// Wide, because the pane holds a paragraph rather than a control : a tight
+    /// corner on a shape this size reads as a dialog box, and the material is
+    /// at its best on a shape a page could have been cut from.
+    static let paneCorner: CGFloat = 28
 }
 
 /// What stands where an edition would, when there is not one.

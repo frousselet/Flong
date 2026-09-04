@@ -23,7 +23,7 @@ So the digest is set as an editor would set a page :
 
 The measures live in `Flong/Support/Editorial.swift` and the faces in `Flong/Support/Theme.swift`. A screen that needs a fifth spacing value is a screen that has gone wrong.
 
-Section headers are uppercase, kerned, secondary, and a hairline rule sits above each row. That is the whole vocabulary. No card, no box, no shadow, no glass in the content.
+Section headers are uppercase, kerned, secondary, and a hairline rule sits above each row. That is the whole vocabulary for a list of stories : no card, no box, no shadow. The one thing on the front page that stands on a pane of its own is what the edition says at the head of it, and the four places glass is drawn are set out below.
 
 ## Three themes, and what a theme reaches
 
@@ -100,13 +100,17 @@ Apple's guidance for the 2026 material is explicit : glass is the layer that flo
 
 Flong broke it once. A hand-rolled floating bar in `safeAreaBar(edge: .bottom)`, drawn with `glassEffect`, collided on iPhone with the system search field, which is also glass : two blurred capsules overlapping, each refracting the other. The fix was not to tune the material but to delete the bar. The sections are a system `TabView`, the search tab carries `role: .search` so the system puts search where the system puts search, and `tabBarMinimizeBehavior(.onScrollDown)` gets the bar out of the way when the reader scrolls into something.
 
-The application draws glass of its own in three kinds of place. The first two are the same rule rather than exceptions to it ; the third is an exception, and is admitted as one.
+The application draws glass of its own in four kinds of place. The first two are the same rule rather than exceptions to it ; the last two are exceptions, and are admitted as ones.
 
 **The subject pills at the top of the digest** are controls floating over the page, which is the layer the material is for, and the row sits in the content and scrolls away with it rather than pinning itself under the tab bar, where it would be glass directly under glass.
 
 **The credit in the corner of a picture** is the other case, and it is not a control. It is the one thing on the page that has to stay readable over an image nobody chose, and text laid straight on a photograph is unreadable on half the photographs there are. The usual answer is a scrim, which is a dark band across a picture the reader came to look at ; a pill the size of a name takes what is under it and leaves the picture whole around it. It is a handful per screen rather than one per row, which is what the hairline edge of a picture refused glass for.
 
-**The danger zone at the foot of the reader's `Vos données`** is the exception, and it is one place in the whole application. The material is used there to say danger rather than to float over anything : the card leaves the grouped background the rest of the panel sits in, which is exactly the point, since a row that looks like its neighbours is a row that is pressed like its neighbours and this one deletes everything the reader has. It is admissible because it breaks neither half of the rule in practice : the form under it is not glass, so no glass sits on glass, and there is one card, not a pattern.
+**The few points at the head of an edition** stand on a pane of glass, and the argument is the credit's rather than the pill's. Set straight on the page they were three sentences of body type above ten stories of body type, told apart from the news by a hairline and by nothing else : a reader coming to the page met a wall of grey and had to work out where the edition stopped and the news began. The pane says it in one move, and what is under it goes on showing through, which a filled card would not do. One pane and not three : a card per point is three objects with three shadows where there is one thing being said, and the points are told apart inside it by a hairline, which is the vocabulary the rest of the page already uses between rows.
+
+The rule that used to sit under it is gone with it : a rule between two rows is what separates one story from the next, and over the first row it is a border round the page, drawn directly under a pane that already tells the edition apart from the news.
+
+**The danger zone at the foot of the reader's `Vos données`** is the last exception, and it is one place in the whole application. The material is used there to say danger rather than to float over anything : the card leaves the grouped background the rest of the panel sits in, which is exactly the point, since a row that looks like its neighbours is a row that is pressed like its neighbours and this one deletes everything the reader has. It is admissible because it breaks neither half of the rule in practice : the form under it is not glass, so no glass sits on glass, and there is one card, not a pattern.
 
 **Tinted at a third and not at full strength.** Red glass at full tint stops being glass : it is a flat red block, nothing of the page shows through it, and the solid red button it holds disappears into it. At a third the material does its own work, the heading and the sentence keep the contrast they need in both appearances, and the button stays the strongest red on screen, which is the right way round for the one control in the card. The warning mark is the red thing in the heading and the words are not, since a title in red on a red wash is a title read with effort.
 
