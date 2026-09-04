@@ -340,35 +340,53 @@ struct TextPlaceholder: View {
 /// ever has, so the page only ever grows into it.
 struct EditionPlaceholder: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            // **Keyed by where it stands and not by what it holds.** These are
-            // three points of two, one and two lines, and `id: \.self` over
-            // that is the identity 2 twice : SwiftUI says so at runtime and
-            // then gives undefined results, which for a placeholder means a bar
-            // that flickers or does not animate out with its neighbours. What
-            // identifies a bar here is its place in the list, nothing else
-            // about it being its own.
-            ForEach(Array(Self.points.enumerated()), id: \.offset) { _, lines in
-                HStack(alignment: .top, spacing: 10) {
-                    // The room a mark takes, and no mark : a skeleton claiming
-                    // a subject before anything has been filed under one would
-                    // be a promise, and the page would change shape twice.
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(.quaternary)
-                        .frame(width: 14, height: 14)
-                        .frame(width: EditionHead.markWidth)
-                        .padding(.top, 2)
-                    // The same room a line of the real thing takes : a bar and
-                    // the air after it come to the height of a line of type
-                    // plus its leading, or the page moves when the words land.
-                    TextPlaceholder(
-                        lines: lines, last: lines > 1 ? 0.5 : 0.8, height: 9,
-                        spacing: EditionHead.leading + 11)
+        GlassEffectContainer {
+            VStack(alignment: .leading, spacing: 0) {
+                // **Keyed by where it stands and not by what it holds.** These
+                // are three points of two, one and two lines, and `id: \.self`
+                // over that is the identity 2 twice : SwiftUI says so at
+                // runtime and then gives undefined results, which for a
+                // placeholder means a bar that flickers or does not animate out
+                // with its neighbours.
+                ForEach(Array(Self.points.enumerated()), id: \.offset) { index, lines in
+                    if index > 0 {
+                        Divider()
+                            .padding(.leading, EditionHead.markWidth + EditionHead.columnGap)
+                    }
+
+                    HStack(alignment: .top, spacing: EditionHead.columnGap) {
+                        // The room a mark takes, and no mark : a skeleton
+                        // claiming a subject before anything has been filed
+                        // under one would be a promise, and the page would
+                        // change shape twice.
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(.quaternary)
+                            .frame(width: 14, height: 14)
+                            .frame(width: EditionHead.markWidth)
+                            .padding(.top, 3)
+
+                        // The same room a line of the real thing takes : a bar
+                        // and the air after it come to the height of a line of
+                        // type plus its leading, or the page moves when the
+                        // words land.
+                        TextPlaceholder(
+                            lines: lines, last: lines > 1 ? 0.5 : 0.8, height: 9,
+                            spacing: EditionHead.leading + 11
+                        )
+                    }
+                    .padding(.vertical, EditionHead.rowAir)
                 }
             }
+            // **The same pane, and it has to be.** The skeleton exists to hold
+            // the room the thing it stands for will take : drawn as a bare list
+            // where the edition arrives on a pane, it is the wrong height and
+            // the wrong shape, and the page moves twice rather than not at all
+            // - once when the pane appears and once when the words land in it.
+            .padding(.horizontal, EditionHead.paneInset)
+            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassEffect(.regular, in: .rect(cornerRadius: EditionHead.paneCorner))
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 6)
         .padding(.bottom, Editorial.rhythm)
         // What tells a page that is filling in from a page that is broken.
         .shimmering()
@@ -380,11 +398,10 @@ struct EditionPlaceholder: View {
 
     /// How many lines each point stands for.
     ///
-    /// **Three points and not five, deliberately.** A placeholder claiming the
-    /// exact shape of an answer nobody has yet is a second guess : the model
-    /// writes three as often as five, and a page settling from five bars to
-    /// three jumps exactly as far as one settling from nothing. Three is the
-    /// fewest a list ever has, so the page only ever grows into it.
+    /// **Three points, which is what an edition carries.** A placeholder
+    /// claiming the exact shape of an answer nobody has yet is a second guess,
+    /// so the middle one stands a single line where the two either side stand
+    /// two : the page settles by a line rather than by a block.
     private static let points = [2, 1, 2]
 }
 
