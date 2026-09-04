@@ -1092,6 +1092,23 @@ nonisolated extension AppDatabase {
             )
         }
 
+        /// The mark a subject wears.
+        ///
+        /// A row of pills reading `Politique · Économie · Cinéma · Sport` is
+        /// four words a reader has to read ; the same row with a glyph in front
+        /// of each is four shapes they recognize. The sections get theirs from
+        /// the catalogue, and a subject the reader wrote gets the one they
+        /// picked.
+        ///
+        /// Null for anything already in the store : the seeding fills the
+        /// sections in at the next launch, and a subject the reader wrote
+        /// before this wears the default until they say otherwise.
+        migrator.registerMigration("v48.aMarkForEverySubject") { db in
+            try db.alter(table: "topic") { table in
+                table.add(column: "symbol", .text)
+            }
+        }
+
         return migrator
     }
 

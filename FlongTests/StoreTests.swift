@@ -75,6 +75,7 @@ struct StoreTests {
                 "v45.toldAboutThisOne",
                 "v46.aFewPointsRatherThanAParagraph",
                 "v47.aPageHasNoNameOfItsOwn",
+                "v48.aMarkForEverySubject",
             ]
         )
     }

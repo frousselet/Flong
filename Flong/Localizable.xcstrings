@@ -1915,6 +1915,17 @@
         }
       }
     },
+    "Change the mark of %@": {
+      "comment": "Read out by VoiceOver on the glyph beside a subject the reader wrote. The argument is its name.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changer le symbole de %@"
+          }
+        }
+      }
+    },
     "Choose a picture": {
       "localizations": {
         "fr": {
@@ -3305,6 +3316,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gérer la collaboration"
+          }
+        }
+      }
+    },
+    "Mark": {
+      "comment": "The title of the sheet where the reader picks the glyph a subject of their own wears.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Symbole"
           }
         }
       }

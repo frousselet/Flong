@@ -2150,9 +2150,20 @@ final class AppModel {
     }
 
     /// Adds a subject of the reader's own, which the model then files under.
-    func addTopic(_ name: String) async {
-        try? await TopicPreferences(database).add(name)
+    func addTopic(_ name: String, symbol: String? = nil) async {
+        try? await TopicPreferences(database).add(name, symbol: symbol)
         await loadKnownTopics()
+        await loadDigest()
+    }
+
+    /// Changes the mark a subject the reader wrote wears.
+    ///
+    /// Theirs only : a section's mark comes from the catalogue and is the same
+    /// on every device.
+    func setTopicSymbol(_ symbol: String, of name: String) async {
+        try? await TopicPreferences(database).setSymbol(symbol, of: name)
+        await loadKnownTopics()
+        await loadDigest()
     }
 
     /// Removes a subject the reader wrote, and everything hanging off it.
