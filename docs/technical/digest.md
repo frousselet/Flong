@@ -124,6 +124,32 @@ The prompt is bounded before it is sent : six articles and two hundred and forty
 
 **The furniture a template staples to a headline comes off.** `| Letters`, `| First Thing`, `| Polly Toynbee` : the section, the newsletter or the columnist, added after the headline by whichever system built the feed. It says where the piece ran and never what happened. Only what follows the last pipe, only where that is short, and only where what stands before it is still a headline.
 
+## Editions
+
+The page was rebuilt on every fetch. That is the right thing for a list and the wrong thing for a front page : there was never twice the same page, so there was no such thing as having read it, and a reader who looked at nine and again at ten watched it shift under them for reasons they could not see. A newspaper solves this by coming out at an hour.
+
+**Four a day, at hours the reader sets.** Morning, midday, evening and night, at seven, noon, six and eleven before anybody moves them, each of them movable and each switchable off. Those are the hours somebody actually picks a paper up rather than four points evenly spaced round a clock, and the night one is late rather than at three in the morning because what it is for is the last look before the phone goes down.
+
+**An edition is known by the moment it opened.** Not by a key one device minted : two devices working from one schedule work out the same boundary and build one edition for one morning rather than two. The schedule therefore has to travel, and it does, through the key-value store like every other thing the reader chose. It is also the only part of this that must : the editions themselves are derived data and are never synchronized, exactly as the stories under them are not.
+
+**Ten stories, and the rest is the wire.** Ten is what a person reads over a coffee. A front page that grew with the day is a page nobody can finish, and one capped at sixty was a list. What did not fit is not hidden and never was : the section beside the digest holds everything that arrives, and the next edition may well lead on it.
+
+**Only stories the model has written about are eligible.** That is what makes `every edition is written` a rule rather than an aspiration, and it is also what stops the rule deadlocking : a story both voices declined would otherwise stand at the top of a page that could never be published, and one refusal would silence the front page for a day. It stays in the wire, where everything that is not a story stays.
+
+It follows that a device with no model builds no edition at all, and the page says so in one line naming which of the three reasons it is. That is section 14's no-model path answered honestly. It used to be a page of stories wearing their own articles' headlines, which is a page working exactly as intended and looking exactly like a page that is broken.
+
+**The edition carries a headline and a few lines of its own.** Written by the model over the whole page, in the reader's language, and marked as the model's like everything else it writes. It is a different question from the one a story is asked, and asked with the story's instructions the model picked the first headline and rewrote it, which is a page named after its lead rather than a page named. So it is told what it is doing : name what these stories add up to, and say what is happening in two or three sentences.
+
+Everything else is the story's own machinery, deliberately. The same permissive guardrails, the same greedy sampling, the same two voices, the same length checks, the same demand for the reader's language said twice and the second time in that language, and the same three outcomes told apart in the same place. A second set of rules for the same job is a second set to keep true.
+
+**What invalidates it is any article, anywhere underneath.** A story's own brief is invalidated by the articles it was written from ; a page is invalidated by anything at all changing under it, which is what was asked for : an article joining any story on the page makes it a slightly different page, and the sentence over it is a question worth putting again. `edition.brief_members` is every article of every story on it, sorted, so the key is a set.
+
+**Publishing is once, and the moment is never cleared.** An edition whose stories move is asked about again and its headline is replaced, and clearing the moment would take the page off the screen while the model wrote the next one : a front page that goes blank several times a day is exactly what a page made at an hour exists to stop. And the page shows the newest **published** edition rather than the newest one, so last night's stands until this morning's is written, which is what a paper on a table does.
+
+**The archive is the back numbers.** Held to the same three days the stories are, since an edition older than that is a page of headlines whose articles have gone. Each is what it was : the name it was given and the ten headlines it led on, frozen when it closed, in `edition_story` rather than joined to the story table. A purge that took an article shrinks a story and can tidy it away altogether, and a page from last Tuesday that lost a row would be an archive nobody could trust. It is the same rule the library keeps against the stream, and the story identifier travels beside the frozen head with no key, so a row whose story is still there opens it and one whose story has gone is a headline and nothing more.
+
+**Narrowing to a subject is a question about everything.** A pill reads the whole of the three days, as it always did. The cap of ten belongs to the front page, which is what an edition is ; ten of anything would answer `what is there about typography` badly.
+
 ## Subjects
 
 A story is one event ; a subject is the field several events belong to. The difference is the whole reason the pills are worth having : filtering by `Éducation` says something the list of stories underneath does not already say, whereas a pill per story would be the same page twice.

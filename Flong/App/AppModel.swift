@@ -780,6 +780,9 @@ final class AppModel {
         if stages.contains(.filing) {
             costs[.filing] = max((try? await FileStoriesJob(database).remaining()) ?? 0, floor)
         }
+        if stages.contains(.naming) {
+            costs[.naming] = (try? await BriefEditionsJob(database).remaining()) ?? 0
+        }
         if stages.contains(.indexing) {
             costs[.indexing] = (try? await VectorStore(database).outstandingCount()) ?? 0
         }
@@ -1167,6 +1170,7 @@ final class AppModel {
         self.articleBody = preferences.articleBody
         self.theme = preferences.theme
         self.wantsNewStoryNotices = preferences.wantsNewStoryNotices
+        self.wantsNewEditionNotices = preferences.wantsNewEditionNotices
         self.wantsNewArticleNotices = preferences.wantsNewArticleNotices
         self.wantsCollaborationNotices = preferences.wantsCollaborationNotices
         self.mutedSharedCollections = preferences.mutedSharedCollections
@@ -1413,6 +1417,28 @@ final class AppModel {
     }
 
     private(set) var digest = Digest()
+
+    /// The edition the front page is showing, which is the newest published one.
+    ///
+    /// `nil` is a device that has never published one : no model, or a model
+    /// that has not got to the page yet. The screen says which, since a page
+    /// working exactly as section 14 says it should and a page that is broken
+    /// look identical without a line to tell them apart.
+    private(set) var edition: PublishedEdition?
+
+    /// Every published edition, newest first. What the archive shows.
+    private(set) var editionArchive: [PublishedEdition] = []
+
+    /// When each of the four editions comes out, as the reader has it.
+    var editionSchedule: EditionSchedule {
+        get { preferences.editionSchedule }
+        set {
+            guard newValue != preferences.editionSchedule else { return }
+            preferences.editionSchedule = newValue
+            Task { await rebuildDigest() }
+        }
+    }
+
     /// The articles of the story the reader opened, and of that one only : a
     /// digest that loaded every article of every story would be the list it
     /// exists to replace.
@@ -1447,6 +1473,13 @@ final class AppModel {
             // are looking at rather than about what the system search should be
             // able to find.
             if digestTopic == .frontPage { await handToSpotlight(fetched.all) }
+
+            // The editions are read from the same call, since they are the same
+            // page asked for at a different grain : the reader looks at one
+            // edition and the archive is the ones before it.
+            let editions = try await digestService.editions()
+            if editions.current != edition { edition = editions.current }
+            if editions.archive != editionArchive { editionArchive = editions.archive }
         } catch {
             Log.enrich.error("The digest could not be read : \(error, privacy: .public)")
         }
@@ -1485,6 +1518,7 @@ final class AppModel {
     func rebuildDigest() async {
         moveWork(to: .grouping)
         await digestService.buildStories()
+        await digestService.buildEditions(preferences.editionSchedule)
         await loadDigest()
 
         // The headlines and the subjects, turn about and under a bound. They
@@ -1962,6 +1996,61 @@ final class AppModel {
         await announcer.post(announcement)
     }
 
+    /// Whether the reader wants to be told when an edition comes out.
+    private(set) var wantsNewEditionNotices = false
+
+    func setWantsNewEditionNotices(_ wanted: Bool) async {
+        guard wanted else {
+            wantsNewEditionNotices = false
+            preferences.wantsNewEditionNotices = false
+            return
+        }
+        guard await authorizeNotifications() else {
+            wantsNewEditionNotices = false
+            preferences.wantsNewEditionNotices = false
+            await refreshNotificationStatus()
+            return
+        }
+        wantsNewEditionNotices = true
+        preferences.wantsNewEditionNotices = true
+        // The editions already published are not news. The clock starts here,
+        // exactly as it does for the stories and for the articles.
+        if preferences.editionsAnnouncedAt == nil {
+            let current = try? await digestService.editions().current
+            preferences.editionsAnnouncedAt = current?.edition.openedAt ?? Date()
+        }
+    }
+
+    /// Tells the reader that an edition has come out.
+    ///
+    /// **The watermark is a boundary and not a clock.** Everything else here is
+    /// metered by when this device last spoke, because what it meters is a
+    /// stream of things that have no name. An edition has one : it is the page
+    /// of a moment, and the moment is its identity on every device. So what is
+    /// written down is which edition was said, and an edition is said once
+    /// however many passes go over it while it is the current one.
+    ///
+    /// It moves whether a notice was posted or not, like the others : a reader
+    /// who watched the page change is a reader who knows.
+    func announceNewEdition() async {
+        guard wantsNewEditionNotices else { return }
+        guard !Task.isCancelled else { return }
+        guard let current = try? await digestService.editions().current else { return }
+
+        // Never said, so the clock starts here and this pass says nothing :
+        // the switch may have arrived from another device, and what was
+        // published before this one heard about it is not news.
+        guard let said = preferences.editionsAnnouncedAt else {
+            preferences.editionsAnnouncedAt = current.edition.openedAt
+            return
+        }
+        guard current.edition.openedAt > said else { return }
+        preferences.editionsAnnouncedAt = current.edition.openedAt
+
+        guard !isReading, let announcement = Announcement.newEdition(current.edition) else { return }
+        await announcer.post(announcement)
+    }
+
     /// Every subject there is, for the screen that manages them.
     private(set) var knownTopics: [TopicPreferences.Known] = []
 
@@ -2217,6 +2306,53 @@ final class AppModel {
         BackgroundScheduler.schedule(earliest: await refresher.nextDue())
     }
 
+    /// Makes the edition of the moment, names it, and tells the reader.
+    ///
+    /// **Its own pass, and a short one.** It fetches nothing and asks no
+    /// publisher anything : what it does is read the page the collection has
+    /// already brought in, take the ten stories that matter most, put them to
+    /// the model as one question, and say so. Everything it needs is already in
+    /// the store, which is why it can ask for a network and not for the mains
+    /// and still be the thing that arrives on time.
+    ///
+    /// It is idempotent, which is what makes it safe to run on the hour and
+    /// again whenever a window opens : an edition already made and already
+    /// named is one query and no work at all.
+    func backgroundEdition() async {
+        // Whatever made the model fail hours ago is worth trying again : an
+        // edition is a page the model has to write, and one it was too busy to
+        // write at seven is one worth asking about at five past.
+        OnDeviceModel.reconsider()
+
+        await exclusively("The edition") {
+            let pass = await self.beginWork([.grouping, .naming])
+            defer { self.endWork(pass) }
+
+            self.moveWork(to: .grouping)
+            await self.digestService.buildStories()
+            await self.digestService.buildEditions(self.preferences.editionSchedule)
+
+            self.moveWork(to: .naming)
+            await self.digestService.briefEditions(
+                until: Date().addingTimeInterval(BackgroundScheduler.fullPassBudget),
+                onProgress: self.progress(of: .naming)
+            )
+
+            await self.announceNewEdition()
+            await self.reloadWhatIsShown()
+        }
+
+        // Asked for again from here, since only this side knows the reader's
+        // schedule. The handler cannot : it is registered before there is a
+        // store to read one out of.
+        scheduleTheNextEdition()
+    }
+
+    /// Asks the system to wake for the next edition.
+    func scheduleTheNextEdition(now: Date = Date()) {
+        BackgroundScheduler.scheduleEdition(at: preferences.editionSchedule.next(after: now))
+    }
+
     /// The whole of the work, at rest and on the mains.
     ///
     /// **Every feed, not the ones that are due.** The half-hourly refresh asks
@@ -2254,7 +2390,8 @@ final class AppModel {
     /// iCloud. Named step by step, since this is the pass a reader watches.
     private func fullPass() async {
         let pass = await beginWork([
-            .fetching, .indexing, .reading, .grouping, .writing, .filing, .tidying, .synchronizing, .exchanging,
+            .fetching, .indexing, .reading, .grouping, .writing, .filing, .naming, .tidying, .synchronizing,
+            .exchanging,
         ])
         defer { endWork(pass) }
 
@@ -2275,6 +2412,7 @@ final class AppModel {
 
         moveWork(to: .grouping)
         await digestService.buildStories()
+        await digestService.buildEditions(preferences.editionSchedule)
 
         // Generous, and bounded all the same. The pass has minutes rather than
         // seconds, and the model's two halves share whatever it turns out to
@@ -2284,6 +2422,7 @@ final class AppModel {
             until: Date().addingTimeInterval(BackgroundScheduler.fullPassBudget),
             onWriting: progress(of: .writing),
             onFiling: progress(of: .filing),
+            onNaming: progress(of: .naming),
             onPhase: { [weak self] phase in
                 Task { @MainActor [weak self] in self?.moveWork(to: phase) }
             }
@@ -2601,6 +2740,9 @@ final class AppModel {
         articleBody = .feed
         theme = .standard
         wantsNewStoryNotices = false
+        wantsNewEditionNotices = false
+        edition = nil
+        editionArchive = []
         forgetSearches()
         contributesToPool = nil
         popularFeeds = []
@@ -3975,7 +4117,7 @@ final class AppModel {
 
     private func catchingUp(_ reason: CatchUp, until deadline: Date?) async {
         let pass = await beginWork(
-            [.fetching, .grouping, .writing, .filing, .reading], atOnce: reason.isAskedFor)
+            [.fetching, .grouping, .writing, .filing, .naming, .reading], atOnce: reason.isAskedFor)
 
         // **The pass outlives this function, and is ended all the same.** The
         // model's work is the last two stages of it and runs behind the
@@ -4027,6 +4169,7 @@ final class AppModel {
         // now, so there is nothing to lay out against and nothing to except.
         moveWork(to: .grouping)
         await digestService.buildStories()
+        await digestService.buildEditions(preferences.editionSchedule)
         await load()
 
         // An article from a favourite source or a favourite writer is chosen
@@ -4156,11 +4299,15 @@ final class AppModel {
                 until: deadline,
                 onWriting: progress(of: .writing),
                 onFiling: progress(of: .filing),
+                onNaming: progress(of: .naming),
                 onPhase: { [weak self] phase in
                     Task { @MainActor [weak self] in self?.moveWork(to: phase) }
                 }
             )
             await loadDigest()
+            // The page may have been published while this ran, which is the one
+            // thing a reader is waiting to be told about.
+            await announceNewEdition()
             // The two notices are said by the pass that started this, before it
             // handed the model's work over : both are answered by the store and
             // neither waits on a headline being written, and saying them twice

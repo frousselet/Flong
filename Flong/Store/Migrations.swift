@@ -1005,6 +1005,14 @@ nonisolated extension AppDatabase {
 
         migrator.registerMigration("v43.anImportThatSurvivesTheLaunch", migrate: createImportJob)
 
+        /// The digest as editions : a page made at an hour, and its archive.
+        ///
+        /// Both tables are local and derived, exactly as the stories they hold
+        /// are : another device works out the same ten from the same articles
+        /// and the same schedule, and sending them would spend records of
+        /// section 7's budget to say what the other end already knows.
+        migrator.registerMigration("v44.aPageMadeAtAnHour", migrate: createEditions)
+
         return migrator
     }
 
@@ -1055,6 +1063,59 @@ nonisolated extension AppDatabase {
             table.column("is_done", .boolean).notNull().defaults(to: false)
             table.primaryKey(["job_id", "stream_id"])
         }
+    }
+
+    /// The editions, and the ten stories each of them carries.
+    ///
+    /// `opened_at` is the identity rather than the key : it is the boundary the
+    /// edition belongs to, worked out from a schedule every device has, so two
+    /// devices in one time zone build one edition for one morning rather than
+    /// two. The unique index is what says so.
+    ///
+    /// The stories are copied rather than joined to. A story is derived data
+    /// and the grouping tidies away the ones that lose their members, so an
+    /// edition from last Tuesday joined to the story table would be a page that
+    /// shrank behind the reader's back. It is the same rule the library keeps
+    /// against the stream : what was kept is frozen, and what it was made from
+    /// may go. The identifier travels beside the frozen head, without a key, so
+    /// a row whose story is still there opens it and one whose story has gone
+    /// is a headline and nothing more.
+    private static func createEditions(_ db: Database) throws {
+        try db.create(table: "edition") { table in
+            table.primaryKey("id", .blob)
+            table.column("slot", .text).notNull()
+            table.column("opened_at", .datetime).notNull()
+            table.column("closed_at", .datetime)
+
+            // Both null until the model has written them. An edition wears no
+            // headline of its own until then and is not shown.
+            table.column("title", .text)
+            table.column("summary", .text)
+            table.column("brief_locale", .text)
+            table.column("brief_members", .text)
+
+            // When it became something the reader may be shown, which is when
+            // the whole of it had been written.
+            table.column("published_at", .datetime)
+            table.column("updated_at", .datetime).notNull()
+        }
+
+        try db.create(index: "edition_on_opened_at", on: "edition", columns: ["opened_at"], options: .unique)
+        try db.create(index: "edition_on_published_at", on: "edition", columns: ["published_at"])
+
+        try db.create(table: "edition_story") { table in
+            table.column("edition_id", .blob).notNull().references("edition", onDelete: .cascade)
+            table.column("position", .integer).notNull()
+            table.column("story_id", .blob).notNull()
+            table.column("title", .text).notNull()
+            table.column("summary", .text)
+            table.column("is_generated", .boolean).notNull().defaults(to: false)
+            table.column("is_translated", .boolean).notNull().defaults(to: false)
+            table.column("image_url", .text)
+            table.primaryKey(["edition_id", "position"])
+        }
+
+        try db.create(index: "edition_story_on_story", on: "edition_story", columns: ["story_id"])
     }
 
     /// Writes every stored byline the way ``Author/name(from:)`` spells it.

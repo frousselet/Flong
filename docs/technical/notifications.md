@@ -28,7 +28,7 @@ A refusal is final until the reader goes to the system settings : asking again d
 
 ## New stories
 
-The first of the four.
+One of the five.
 
 A story is several articles, from several newsrooms, about one thing : the unit of the front page, and the whole difference between watching a field and watching a list of what arrived. A story opening is the moment the press starts covering something, which is the one thing in a feed reader worth interrupting somebody for.
 
@@ -57,6 +57,18 @@ Everything that was already open when the reader turned the notices on is not ne
 **Several are counted in the title and listed in the body**, so the two always agree, and the headlines are joined by a middle dot rather than by commas : a headline may hold commas of its own, and a comma list of them reads as one long broken sentence. A tap opens nothing, several stories not being a place to go.
 
 Announced after the model has written the headlines rather than before, so what the reader is shown is the written headline and not the title of whichever article happened to be nearest the middle of the group.
+
+## A new edition
+
+The digest comes out four times a day now, at hours the reader sets, and an edition arriving is the one moment the front page has something to announce that the stories cannot. A story opening is a thing happening in the world ; an edition is the page itself, made and named.
+
+**The one notice whose words are already written.** Everything else here is a sentence assembled from names, which is why `Announcement` is a function from names to a sentence and why almost all of what can be wrong about a notification is decided there. An edition arrives carrying a headline and a few lines the model wrote over the whole page, in the reader's own language. Those are the notice. Writing anything of our own on top would be a third opinion about a page that already has one, and the edition's name goes on the line between as the attribution it is.
+
+**A tap opens the digest, and there is nowhere deeper to go.** The edition *is* the front page. So the notice carries neither a story nor an article, which is also why it carries no picture : the rule that a picture belongs only to a notice about one thing holds, and an edition is ten things.
+
+**The watermark is a boundary and not a clock.** Every other notice here is metered by when this device last spoke, because what each meters is a stream of things with no names of their own. An edition has one : it is the page of a moment, and the moment is its identity on every device. So what is written down is which edition was said, and an edition is said once however many passes go over it while it is the current one. It moves whether a notice was posted or not, like the others, and a reader who watched the page change is a reader who knows.
+
+**Nothing is said about a page that was published before the switch was thrown.** Turning the notice on stamps the current edition, so the first thing the reader hears about is the next one. A decision arriving from another device is the same case and is answered the same way.
 
 ## Every article of one source
 

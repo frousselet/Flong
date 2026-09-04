@@ -14,6 +14,7 @@
 		<string>com.rslt.Flong.refresh</string>
 		<string>com.rslt.Flong.processing</string>
 		<string>com.rslt.Flong.continued</string>
+		<string>com.rslt.Flong.edition</string>
 	</array>
 	<!-- Somebody invited to a shared collection who has not accepted yet has
 	     no identity for CloudKit to resolve : all the share carries is the

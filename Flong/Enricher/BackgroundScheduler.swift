@@ -36,6 +36,16 @@ nonisolated enum BackgroundScheduler {
     /// The one the reader starts themselves, and watches finish.
     static let continuedIdentifier = "com.rslt.Flong.continued"
 
+    /// The edition of the moment, asked for at the hour it comes out.
+    ///
+    /// **Its own identifier, and not a stage of the full pass.** The full pass
+    /// wants the mains and comes round every six hours with three quarters of
+    /// an hour of jitter on top, which is right for vectorizing a corpus and
+    /// wrong for a morning paper : a reader whose phone is not on charge at
+    /// four in the morning would have had no edition at all. This one asks for
+    /// a network and nothing else, at the boundary itself.
+    static let editionIdentifier = "com.rslt.Flong.edition"
+
     /// About what a refresh is given, and all it should count on.
     static let refreshBudget: TimeInterval = 25
 
@@ -243,7 +253,9 @@ nonisolated enum BackgroundScheduler {
         /// Registers the handlers. Must happen before the application finishes
         /// launching, or the system refuses the identifier for the whole run.
         static func register(
-            refresh: @escaping @Sendable () async -> Void, process: @escaping @Sendable () async -> Void
+            refresh: @escaping @Sendable () async -> Void,
+            process: @escaping @Sendable () async -> Void,
+            edition: @escaping @Sendable () async -> Void
         ) {
             BGTaskScheduler.shared.register(forTaskWithIdentifier: refreshIdentifier, using: nil) { task in
                 handle(task, budget: refreshBudget) { await runRefresh { await refresh() } }
@@ -260,6 +272,33 @@ nonisolated enum BackgroundScheduler {
                     continued.withLock { $0.progress = nil }
                 }
             }
+            BGTaskScheduler.shared.register(forTaskWithIdentifier: editionIdentifier, using: nil) { task in
+                handle(task, budget: nil) { await edition() }
+                // The next boundary is asked for by whatever knows the reader's
+                // schedule, which is the model : the request submitted here
+                // would be the floor and nothing more.
+            }
+        }
+
+        /// Asks for the moment the next edition comes out.
+        ///
+        /// **A moment and not an interval.** An edition is a page made at an
+        /// hour, so the request names that hour ; the system may of course be
+        /// late, and it often will be, which is why the foreground path builds
+        /// and names the edition too. Section 25 is explicit that background
+        /// time is a bonus and the foreground is the mechanism, and nothing
+        /// here forgets it.
+        ///
+        /// It asks for a network but not for the mains. A morning paper that
+        /// only arrived on a phone left charging overnight would be a morning
+        /// paper most readers never saw.
+        static func scheduleEdition(at moment: Date?) {
+            guard let moment else { return }
+            let request = BGProcessingTaskRequest(identifier: editionIdentifier)
+            request.requiresExternalPower = false
+            request.requiresNetworkConnectivity = true
+            request.earliestBeginDate = max(moment, Date(timeIntervalSinceNow: 60))
+            submit(request)
         }
 
         /// The bar the system draws for the task the reader started.
@@ -434,10 +473,22 @@ nonisolated enum BackgroundScheduler {
         /// The macOS equivalent, which asks for the same two kinds of time.
         private nonisolated(unsafe) static var refreshActivity: NSBackgroundActivityScheduler?
         private nonisolated(unsafe) static var processingActivity: NSBackgroundActivityScheduler?
+        private nonisolated(unsafe) static var editionActivity: NSBackgroundActivityScheduler?
 
         static func register(
-            refresh: @escaping @Sendable () async -> Void, process: @escaping @Sendable () async -> Void
+            refresh: @escaping @Sendable () async -> Void,
+            process: @escaping @Sendable () async -> Void,
+            edition: @escaping @Sendable () async -> Void
         ) {
+            // The editions, on the hour. `NSBackgroundActivityScheduler` finds
+            // an idle moment rather than a named one, so this asks every hour
+            // and the pass itself decides whether there is anything to do : an
+            // edition already made and already named is one query and no work,
+            // which is what makes asking often affordable.
+            editionActivity = activity(identifier: editionIdentifier, interval: 60 * 60) {
+                await edition()
+            }
+
             // The same floor a feed is held to anyway, so a Mac left with its
             // window behind another one is asked as often as a phone is. What
             // reaches a publisher is still decided per feed.
@@ -467,6 +518,10 @@ nonisolated enum BackgroundScheduler {
         /// `NSBackgroundActivityScheduler` repeats on its own, so there is
         /// nothing to ask for a second time.
         static func scheduleFullPass(now: Date = Date()) {}
+
+        /// `NSBackgroundActivityScheduler` repeats on its own, so there is
+        /// nothing to ask for a second time.
+        static func scheduleEdition(at moment: Date?) {}
 
         /// macOS has no equivalent, and needs none : an application that is open
         /// is an application that can simply do the work.

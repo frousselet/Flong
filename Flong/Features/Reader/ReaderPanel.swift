@@ -282,6 +282,7 @@ struct ReaderPanel: View {
         switch page {
         case .profile: ProfileSettings(model: model, close: close)
         case .appearance: AppearanceSettings(model: model, close: close)
+        case .editions: EditionSettings(model: model)
         case .popular: PoolSettings(model: model, close: close)
         case .sites: SiteSettings(model: model, close: close)
         case .data: DataSettings(model: model, close: close)
@@ -304,6 +305,8 @@ enum ReaderPage: Hashable, CaseIterable {
     case profile
     /// The face the page is set in, and the paper it is printed on.
     case appearance
+    /// When the four editions of the digest come out.
+    case editions
     /// What they offer the other readers, and who they brought in.
     case popular
     /// The sites they pay for and are signed in to.
@@ -319,6 +322,7 @@ enum ReaderPage: Hashable, CaseIterable {
         switch self {
         case .profile: "Profile"
         case .appearance: "Appearance"
+        case .editions: "Editions"
         case .popular: "Popular feeds"
         case .sites: "Subscribed sites"
         case .data: "Your data"
@@ -330,6 +334,7 @@ enum ReaderPage: Hashable, CaseIterable {
         switch self {
         case .profile: "person.crop.circle"
         case .appearance: "paintpalette"
+        case .editions: "newspaper"
         case .popular: "person.2"
         case .sites: "key"
         case .data: "icloud"
@@ -342,6 +347,7 @@ enum ReaderPage: Hashable, CaseIterable {
         switch self {
         case .profile: "reader-profile"
         case .appearance: "reader-appearance"
+        case .editions: "reader-editions"
         case .popular: "reader-popular"
         case .sites: "reader-sites"
         case .data: "reader-data"

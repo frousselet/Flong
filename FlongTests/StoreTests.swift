@@ -40,6 +40,7 @@ struct StoreTests {
             "pool_list", "pool_entry", "pool_trust",
             "pool_vouch", "pool_authorised", "pool_ban", "pool_block", "pending_deletion",
             "share_member", "shared_removal",
+            "edition", "edition_story",
         ]
         #expect(expected.isSubset(of: tables))
     }
@@ -70,6 +71,7 @@ struct StoreTests {
                 "v41.aHeadlineWithNoLineUnderIt",
                 "v42.carriedAcrossRatherThanWritten",
                 "v43.anImportThatSurvivesTheLaunch",
+                "v44.aPageMadeAtAnHour",
             ]
         )
     }
