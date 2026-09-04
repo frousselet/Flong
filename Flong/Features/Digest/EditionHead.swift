@@ -66,6 +66,10 @@ struct EditionHead: View {
                     .font(.footnote)
             }
             .buttonStyle(.plain)
+            // An identifier beside the name, because the name is translated and
+            // a test that looked for the English would pass here and fail on a
+            // device set to the reader's own language.
+            .accessibilityIdentifier("edition-archive")
             .foregroundStyle(.tint)
             .padding(.top, 2)
         }
