@@ -28,7 +28,7 @@ nonisolated struct EditionBrief: Hashable, Sendable {
 nonisolated struct GeneratedEditionPoints {
     @Guide(
         description:
-            "The three to five things worth knowing, one short sentence of at most 120 characters each, no numbering",
+            "The two or three things worth knowing, one short sentence of at most 120 characters each, no numbering",
         .maximumCount(EditionSummarizer.mostPoints)
     )
     var points: [String]
@@ -57,13 +57,13 @@ nonisolated struct GeneratedEditionPoints {
 nonisolated struct EditionSummarizer: Sendable {
     /// How many points an edition ever carries.
     ///
-    /// **Five, and it was a paragraph.** Asked for two or three sentences over
-    /// ten stories the model wrote one clause per story and joined them with
-    /// commas : seven items and eight lines of type under the headline, which
-    /// is the shape a reader's eye slides off. Five is what a person takes in
-    /// at a glance and half of what the page below them holds, so the list says
-    /// what matters rather than repeating the page in prose.
-    static let mostPoints = 5
+    /// **Three, and it was a paragraph.** Asked for two or three sentences
+    /// over ten stories the model wrote one clause per story and joined them
+    /// with commas : seven items and eight lines of type under the headline,
+    /// which is the shape a reader's eye slides off. It was cut to five, which
+    /// was still most of a screen before the first headline. Three is what an
+    /// edition is actually about, and what is left is on the page underneath.
+    static let mostPoints = 3
 
     /// The fewest worth calling a list.
     ///
@@ -208,7 +208,7 @@ nonisolated struct EditionSummarizer: Sendable {
 
         do {
             let generated = try await session.respond(
-                to: "\(fault) Write only the points : three to five things worth knowing, one short sentence "
+                to: "\(fault) Write only the points : two or three things worth knowing, one short sentence "
                     + "each, no numbering.",
                 generating: GeneratedEditionPoints.self,
                 options: OnDeviceModel.options(maximumTokens: Self.reservedTokens)
@@ -237,7 +237,7 @@ nonisolated struct EditionSummarizer: Sendable {
             return "One of those points gives a date. Write them again with no date, no year and no day."
         }
         if points.count < leastPoints {
-            return "That is not a list. Write three to five things worth knowing, one short sentence each."
+            return "That is not a list. Write two or three things worth knowing, one short sentence each."
         }
         if let long = points.first(where: { !isBrief($0) }) {
             return
@@ -294,7 +294,7 @@ nonisolated struct EditionSummarizer: Sendable {
 
         return """
             These are the stories on the reader's front page, in the order the page shows them. \
-            List the three to five things worth knowing.
+            List the two or three things worth knowing.
 
             \(lines.joined(separator: "\n"))
 
@@ -311,9 +311,13 @@ nonisolated struct EditionSummarizer: Sendable {
     static let instructions = """
         You are the editor of a daily digest, writing the few lines that stand at the top of one edition.
 
-        Three to five things worth knowing, one short sentence each, one thing to a line, in the order they \
+        Two or three things worth knowing, one short sentence each, one thing to a line, in the order they \
         matter. Every word carries information : a fact, a figure, a named actor or a verb of action. \
         No jargon, no abstraction, no wordplay.
+
+        Say what happened, not who said it. Write `A Russian drone hit the SBU headquarters in Kyiv`, \
+        never `The president says a Russian drone hit the SBU headquarters in Kyiv`. Name the speaker only \
+        where the speaking is itself the news, as in a resignation, a denial or a decision announced.
 
         No numbering and no bullet characters, the page draws its own. Never say more than these stories \
         say. Never give a date, a year or a day. Never end a line with `and more` or anything like it.
@@ -330,8 +334,10 @@ nonisolated struct EditionSummarizer: Sendable {
         to. Your task is to condense them : to say in a few lines what these published headlines say. \
         You are not writing about the events. You are restating what has already been written.
 
-        Three to five of them, restated, one short sentence each, one to a line, in the order they matter. \
-        No numbering and no bullet characters. Never say more than these headlines say. Never give a date, \
-        a year or a day.
+        Two or three of them, restated, one short sentence each, one to a line, in the order they matter. \
+        Restate what happened rather than who reported it : `A Russian drone hit the SBU headquarters in \
+        Kyiv`, never `The president says a Russian drone hit the SBU headquarters in Kyiv`. Name the \
+        speaker only where the speaking is itself the news. No numbering and no bullet characters. Never \
+        say more than these headlines say. Never give a date, a year or a day.
         """
 }
