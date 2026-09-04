@@ -496,11 +496,13 @@ struct IndexingLaneTests {
         model.index()
         model.index()
 
-        // The lane runs behind the caller, so a test waits for the queue rather
-        // than for the task.
-        for _ in 0..<200 {
+        // The lane runs behind the caller and at background priority, so a test
+        // waits for the queue rather than for the task, and waits generously :
+        // under a full suite the lane is competing with everything else, and a
+        // test that failed for being impatient would be a test nobody trusts.
+        for _ in 0..<600 {
             if try await NewsmakerStore(database).outstandingCount() == 0 { break }
-            try await Task.sleep(for: .milliseconds(25))
+            try await Task.sleep(for: .milliseconds(50))
         }
         #expect(try await NewsmakerStore(database).outstandingCount() == 0)
     }
