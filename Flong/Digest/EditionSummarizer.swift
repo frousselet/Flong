@@ -24,6 +24,20 @@ nonisolated struct EditionBrief: Hashable, Sendable {
     let askedIn: Locale
 }
 
+/// The lines alone, where the name is settled and the lines are not.
+///
+/// A shape of its own rather than ``GeneratedEdition`` with its first field
+/// thrown away : a model asked to name the page names it again, and a name
+/// written a second time may not be the one already accepted.
+@Generable
+nonisolated struct GeneratedEditionLine {
+    @Guide(
+        description:
+            "What is happening, in two or three whole sentences, naming the two or three things that matter most"
+    )
+    var summary: String
+}
+
 /// The shape the model fills in for a whole page.
 @Generable
 nonisolated struct GeneratedEdition {
@@ -62,16 +76,26 @@ nonisolated struct EditionSummarizer: Sendable {
     /// furniture at the same size, above a page rather than above a story.
     static let maximumTitleWords = StorySummarizer.maximumTitleWords
 
-    /// How many words the line under it may run to.
+    /// How many words the lines under it may run to.
     ///
-    /// More than a story's forty-five, and not much more. A story's line states
-    /// one angle ; this one has to name two or three things and join them,
-    /// which is a sentence more. Sixty is a paragraph's worth and no further :
-    /// past that it is not a summary of the page, it is the page.
-    static let maximumSummaryWords = 60
+    /// **Twice a story's forty-five, and it was measured rather than guessed.**
+    /// A story's line states one angle and is over ; this one stands over as
+    /// many as ten stories, and what the model actually writes for a real
+    /// morning is a clause apiece for the four or five that matter. Sixty was
+    /// the first guess and every real page overran it, so every real page was
+    /// asked again twice and kept its first answer anyway : a ceiling nothing
+    /// passes is not a ceiling, it is three wasted calls to the model.
+    ///
+    /// Ninety is still a ceiling. What it is for is the model that writes the
+    /// page out in full, and past that it is not a summary of the page, it is
+    /// the page.
+    static let maximumSummaryWords = 90
 
     /// What is kept for the answer, whatever the prompt costs.
     static let reservedTokens = 500
+
+    /// And what is kept for an answer that is the lines alone.
+    static let reservedLineTokens = 300
 
     /// How much of a story's own line is shown.
     ///
@@ -153,15 +177,30 @@ nonisolated struct EditionSummarizer: Sendable {
 
             OnDeviceModel.succeeded()
 
-            // The same three checks a story's brief is held to, and one asked
-            // for again rather than thrown away : the session still holds what
-            // it just wrote, so the cheapest question there is is to put the
-            // fault to it once.
-            if let fault = Self.fault(title: title, summary: summary, in: locale, over: stories) {
-                return await retry(in: session, of: model, saying: fault)
+            let written = EditionBrief(title: title, summary: summary, askedIn: locale)
+
+            // The checks a story's brief is held to, asked over a page, and one
+            // asked for again rather than thrown away : the session still holds
+            // what it just wrote, so putting the fault to it once is the
+            // cheapest question there is.
+            guard let fault = Self.fault(title: title, summary: summary, in: locale, over: stories) else {
+                return .wrote(written)
             }
 
-            return .wrote(EditionBrief(title: title, summary: summary, askedIn: locale))
+            // **And the answer stands if the asking does not improve it.**
+            // These checks are style and the rule above them is not : every
+            // edition carries a headline and a line the model wrote, without
+            // exception, and an edition declined is a front page that does not
+            // exist. Measured on a real morning, the model named six unrelated
+            // stories with a list of two of them and wrote the same list again
+            // underneath ; asked twice more it wrote it a third time. A page
+            // whose line reads like its name is a worse page. A reader with no
+            // page at all is worse than that.
+            switch await retry(in: session, of: model, over: stories, saying: fault) {
+            case .wrote(let better): return .wrote(better)
+            case .unusable: return .unusable
+            case .declined: return .wrote(written)
+            }
         } catch {
             // A rate limit, an asset still downloading or a language this model
             // does not write says nothing about this page, and stamping the
@@ -176,14 +215,21 @@ nonisolated struct EditionSummarizer: Sendable {
         }
     }
 
-    /// One more ask, in the same session, about the one thing that was wrong.
+    /// One more ask, in the same session, about the one thing that was wrong ;
+    /// and then, if that is still wrong, the lines on their own.
     ///
-    /// Once and never twice : a model that has been told twice and answered
-    /// badly twice is a model that will answer badly a third time, and the page
-    /// is better off asked again when it has changed.
+    /// **The single field is the move that actually works**, and the story
+    /// briefs found it first. The whole brief asked again puts an approved name
+    /// back in play and, sampling being greedy, very often comes back word for
+    /// word the same : the first real page named here answered `Deux ouvriers
+    /// sauvés au Népal, Gaël Monfils éliminé, et plus` twice, was asked again,
+    /// and answered it a third time. What is left to ask by then is two
+    /// sentences, which is the cheapest question there is to put and the one
+    /// the session already has everything it needs to answer.
     private func retry(
         in session: LanguageModelSession,
         of model: SystemLanguageModel,
+        over stories: [(title: String, summary: String?)],
         saying fault: String
     ) async -> Outcome {
         do {
@@ -195,9 +241,48 @@ nonisolated struct EditionSummarizer: Sendable {
 
             let title = generated.title.trimmingCharacters(in: .whitespacesAndNewlines)
             let summary = generated.summary.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !title.isEmpty, !summary.isEmpty else { return .declined }
-            guard Self.isShort(title), Self.isBrief(summary) else { return .declined }
-            guard StorySummarizer.isWritten(in: locale, title: title, summary: summary) else { return .declined }
+            guard !title.isEmpty, !summary.isEmpty, Self.isShort(title) else { return .declined }
+
+            OnDeviceModel.succeeded()
+            guard Self.fault(title: title, summary: summary, in: locale, over: stories) != nil else {
+                return .wrote(EditionBrief(title: title, summary: summary, askedIn: locale))
+            }
+
+            // The name is settled by now and accepted twice over. What is left
+            // wrong is the lines, so the lines are what is asked for. Whatever
+            // that comes back with, the answer already in hand stands rather
+            // than the page being left unwritten.
+            switch await line(under: title, in: session, over: stories) {
+            case .wrote(let better): return .wrote(better)
+            case .unusable: return .unusable
+            case .declined: return .wrote(EditionBrief(title: title, summary: summary, askedIn: locale))
+            }
+        } catch {
+            OnDeviceModel.refused(error)
+            return OnDeviceModel.isTheModelItself(error) ? .unusable : .declined
+        }
+    }
+
+    /// The lines on their own, under a name that is settled.
+    private func line(
+        under title: String,
+        in session: LanguageModelSession,
+        over stories: [(title: String, summary: String?)]
+    ) async -> Outcome {
+        do {
+            let generated = try await session.respond(
+                to: "Keep that name. Write only the lines under it, in two or three whole sentences, "
+                    + "saying what happened in the two or three stories that matter most. "
+                    + "Do not repeat the name.",
+                generating: GeneratedEditionLine.self,
+                options: OnDeviceModel.options(maximumTokens: Self.reservedLineTokens)
+            ).content
+
+            let summary = generated.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !summary.isEmpty else { return .declined }
+            guard Self.fault(title: title, summary: summary, in: locale, over: stories) == nil else {
+                return .declined
+            }
 
             OnDeviceModel.succeeded()
             return .wrote(EditionBrief(title: title, summary: summary, askedIn: locale))
@@ -224,8 +309,28 @@ nonisolated struct EditionSummarizer: Sendable {
         if !isShort(title) {
             return "That name is too long. Write it again in at most ten words."
         }
+        // **The page is not its lead.** The instruction says so and a model of
+        // this size does not hold it : shown six headlines it hands back the
+        // first one, and the page then reads the same sentence twice over, once
+        // as the name of the edition and again as the headline directly under
+        // it. It is checked against the headlines it was actually shown, which
+        // is exact, cheap, and says nothing about any language.
+        if stories.contains(where: { StorySummarizer.repeats($0.title, in: title) }) {
+            return "That name is one of the headlines. Write a name for the whole page instead, saying what "
+                + "these stories add up to."
+        }
         if !isBrief(summary) {
             return "That summary is too long. Write it again in two or three sentences."
+        }
+        // **A line that repeats the name has spent the only lines the page
+        // gets saying nothing new.** The story briefs have checked this from
+        // the beginning and the edition did not, and the model does exactly
+        // what it does there : the first real page it named came back with the
+        // name and the summary word for word the same, `Deux ouvriers sauvés au
+        // Népal, Gaël Monfils éliminé, et plus`, twice over.
+        if StorySummarizer.repeats(title, in: summary) {
+            return "That summary repeats the name. Write it again, saying what happened in the two or three "
+                + "stories that matter most."
         }
         if OnDeviceModel.writes(locale), !StorySummarizer.isWritten(in: locale, title: title, summary: summary) {
             return OnDeviceModel.languageReminder(for: locale)
@@ -281,9 +386,10 @@ nonisolated struct EditionSummarizer: Sendable {
         The name is not the first headline rewritten. It stands over all of these stories, so it names \
         what they add up to, or the two things a reader would mention first.
 
-        The lines under it say what is happening : two or three sentences, naming the two or three stories \
-        that matter most and what happened in them. Prefer a fact, a figure or a named actor to a general \
-        statement.
+        The lines under it say what is happening : two or three whole sentences, naming the two or three \
+        stories that matter most and what happened in them. Prefer a fact, a figure or a named actor to a \
+        general statement. They are not the name again in other words, and they never end with `and more` \
+        or anything like it.
 
         Never say more than these stories say. Never give a date, a year or a day.
         """
@@ -302,7 +408,9 @@ nonisolated struct EditionSummarizer: Sendable {
         The name says what these headlines amount to. At most ten words, every one of them carrying \
         information. No jargon, no wordplay. It is not the first headline rewritten : it stands over all of them.
 
-        The lines under it restate the two or three headlines that matter most, in two or three sentences.
+        The lines under it restate the two or three headlines that matter most, in two or three whole \
+        sentences. They are not the name again in other words, and they never end with `and more` or \
+        anything like it.
 
         Never say more than these headlines say. Never give a date, a year or a day.
         """

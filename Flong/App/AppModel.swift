@@ -2360,6 +2360,11 @@ final class AppModel {
             await self.digestService.buildStories()
             await self.digestService.buildEditions(self.preferences.editionSchedule)
 
+            // Filled again after the collection and the model have both had
+            // their turn, since only a story the model has written about may
+            // stand on a page.
+            await self.digestService.buildEditions(self.preferences.editionSchedule)
+
             self.moveWork(to: .naming)
             await self.digestService.briefEditions(
                 until: Date().addingTimeInterval(BackgroundScheduler.fullPassBudget),
@@ -2448,6 +2453,7 @@ final class AppModel {
         // never asked for.
         await digestService.enrich(
             until: Date().addingTimeInterval(BackgroundScheduler.fullPassBudget),
+            schedule: preferences.editionSchedule,
             onWriting: progress(of: .writing),
             onFiling: progress(of: .filing),
             onNaming: progress(of: .naming),
@@ -4393,6 +4399,7 @@ final class AppModel {
 
             await digestService.enrich(
                 until: deadline,
+                schedule: preferences.editionSchedule,
                 onWriting: progress(of: .writing),
                 onFiling: progress(of: .filing),
                 onNaming: progress(of: .naming),

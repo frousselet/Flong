@@ -332,6 +332,76 @@ struct EditionBriefWorkTests {
     }
 }
 
+/// The checks an edition's own headline is held to, which are a story's checks
+/// asked over a page.
+@Suite("What an edition's headline is held to")
+struct EditionBriefChecksTests {
+    private let french = Locale(identifier: "fr_FR")
+    private let page: [(title: String, summary: String?)] = [
+        ("Deux ouvriers sauvés au Népal", "Neuf jours après la catastrophe."),
+        ("Gaël Monfils éliminé à l'US Open", "Au deuxième tour, en quatre sets."),
+    ]
+
+    @Test("A name of twenty words is a sentence, and is asked for again")
+    func tooLong() {
+        let long = String(repeating: "mot ", count: 20)
+        #expect(EditionSummarizer.fault(title: long, summary: "Une phrase.", in: french, over: page) != nil)
+    }
+
+    /// **The one the first real page tripped over.** The model named a morning
+    /// `Deux ouvriers sauvés au Népal, Gaël Monfils éliminé, et plus` and wrote
+    /// the same sentence again underneath, word for word. The story briefs have
+    /// checked for exactly that from the beginning ; the edition did not.
+    @Test("A summary that repeats the name has said nothing, and is asked for again")
+    func repeatsTheName() {
+        let name = "Deux ouvriers sauvés au Népal, Gaël Monfils éliminé"
+        #expect(EditionSummarizer.fault(title: name, summary: name, in: french, over: page) != nil)
+    }
+
+    /// **The page is not its lead.** Shown six headlines the model hands back
+    /// the first one, and the page then reads the same sentence twice : once as
+    /// the name of the edition and again as the headline directly under it.
+    /// Measured on a real morning, which is where it was found.
+    @Test("A name that is one of the headlines is asked for again")
+    func namedAfterItsLead() {
+        #expect(
+            EditionSummarizer.fault(
+                title: "Deux ouvriers sauvés au Népal",
+                summary: "Neuf jours après la catastrophe, deux hommes sont sortis vivants.",
+                in: french,
+                over: page
+            ) != nil
+        )
+    }
+
+    @Test("A name and a line that each say something are left alone")
+    func settled() {
+        #expect(
+            EditionSummarizer.fault(
+                title: "Sauvetage au Népal et sortie de Monfils",
+                summary: "Deux ouvriers ont été retrouvés vivants neuf jours après la catastrophe. "
+                    + "Gaël Monfils a quitté l'US Open au deuxième tour.",
+                in: french,
+                over: page
+            ) == nil
+        )
+    }
+
+    /// The page already says when every story on it arrived, and the model is
+    /// shown no dates at all, so a year in a name is a year it invented.
+    @Test("A year nothing on the page mentions is asked for again")
+    func inventedYear() {
+        #expect(
+            EditionSummarizer.fault(
+                title: "Le bilan de 2019",
+                summary: "Deux ouvriers ont été retrouvés vivants.",
+                in: french,
+                over: page
+            ) != nil
+        )
+    }
+}
+
 @Suite("Telling the reader an edition has come out")
 struct EditionNoticeTests {
     private func edition(title: String?, summary: String?) -> Edition {
@@ -407,31 +477,27 @@ struct IndexingLaneTests {
         }
     }
 
-    /// The point of the lane, said as plainly as a test can say it : asking for
-    /// indexing returns at once, and the work happens behind.
-    @Test("Asking for indexing does not wait for it")
-    func doesNotWait() async throws {
-        try await article(named: "Une réforme", about: "Claire Ancelin")
-
-        model.index()
-
-        // Nothing has been awaited, so the queue is still exactly as it was :
-        // whatever the lane does, it does not do it before returning.
-        #expect(try await NewsmakerStore(database).outstandingCount() > 0)
-    }
-
-    /// What the lane does is bring the index up to what the store says now, so
-    /// two requests and one are the same request. A second while the first runs
-    /// is remembered rather than queued.
-    @Test("The lane drains the queue, and asking twice is asking once")
+    /// **The point of the lane is in the call and not in the timing.**
+    /// `index()` is not `async` : there is no `await` at any of its call sites,
+    /// so no gesture, no render and no store tick can wait on it, which is the
+    /// whole of what `indexing always happens behind` means. A test that
+    /// asserted the queue was still full a line later would be asserting that
+    /// the lane is slow, which is neither true nor wanted.
+    ///
+    /// What is worth pinning is the other half : it does get done, and asking
+    /// twice is asking once, since what the lane does is bring the index up to
+    /// what the store says now.
+    @Test("The lane is never waited on, and drains the queue all the same")
     func drains() async throws {
         try await article(named: "Une réforme", about: "Claire Ancelin")
+        #expect(try await NewsmakerStore(database).outstandingCount() > 0)
 
+        // No `await` : that is the property.
         model.index()
         model.index()
 
-        // The lane runs at background priority behind the caller, so a test
-        // waits for the queue rather than for the task.
+        // The lane runs behind the caller, so a test waits for the queue rather
+        // than for the task.
         for _ in 0..<200 {
             if try await NewsmakerStore(database).outstandingCount() == 0 { break }
             try await Task.sleep(for: .milliseconds(25))

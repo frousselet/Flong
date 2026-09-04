@@ -613,9 +613,17 @@ nonisolated struct DigestService: Sendable {
     /// A slice each, in turn, until there is nothing left to do or no time left
     /// to do it in. Neither half can starve the other, and both stop cleanly on
     /// a batch that changed nothing.
+    /// - Parameter schedule: when the reader's editions come out. The page is
+    ///   filled again between the briefs and the naming, and it has to be : a
+    ///   story is only eligible for an edition once the model has written about
+    ///   it, and the pass that builds the page runs before the pass that
+    ///   writes. Built once at grouping time it found nothing eligible, stayed
+    ///   empty for the whole of its life, and was stamped as a page the model
+    ///   declined to name. Filling it here is what closes the circle.
     func enrich(
         until deadline: Date? = nil,
         now: Date = Date(),
+        schedule: EditionSchedule = .standard,
         onWriting: @escaping @Sendable (Int, Int) -> Void = { _, _ in },
         onFiling: @escaping @Sendable (Int, Int) -> Void = { _, _ in },
         onNaming: @escaping @Sendable (Int, Int) -> Void = { _, _ in },
@@ -639,6 +647,15 @@ nonisolated struct DigestService: Sendable {
             // cheapest of the three, being one call for the whole page, so
             // going last costs it nothing : what the other two leave it is
             // always enough for one ask.
+            //
+            // The page is filled again first. Only a story the model has
+            // written about may stand on an edition, and the pass that fills
+            // the page runs at grouping time, before a word has been written :
+            // built once and never again, the morning edition found nothing
+            // eligible, stayed empty for the whole of its life, and was stamped
+            // as a page the model had declined to name.
+            await buildEditions(schedule, now: now)
+
             onPhase(.naming)
             let named = await briefEditions(
                 until: min(Date().addingTimeInterval(Self.enrichmentSlice), end), now: now, onProgress: onNaming)
@@ -651,12 +668,15 @@ nonisolated struct DigestService: Sendable {
     func rebuild(
         until deadline: Date? = nil,
         now: Date = Date(),
+        schedule: EditionSchedule = .standard,
         onWriting: @escaping @Sendable (Int, Int) -> Void = { _, _ in },
         onFiling: @escaping @Sendable (Int, Int) -> Void = { _, _ in },
         onPhase: @Sendable (WorkPhase) -> Void = { _ in }
     ) async -> StoryBuilder.Summary {
         let summary = await buildStories(now: now)
-        await enrich(until: deadline, now: now, onWriting: onWriting, onFiling: onFiling, onPhase: onPhase)
+        await enrich(
+            until: deadline, now: now, schedule: schedule,
+            onWriting: onWriting, onFiling: onFiling, onPhase: onPhase)
         return summary
     }
 
