@@ -199,7 +199,14 @@ struct TextPlaceholder: View {
 struct EditionPlaceholder: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            ForEach(Self.points, id: \.self) { lines in
+            // **Keyed by where it stands and not by what it holds.** These are
+            // three points of two, one and two lines, and `id: \.self` over
+            // that is the identity 2 twice : SwiftUI says so at runtime and
+            // then gives undefined results, which for a placeholder means a bar
+            // that flickers or does not animate out with its neighbours. What
+            // identifies a bar here is its place in the list, nothing else
+            // about it being its own.
+            ForEach(Array(Self.points.enumerated()), id: \.offset) { _, lines in
                 HStack(alignment: .top, spacing: 10) {
                     Rectangle()
                         .frame(width: 14, height: 1)
