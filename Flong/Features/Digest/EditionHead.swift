@@ -547,7 +547,7 @@ struct PaneSurface: ViewModifier {
             .background {
                 shape
                     .fill(veil)
-                    .shadow(color: .black.opacity(scheme == .dark ? 0.45 : 0.30), radius: 22, y: 6)
+                    .shadow(color: .black.opacity(scheme == .dark ? 0.35 : 0.30), radius: 22, y: 6)
             }
             // The rim, and it is what says the material more than the veil
             // does : a bright hairline where the light would catch the top
@@ -559,7 +559,7 @@ struct PaneSurface: ViewModifier {
 
     /// The white the page shows through.
     private var veil: Color {
-        .white.opacity(scheme == .dark ? 0.10 : 0.34)
+        .white.opacity(scheme == .dark ? 0.05 : 0.34)
     }
 
     /// The line round it : all the way round, and brightest at the top.
@@ -577,7 +577,7 @@ struct PaneSurface: ViewModifier {
     private var rim: LinearGradient {
         LinearGradient(
             colors: scheme == .dark
-                ? [.white.opacity(0.40), .white.opacity(0.16)]
+                ? [.white.opacity(0.14), .white.opacity(0.07)]
                 : [.white, .white.opacity(0.70)],
             startPoint: .top,
             endPoint: .bottom
