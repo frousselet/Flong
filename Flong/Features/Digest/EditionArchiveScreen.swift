@@ -143,7 +143,7 @@ struct EditionScreen: View {
                 if let published, case let edition = published.edition {
                     VStack(alignment: .leading, spacing: Editorial.tightRhythm) {
                         if !edition.points.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 18) {
                                 ForEach(Array(edition.points.enumerated()), id: \.offset) { index, point in
                                     HStack(alignment: .firstTextBaseline, spacing: 10) {
                                         Image(systemName: mark(of: published, at: index))
@@ -157,6 +157,7 @@ struct EditionScreen: View {
                                 }
                             }
                             .font(.title3)
+                            .lineSpacing(EditionHead.leading)
                             .foregroundStyle(.primary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 4)
