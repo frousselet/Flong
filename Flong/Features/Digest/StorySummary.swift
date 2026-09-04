@@ -85,15 +85,17 @@ struct StorySummary: View {
     /// of a read headline is built exactly this way, a screen away in
     /// ``ArticleRow``.
     private var line: Text {
-        let sentence = Text(verbatim: summary)
-        guard isGenerated else { return sentence }
+        guard isGenerated else { return Text(verbatim: summary) }
 
         // A step quieter than the words it stands in front of, and a size
         // under them : it says who wrote them and is not one of them.
-        return Text(Image(systemName: mark))
+        let badge = Text(Image(systemName: mark))
             .font(markFont)
             .foregroundStyle(.tertiary)
-            + Text(verbatim: " ") + sentence
+        return Text(
+            "\(badge) \(Text(verbatim: summary))",
+            comment: "A machine-written summary, behind the mark that says who wrote it"
+        )
     }
 
     /// **Two marks, because they say two things.** A summary written on this

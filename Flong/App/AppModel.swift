@@ -884,7 +884,7 @@ final class AppModel {
     }
 
     /// A progress callback for the jobs, which are all `nonisolated`.
-    private func progress(of phase: WorkPhase) -> @Sendable (Int, Int) -> Void {
+    private nonisolated func progress(of phase: WorkPhase) -> @Sendable (Int, Int) -> Void {
         { [weak self] done, total in
             Task { @MainActor [weak self] in self?.advance(phase, done: done, total: total) }
         }
@@ -1262,7 +1262,7 @@ final class AppModel {
                 // once the gesture is over and the control has had time to
                 // retract, which is also the reload that gesture needs.
                 var waited = false
-                while await self?.isRefreshing == true {
+                while self?.isRefreshing == true {
                     waited = true
                     try? await Task.sleep(for: StoreChanges.settling)
                 }
@@ -1277,7 +1277,7 @@ final class AppModel {
             // a finished task in it left the window deaf for the rest of the
             // process with nothing but a log line to show for it. Coming back
             // to the foreground calls this again.
-            await self?.stopWatching()
+            self?.stopWatching()
         }
 
         startTheClock(.launch)
@@ -2148,7 +2148,7 @@ final class AppModel {
     /// Not in a migration : the names are in the reader's language, and a
     /// migration runs before anything has asked what that is.
     func seedStandardTopics() async {
-        try? await TopicPreferences(database).seedStandards()
+        _ = try? await TopicPreferences(database).seedStandards()
     }
 
     func loadKnownTopics() async {
@@ -2161,7 +2161,7 @@ final class AppModel {
         let preferences = TopicPreferences(database)
         try? await preferences.clear(topic)
         if direction != 0 {
-            try? await preferences.adjust(topic, by: direction)
+            _ = try? await preferences.adjust(topic, by: direction)
         }
 
         await loadKnownTopics()
@@ -2170,7 +2170,7 @@ final class AppModel {
 
     /// Adds a subject of the reader's own, which the model then files under.
     func addTopic(_ name: String, symbol: String? = nil) async {
-        try? await TopicPreferences(database).add(name, symbol: symbol)
+        _ = try? await TopicPreferences(database).add(name, symbol: symbol)
         await loadKnownTopics()
         await loadDigest()
     }
@@ -2204,7 +2204,7 @@ final class AppModel {
     /// The page is read again straight away : a preference nobody can see the
     /// effect of is a preference nobody trusts.
     func prefer(_ topic: String, by delta: Int) async {
-        try? await TopicPreferences(database).adjust(topic, by: delta)
+        _ = try? await TopicPreferences(database).adjust(topic, by: delta)
         await loadDigest()
         await loadKnownTopics()
     }
@@ -4765,7 +4765,7 @@ final class AppModel {
         // root is in without anybody having let them in, and a device that
         // waited for a record to arrive before working that out would tell the
         // author they were waiting for a sponsorship that cannot come.
-        try? await pool.resolve()
+        _ = try? await pool.resolve()
         await loadPoolStanding()
     }
 

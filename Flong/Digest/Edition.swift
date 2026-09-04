@@ -213,7 +213,7 @@ nonisolated struct Edition: Identifiable, Hashable, StoredRecord {
     }
 }
 
-extension Edition {
+nonisolated extension Edition {
     enum Columns {
         static let id = Column(CodingKeys.id)
         static let slot = Column(CodingKeys.slot)

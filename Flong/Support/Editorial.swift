@@ -264,14 +264,19 @@ struct ArticleMoment: View {
         }
     }
 
+    /// Whole sentences rather than pieces joined end to end : a language that
+    /// wants the second date first, or a different stop between the two, has
+    /// nowhere to say so when the joining is done here.
     private var spoken: Text {
-        let when =
-            isDated
-            ? Text("Published on \(date, format: Self.spelled)")
-            : Text("Received on \(date, format: Self.spelled)")
+        guard let updated = updatedAt else {
+            return isDated
+                ? Text("Published on \(date, format: Self.spelled)")
+                : Text("Received on \(date, format: Self.spelled)")
+        }
 
-        guard let updated = updatedAt else { return when }
-        return when + Text(verbatim: ". ") + Text("updated on \(updated, format: Self.spelled)")
+        return isDated
+            ? Text("Published on \(date, format: Self.spelled). Updated on \(updated, format: Self.spelled)")
+            : Text("Received on \(date, format: Self.spelled). Updated on \(updated, format: Self.spelled)")
     }
 
     /// How a moment is written in a row : the day, the month and the hour, with

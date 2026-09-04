@@ -171,7 +171,10 @@ actor PoolExchange {
     /// same as folding it in once.
     @discardableResult
     func refresh() async -> Bool {
-        await readAuthority()
+        // Whether the graph grew is not asked : a walk that let somebody in
+        // forgets the cursor, so their lists are fetched by the loop below and
+        // counted there.
+        _ = await readAuthority()
 
         var since = await cursor()
         var absorbed = 0

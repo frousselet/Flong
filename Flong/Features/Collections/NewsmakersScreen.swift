@@ -185,8 +185,8 @@ struct NewsmakerRow: View {
             // the count keeps the plural the rest of the application has and
             // the name stays a name in every language.
             .accessibilityLabel(
-                Text(verbatim: newsmaker.name) + Text(verbatim: ", ") + Text("\(newsmaker.count) articles")
-                    + Text(verbatim: named.isEmpty ? "" : ", " + named.joined(separator: ", "))
+                ([newsmaker.name, String(localized: "\(newsmaker.count) articles")] + named)
+                    .joined(separator: ", ")
             )
 
             Button(action: favourite) {

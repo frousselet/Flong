@@ -186,14 +186,14 @@ struct AuthorRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityElement(children: .combine)
-            // Built out of the two pieces rather than written as one sentence,
-            // so the count keeps the plural the rest of the application already
-            // has and the name stays a name in every language.
+            // Built out of the pieces rather than written as one sentence, so
+            // the count keeps the plural the rest of the application already
+            // has and the name stays a name in every language. The marks say
+            // where in a shape, and say nothing at all to a reader who is
+            // listening to the page.
             .accessibilityLabel(
-                Text(verbatim: author.name) + Text(verbatim: ", ") + Text("\(author.count) articles")
-                    // The marks say where in a shape, and say nothing at all to
-                    // a reader who is listening to the page.
-                    + Text(verbatim: named.isEmpty ? "" : ", " + named.joined(separator: ", "))
+                ([author.name, String(localized: "\(author.count) articles")] + named)
+                    .joined(separator: ", ")
             )
 
             Button(action: favourite) {

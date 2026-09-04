@@ -833,11 +833,13 @@ struct ArticleRow: View {
     /// looks stale, and a story worth reading is worth reading whether it has
     /// been opened once already or not.
     private var headline: Text {
-        let title = Text(verbatim: article.title)
-        guard article.isRead else { return title }
+        guard article.isRead else { return Text(verbatim: article.title) }
 
-        return title + Text(verbatim: "  ")
-            + Text(Image(systemName: "checkmark")).font(.caption2).foregroundStyle(.tertiary)
+        let tick = Text(Image(systemName: "checkmark")).font(.caption2).foregroundStyle(.tertiary)
+        return Text(
+            "\(Text(verbatim: article.title))  \(tick)",
+            comment: "A headline, and the tick that says the article has been read"
+        )
     }
 
     var body: some View {

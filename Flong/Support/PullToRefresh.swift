@@ -49,10 +49,16 @@ import SwiftUI
 /// menu, nothing there asks by hand at all : it keeps up through the clock
 /// while a window sits open, the full pass at rest on the mains, and the
 /// watcher that follows the store.
-struct PullToRefresh: View {
+/// `nonisolated` because it holds nothing but the closure it hands on : the
+/// control, and every touch of it, is UIKit's business on the main thread.
+nonisolated struct PullToRefresh: View {
     /// What the gesture asks for. It runs behind the control rather than under
     /// it : nothing here waits for it.
-    let action: @MainActor () async -> Void
+    ///
+    /// `@Sendable` because the control lives in UIKit and the work is started
+    /// from a target action : the closure crosses out of the view value that
+    /// holds it and back onto the main actor to run.
+    let action: @MainActor @Sendable () async -> Void
 
     @ViewBuilder
     var body: some View {
@@ -68,7 +74,7 @@ struct PullToRefresh: View {
 
     /// The one point where UIKit is reached for.
     private struct Bridge: UIViewRepresentable {
-        let action: @MainActor () async -> Void
+        let action: @MainActor @Sendable () async -> Void
 
         func makeCoordinator() -> Coordinator { Coordinator(action) }
 
@@ -87,7 +93,7 @@ struct PullToRefresh: View {
         }
 
         final class Coordinator: NSObject {
-            var action: @MainActor () async -> Void
+            var action: @MainActor @Sendable () async -> Void
 
             private let control = UIRefreshControl()
             private weak var scrollView: UIScrollView?
@@ -104,7 +110,7 @@ struct PullToRefresh: View {
             /// making more of it than the reader did.
             private let tap = UIImpactFeedbackGenerator(style: .light)
 
-            init(_ action: @escaping @MainActor () async -> Void) {
+            init(_ action: @escaping @MainActor @Sendable () async -> Void) {
                 self.action = action
                 super.init()
                 control.addTarget(self, action: #selector(pulled), for: .valueChanged)

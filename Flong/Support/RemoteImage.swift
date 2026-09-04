@@ -67,6 +67,12 @@ nonisolated struct Wash: Hashable, Sendable {
 nonisolated final class ImageStore: Sendable {
     static let shared = ImageStore()
 
+    // **The four caches below are `nonisolated(unsafe)`.** `NSCache` locks
+    // internally and is safe to read and write from any thread, which is the
+    // whole reason it is used here rather than a dictionary, but it carries no
+    // `Sendable` conformance to say so. The compiler has no way of knowing,
+    // and this is where that is asserted.
+
     /// A picture past this is not a picture, it is a mistake or an attack.
     static let maximumBytes = 12 << 20
 
@@ -77,7 +83,7 @@ nonisolated final class ImageStore: Sendable {
         init(_ image: CGImage) { self.image = image }
     }
 
-    private let memory = NSCache<NSString, Cached>()
+    nonisolated(unsafe) private let memory = NSCache<NSString, Cached>()
 
     /// The average colour of each mark, by the address it came from.
     ///
@@ -85,7 +91,7 @@ nonisolated final class ImageStore: Sendable {
     /// size : a mark asked for at thirteen points and at seventeen is two
     /// entries there and one colour here, which is the point, since what is
     /// wanted is the colour of the publisher rather than of a thumbnail.
-    private let tints = NSCache<NSString, TintBox>()
+    nonisolated(unsafe) private let tints = NSCache<NSString, TintBox>()
 
     /// A colour in a cache, which takes objects and not values.
     private final class TintBox: @unchecked Sendable {
@@ -97,7 +103,7 @@ nonisolated final class ImageStore: Sendable {
     ///
     /// Keyed by address alone, like the tints and for the same reason : what is
     /// wanted is the colour of the picture rather than of one thumbnail of it.
-    private let washes = NSCache<NSString, WashBox>()
+    nonisolated(unsafe) private let washes = NSCache<NSString, WashBox>()
 
     /// A wash in a cache, which takes objects and not values.
     private final class WashBox: @unchecked Sendable {
@@ -119,7 +125,7 @@ nonisolated final class ImageStore: Sendable {
     /// refused for the rest of the process. Nothing cleared it but quitting the
     /// application, which is exactly how it was reported : the lead story's
     /// photograph missing until a relaunch.
-    private let refused = NSCache<NSString, NSNumber>()
+    nonisolated(unsafe) private let refused = NSCache<NSString, NSNumber>()
     private let session: URLSession
     private static let log = Logger(subsystem: "com.rslt.Flong", category: "images")
 

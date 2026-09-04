@@ -122,7 +122,7 @@ struct FlowChart: View {
     /// The mark the reader is pointing at, or the busiest one when they are
     /// pointing at nothing.
     private var current: Arrivals? {
-        if let chosen, let mark = flow.min(by: { distance(of: $0) < distance(of: $1) }), distance(of: mark) < span {
+        if chosen != nil, let mark = flow.min(by: { distance(of: $0) < distance(of: $1) }), distance(of: mark) < span {
             return mark
         }
         return flow.max { $0.count < $1.count }
