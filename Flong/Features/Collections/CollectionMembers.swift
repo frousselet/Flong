@@ -26,6 +26,8 @@ struct MemberFace: View {
     var side: CGFloat = 30
 
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         Group {
@@ -36,7 +38,7 @@ struct MemberFace: View {
             } else if let initials = member.initials {
                 Text(verbatim: initials)
                     .font(.system(size: side * 0.42, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(theme.onAccent(in: scheme))
                     .minimumScaleFactor(0.6)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Circle().fill(.tint))

@@ -38,6 +38,7 @@ struct StatisticsPanel: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var scheme
     @Environment(\.publishers) private var publishers
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.calendar) private var calendar
@@ -169,7 +170,7 @@ struct StatisticsPanel: View {
         } label: {
             Text(range.name)
                 .font(.subheadline.weight(isCurrent ? .semibold : .regular))
-                .foregroundStyle(isCurrent ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                .foregroundStyle(isCurrent ? AnyShapeStyle(theme.onAccent(in: scheme)) : AnyShapeStyle(.primary))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .contentShape(.rect)

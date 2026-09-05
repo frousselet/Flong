@@ -30,6 +30,7 @@ struct DigestScreen: View {
     let open: (Route) -> Void
 
     @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var scheme
 
     /// Carries a pill's glass from one state to the next.
     @Namespace private var pills
@@ -298,7 +299,7 @@ struct DigestScreen: View {
     /// asked the store again would be asking at a moment of the layout's
     /// choosing.
     private func row(_ story: DigestStory, isLead: Bool, isFirst: Bool = false) -> some View {
-        StoryRow(story: story, isLead: isLead, isFirst: isFirst, zoom: zoom) {
+        StoryRow(story: story, isLead: isLead, isFirst: isFirst, marks: model.digest.symbols, zoom: zoom) {
             open(.story(story.id))
         }
     }
@@ -352,6 +353,21 @@ struct DigestScreen: View {
     private func mark(of topic: DigestTopic) -> String {
         guard let name = topic.name else { return "newspaper" }
         return model.digest.symbols[name] ?? Topic.defaultSymbol
+    }
+
+    /// The colour a pill is drawn in : its glass, its mark, and its type where
+    /// it is the one chosen.
+    ///
+    /// Taken from the mark rather than from the name, for the reason
+    /// ``StandardTopics/families`` gives.
+    ///
+    /// **The front page keeps the accent, being no subject.** It is the one
+    /// pill that names the whole page rather than a kind of news, and a row
+    /// whose first capsule is the theme's own colour is a row a reader can find
+    /// their way back along.
+    private func colour(of topic: DigestTopic) -> Color {
+        guard topic.name != nil else { return theme.accent(in: scheme) }
+        return StandardTopics.family(of: mark(of: topic)).color(in: scheme)
     }
 
     /// The edition's stories, in the edition's order, as the page holds them.
@@ -537,7 +553,14 @@ struct DigestScreen: View {
                 label(topic, title: title)
             }
             .buttonStyle(.plain)
-            .modifier(PillShape(isCurrent: model.digestTopic == topic, topic: topic, namespace: pills))
+            .modifier(
+                PillShape(
+                    isCurrent: model.digestTopic == topic,
+                    topic: topic,
+                    colour: colour(of: topic),
+                    namespace: pills
+                )
+            )
         } else {
             Menu {
                 preferences(for: topic)
@@ -547,7 +570,14 @@ struct DigestScreen: View {
                 choose(topic)
             }
             .buttonStyle(.plain)
-            .modifier(PillShape(isCurrent: model.digestTopic == topic, topic: topic, namespace: pills))
+            .modifier(
+                PillShape(
+                    isCurrent: model.digestTopic == topic,
+                    topic: topic,
+                    colour: colour(of: topic),
+                    namespace: pills
+                )
+            )
             // The Mac says the same thing by right-clicking.
             .contextMenu { preferences(for: topic) }
         }
@@ -568,8 +598,13 @@ struct DigestScreen: View {
             // with a glyph in front of each is four shapes they recognize. It
             // is hidden from VoiceOver, the name beside it saying the same
             // thing and saying it better.
+            // **In its subject's own colour, and only when the pill is not the
+            // one chosen.** A chosen pill is a pane of the accent with white
+            // type on it, and a coloured glyph on that is a third colour in a
+            // capsule the width of a word.
             Image(systemName: mark(of: topic))
                 .font(.system(.caption, weight: .medium))
+                .foregroundStyle(isCurrent ? theme.onAccent(in: scheme) : colour(of: topic))
                 .accessibilityHidden(true)
 
             // Only when there is something to say : a row of arrows on every
@@ -586,7 +621,7 @@ struct DigestScreen: View {
                 .font(.system(.footnote, weight: .medium))
                 .lineLimit(1)
         }
-        .foregroundStyle(isCurrent ? Color.white : Color.primary)
+        .foregroundStyle(isCurrent ? AnyShapeStyle(theme.onAccent(in: scheme)) : AnyShapeStyle(.primary))
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
     }
@@ -648,6 +683,9 @@ struct StoryRow: View {
     /// Whether this is the first row of the page, which is the one row that
     /// carries no rule above it.
     var isFirst = false
+    /// The mark each subject wears, which is what its rubric is printed from :
+    /// see ``StandardTopics/families``.
+    var marks: [String: String] = [:]
     let zoom: Namespace.ID
     let open: () -> Void
 
@@ -752,11 +790,7 @@ struct StoryRow: View {
             // it before the headline, the way a rubric is read before the piece
             // under it.
             if !story.topics.isEmpty {
-                rubric
-                    .font(.system(.caption2, weight: .semibold))
-                    .textCase(.uppercase)
-                    .kerning(0.5)
-                    .foregroundStyle(.tertiary)
+                Rubric(topics: story.topics, marks: marks)
                     .lineLimit(1)
             }
 
@@ -767,19 +801,6 @@ struct StoryRow: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// The subjects a story is filed under.
-    ///
-    /// Built as one `Text` rather than a row of views, so it stays a line of
-    /// type : it is set above a headline like a rubric above a piece, and a
-    /// stack of labels there would read as a control.
-    ///
-    /// They used to be marked where the model had named one itself. It names
-    /// none now : every one of these is a section the reader has, so there is
-    /// no difference left to draw.
-    private var rubric: Text {
-        Text(verbatim: story.topics.joined(separator: " · "))
     }
 
     /// What happened, which is what a picture sits beside.
@@ -957,10 +978,26 @@ struct ArticleRow: View {
 /// Its own modifier so a button and a menu wear exactly the same one, and so
 /// that what changes when a pill is chosen is its colour and nothing about its
 /// size.
+///
+/// **Every pill is tinted with its own subject's colour.** It was clear glass
+/// for all of them and the accent for whichever was chosen, which made the row
+/// one colour and a highlight ; a reader coming back to a page they know finds
+/// `Sport` by its orange before they have read a word. Chosen, the same colour
+/// at full strength, so choosing a subject deepens what was already there
+/// rather than swapping it for a colour that says nothing about the subject.
 private struct PillShape: ViewModifier {
     let isCurrent: Bool
     let topic: DigestTopic
+    /// The subject's own colour : see ``DigestScreen/colour(of:)``.
+    let colour: Color
     let namespace: Namespace.ID
+
+    /// How much of the colour an unchosen pill keeps.
+    ///
+    /// A wash rather than the colour : fifteen capsules at full strength is a
+    /// paint chart, and the type on them has to stay the page's own ink, which
+    /// wants the ground behind it to stay near the paper.
+    private static let wash = 0.22
 
     func body(content: Content) -> some View {
         content
@@ -970,7 +1007,7 @@ private struct PillShape: ViewModifier {
             // pill answers a tap ; it does not need to answer a finger passing
             // over it.
             .glassEffect(
-                isCurrent ? .regular.tint(.accentColor) : .regular,
+                .regular.tint(isCurrent ? colour : colour.opacity(Self.wash)),
                 in: .capsule
             )
             .glassEffectID(topic, in: namespace)

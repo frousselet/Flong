@@ -1196,6 +1196,16 @@
         }
       }
     },
+    "A subject takes the colour of the mark you pick.": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une thématique prend la couleur du symbole choisi."
+          }
+        }
+      }
+    },
     "A subscription platform gives each subscriber an address nobody else has. It goes to the keychain, and out of the database and your iCloud, where it is sitting now.": {
       "localizations": {
         "fr": {
