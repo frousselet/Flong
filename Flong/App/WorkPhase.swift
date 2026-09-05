@@ -45,6 +45,40 @@ nonisolated enum WorkPhase: String, Hashable, Sendable, CaseIterable {
         }
     }
 
+    /// The mark the ring wears while this stage runs.
+    ///
+    /// **The circle is the ring, and what stands inside it says which work.**
+    /// Every one of these is a symbol of the `.circle` family, whose enclosure
+    /// answers to a variable value : given the fraction of the pass, the system
+    /// inks that circle round from the top, continuously, and leaves the glyph
+    /// inside it alone. So one symbol is both the measure and the subject of
+    /// the measure, where the corner of the bar has room for one small round
+    /// thing and no room at all for a legend beside it.
+    ///
+    /// The thing rather than the word, as everywhere else in the application :
+    /// the fetching is what comes down the wire, the grouping is the paper the
+    /// articles become, the naming is the list of points an edition carries,
+    /// and the filing is the tag a subject wears when it has no mark of its
+    /// own.
+    ///
+    /// Every one is checked against the system at test time, and checked for
+    /// answering to a value : a glyph that ignores it draws the same ring from
+    /// end to end, and a measure that never moves is worse than no measure.
+    var mark: String {
+        switch self {
+        case .fetching: "arrow.down.circle"
+        case .grouping: "newspaper.circle"
+        case .indexing: "magnifyingglass.circle"
+        case .reading: "person.circle"
+        case .writing: "pencil.circle"
+        case .filing: "tag.circle"
+        case .naming: "list.bullet.circle"
+        case .tidying: "trash.circle"
+        case .synchronizing: "icloud.circle"
+        case .exchanging: "arrow.up.arrow.down.circle"
+        }
+    }
+
     /// Whether the stage can say how much of itself it has done.
     ///
     /// Six can, and they are the six that matter : each is a queue the store

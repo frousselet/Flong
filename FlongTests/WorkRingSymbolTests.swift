@@ -28,7 +28,7 @@ struct WorkRingSymbolTests {
     /// string at all and draws nothing where the system has no such symbol, so
     /// a wrong name here is a corner of the bar with a hole in it while every
     /// pass runs, and the compiler is perfectly happy about it.
-    @Test("Both rings are symbols the system has")
+    @Test("Every ring is a symbol the system has")
     func theSymbolsExist() {
         for symbol in WorkRing.symbols {
             #expect(exists(symbol), "\(symbol) is not a symbol the system knows")
@@ -40,7 +40,7 @@ struct WorkRingSymbolTests {
     /// at nine tenths, which is a dial that never moves : the pass would run
     /// from end to end under a ring that says the same thing throughout, and
     /// the page would look right in every screenshot anyone ever took of it.
-    @Test("Both answer to a variable value")
+    @Test("Every one answers to a variable value")
     func theSymbolsAreVariable() {
         for symbol in WorkRing.symbols {
             let low = rendering(symbol, value: WorkRing.least)
@@ -58,10 +58,35 @@ struct WorkRingSymbolTests {
     /// pass and then jumps, and the whole point of measuring is that the reader
     /// can see it move. Sixteen distinct drawings across sixteen values is what
     /// a continuous glyph gives ; a segmented one would repeat itself.
-    @Test("The measured ring is drawn continuously")
-    func theDialIsContinuous() {
-        let drawings = Set((0..<16).compactMap { rendering(WorkRing.dial, value: Double($0) / 16) })
-        #expect(drawings.count == 16, "the dial has only \(drawings.count) drawings across sixteen values")
+    ///
+    /// Every stage's own, since the stage is what decides which glyph the
+    /// measure is drawn on : a mark of the `.circle` family whose enclosure did
+    /// not sweep would be a ring that stands still through whichever stage
+    /// happened to pick it.
+    @Test("Every measured ring is drawn continuously")
+    func theDialsAreContinuous() {
+        for dial in WorkRing.dials {
+            let drawings = Set((0..<16).compactMap { rendering(dial, value: Double($0) / 16) })
+            #expect(drawings.count == 16, "\(dial) has only \(drawings.count) drawings across sixteen values")
+        }
+    }
+
+    /// **One stage, one mark.** Two stages under one glyph is a ring that says
+    /// the same thing about two different pieces of work, and the reader who
+    /// learns that the cloud means iCloud learns nothing from a second cloud.
+    @Test("No two stages wear the same mark")
+    func everyStageIsToldApart() {
+        #expect(Set(WorkRing.dials).count == WorkPhase.allCases.count)
+    }
+
+    /// The mark is what the ring is drawn on, so the stage running is what
+    /// decides it : a stage with no mark of its own would draw nothing at all.
+    @Test("Every stage names a mark of the circle family")
+    func everyStageIsMarked() {
+        for phase in WorkPhase.allCases {
+            #expect(phase.mark.hasSuffix(".circle"), "\(phase) is drawn on \(phase.mark), which is no ring")
+            #expect(exists(phase.mark))
+        }
     }
 
     /// The chase needs layers to light in turn : a glyph drawn as one unbroken
