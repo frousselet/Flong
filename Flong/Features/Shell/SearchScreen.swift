@@ -141,8 +141,10 @@ struct SearchScreen: View {
         #endif
         .task {
             model.selection = .all
+            model.showsArticleList = true
             await model.loadArticles()
         }
+        .onDisappear { model.showsArticleList = false }
         // Arriving is what puts the cursor in the field, and arriving happens
         // more than once. The pause is the field being installed : asked for
         // in the same turn the section becomes current, the focus lands on a

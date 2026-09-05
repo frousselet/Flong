@@ -1409,7 +1409,15 @@ final class AppModel {
         await loadSidebar()
         await loadDigest()
         await loadCollections()
-        if selectedArticle == nil { await loadArticles() }
+
+        // **Only where the reader is in it.** The wire is five hundred rows
+        // queried, decoded and published, plus a count per hour for the chart
+        // over it, and it was read on every store tick whatever the reader was
+        // looking at : a reader on the front page paid the whole of it for
+        // every batch a synchronization brought in, for a list they could not
+        // see. The wire and the search both read themselves back when the
+        // reader arrives, so nothing is stale.
+        if showsArticleList, selectedArticle == nil { await loadArticles() }
     }
 
     func load() async {
@@ -3217,10 +3225,20 @@ final class AppModel {
         sidebar.flatMap { [$0] + $0.children }.first { $0.kind == kind }?.title
     }
 
+    /// Whether the window is showing a list of articles at all.
+    ///
+    /// Written by the shell as the reader moves between sections. It is what
+    /// keeps the wire's five hundred rows from being read back under a reader
+    /// who is on the front page.
+    var showsArticleList = false
+
     func loadArticles() async {
         do {
-            summaries = try await articles.summaries(filter, matching: query)
-            hourlyCounts = try await articles.hourlyCounts(filter, matching: query)
+            let read = try await articles.summaries(filter, matching: query)
+            if read != summaries { summaries = read }
+
+            let hourly = try await articles.hourlyCounts(filter, matching: query)
+            if hourly != hourlyCounts { hourlyCounts = hourly }
             if let selectedArticle, !summaries.contains(where: { $0.id == selectedArticle }) {
                 self.selectedArticle = nil
             }

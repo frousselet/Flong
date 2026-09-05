@@ -164,8 +164,12 @@ struct ArticleFeedScreen: View {
         .task {
             model.selection = kind
             day = nil
+            // The wire is on screen, so it is worth reading back when the store
+            // changes. See ``AppModel/showsArticleList``.
+            model.showsArticleList = true
             await model.loadArticles()
         }
+        .onDisappear { model.showsArticleList = false }
     }
 
     // MARK: - The month over the list
