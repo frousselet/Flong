@@ -652,6 +652,10 @@ struct StoryRow: View {
     let open: () -> Void
 
     @Environment(\.theme) private var theme
+    /// Which way round the page is, since what separates one lapped mark from
+    /// the next is a shadow on white paper and a halo on black. See
+    /// ``roomShadow``.
+    @Environment(\.colorScheme) private var scheme
 
     /// The width of the picture beside a story that is not the lead. Its
     /// height follows from the one ratio every picture is shown in.
@@ -665,6 +669,25 @@ struct StoryRow: View {
     /// which publisher it is, since a favicon is recognized by its shape and
     /// its colour and both live at its edge as much as at its middle.
     private static let roomOverlap: CGFloat = 3.5
+
+    /// What a mark casts on the one it laps.
+    ///
+    /// Slight, in both cases. What it separates is two discs of fourteen
+    /// points, so it is read at about the width of a hairline and anything
+    /// heavier is a row of stickers rather than a row of marks.
+    ///
+    /// **Dark on paper and light on a black page**, which is not symmetry for
+    /// its own sake. A shadow separates by darkening what is behind it, and on
+    /// a dark page there is nothing left to darken : a publisher whose mark is
+    /// black, and several of the ones a French reader follows are, came out as
+    /// one shape with the disc behind it and the hairline every mark wears was
+    /// all that was left to tell them apart. Photographed, it did not. So the
+    /// dark page gets the halo, which separates the way the shadow does on
+    /// paper : by putting something between the two discs that is neither of
+    /// them.
+    private var roomShadow: Color {
+        scheme == .dark ? .white.opacity(0.35) : .black.opacity(0.22)
+    }
 
     var body: some View {
         Button(action: open) {
@@ -848,6 +871,16 @@ struct StoryRow: View {
             // it is written and that order is the opposite one.
             ForEach(Array(story.feedMarks.enumerated()), id: \.element.id) { position, mark in
                 SourceStamp(domain: mark.room, side: 14, showsName: false)
+                    // **And each one is lifted off the one it laps.** The
+                    // hairline every mark wears tells a disc from the paper,
+                    // which is all it had to do while they stood apart. Lapped,
+                    // a mark has another mark behind it rather than paper, and
+                    // two favicons of a similar colour meeting under a hairline
+                    // read as one shape with a seam. A shadow is what says one
+                    // is in front of the other : it is cast on the disc behind
+                    // and not on the page, which is the whole of what the row
+                    // needs said.
+                    .shadow(color: roomShadow, radius: 1.5, y: scheme == .dark ? 0 : 0.5)
                     .zIndex(Double(story.feedMarks.count - position))
             }
 
