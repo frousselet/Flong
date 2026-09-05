@@ -144,12 +144,31 @@ nonisolated final class ImageStore: Sendable {
         ]
         session = URLSession(configuration: configuration)
 
-        // Decoded thumbnails, not originals : a few hundred of them are a few
-        // megabytes, and the system empties this under pressure anyway.
+        // **A budget in bytes and not only in objects.** Four hundred decoded
+        // pictures is not a size : a phone-width photograph at three times is
+        // eleven megabytes on its own, so a count alone let the cache grow
+        // until the system purged the lot at once, which is a page that has to
+        // fetch and decode everything again. Each entry carries its own cost
+        // below, so eviction is gradual and proportional to what it holds.
         memory.countLimit = 400
+        memory.totalCostLimit = 48 << 20
         refused.countLimit = 500
         tints.countLimit = 400
         washes.countLimit = 60
+    }
+
+    /// The picture at that address if it is already decoded and held.
+    ///
+    /// **Never fetches and never decodes**, which is what lets a row that is
+    /// scrolled back into view draw straight away : the asynchronous path below
+    /// costs a hop off the actor and a two-tenths fade, and a reader running a
+    /// list back and forth paid both for pictures that were in hand all along.
+    /// `NSCache` locks internally, so asking it from wherever a view is drawn
+    /// is safe.
+    func held(at url: URL, maximumPixels: Int) -> CGImage? {
+        guard HTTPURL.isFetchable(url) else { return nil }
+        let key = "\(HTTPURL.secured(url).absoluteString)|\(maximumPixels)" as NSString
+        return memory.object(forKey: key)?.image
     }
 
     /// The picture at that address, decoded no larger than it will be drawn.
@@ -184,14 +203,21 @@ nonisolated final class ImageStore: Sendable {
         request.timeoutInterval = 20
         let (data, response) = try await session.data(for: request)
 
-        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { return nil }
+        // A refusal is remembered like anything else that will never be a
+        // picture : a mark that answers 404 on a well-known path answers it
+        // again on every row that asks, and a list scrolled back through asks
+        // once per row per appearance.
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            refused.setObject(1, forKey: url.absoluteString as NSString)
+            return nil
+        }
         guard data.count <= Self.maximumBytes else {
             Self.log.notice("Picture too large, ignored : \(data.count, privacy: .public) bytes")
             return nil
         }
         switch Self.decode(data, maximumPixels: maximumPixels) {
         case .picture(let image):
-            memory.setObject(Cached(image), forKey: key)
+            memory.setObject(Cached(image), forKey: key, cost: image.bytesPerRow * image.height)
             // Worked out here, once, while the pixels are already in hand.
             //
             // **For a mark and not for a photograph.** A logo is a few dozen
@@ -542,6 +568,17 @@ struct PictureCredit: View {
     }
 }
 
+/// What a picture is asked for : the address and the width it will be drawn at.
+///
+/// The width is part of the question because the store is keyed by it : the
+/// same photograph at two widths is two decodes and two entries, and a row
+/// whose slot has just been measured is asking a different question from the
+/// one it asked before the layout pass.
+private struct Sizing: Hashable {
+    let url: URL?
+    let points: CGFloat?
+}
+
 struct RemoteImage: View {
     let url: URL?
     /// The publisher whose article the picture came with, credited in the
@@ -587,6 +624,8 @@ struct RemoteImage: View {
 
     @State private var image: CGImage?
     @State private var isLoading = true
+    /// How wide the picture is actually drawn, which is what it is decoded to.
+    @State private var measured: CGFloat?
     @Environment(\.displayScale) private var displayScale
 
     var body: some View {
@@ -605,7 +644,15 @@ struct RemoteImage: View {
                     .accessibilityHidden(true)
             }
         }
-        .task(id: url) { await load() }
+        // What the slot actually is, so a picture with no stated width is
+        // decoded to the room it has rather than to the width of a column of
+        // type. Stepped, so a layout nudge of a point is not a second decode.
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            Self.stepped(proxy.size.width)
+        } action: { drawn in
+            measured = drawn
+        }
+        .task(id: Sizing(url: url, points: side ?? width ?? measured)) { await load() }
     }
 
     /// How large the credit is drawn : the picture's own size decides it, so a
@@ -649,20 +696,49 @@ struct RemoteImage: View {
     }
 
     private func load() async {
-        image = nil
-        isLoading = url != nil
-        guard let url else { return }
+        guard let url else {
+            image = nil
+            isLoading = false
+            return
+        }
 
-        let points = side ?? width ?? Editorial.measure
-        let loaded = try? await ImageStore.shared.image(
-            at: url,
-            maximumPixels: max(Int(points * displayScale), 1)
-        )
+        // **Not the text measure.** `Editorial.measure` is how wide a column of
+        // type may run, not how wide a picture is drawn : at six hundred and
+        // eighty points on a three-times phone it decoded two thousand and
+        // forty pixels across for a slot under four hundred points wide, which
+        // is near four times the pixels drawn and an eleven megabyte bitmap for
+        // the lead. Where a caller states no width, the slot is measured and
+        // the picture decoded to that.
+        let points = side ?? width ?? measured ?? Editorial.measure
+        let pixels = max(Int(points * displayScale), 1)
+
+        // Already in hand : no hop off the actor, no grey frame, no fade. A
+        // list run back and forth is rows realized again and again, and every
+        // one of them was paying both.
+        if let alreadyHeld = ImageStore.shared.held(at: url, maximumPixels: pixels) {
+            if image == nil { image = alreadyHeld }
+            isLoading = false
+            return
+        }
+
+        image = nil
+        isLoading = true
+
+        let loaded = try? await ImageStore.shared.image(at: url, maximumPixels: pixels)
 
         guard !Task.isCancelled else { return }
         withAnimation(.easeOut(duration: 0.2)) {
             image = loaded
             isLoading = false
         }
+    }
+
+    /// A drawn width, rounded up to a step.
+    ///
+    /// The cache is keyed by the pixels asked for, so a layout a point narrower
+    /// than the last one is a second entry and a second decode of the same
+    /// photograph. Stepped, every slot of about the same width shares one.
+    private static func stepped(_ width: CGFloat) -> CGFloat {
+        max(32, (width / 32).rounded(.up) * 32)
     }
 }
