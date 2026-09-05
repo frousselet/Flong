@@ -1,5 +1,5 @@
 //
-//  RoomMarks.swift
+//  MarkRow.swift
 //  Flong
 //
 //  Created by François Rousselet on 05/09/2026.
@@ -11,29 +11,40 @@
 
 import SwiftUI
 
-/// Who is running a story, by their marks rather than by a count of them.
+/// Several publishers, by their marks rather than by a count of them.
 ///
 /// `4 rédactions` is a number a reader has to turn back into rooms. Four marks
 /// are the rooms, and they say which ones, which is the question behind the
 /// number : a story every paper is running and a story only the trade press is
-/// running are not the same story.
+/// running are not the same story. An author's row and a newsmaker's ask the
+/// same question about a person rather than about a story, and answer it the
+/// same way.
 ///
-/// **One drawing, and it was two.** The row of a front page and the head of a
-/// story's own page each set the same marks out by hand, at two sizes, with two
-/// spacings and one of the two lacking the line limit on its count. The comment
-/// over the second said `the same marks the row carried`, which was the
-/// intention and not the fact : a fault fixed in one was a fault left in the
-/// other, and that is exactly what happened. There is one of it now, and what a
-/// caller chooses is how large it is drawn.
+/// **One drawing, and it was four.** The row of a front page, the head of a
+/// story's own page, an author's row and a newsmaker's each set the same marks
+/// out by hand, at their own sizes and spacings, and only one of the four kept
+/// its count on a line. The comment over the second said `the same marks the
+/// row carried`, which was the intention and not the fact : a fault fixed in
+/// one was a fault left in the other three. There is one of it now, and what a
+/// caller chooses is how large it is drawn and whether there is a count.
 ///
-/// The count survives for anyone listening to the page rather than looking at
-/// it, and for the rooms there was no room to show.
-struct RoomMarks: View {
-    /// The rooms whose mark is shown, in the order the page ranks them.
-    let marks: [FeedMark]
-    /// How many rooms there are in total, which is what the `+` stands for and
-    /// what a reader listening to the page is told.
-    let count: Int
+/// **And nothing is said to VoiceOver here.** A row of marks means a different
+/// thing in each of the four places it is drawn : the rooms running a story,
+/// the papers somebody writes for, the papers writing about somebody. The
+/// drawing is the same and the sentence is not, so the sentence stays where the
+/// row is.
+struct MarkRow: View {
+    /// The publishers whose mark is shown, by the domain each is known by, in
+    /// the order the page ranks them.
+    let domains: [String]
+
+    /// How many there are in all, where what is drawn is a sample of a larger
+    /// number and says so with a `+`. Nothing where the row is all there is,
+    /// which is what an author's row wants : four marks are a hint of where
+    /// somebody writes rather than an inventory of it, and the row already
+    /// carries a number of its own.
+    var total: Int?
+
     /// How wide one mark is drawn. A row of the front page can spare a little
     /// less than the head of a story's own page.
     var side: CGFloat = 14
@@ -62,7 +73,7 @@ struct RoomMarks: View {
             // right is a row whose first thing is on top. `zIndex` is what says
             // so, since a stack draws in the order it is written and that order
             // is the opposite one.
-            ForEach(Array(marks.enumerated()), id: \.element.id) { position, mark in
+            ForEach(Array(domains.enumerated()), id: \.element) { position, domain in
                 // **The one in front cuts the one behind.** Two favicons
                 // meeting under a hairline read as one shape with a seam, and
                 // several of the marks a French reader follows are black discs.
@@ -77,12 +88,12 @@ struct RoomMarks: View {
                 // grown by a hair, so the gap between two discs is the page
                 // itself and it is the page whatever colour the page is. There
                 // is nothing to tune for an appearance and nothing to draw.
-                SourceStamp(domain: mark.room, side: side, showsName: false)
+                SourceStamp(domain: domain, side: side, showsName: false)
                     .mask { cutout(behind: position > 0) }
-                    .zIndex(Double(marks.count - position))
+                    .zIndex(Double(domains.count - position))
             }
 
-            if count > marks.count {
+            if let total, total > domains.count {
                 // **It may not be squeezed, and `lineLimit` does not say
                 // that.** A line limit caps how many lines a text may take and
                 // says nothing about the width it is given : on the front page
@@ -90,7 +101,7 @@ struct RoomMarks: View {
                 // beside a picture, and offered less width than `+4` needs it
                 // broke between the sign and the figure. Two lines for two
                 // characters, reading as a stray `4` under a stray `+`.
-                Text(verbatim: "+\(count - marks.count)")
+                Text(verbatim: "+\(total - domains.count)")
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
                     // The lap is negative space the whole row carries, and this
@@ -99,8 +110,6 @@ struct RoomMarks: View {
                     .padding(.leading, overlap + 3)
             }
         }
-        .accessibilityElement()
-        .accessibilityLabel(Text("\(count) rooms"))
     }
 
     /// One mark, less the bite the mark in front of it takes out of it.

@@ -825,7 +825,9 @@ struct StoryRow: View {
     /// The count survives for anyone listening to the page rather than looking
     /// at it, and for the rooms there was no room to show.
     private var rooms: some View {
-        RoomMarks(marks: story.feedMarks, count: story.feedCount)
+        MarkRow(domains: story.feedMarks.map(\.room), total: story.feedCount)
+            .accessibilityElement()
+            .accessibilityLabel(Text("\(story.feedCount) rooms"))
     }
 
     /// Why this is here : who is saying it, how many of them, and how fast.
