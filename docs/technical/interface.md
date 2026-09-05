@@ -116,6 +116,16 @@ The rule that used to sit under it is gone with it : a rule between two rows is 
 
 Everywhere else the glass on screen is the system's.
 
+## What the window waits on runs off the window
+
+**`nonisolated` does not mean `elsewhere`.** The target builds with approachable concurrency, where a `nonisolated async` function runs on the actor that called it. Every store and service here is a `nonisolated struct`, which reads as though it were off the main thread and is not : called from the model, as all of them are, they ran on it. The SQL hops to the database's own queue, which is what a `DatabaseQueue` is for ; the decoding, the scoring, the sorting, the parsing of a feed and the sanitizing of its HTML did not.
+
+What that cost is a page that stutters exactly when there is most to see : a synchronization writes in bursts, every burst is a store change, every change reads the window back, and the reader is scrolling through what just arrived. The same for a fetch, which parsed three hundred feeds in front of them.
+
+So every entry point of `ArticleStore`, `SubscriptionStore`, `CollectionStore`, `StatisticsStore`, `DigestStore`, `EditionStore`, `DigestService` and `FeedRefresh` carries `@concurrent`, which puts it on the global executor and hands only the result back. Their private helpers do not need it : they inherit the context of the entry point that called them.
+
+The rule for anything added later : if the window awaits it and it touches the store, it is `@concurrent`.
+
 On macOS the same four sections become a sidebar, through `tabViewStyle(.sidebarAdaptable)` : there is no bar to minimize on a Mac, and a window is already out of its own way.
 
 ## Pictures

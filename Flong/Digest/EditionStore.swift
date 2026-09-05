@@ -57,6 +57,7 @@ nonisolated struct EditionStore: Sendable {
     /// - Returns: the edition of the moment, or `nil` where the reader has
     ///   switched every one of them off.
     @discardableResult
+    @concurrent
     func build(_ schedule: EditionSchedule, now: Date = Date(), calendar: Calendar = .current) async throws
         -> Edition?
     {
@@ -122,6 +123,7 @@ nonisolated struct EditionStore: Sendable {
     /// of its own is not an edition. Neither is a loss, the stories themselves
     /// being untouched by any of this.
     @discardableResult
+    @concurrent
     func purge(now: Date = Date()) async throws -> Int {
         try await database.writer.write { db in
             try db.execute(
@@ -141,6 +143,7 @@ nonisolated struct EditionStore: Sendable {
     /// that emptied while the model worked would be a front page that goes
     /// blank four times a day. Last night's edition stands until this morning's
     /// is written, which is what a paper on a table does.
+    @concurrent
     func current(now: Date = Date()) async throws -> PublishedEdition? {
         try await database.writer.read { db in
             guard
@@ -156,6 +159,7 @@ nonisolated struct EditionStore: Sendable {
     }
 
     /// Every published edition, newest first, for the archive.
+    @concurrent
     func archive(now: Date = Date()) async throws -> [PublishedEdition] {
         try await database.writer.read { db in
             try Edition

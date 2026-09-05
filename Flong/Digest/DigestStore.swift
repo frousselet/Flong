@@ -196,6 +196,7 @@ nonisolated struct DigestStore: Sendable {
         self.database = database
     }
 
+    @concurrent
     func digest(_ topic: DigestTopic = .frontPage, now: Date = Date(), limit: Int = 60) async throws -> Digest {
         let since = now.addingTimeInterval(-Self.window)
         let preferences = TopicPreferences(database)
@@ -304,6 +305,7 @@ nonisolated struct DigestStore: Sendable {
     /// the stage is then worth nothing, and the bar reaches the end of its rail
     /// while the pass is a third done. The stories already on the page are the
     /// right order of magnitude for the ones that are about to be.
+    @concurrent
     func storyCount(now: Date = Date()) async throws -> Int {
         let since = now.addingTimeInterval(-Self.window)
 
@@ -356,6 +358,7 @@ nonisolated struct DigestStore: Sendable {
     ///   and for the same reason : the mark is the clock, so anything this
     ///   answer does not hold is behind it at the next pass. See
     ///   ``ArticleStore/mostBeforeAnnouncing``.
+    @concurrent
     func opened(
         since moment: Date,
         limit: Int = ArticleStore.mostBeforeAnnouncing,

@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
-- Scrolling while iCloud catches up : the window is read back at most every couple of seconds rather than twice a second, every read the window waits on happens off the main thread, and the indexing lane stands aside between batches while somebody is looking at the page.
+- Scrolling while anything else is happening : every store and service the window waits on now runs off the main thread rather than on it, the window is read back at most every couple of seconds while iCloud catches up rather than twice a second, and the indexing lane stands aside between batches while somebody is looking at the page.
 
 - What an edition says stands on a pane of glass at the head of the page, which sinks away behind the news as the page is scrolled rather than sliding off the top of it, the points separated by a hairline : three at most, set at the size the page reads in, three lines apiece : the model is held to a hundred and twenty characters a point so nothing is ever cut or shrunk to fit, and it is told to say what happened rather than who said it.
 

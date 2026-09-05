@@ -133,11 +133,13 @@ nonisolated struct SubscriptionStore: Sendable {
         }
     }
 
+    @concurrent
     func feed(id: UUID) async throws -> Feed? {
         try await database.writer.read { db in try Feed.fetchOne(db, key: id) }
     }
 
     /// The feed followed at that address, whichever way the address is spelled.
+    @concurrent
     func feed(at address: String) async throws -> Feed? {
         let url = try FeedURL.canonical(address)
         return try await database.writer.read { db in
@@ -145,6 +147,7 @@ nonisolated struct SubscriptionStore: Sendable {
         }
     }
 
+    @concurrent
     func count() async throws -> Int {
         try await database.writer.read { db in try Feed.fetchCount(db) }
     }
@@ -155,6 +158,7 @@ nonisolated struct SubscriptionStore: Sendable {
     /// address its feeds share, so there is never a group without feeds and
     /// never a feed without a group. Only the names the reader wrote are read
     /// back off the disk.
+    @concurrent
     func groups() async throws -> [SourceGroup] {
         let (feeds, names) = try await database.writer.read { db in
             (try Feed.all().orderedByTitle().fetchAll(db), try SourceName.fetchAll(db))
@@ -166,6 +170,7 @@ nonisolated struct SubscriptionStore: Sendable {
     ///
     /// One entry per group, which is the whole point : it is what lets a paper
     /// with six feeds be one name and one favicon everywhere it is shown.
+    @concurrent
     func identities() async throws -> [String: SourceIdentity] {
         Dictionary(try await groups().map { ($0.domain, $0.identity) }, uniquingKeysWith: { first, _ in first })
     }
@@ -178,6 +183,7 @@ nonisolated struct SubscriptionStore: Sendable {
         }
     }
 
+    @concurrent
     func name(ofDomain domain: String) async throws -> SourceName? {
         try await database.writer.read { db in
             try SourceName.filter(SourceName.Columns.domain == domain).fetchOne(db)
@@ -197,6 +203,7 @@ nonisolated struct SubscriptionStore: Sendable {
 
     /// Follows a feed, or returns the one already followed at that address.
     @discardableResult
+    @concurrent
     func subscribe(to subscription: Subscription) async throws -> SubscriptionResult {
         try await database.writer.write { db in try Self.upsert(subscription, in: db) }
     }
@@ -206,6 +213,7 @@ nonisolated struct SubscriptionStore: Sendable {
     /// Results come back in the order they were asked for, so a caller can pair
     /// them with what it read from its file.
     @discardableResult
+    @concurrent
     func subscribe(to subscriptions: [Subscription]) async throws -> [SubscriptionResult] {
         try await database.writer.write { db in
             try subscriptions.map { try Self.upsert($0, in: db) }
@@ -249,6 +257,7 @@ nonisolated struct SubscriptionStore: Sendable {
     // MARK: - Editing
 
     /// Renames a feed. An empty title falls back to the host.
+    @concurrent
     func rename(_ id: UUID, to title: String) async throws {
         try await update(id) { feed in
             let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -261,6 +270,7 @@ nonisolated struct SubscriptionStore: Sendable {
     /// It says nothing whatever about the articles underneath : section 13 of
     /// the specification keeps the star an article wears a judgement about that
     /// article, and this is a judgement about the publisher.
+    @concurrent
     func setFavourite(_ id: UUID, _ isFavourite: Bool) async throws {
         try await update(id) { feed in feed.isFavourite = isFavourite }
     }
@@ -272,12 +282,14 @@ nonisolated struct SubscriptionStore: Sendable {
     /// articles : a source the reader wants near the top of their lists is not
     /// the same as one they want to be interrupted for, and a reader with forty
     /// favourites would otherwise have forty notifications a day.
+    @concurrent
     func setNotifies(_ id: UUID, _ notifies: Bool) async throws {
         try await update(id) { feed in feed.notifiesNewArticles = notifies }
     }
 
     /// The sources the reader asked to be told about, in the order a list shows
     /// them.
+    @concurrent
     func announcing() async throws -> [Feed] {
         try await database.writer.read { db in
             try Feed.filter(Feed.Columns.notifiesNewArticles == true).orderedByTitle().fetchAll(db)
@@ -303,6 +315,7 @@ nonisolated struct SubscriptionStore: Sendable {
     /// iCloud names every record after the address, and Spotlight holds the
     /// name of the publisher on every article of it.
     @discardableResult
+    @concurrent
     func edit(_ id: UUID, to edited: SourceEdit) async throws -> SourceChange {
         let address = edited.address.trimmingCharacters(in: .whitespacesAndNewlines)
         let asked = address.isEmpty ? nil : try FeedURL.canonical(address)
@@ -352,6 +365,7 @@ nonisolated struct SubscriptionStore: Sendable {
     /// error : records are replayed, and a second application has to change
     /// nothing.
     @discardableResult
+    @concurrent
     func readdress(from previous: URL, to url: URL) async throws -> SourceChange? {
         try await database.writer.write { db in
             guard var feed = try Feed.filter(Feed.Columns.url == previous).fetchOne(db),
@@ -386,6 +400,7 @@ nonisolated struct SubscriptionStore: Sendable {
     /// older record carries no favourite, no notification and may carry no
     /// site, and nothing said is not the same as `no`.
     @discardableResult
+    @concurrent
     func adopt(
         _ subscription: Subscription,
         isFavourite: Bool?,
@@ -432,6 +447,7 @@ nonisolated struct SubscriptionStore: Sendable {
     /// reaches, and every one of them would otherwise be a row pointing at
     /// something that no longer exists.
     @discardableResult
+    @concurrent
     func unsubscribe(_ id: UUID) async throws -> Unsubscription {
         try await database.writer.write { db in
             guard let feed = try Feed.fetchOne(db, key: id) else { throw SubscriptionError.unknownFeed(id) }
@@ -447,6 +463,7 @@ nonisolated struct SubscriptionStore: Sendable {
     /// transaction, since a publisher half removed is a heading over the desks
     /// that happened to fail.
     @discardableResult
+    @concurrent
     func unsubscribe(fromPublisher domain: String) async throws -> [Unsubscription] {
         try await database.writer.write { db in
             try Feed.all().orderedByTitle().fetchAll(db)
@@ -607,6 +624,7 @@ nonisolated struct SubscriptionStore: Sendable {
     /// The sources do not move. A group is where a feed already is, not
     /// somewhere it was put.
     @discardableResult
+    @concurrent
     func rename(domain: String, to raw: String?, at date: Date = Date()) async throws -> String? {
         let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines)
         let kept = (trimmed?.isEmpty == false && trimmed != domain) ? trimmed : nil

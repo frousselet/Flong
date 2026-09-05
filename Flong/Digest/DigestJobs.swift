@@ -546,6 +546,7 @@ nonisolated struct DigestService: Sendable {
     /// nothing to be named after.
     /// Groups what has arrived. Fast, and what the screen waits for.
     @discardableResult
+    @concurrent
     func buildStories(now: Date = Date()) async -> StoryBuilder.Summary {
         (try? await StoryBuilder(database).build(now: now)) ?? StoryBuilder.Summary()
     }
@@ -556,6 +557,7 @@ nonisolated struct DigestService: Sendable {
     /// stories are grouped, so an edition is never later than the moment its
     /// boundary passed plus however long it takes the reader to open Flong.
     @discardableResult
+    @concurrent
     func buildEditions(_ schedule: EditionSchedule, now: Date = Date()) async -> Edition? {
         let store = EditionStore(database)
         do {
@@ -719,6 +721,7 @@ nonisolated struct DigestService: Sendable {
 
     /// Clears the headlines, the summaries and the subjects the model wrote,
     /// leaving alone the stories whose headline the reader settled.
+    @concurrent
     func discardWhatTheModelWrote() async {
         try? await database.writer.write { db in
             try db.execute(
@@ -740,6 +743,7 @@ nonisolated struct DigestService: Sendable {
         }
     }
 
+    @concurrent
     func dropBrief(of storyID: UUID) async {
         let articles = try? await database.writer.read { db in
             try Row.fetchAll(
@@ -769,6 +773,7 @@ nonisolated struct DigestService: Sendable {
     }
 
     /// The articles of one story, newest first, for the list beneath a card.
+    @concurrent
     func articles(of storyID: UUID) async throws -> [ArticleSummary] {
         try await database.writer.read { db in
             try ArticleSummary.fetchAll(
