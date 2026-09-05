@@ -381,6 +381,7 @@ nonisolated struct ArticleStore: Sendable {
     /// was unread, which is a number that only ever grows and that nobody owes
     /// their feeds : a reader looking down the list wants to know how much a
     /// publisher has given them, not how much of it they are behind on.
+    @concurrent
     func counts() async throws -> [UUID: Int] {
         try await counts(unreadOnly: false)
     }

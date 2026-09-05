@@ -54,6 +54,14 @@ nonisolated enum StoreChanges {
     /// the reload collapses into the single tick that follows.
     static let settling = Duration.milliseconds(400)
 
+    /// How much longer to wait while iCloud is bringing a backlog in.
+    ///
+    /// An exchange writes in bursts for as long as it runs, and the window has
+    /// no business keeping up with it : settled at four hundred milliseconds
+    /// the whole of it was read back twice a second for minutes, under a reader
+    /// trying to read it.
+    static let exchanging = Duration.seconds(2)
+
     /// Ticks while anything the interface is drawn from is written to.
     static func ticks(in database: AppDatabase) -> AsyncStream<Void> {
         AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
