@@ -142,16 +142,24 @@ struct EditionHead: View {
                             .frame(width: Self.markWidth)
                             .accessibilityHidden(true)
 
-                        // **Three lines, and never a truncated one.** The bound
-                        // is kept where the words are written rather than where
-                        // they are drawn : the model is held to a hundred and
-                        // twenty characters a point, which is under what three
-                        // lines hold here, so nothing reaches this and needs
-                        // cutting. Setting a long point smaller until it fitted
-                        // was the other way, and it is a page whispering the
-                        // news. See ``EditionSummarizer/maximumPointCharacters``.
+                        // **Never a cut one, and no cap on the lines.** The
+                        // bound is kept where the words are written rather than
+                        // where they are drawn : the model is held to eighteen
+                        // words a point. A cap here was the belt to that
+                        // brace, and it was the thing that actually cut : three
+                        // lines hold about a hundred and ten characters on a
+                        // phone and fewer as the reader turns their type up, so
+                        // the cap fired on the readers it was least meant for
+                        // and a sentence ended in an ellipsis. A point runs to
+                        // the lines it needs. Setting a long one smaller until
+                        // it fitted was the other way, and it is a page
+                        // whispering the news. See
+                        // ``EditionSummarizer/maximumPointWords``.
                         Text(verbatim: point)
-                            .lineLimit(3)
+                            // A row of a `List` clips what it was not told to
+                            // make room for, and one of the places this is
+                            // drawn is a row of a `List`.
+                            .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(.vertical, Self.rowAir)
