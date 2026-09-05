@@ -63,13 +63,15 @@ struct EditionArchiveScreen: View {
     /// the section above the row says which edition it is, so nothing here has
     /// to name it.
     ///
-    /// **It ranked its two points before the front page did, and it stops having
-    /// a private opinion about how.** It set the first in `headline` and the
-    /// second in `subheadline`, in the system's own face, at a call site : the
-    /// instinct was right and it is the shared drawing's now, so an archive row
-    /// changes face with the theme like everything around it, and gains the
-    /// subject marks it never had, which cost it no width now that they are
-    /// inside the line.
+    /// **It ranked its two points, and it stops.** It set the first in
+    /// `headline` and the second in `subheadline`, in the system's own face, at
+    /// a call site. Two points are two things worth knowing equally : nothing
+    /// scores them and nothing checks the order they came back in, so the
+    /// larger of the two was a hierarchy the row had invented. It draws them
+    /// the way the head of an edition draws them now, which also means it
+    /// changes face with the theme like everything around it and gains the
+    /// subject marks it never had, at no cost in width since they are inside
+    /// the line.
     ///
     /// **And it cuts nothing.** It held each point to two lines, which was one
     /// of the places a point ended in an ellipsis. What keeps this row short is

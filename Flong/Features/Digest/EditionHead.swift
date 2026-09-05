@@ -84,22 +84,23 @@ struct EditionHead: View {
 /// explained why. There is one of it now, and what a caller chooses is how many
 /// points to show and what ground to lay them on.
 ///
-/// **Ranked, because the model ranked them.** The instructions ask for the
-/// things worth knowing `in the order they matter` and say so twice ; the page
-/// then set all three at one size, one weight and one colour, so an ordering
-/// that was asked for, written and checked was thrown away at the last step, on
-/// the one screen whose whole argument is that a page where everything is the
-/// same size is a list, and that a list makes the reader do the ranking the
-/// digest exists to do.
+/// **Three points of one weight, and it is the whole of what the list means.**
+/// They were set at one size, one weight and one colour, and for a while they
+/// were not : the first was given the theme's display face and the two under it
+/// stood back, on the argument that the model is asked for what matters in the
+/// order it matters. The premise was wrong. The three points are three things
+/// worth knowing and they are worth knowing equally ; nothing scores them,
+/// nothing checks the order they come back in, and a page that set one of them
+/// larger would be inventing a hierarchy and then asking the reader to believe
+/// it. Emphasis has to be earned somewhere, and there is nowhere here it could
+/// be.
 ///
-/// **And the lead is where the theme speaks.** It was `.font(.body)`, which made
-/// this the only block of type on the front page that asked nobody : under
-/// `Papier` and `Solarized` every headline, standfirst and caption on the page
-/// changed face and the pane did not, three lines of system sans directly above
-/// a serif or a monospace title. The first point is the one line of the page a
-/// reader glances at before they have read a headline, so it takes the theme's
-/// face at the body step : a step under the news it stands over, never level
-/// with it. The two under it are prose and get out of the way.
+/// **They are prose, so they are set in prose's face.** Not `.font(.body)`,
+/// which was the only block of type on the front page that asked nobody : under
+/// `Papier` and `Solarized` every headline and caption changed face and the
+/// pane did not. Through ``Theme/standfirst(_:)`` it asks, and the answer is
+/// the same sans in all three themes, for the reason that token gives : a theme
+/// speaks in the line that is glanced at, and prose is not glanced at.
 ///
 /// **And nothing is truncated.** There is no line limit here nor anywhere else
 /// a point is drawn. What holds a point to a readable length is the model, and
@@ -138,7 +139,7 @@ struct EditionPoints: View {
     var body: some View {
         VStack(alignment: .leading, spacing: EditionHead.pointAir) {
             ForEach(Array(said.enumerated()), id: \.offset) { index, point in
-                line(point, wearing: mark(at: index), leads: index == 0)
+                line(point, wearing: mark(at: index))
             }
         }
         .lineSpacing(EditionHead.leading)
@@ -181,19 +182,19 @@ struct EditionPoints: View {
     ///
     /// **A symbol is not a letter.** Set at the font of its line it fills the
     /// cap height and comes out heavier than anything beside it, so the mark
-    /// takes a step down from whatever the line is set at : read before the
+    /// takes a step down from what the line is set at : read before the
     /// sentence, never instead of it. A step of the scale and not a size in
     /// points, so it grows with the reader's type.
-    private func line(_ point: String, wearing symbol: String, leads: Bool) -> some View {
+    private func line(_ point: String, wearing symbol: String) -> some View {
         let badge = Text(Image(systemName: symbol))
-            .font(.system(leads ? .footnote : .caption, weight: .semibold))
+            .font(.system(.footnote, weight: .semibold))
 
         return Text(
             "\(badge) \(Text(verbatim: point))",
             comment: "A line the model wrote, behind the mark that stands in front of it"
         )
-        .font(leads ? theme.headline(.body) : theme.standfirst(.subheadline))
-        .foregroundStyle(leads ? HierarchicalShapeStyle.primary : .secondary)
+        .font(theme.standfirst(.body))
+        .foregroundStyle(.primary)
         // **What makes `never cut` true rather than merely intended.** A row of
         // a `List` clips what it was not told to make room for, and one of the
         // places this is drawn is a row of a `List`.
@@ -480,25 +481,26 @@ struct TextPlaceholder: View {
 /// exactly as far as one that settled from nothing. Three is the fewest a list
 /// ever has, so the page only ever grows into it.
 struct EditionPlaceholder: View {
-    /// The bar that stands for a line of the lead point, and the air after it.
+    /// The bar that stands for a line of a point, and the air after it.
     ///
-    /// **A bar and its air stand for a line of type and its leading.** The lead
-    /// point is set in the theme's face at the body step, where a line and the
-    /// six points of leading under it come to twenty-eight. Thin next to the
-    /// space around it, because what a skeleton is is thin, even rules light
-    /// enough to read as an absence rather than as content.
+    /// **A bar and its air stand for a line of type and its leading.** A point
+    /// is set at the body step, where a line and the six points of leading
+    /// under it come to twenty-eight. Thin next to the space around it, because
+    /// what a skeleton is is thin, even rules light enough to read as an
+    /// absence rather than as content.
+    ///
+    /// **One height for all three, because the pane sets all three alike.** The
+    /// skeleton ranked them for a while, a taller bar for the first, and it was
+    /// promising a hierarchy the page does not draw : three points are three
+    /// things worth knowing equally.
     ///
     /// **Scaled, because the type it stands for is.** Held at the size it is
     /// drawn at today, the skeleton was the right height for a reader at the
     /// default size and the wrong one for everybody else, and the page moved by
     /// the difference for all of them when the words landed, which is the whole
     /// of what this exists to stop.
-    @ScaledMetric(relativeTo: .body) private var leadBar: CGFloat = 11
-    @ScaledMetric(relativeTo: .body) private var leadAir: CGFloat = 28
-
-    /// The same, for the two points under the lead, which are set a step down.
-    @ScaledMetric(relativeTo: .subheadline) private var followBar: CGFloat = 9
-    @ScaledMetric(relativeTo: .subheadline) private var followAir: CGFloat = 26
+    @ScaledMetric(relativeTo: .body) private var bar: CGFloat = 11
+    @ScaledMetric(relativeTo: .body) private var air: CGFloat = 28
 
     var body: some View {
         VStack(alignment: .leading, spacing: EditionHead.pointAir) {
@@ -507,18 +509,8 @@ struct EditionPlaceholder: View {
             // that is the identity 2 twice : SwiftUI says so at runtime and
             // then gives undefined results, which for a placeholder means a bar
             // that flickers or does not animate out with its neighbours.
-            ForEach(Array(Self.points.enumerated()), id: \.offset) { index, lines in
-                // **And the skeleton ranks them, because the pane does.** The
-                // first point is set a step up from the two under it, so three
-                // blocks of one bar height are the wrong total height before a
-                // word has landed, and they promise a flat list where the page
-                // is about to draw a lead.
-                TextPlaceholder(
-                    lines: lines,
-                    last: lines > 1 ? 0.5 : 0.8,
-                    height: index == 0 ? leadBar : followBar,
-                    spacing: index == 0 ? leadAir : followAir
-                )
+            ForEach(Array(Self.points.enumerated()), id: \.offset) { _, lines in
+                TextPlaceholder(lines: lines, last: lines > 1 ? 0.5 : 0.8, height: bar, spacing: air)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
