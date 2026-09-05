@@ -26,11 +26,7 @@ nonisolated struct EditionBrief: Hashable, Sendable {
 /// The shape the model fills in for a whole page.
 @Generable
 nonisolated struct GeneratedEditionPoints {
-    @Guide(
-        description:
-            "The two or three things worth knowing, one short sentence of at most 100 characters each, no numbering",
-        .maximumCount(EditionSummarizer.mostPoints)
-    )
+    @Guide(description: EditionSummarizer.pointGuide, .maximumCount(EditionSummarizer.mostPoints))
     var points: [String]
 }
 
@@ -71,20 +67,69 @@ nonisolated struct EditionSummarizer: Sendable {
     /// page that came back with one is a page to ask about again.
     static let leastPoints = 2
 
-    /// How many characters one point may run to.
+    /// What the model is asked for, written once.
     ///
-    /// **Characters and not words, because the page is measured in lines.** A
-    /// point stands on three lines at most, and what fills a line is letters :
-    /// asked in words, the model wrote twenty-five short ones or twenty-five
-    /// long ones and the page had no way of knowing which was coming. Three
-    /// lines of body across this column hold about a hundred and thirty
-    /// characters, and the bound is set under that so a point never reaches
-    /// the end of the third line.
+    /// **Interpolated rather than typed out.** The guide said `at most 100
+    /// characters` as a literal while the constant under it said a hundred and
+    /// the page's own doc comment said a hundred and twenty : a bound written in
+    /// three places is a bound that stopped agreeing with itself the first time
+    /// one of the three was changed, and it had.
+    static let pointGuide =
+        "The two or three things worth knowing, one short sentence of at most "
+        + "\(maximumPointWords) words each, no numbering"
+
+    /// How many words one point may run to.
     ///
-    /// It is the model that is held to it rather than the page : a page that
-    /// cut a point to fit would be a page throwing away the end of a sentence,
-    /// and one that set it smaller to fit would be a page whispering the news.
-    static let maximumPointCharacters = 100
+    /// **Words and not characters, because the page has stopped counting
+    /// lines.** The old bound was a hundred characters and its argument was
+    /// sound as far as it went : a point stood on three lines at most, and what
+    /// fills a line is letters. The premise was measured across the six hundred
+    /// and eighty point measure, where three lines of body hold about two
+    /// hundred characters and a hundred is comfortable. The page it shipped to
+    /// was a phone, where the same three lines hold about a hundred and ten and
+    /// the bound sat exactly at the edge ; and then the reader turns their type
+    /// up, and at the largest of the ordinary sizes three lines hold about
+    /// seventy-five. So the bound was reasoned against an iPad and shipped to a
+    /// pocket, and what a reader above the default size met was a sentence
+    /// ending in an ellipsis, which is the one thing the bound existed to stop.
+    ///
+    /// A line count is a promise the writing cannot keep : it depends on the
+    /// column, the face, the type size and the platform, none of which the model
+    /// can be told and all of which the reader may change while the edition is
+    /// on the screen. So the words bound the thought and the lines are left to
+    /// the layout, which is the only thing that knows how wide the page is.
+    /// Nothing truncates a point anywhere now, so there is no third line left to
+    /// protect : see ``EditionPoints``.
+    ///
+    /// **And a bound in characters was quietly two different bounds.** A word
+    /// and the space after it come to about six characters in French and five
+    /// and a half in English, so a hundred characters was sixteen French words
+    /// and seventeen or eighteen English ones : the same rule gave a French
+    /// reader less to be told than an English one, for no reason anybody chose.
+    ///
+    /// **Eighteen, and the arithmetic is the old bound's own.** A hundred
+    /// characters was about sixteen or seventeen words all along, so this is the
+    /// same length said in the unit that survives a change of column, with a
+    /// word of slack on top : rejecting a good point of seventeen words costs
+    /// the reader a real line for nothing, since what replaces a rejected point
+    /// is a worse one. It is the generosity ``StorySummarizer/maximumSummaryWords``
+    /// is set with, and for that reason.
+    ///
+    /// It also sits where a point belongs. A headline is held to twelve words
+    /// and says one thing ; a standfirst of one or two sentences to forty-five.
+    /// A point is one sentence saying what happened and the circumstance that
+    /// makes it worth knowing, which is a headline and a clause : `A Russian
+    /// drone hit the SBU headquarters in Kyiv` is nine words and `Une attaque
+    /// russe a frappé le siège du SBU à Kiev` is eleven, and eighteen leaves
+    /// either of them the clause. Past eighteen a sentence has stopped being one
+    /// thing said and become two joined with a comma, which is the paragraph
+    /// this whole list was made to replace.
+    ///
+    /// It is still the model that is held to it rather than the page : a page
+    /// that cut a point to fit would be a page throwing away the end of a
+    /// sentence, and one that set it smaller to fit would be a page whispering
+    /// the news.
+    static let maximumPointWords = 18
 
     /// What is kept for the answer, whatever the prompt costs.
     static let reservedTokens = 500
@@ -245,7 +290,7 @@ nonisolated struct EditionSummarizer: Sendable {
         }
         if let long = points.first(where: { !isBrief($0) }) {
             return
-                "This point is too long : \(long). Write every point again in one sentence of at most \(maximumPointCharacters) characters."
+                "This point is too long : \(long). Write every point again in one sentence of at most \(maximumPointWords) words."
         }
         return nil
     }
@@ -289,8 +334,12 @@ nonisolated struct EditionSummarizer: Sendable {
     static let sameThing = 0.66
 
     /// Whether one point has stayed one thing worth knowing.
+    ///
+    /// Counted on whitespace, exactly as a headline and a standfirst are, so an
+    /// elision is the one word it is : `l'étude` is not two. Two bounds that
+    /// counted differently would be counting two different things.
     static func isBrief(_ point: String) -> Bool {
-        point.count <= maximumPointCharacters
+        point.split(whereSeparator: \.isWhitespace).count <= maximumPointWords
     }
 
     /// What comes back, put in the shape the page draws.
@@ -390,13 +439,20 @@ nonisolated struct EditionSummarizer: Sendable {
 nonisolated extension Array where Element == String {
     /// The points that fit, unless dropping the rest would leave no list.
     ///
-    /// **The page holds a point to three lines and never cuts one**, so a point
-    /// the model would not shorten is better left out than drawn with its last
-    /// words missing. Better, that is, until leaving it out empties the page :
-    /// a bound set a few characters too tight took every point of an edition
-    /// out at once and the reader was shown a pane with nothing on it. So the
-    /// rule gives way rather than the page : where what fits is not a list any
-    /// more, what came back stands as it came back.
+    /// **It was a safety valve and it is a courtesy.** The page held a point to
+    /// three lines and never cut one, so a point the model would not shorten had
+    /// to be left out : shown, it reached the cap and was drawn with its last
+    /// words missing, which is the one thing this list must not do. That made
+    /// this escape hatch the dangerous part of the arrangement, since it is
+    /// exactly what let an over-long point through. The page caps no lines now,
+    /// so what gets through here is a point running a line further down the
+    /// pane, whole, which is a worse point and not a broken one.
+    ///
+    /// The rule still gives way rather than the page, for the reason it always
+    /// did : a bound set a few words too tight would take every point of an
+    /// edition out at once and show the reader a pane with nothing on it. Where
+    /// what fits is not a list any more, what came back stands as it came back,
+    /// at whatever length it came back, and it is drawn whole.
     func withinTheBound() -> [String] {
         let fitting = filter(EditionSummarizer.isBrief)
         return fitting.count >= EditionSummarizer.leastPoints ? fitting : self
