@@ -49,7 +49,7 @@ struct TopicSymbolTests {
     /// second is one out, every page still draws, and `Cinéma` wears a tractor.
     @Test("Every section has a mark, and the two are one value")
     func everySectionIsMarked() {
-        #expect(StandardTopics.all.count == 50)
+        #expect(StandardTopics.all.count == 52)
         #expect(StandardTopics.all.allSatisfy { !$0.symbol.isEmpty })
 
         let names = StandardTopics.names(for: Locale(identifier: "en"))

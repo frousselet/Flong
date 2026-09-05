@@ -138,7 +138,7 @@ struct TopicNamerLiveTests {
         // cost more than it saved, the model taking it constantly, and a page
         // where half the stories are filed under nothing is a page whose pills
         // say nothing. There is no second pass to save this story any more
-        // either, which is why the catalogue is fifty names deep : what a
+        // either, which is why the catalogue is fifty-two names deep : what a
         // reader actually follows should be in it.
         guard
             case .chosen(let filed) = await namer.file(

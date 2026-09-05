@@ -136,7 +136,7 @@ nonisolated struct FileStoriesJob: ResumableJob {
             // let name what the story was actually about. What came of the
             // second was a drift of near synonyms of the first, in whichever
             // language the articles happened to be in. The catalogue of
-            // sections is fifty names deep now, which is what the second pass
+            // sections is fifty-two names deep now, which is what the second pass
             // was really reaching for.
             let filed: [String]
 

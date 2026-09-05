@@ -562,7 +562,7 @@ Three buttons stand in the leading corner, in the order a reader meets what they
 
 **The way out is a flick, and the indicator says so.** There is no `Terminé` : a button that repeats what the gesture already offers is a control spent on nothing, and the indicator at the head of every panel is the thing that says a panel is a panel. A Mac keeps the button, and only a Mac, since a Mac sheet cannot be flicked and would strand the reader with no way out at all.
 
-**The sources and the subjects stand taller and scroll.** One switch has a height of its own ; a list of publishers, or fifty sections and however many the reader wrote, wants the height a reader chooses. Both open at a height of their own rather than at `.medium`, which is measured off the bottom of the screen and takes the panel's lower corners with it, and both pull up to the whole screen.
+**The sources and the subjects stand taller and scroll.** One switch has a height of its own ; a list of publishers, or fifty-two sections and however many the reader wrote, wants the height a reader chooses. Both open at a height of their own rather than at `.medium`, which is measured off the bottom of the screen and takes the panel's lower corners with it, and both pull up to the whole screen.
 
 **Picking a source closes the panel.** It is the one of the three that leads somewhere : the panel goes and the page it asked for arrives behind it, rather than staying on the stack as a way back nobody asked for.
 

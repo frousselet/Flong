@@ -21,11 +21,11 @@ import Foundation
 /// is this catalogue and whatever the reader writes themselves, and a story is
 /// filed under one or two of those or under nothing.
 ///
-/// **Fifty, because the model cannot invent past the end of the list.** Thirteen
-/// was a set of desks and everything finer landed on the nearest one ; a gap in
-/// a list nothing may go outside of is a story misfiled for ever. Fifty is
-/// enough that most stories meet something exact, and few enough that a reader
-/// can hold an opinion about each name.
+/// **Fifty-two, because the model cannot invent past the end of the list.**
+/// Thirteen was a set of desks and everything finer landed on the nearest one ;
+/// a gap in a list nothing may go outside of is a story misfiled for ever.
+/// Fifty-two is enough that most stories meet something exact, and few enough
+/// that a reader can hold an opinion about each name.
 ///
 /// **`Société` and `Culture` are last on purpose.** They are the two that sort
 /// nothing, and they are kept because they are the fallbacks and because
@@ -42,6 +42,12 @@ import Foundation
 /// except that the reader may not delete them : a story is filed under one the
 /// same way it is filed under any other, and a preference attached to one works
 /// the same.
+///
+/// **A subject the reader wrote first is taken over, never doubled.** The
+/// catalogue reaching a name they had already written is one subject under two
+/// spellings, which is what folding exists to prevent : the section wins, under
+/// the catalogue's own spelling and mark, and it keeps the stories filed under
+/// it and what the reader said about it.
 ///
 /// **Stored in the reader's language, like everything else the model writes.**
 /// A subject is a string in the store, and the model is shown strings and
@@ -109,6 +115,7 @@ nonisolated enum StandardTopics {
         Section("Religion", "hands.sparkles"),
         Section("Crime", "exclamationmark.triangle"),
         Section("Environment", "tree"),
+        Section("Ecology", "arrow.3.trianglepath"),
         Section("Climate", "thermometer"),
         Section("Weather", "cloud.sun"),
 
@@ -131,6 +138,7 @@ nonisolated enum StandardTopics {
         Section("Music", "music.note"),
         Section("Books", "books.vertical"),
         Section("Art", "paintpalette"),
+        Section("Photography", "camera"),
         Section("Architecture", "building.2"),
         Section("Fashion", "tshirt"),
         Section("Video games", "gamecontroller"),
@@ -171,14 +179,15 @@ nonisolated enum StandardTopics {
     /// is in the reader's language, and a migration runs before anything has
     /// asked what that language is.
     ///
-    /// `Écologie` is the one that forced this. In French it names the political
-    /// movement first, so a story about the party filed under it rather than
-    /// under `Politique` ; and in English the same key was translated `Climate`,
-    /// which would have folded a whole ecology backlog into the narrower
-    /// `Climat` this catalogue adds beside it.
-    static let renamed: [(was: LocalizedStringResource, now: LocalizedStringResource)] = [
-        (was: "Écologie", now: "Environment")
-    ]
+    /// Empty, and the mechanism kept for the next one.
+    ///
+    /// `Écologie` is what filled it and what emptied it again. It was moved
+    /// onto `Environment`, on the grounds that in French it names the political
+    /// movement first ; it is a section of its own now, beside `Environnement`
+    /// and `Climat`, so a renaming would take a reader's ecology backlog off
+    /// the section that holds it a moment before the catalogue puts that
+    /// section back.
+    static let renamed: [(was: LocalizedStringResource, now: LocalizedStringResource)] = []
 
     /// The names as this reader reads them.
     static func names(for locale: Locale = .current) -> [String] {

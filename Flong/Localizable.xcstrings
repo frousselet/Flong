@@ -2235,6 +2235,16 @@
         }
       }
     },
+    "Ecology": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Écologie"
+          }
+        }
+      }
+    },
     "Economy": {
       "localizations": {
         "fr": {
@@ -3993,6 +4003,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Heure de pointe"
+          }
+        }
+      }
+    },
+    "Photography": {
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Photographie"
           }
         }
       }
@@ -6066,23 +6086,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "modifié le %@"
-          }
-        }
-      }
-    },
-    "Écologie": {
-      "comment": "The former name of the Environment section, kept so a rename can find it",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Climate"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Écologie"
           }
         }
       }

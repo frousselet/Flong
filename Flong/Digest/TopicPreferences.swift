@@ -19,11 +19,16 @@ import OSLog
 /// newspapers, or the reader. There was a third, the model's own, coined when
 /// nothing it was shown covered a story ; what came of it was a drift of near
 /// synonyms of the sections that already existed, so the model names nothing
-/// now and the catalogue was widened to fifty instead.
+/// now and the catalogue was widened instead.
 ///
 /// The difference is what the reader may do to it. A standard one cannot be
 /// deleted, since it is not a thing that was made ; the reader's own are theirs
 /// to add and to remove.
+///
+/// One of theirs becomes standard where the catalogue takes up the name they
+/// wrote : two spellings of one subject is what folding exists to prevent, and
+/// of the two it is the section that carries a mark of its own and reads the
+/// same on every device.
 nonisolated enum TopicKind: String, Hashable, Sendable, Codable, CaseIterable {
     case standard
     case own
@@ -150,7 +155,7 @@ nonisolated struct TopicPreferences: Sendable {
             // had spoken about and then with what covered the most of the page,
             // which is an order that reads well on a front page and badly in a
             // list somebody is editing : a subject nudged up moved out from
-            // under their finger, and a reader looking for `Météo` among fifty
+            // under their finger, and a reader looking for `Météo` among the
             // sections had to know how much of the page it covers to guess
             // where it is.
             //
@@ -179,8 +184,9 @@ nonisolated struct TopicPreferences: Sendable {
     /// Writes down the sections every reader has, once.
     ///
     /// Idempotent, and folded like everything else : a reader who had already
-    /// written `Écologie` themselves keeps theirs, and the standard one is not
-    /// added beside it.
+    /// written `Photographie` themselves does not get a second one beside it.
+    /// Theirs becomes the section, under the catalogue's spelling and mark,
+    /// keeping the stories filed under it and what they said about it.
     ///
     /// **A section that has been renamed takes its stories and the reader's
     /// opinion with it.** A section is known by its name and by nothing else,
@@ -204,16 +210,20 @@ nonisolated struct TopicPreferences: Sendable {
                 changed = true
             }
 
-            for name in names where try Self.folded(name, in: db) == nil {
-                try Topic(name: name, kind: .standard, symbol: symbols[name], createdAt: date).insert(db)
-                changed = true
+            for name in names {
+                guard let written = try Self.folded(name, in: db) else {
+                    try Topic(name: name, kind: .standard, symbol: symbols[name], createdAt: date).insert(db)
+                    changed = true
+                    continue
+                }
+                if try Self.adopt(written, as: name, wearing: symbols[name], in: db) { changed = true }
             }
 
             // **The marks are filled in on a store that already has the
             // sections.** Every reader who was using Flong before there were
-            // marks has all fifty and needs none of them inserted, so a seeding
-            // that only ever wrote new rows would leave every one of them
-            // wearing the default for good. It is not a change to the
+            // marks has every section already and needs none of them
+            // inserted, so a seeding that only ever wrote new rows would leave
+            // every one of them wearing the default for good. It is not a change to the
             // vocabulary : nothing is renamed, nothing is added, and no story
             // is asked about again, so it does not set `changed`.
             for (name, symbol) in symbols {
@@ -238,14 +248,60 @@ nonisolated struct TopicPreferences: Sendable {
     private static func rename(_ was: String, to now: String, in db: Database) throws -> Bool {
         guard try folded(was, in: db) != nil, try folded(now, in: db) == nil else { return false }
 
+        try move(was, to: now, in: db)
+
+        Log.enrich.notice("A section was renamed, with its stories and what was said about it")
+        return true
+    }
+
+    /// Takes a subject the reader wrote into the catalogue.
+    ///
+    /// **The section wins, and the reader loses nothing.** A catalogue that
+    /// grows a name somebody had already written meets one subject under two
+    /// spellings, and leaving theirs as it was is a section that cannot be
+    /// filed under, wearing the tag, sitting where the model will not find the
+    /// mark. Theirs takes the catalogue's spelling and mark instead, and its
+    /// stories and what they said about it come with the name.
+    ///
+    /// Only the reader's own : a section already standard is where seeding
+    /// leaves off, which is what makes a second seeding cost nothing.
+    private static func adopt(_ written: String, as name: String, wearing symbol: String?, in db: Database) throws
+        -> Bool
+    {
+        let isOwn = try Bool.fetchOne(
+            db,
+            sql: "SELECT kind = ? FROM topic WHERE name = ?",
+            arguments: [TopicKind.own.rawValue, written]
+        )
+        guard isOwn == true else { return false }
+
+        if written != name { try move(written, to: name, in: db) }
+
+        // The mark comes from the catalogue, which is what makes it the same on
+        // every device ; where the catalogue names none, the one they picked
+        // stands rather than being wiped for nothing.
+        try db.execute(
+            sql: "UPDATE topic SET kind = ?, is_own = 0, symbol = COALESCE(?, symbol) WHERE name = ?",
+            arguments: [TopicKind.standard.rawValue, symbol, name]
+        )
+
+        Log.enrich.notice("A subject the reader wrote is a section of the catalogue now")
+        return true
+    }
+
+    /// Moves a subject, its filings and what the reader said about it onto
+    /// another name.
+    ///
+    /// The name is the only handle any of the three have, so all three move or
+    /// none do. `OR IGNORE` and then a delete, since the far side may already
+    /// hold a row for the same story or the same preference and a union is what
+    /// is wanted there.
+    private static func move(_ was: String, to now: String, in db: Database) throws {
         try db.execute(sql: "UPDATE topic SET name = ? WHERE name = ?", arguments: [now, was])
         try db.execute(sql: "UPDATE OR IGNORE story_topic SET name = ? WHERE name = ?", arguments: [now, was])
         try db.execute(sql: "DELETE FROM story_topic WHERE name = ?", arguments: [was])
         try db.execute(sql: "UPDATE OR IGNORE topic_preference SET name = ? WHERE name = ?", arguments: [now, was])
         try db.execute(sql: "DELETE FROM topic_preference WHERE name = ?", arguments: [was])
-
-        Log.enrich.notice("A section was renamed, with its stories and what was said about it")
-        return true
     }
 
     /// Asks again about the stories the vocabulary has caught up with.
@@ -333,8 +389,8 @@ nonisolated struct TopicPreferences: Sendable {
 
     /// The mark each subject wears, by name.
     ///
-    /// What the pills are drawn from. One read of a table of fifty rows, beside
-    /// the scores the page already reads.
+    /// What the pills are drawn from. One read of a table of fifty-odd rows,
+    /// beside the scores the page already reads.
     func symbols() async throws -> [String: String] {
         try await database.writer.read { db in
             try Row.fetchAll(db, sql: "SELECT name, symbol FROM topic")
