@@ -110,6 +110,7 @@ nonisolated struct FullText: Sendable {
     ///
     /// Returns `nil` where the page could not be reached or held no article,
     /// which is not an error : the excerpt is what stands in its place.
+    @concurrent
     func article(at url: URL) async -> String? {
         guard url.scheme?.hasPrefix("http") == true else { return nil }
 
@@ -140,6 +141,7 @@ nonisolated struct FullText: Sendable {
     /// held no article. Either way the reader keeps what the feed gave, which
     /// is why nothing here is worth an error on screen.
     @discardableResult
+    @concurrent
     func extract(_ entryID: UUID) async -> String? {
         let article = try? await database.writer.read { db -> (url: URL, feedHTML: String?, extracted: String?)? in
             guard let entry = try Entry.fetchOne(db, key: entryID), let url = entry.url else { return nil }

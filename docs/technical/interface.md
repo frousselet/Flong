@@ -126,6 +126,16 @@ So every entry point of `ArticleStore`, `SubscriptionStore`, `CollectionStore`, 
 
 The rule for anything added later : if the window awaits it and it touches the store, it is `@concurrent`.
 
+**A background priority is not a background thread.** `Task(priority: .background) { … }` created inside the model inherits the model's isolation, which is the main actor : the priority says when the system would rather run it and nothing about where. The indexing lane was written that way and ran its named-entity passes and its sentence embeddings on the main thread for twenty seconds after every catch-up, which is exactly when the reader is looking at what the catch-up brought. What moves work off is `@concurrent` on the first `nonisolated async` hop, and one is enough : everything it calls inherits its context in turn. `JobRunner.run` carries it for the whole of the enrichment.
+
+## What the window publishes, it publishes once
+
+`@Observable` notifies on the assignment and not on the value. Writing a property back with what it already held rebuilds every view that reads it, and the window's reloads run on every store change : a synchronization is a store change per batch, and a fetch is one per feed. Three of them were unguarded and each rebuilt the front page.
+
+**The sidebar** publishes five things, and `publishers` is an environment value the whole window hangs off while `feedCount` reaches the front page through `isEmpty`. **The exchange's status** is reported per `CKSyncEngine` event, and most events say what the last one said. **The work plan** was republished per progress callback, so a fetch of three hundred feeds was three hundred rebuilds of a page to move a ring by a third of a per cent ; what the ring draws is one fraction, and that is what the guard compares.
+
+The rule is the one `loadDigest` already followed : compare, then assign.
+
 On macOS the same four sections become a sidebar, through `tabViewStyle(.sidebarAdaptable)` : there is no bar to minimize on a Mac, and a window is already out of its own way.
 
 ## Pictures

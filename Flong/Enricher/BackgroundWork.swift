@@ -160,6 +160,7 @@ nonisolated struct JobRunner: Sendable {
     ///   reader who is trying to scroll. The work is resumable, so what this
     ///   costs is throughput nobody is watching.
     @discardableResult
+    @concurrent
     func run(
         until deadline: Date? = nil,
         breathing: Duration = .zero,

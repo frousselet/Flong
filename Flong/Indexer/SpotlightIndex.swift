@@ -120,6 +120,7 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
     // MARK: - Keeping Spotlight in step
 
     /// Adds or replaces articles in the index.
+    @concurrent
     func index(_ items: [ArticleStore.Chosen]) async throws {
         guard Self.isAvailable, !items.isEmpty else { return }
         let publishers = try await subscriptions.identities()
@@ -127,6 +128,7 @@ nonisolated struct SpotlightIndex: @unchecked Sendable {
     }
 
     /// Takes articles out of it.
+    @concurrent
     func remove(_ ids: [UUID]) async throws {
         guard Self.isAvailable, !ids.isEmpty else { return }
         try await index.deleteSearchableItems(withIdentifiers: ids.map { SpotlightResult.article($0).identifier })

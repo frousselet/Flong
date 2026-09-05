@@ -175,6 +175,7 @@ nonisolated struct ServiceImport: Sendable {
     /// Cancellation is not a failure : an application being put away cancels the
     /// task, the report says the import is not complete, and the row holding
     /// where every stream got to is already on disk.
+    @concurrent
     func run(
         _ job: ImportJob,
         using client: GoogleReaderClient,

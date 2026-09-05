@@ -572,6 +572,7 @@ nonisolated struct DigestService: Sendable {
 
     /// Names the editions. One call to the model per page.
     @discardableResult
+    @concurrent
     func briefEditions(
         until deadline: Date? = nil,
         now: Date = Date(),
@@ -584,6 +585,7 @@ nonisolated struct DigestService: Sendable {
     /// Names and summarizes. Slow, and what the screen does not wait for : a
     /// story with no headline of its own still has its article's.
     @discardableResult
+    @concurrent
     func brief(
         until deadline: Date? = nil,
         onProgress: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
@@ -622,6 +624,7 @@ nonisolated struct DigestService: Sendable {
     ///   writes. Built once at grouping time it found nothing eligible, stayed
     ///   empty for the whole of its life, and was stamped as a page the model
     ///   declined to name. Filling it here is what closes the circle.
+    @concurrent
     func enrich(
         until deadline: Date? = nil,
         now: Date = Date(),
@@ -667,6 +670,7 @@ nonisolated struct DigestService: Sendable {
     }
 
     @discardableResult
+    @concurrent
     func rebuild(
         until deadline: Date? = nil,
         now: Date = Date(),
@@ -689,6 +693,7 @@ nonisolated struct DigestService: Sendable {
     /// page brings in more than twelve between two openings. It runs until the
     /// backlog is empty, the time runs out, or the model gives up.
     @discardableResult
+    @concurrent
     func nameTopics(
         until deadline: Date? = nil,
         now: Date = Date(),
@@ -712,6 +717,18 @@ nonisolated struct DigestService: Sendable {
     }
 
     /// The edition the front page shows, and every one the archive holds.
+    /// What is worth suggesting to somebody searching, out of the headlines on
+    /// the page.
+    ///
+    /// **Here rather than at the call site, for the isolation.** It is a
+    /// named-entity pass over every headline, and it was run straight from the
+    /// window, which under approachable concurrency means on the main thread.
+    /// `@concurrent` puts it on the global executor and hands back the words.
+    @concurrent
+    func subjects(in headlines: [String]) async -> [String] {
+        SearchSubjects.subjects(in: headlines)
+    }
+
     @concurrent
     func editions(now: Date = Date()) async throws -> (current: PublishedEdition?, archive: [PublishedEdition]) {
         let store = EditionStore(database)
