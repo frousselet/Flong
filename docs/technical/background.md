@@ -92,6 +92,8 @@ So a job is a queue the store computes, a batch, and a count of what is left. St
 
 A feed that refuses to be fetched does not hold the queue for ever : three refusals quarantine it, and a quarantined feed is no longer work.
 
+**A job stands aside between batches while a window is up.** The indexing lane is the one piece of work that runs while somebody is reading, and it starts at the end of a catch-up, which is exactly when a reader is looking at what the catch-up brought. A batch is a read and a write of the store and, for the people a story names, a pass of `NLTagger` over its text ; one after another with nothing between them, the lane holds the database and the processor against the page it is indexing. It yields after every batch and waits a further tenth of a second where the window is up. The jobs are resumable, so what that costs is throughput nobody is watching. A pass the system granted time for runs flat out, since nobody is there.
+
 ## Asking the system for time
 
 | API | What it does | What it is worth |

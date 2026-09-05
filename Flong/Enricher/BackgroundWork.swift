@@ -150,9 +150,19 @@ nonisolated struct JobRunner: Sendable {
     ///
     /// Every batch stands alone, so stopping between two of them loses nothing
     /// and the next run picks up exactly where this one left off.
+    /// - Parameter breathing: how long to stand aside between two batches.
+    ///   Nought for a pass the system granted time for, where nobody is
+    ///   waiting and the point is to get through the queue. A moment for
+    ///   anything run while a window is up : a batch is a read and a write of
+    ///   the store and, for the people a story names, a pass of `NLTagger` over
+    ///   its text, and one batch after another with nothing between them is a
+    ///   background lane holding the database and the processor against a
+    ///   reader who is trying to scroll. The work is resumable, so what this
+    ///   costs is throughput nobody is watching.
     @discardableResult
     func run(
         until deadline: Date? = nil,
+        breathing: Duration = .zero,
         onProgress: @Sendable (Int, Int) -> Void = { _, _ in }
     ) async -> Outcome {
         var outcome = Outcome()
@@ -167,6 +177,11 @@ nonisolated struct JobRunner: Sendable {
                 outcome.done += done
                 outcome.remaining = try await job.remaining()
                 onProgress(outcome.done, outcome.done + outcome.remaining)
+
+                // Always let go of the thread between two batches, and stand
+                // aside for as long as the caller asked on top of that.
+                await Task.yield()
+                if breathing > .zero { try? await Task.sleep(for: breathing) }
             } catch {
                 Log.enrich.error("\(job.name, privacy: .public) stopped : \(error, privacy: .public)")
                 break

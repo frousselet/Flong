@@ -72,6 +72,7 @@ nonisolated struct CollectionStore: Sendable {
     // MARK: - Every collection there is
 
     /// All three natures, in the order the page shows them.
+    @concurrent
     func all() async throws -> [ArticleCollection] {
         try await builtIn() + made() + dynamic()
     }

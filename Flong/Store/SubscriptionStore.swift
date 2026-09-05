@@ -126,6 +126,7 @@ nonisolated struct SubscriptionStore: Sendable {
     ///
     /// Sorting happens in SQLite through the localized collation, so `Écrans`
     /// files under E rather than after Z.
+    @concurrent
     func feeds() async throws -> [Feed] {
         try await database.writer.read { db in
             try Feed.all().orderedByTitle().fetchAll(db)
@@ -170,6 +171,7 @@ nonisolated struct SubscriptionStore: Sendable {
     }
 
     /// The names the reader wrote, which is all a group ever stores.
+    @concurrent
     func names() async throws -> [SourceName] {
         try await database.writer.read { db in
             try SourceName.order(SourceName.Columns.domain).fetchAll(db)

@@ -893,6 +893,13 @@ final class AppModel {
     /// What synchronization is doing, in terms the sidebar can show.
     private(set) var syncStatus = SyncStatus.idle(lastSynchronized: nil)
 
+    /// Whether an exchange with iCloud is under way, which is when the store is
+    /// written to in bursts and the window has no business keeping up with it.
+    private var isExchanging: Bool {
+        if case .working = syncStatus { return true }
+        return false
+    }
+
     /// When iCloud last said it had finished, kept so that an exchange which
     /// stops saying anything can fall back on something true rather than on
     /// nothing.
@@ -1261,6 +1268,15 @@ final class AppModel {
                 // returns. Nothing may move under it : the page is read back
                 // once the gesture is over and the control has had time to
                 // retract, which is also the reload that gesture needs.
+                // **And longer again while iCloud is bringing a backlog in.**
+                // An exchange writes in bursts for as long as it runs : settled
+                // at four hundred milliseconds, the whole window was read back
+                // twice a second for minutes, under a reader trying to read it.
+                // A page a couple of seconds behind an exchange nobody asked to
+                // watch is a page nobody notices ; a page rebuilt under a thumb
+                // is one everybody does.
+                if self?.isExchanging == true { try? await Task.sleep(for: StoreChanges.exchanging) }
+
                 var waited = false
                 while self?.isRefreshing == true {
                     waited = true
@@ -3000,8 +3016,18 @@ final class AppModel {
         let vectorize = VectorizeJob(database) { [weak self] items in
             await self?.enqueueVectors(for: items)
         }
-        await JobRunner(vectorize).run(until: deadline ?? Date().addingTimeInterval(Self.indexingSlice))
-        await JobRunner(NewsmakersJob(database)).run(until: deadline ?? Date().addingTimeInterval(Self.indexingSlice))
+        // **Standing aside between batches, because a window is up.** The lane
+        // is the one piece of work that runs while somebody is reading : it
+        // starts at the end of a catch-up, which is exactly when a reader is
+        // looking at what the catch-up brought. Run flat out it holds the store
+        // and the processor for the whole of its turn, and the page it is
+        // indexing is the page being scrolled. The jobs are resumable, so what
+        // the pause costs is throughput nobody is watching.
+        let breathing = isReading ? Self.indexingBreath : .zero
+        await JobRunner(vectorize)
+            .run(until: deadline ?? Date().addingTimeInterval(Self.indexingSlice), breathing: breathing)
+        await JobRunner(NewsmakersJob(database))
+            .run(until: deadline ?? Date().addingTimeInterval(Self.indexingSlice), breathing: breathing)
         await countOutstandingWork()
     }
 
@@ -3015,6 +3041,10 @@ final class AppModel {
     /// buys is that a telephone in somebody's hand is not warm for a quarter of
     /// an hour after a refresh.
     static let indexingSlice: TimeInterval = 20
+
+    /// How long the indexing lane stands aside between two batches while a
+    /// window is up.
+    static let indexingBreath = Duration.milliseconds(120)
 
     /// Tells Spotlight and the other devices that the reader marked something.
     ///
