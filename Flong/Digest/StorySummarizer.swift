@@ -215,6 +215,10 @@ nonisolated struct StorySummarizer: Sendable {
         Never a pun, never a play on words, never a tease, never a question.
         Never promise more than the articles say, and never exaggerate.
 
+        Write it as a sentence of the reader's language, with its articles and its verb, and end it \
+        without a full stop : `L'Argentine restitue un tableau volé par les nazis`, never `Argentine \
+        restitue tableau volé par nazis`, never `Pierre Gasly pole position`.
+
         The standfirst is one or two sentences and no more.
         It states the angle : what this story is about, of everything it could have been about.
         It answers what the headline left out : who, what, where, and why.
@@ -258,6 +262,10 @@ nonisolated struct StorySummarizer: Sendable {
         Every word must carry information. No jargon, no abstractions.
         Name who did what. Prefer a fact, a figure or a verb of action to a general idea.
         Never a pun, never a play on words, never a tease, never a question.
+
+        Write it as a sentence of the reader's language, with its articles and its verb, and end it \
+        without a full stop : `L'Argentine restitue un tableau volé par les nazis`, never `Argentine \
+        restitue tableau volé par nazis`, never `Pierre Gasly pole position`.
 
         The standfirst is one or two sentences and no more.
         It answers what the headline left out : who, what, where, and why.
@@ -365,7 +373,7 @@ nonisolated struct StorySummarizer: Sendable {
             )
             let generated = response.content
 
-            let title = generated.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let title = Self.untailed(generated.title.trimmingCharacters(in: .whitespacesAndNewlines))
             let summary = generated.summary.trimmingCharacters(in: .whitespacesAndNewlines)
             // An empty headline is the model answering nothing, which is not
             // the same as the model being unusable : the same rule as the two
@@ -591,7 +599,7 @@ nonisolated struct StorySummarizer: Sendable {
                 generating: GeneratedBrief.self,
                 options: OnDeviceModel.options(maximumTokens: Self.reservedTokens)
             )
-            var title = response.content.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            var title = Self.untailed(response.content.title.trimmingCharacters(in: .whitespacesAndNewlines))
             let summary = response.content.summary.trimmingCharacters(in: .whitespacesAndNewlines)
 
             // **A headline still too long is asked for on its own.** Told twice
@@ -694,7 +702,7 @@ nonisolated struct StorySummarizer: Sendable {
                 options: OnDeviceModel.options(maximumTokens: Self.reservedTokens)
             )
 
-            let title = answer.content.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let title = Self.untailed(answer.content.title.trimmingCharacters(in: .whitespacesAndNewlines))
             let carried = answer.content.summary.trimmingCharacters(in: .whitespacesAndNewlines)
 
             // A translation that came back in the language it started in is not
@@ -741,7 +749,7 @@ nonisolated struct StorySummarizer: Sendable {
                 generating: GeneratedHeadline.self,
                 options: OnDeviceModel.options(maximumTokens: Self.reservedLineTokens)
             )
-            let title = response.content.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let title = Self.untailed(response.content.title.trimmingCharacters(in: .whitespacesAndNewlines))
 
             guard !title.isEmpty, Self.isShort(title) else { return nil }
             return title
@@ -921,6 +929,25 @@ nonisolated struct StorySummarizer: Sendable {
     /// Whether a standfirst has stayed a standfirst.
     static func isBrief(_ summary: String) -> Bool {
         summary.split(whereSeparator: \.isWhitespace).count <= maximumSummaryWords
+    }
+
+    /// A headline, less the full stop a model puts at the end of it.
+    ///
+    /// **A title is not a sentence of the article.** The instruction says so
+    /// and a small model obeys it most of the time, which is the shape of every
+    /// rule that lives only in a prompt : `Teddy Riner forfait aux Mondiaux de
+    /// judo.` came back with one, in a list where no other headline had it, so
+    /// the page had a row that looked like a mistake. It is one character and
+    /// it is checkable, so it is taken off here rather than asked for again.
+    ///
+    /// Only the full stop. A headline that genuinely ends in a question mark or
+    /// an exclamation is a headline this file has other rules about, and
+    /// trimming those would be this function having an opinion about the
+    /// writing rather than about the punctuation. An ellipsis is left alone for
+    /// the same reason : it is three characters that mean something.
+    static func untailed(_ title: String) -> String {
+        guard title.hasSuffix("."), !title.hasSuffix("..") else { return title }
+        return String(title.dropLast()).trimmingCharacters(in: .whitespaces)
     }
 
     /// Whether a headline is short enough to be one.
