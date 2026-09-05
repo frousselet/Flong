@@ -41,50 +41,7 @@ import SwiftUI
 struct EditionHead: View {
     let published: PublishedEdition
 
-    private var edition: Edition { published.edition }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Editorial.tightRhythm) {
-            if !edition.points.isEmpty {
-                points
-            }
-
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, Editorial.rhythm)
-        .padding(.bottom, Editorial.tightRhythm)
-    }
-
-    /// How much air a point carries between its own lines.
-    ///
-    /// Set against the space between points, which is a little wider still :
-    /// two points set as openly as the lines inside one are two points a reader
-    /// cannot tell apart.
-    static let leading: CGFloat = 6
-
-    /// How wide the mark in front of a point is drawn.
-    ///
-    /// A frame rather than the glyph's own width, so every line of type starts
-    /// at the same place whatever its mark is, and so the skeleton can hold the
-    /// same room before there is a mark at all.
-    static let markWidth: CGFloat = 20
-
-    /// What this edition says, and never more than the bound.
-    ///
-    /// Read here as well as written : an edition published before the bound
-    /// came down carries five points, and the page it is drawn on has one
-    /// rule about how many it shows.
-    private var said: [String] {
-        Array(edition.points.prefix(EditionSummarizer.mostPoints))
-    }
-
-    /// The mark one point wears, or the tag where nothing was matched.
-    private func mark(at index: Int) -> String {
-        guard index < published.marks.count else { return Topic.defaultSymbol }
-        return published.marks[index]
-    }
-
-    /// The few things worth knowing, one per line.
+    /// The few things worth knowing, on the pane the page opens with.
     ///
     /// **A list and not a paragraph.** Asked for two or three sentences over
     /// ten stories the model wrote one clause per story and joined them with
@@ -97,119 +54,242 @@ struct EditionHead: View {
     /// coming to the page met a wall of grey and had to work out where the
     /// edition stopped and the news began. The pane says it in one move.
     ///
-    /// **A fill and not glass.** It was the material first, and the material is
-    /// resolved against whatever is behind it on every frame the pane moves :
-    /// this one moves on every frame of every scroll, and it is blurred on the
-    /// way out, which is a second pass off screen over the first. A fill is a
-    /// colour. It reads as the same object, it holds the words apart from the
-    /// news exactly as well, and it costs one composite. See
-    /// `docs/technical/interface.md`.
-    ///
     /// **One pane and not three.** A card per point was the other way, and
     /// three panes of glass with three shadows at the head of a page is three
-    /// objects where there is one thing being said. The points are told apart
-    /// inside it by a hairline, which is the vocabulary the rest of the page
-    /// already uses between rows.
-    private var points: some View {
-        GlassEffectContainer {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(said.enumerated()), id: \.offset) { index, point in
-                    if index > 0 {
-                        // Set in from the marks, so the rule runs under the
-                        // words and not under the column of glyphs : a rule
-                        // across the whole pane cuts it into boxes, and this
-                        // is one pane with three things on it.
-                        Divider()
-                            .padding(.leading, Self.markWidth + Self.columnGap)
-                    }
-
-                    HStack(alignment: .firstTextBaseline, spacing: Self.columnGap) {
-                        // **The subject's own mark, and it was a rule.** A rule
-                        // is what a page uses where there is nothing to say
-                        // about an item beyond that it is one of several ; here
-                        // there is, since a point is about a story and a story
-                        // is filed under a subject. The row says what kind of
-                        // news each line is before the line is read.
-                        //
-                        // The page's own colour, like the line beside it. A
-                        // mark set quieter than the words it stands in front of
-                        // reads as furniture ; this one says what kind of news
-                        // the line is, which is as much a part of the line as
-                        // the sentence.
-                        Image(systemName: mark(at: index))
-                            .font(.system(.footnote, weight: .semibold))
-                            .foregroundStyle(.primary)
-                            .frame(width: Self.markWidth)
-                            .accessibilityHidden(true)
-
-                        // **Three lines, and never a truncated one.** The bound
-                        // is kept where the words are written rather than where
-                        // they are drawn : the model is held to a hundred and
-                        // twenty characters a point, which is under what three
-                        // lines hold here, so nothing reaches this and needs
-                        // cutting. Setting a long point smaller until it fitted
-                        // was the other way, and it is a page whispering the
-                        // news. See ``EditionSummarizer/maximumPointCharacters``.
-                        Text(verbatim: point)
-                            .lineLimit(3)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .padding(.vertical, Self.rowAir)
-                }
-            }
-            // The page's own colour, at the size the rest of the page reads in.
-            .font(.body)
-            .lineSpacing(Self.leading)
-            .foregroundStyle(.primary)
-            .padding(.horizontal, Self.paneInset)
-            .padding(.vertical, 4)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(.regular, in: .rect(cornerRadius: Self.paneCorner))
+    /// objects where there is one thing being said. What tells the points apart
+    /// inside it is the order the model already wrote them in : see
+    /// ``EditionPoints``.
+    ///
+    /// An edition with no points is not drawn at all : the pane would be an
+    /// empty sheet of glass at the head of a page.
+    @ViewBuilder
+    var body: some View {
+        if !published.edition.points.isEmpty {
+            EditionPoints(published: published)
+                .editionPane()
+                .padding(.vertical, Editorial.rhythm)
         }
-        // Room between what the edition says and the first story it leads on.
-        // They are two different things and were a few points apart.
-        .padding(.bottom, Editorial.rhythm)
+    }
+}
+
+/// What an edition says, ranked, wherever it is drawn.
+///
+/// **One drawing and it was three.** The same three sentences were set out by
+/// hand at the head of the front page, again at the head of a back number and
+/// again in the row that opens one, with two mark weights, two column gaps,
+/// three spacings between them, and only one of the three ranking the points.
+/// What told them apart was where they were drawn, which is the one thing that
+/// ought not to change what they say : a reader who opened yesterday's edition
+/// from the calendar met a plainer copy of this morning and nothing on the page
+/// explained why. There is one of it now, and what a caller chooses is how many
+/// points to show and what ground to lay them on.
+///
+/// **Ranked, because the model ranked them.** The instructions ask for the
+/// things worth knowing `in the order they matter` and say so twice ; the page
+/// then set all three at one size, one weight and one colour, so an ordering
+/// that was asked for, written and checked was thrown away at the last step, on
+/// the one screen whose whole argument is that a page where everything is the
+/// same size is a list, and that a list makes the reader do the ranking the
+/// digest exists to do.
+///
+/// **And the lead is where the theme speaks.** It was `.font(.body)`, which made
+/// this the only block of type on the front page that asked nobody : under
+/// `Papier` and `Solarized` every headline, standfirst and caption on the page
+/// changed face and the pane did not, three lines of system sans directly above
+/// a serif or a monospace title. The first point is the one line of the page a
+/// reader glances at before they have read a headline, so it takes the theme's
+/// face at the body step : a step under the news it stands over, never level
+/// with it. The two under it are prose and get out of the way.
+///
+/// **And nothing is truncated.** There is no line limit here nor anywhere else
+/// a point is drawn. What holds a point to a readable length is the model, and
+/// it is held in words : see ``EditionSummarizer/maximumPointWords``.
+struct EditionPoints: View {
+    let published: PublishedEdition
+
+    /// How many points are shown.
+    ///
+    /// The whole list at the head of an edition ; the first two in a row of the
+    /// archive, where the section over the row already says which edition it is
+    /// and the whole list would be one back number to a screenful.
+    var showing = EditionSummarizer.mostPoints
+
+    @Environment(\.theme) private var theme
+
+    /// What this edition says, and never more than the bound.
+    ///
+    /// Read here as well as written : an edition published before the bound
+    /// came down carries five points, and every page that draws one has the
+    /// same rule about how many it shows.
+    private var said: [String] {
+        Array(published.edition.points.prefix(min(showing, EditionSummarizer.mostPoints)))
+    }
+
+    /// The mark one point wears, or the tag where nothing was matched.
+    ///
+    /// A point about a story the filing never reached is an ordinary state
+    /// rather than a fault : half a mark on a row of marks reads worse than a
+    /// neutral one.
+    private func mark(at index: Int) -> String {
+        guard index < published.marks.count else { return Topic.defaultSymbol }
+        return published.marks[index]
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: EditionHead.pointAir) {
+            ForEach(Array(said.enumerated()), id: \.offset) { index, point in
+                line(point, wearing: mark(at: index), leads: index == 0)
+            }
+        }
+        .lineSpacing(EditionHead.leading)
+        .multilineTextAlignment(.leading)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // One thing said once, rather than three sentences and three glyphs
+        // read out as six things. The marks are inside a run of text and are
+        // hidden from VoiceOver by being images in it.
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text("Written by the model : \(said.joined(separator: ". "))"))
     }
 
-    /// How far the page scrolls before the pane has gone entirely.
+    /// One point, behind the mark of the subject it is about.
     ///
-    /// About the height of the pane itself : it is finished by the time the
-    /// first headline has reached where it stood.
+    /// **The subject's own mark, and it was a rule.** A rule is what a page uses
+    /// where there is nothing to say about an item beyond that it is one of
+    /// several ; here there is, since a point is about a story and a story is
+    /// filed under a subject, so the line says what kind of news it is before it
+    /// is read.
+    ///
+    /// **Set into the line, and it stood beside it.** The mark had a column of
+    /// its own, twenty points wide with twelve of air after it, and every
+    /// wrapped line of a point came back to the far side of it. That is what
+    /// ``StorySummary`` argues against one file away : a label pinned next to a
+    /// paragraph holds a gutter open down the whole pane, it takes the width
+    /// away from the words at the one size where they have least to spare, and a
+    /// point of three lines indented past a glyph reads as a quotation. It
+    /// matters more now than it did, since a point that used to stop at three
+    /// lines may run further.
+    ///
+    /// **One `Text` and not two views.** A glyph that is part of a sentence has
+    /// to break with the sentence, and only a single run of text does that.
+    ///
+    /// **And it takes the colour of the line it stands in front of.**
+    /// ``StorySummary`` sets its own mark quieter than the words, because that
+    /// mark is an attribution : it says who wrote the sentence and is not part
+    /// of it. This one says what kind of news the sentence is, which is as much
+    /// a part of the line as the words are, and one set quieter than them reads
+    /// as furniture. So it inherits, and is told apart by its size alone.
+    ///
+    /// **A symbol is not a letter.** Set at the font of its line it fills the
+    /// cap height and comes out heavier than anything beside it, so the mark
+    /// takes a step down from whatever the line is set at : read before the
+    /// sentence, never instead of it. A step of the scale and not a size in
+    /// points, so it grows with the reader's type.
+    private func line(_ point: String, wearing symbol: String, leads: Bool) -> some View {
+        let badge = Text(Image(systemName: symbol))
+            .font(.system(leads ? .footnote : .caption, weight: .semibold))
+
+        return Text(
+            "\(badge) \(Text(verbatim: point))",
+            comment: "A line the model wrote, behind the mark that stands in front of it"
+        )
+        .font(leads ? theme.headline(.body) : theme.standfirst(.subheadline))
+        .foregroundStyle(leads ? HierarchicalShapeStyle.primary : .secondary)
+        // **What makes `never cut` true rather than merely intended.** A row of
+        // a `List` clips what it was not told to make room for, and one of the
+        // places this is drawn is a row of a `List`.
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+extension EditionHead {
+    /// How much air a point carries between its own lines.
+    ///
+    /// Set against the air between two points, which is three times it : two
+    /// points set as openly as the lines inside one are two points a reader
+    /// cannot tell apart.
+    static let leading: CGFloat = 6
+
+    /// The air between one point and the next.
+    ///
+    /// **It was a hairline, and it is air.** The points were told apart by a
+    /// `Divider` apiece, set in from the marks, which made this the one place on
+    /// the front page where a rule ran *inside* an object : uniform type between
+    /// hairlines in a rounded rectangle is the shape of a grouped table of
+    /// settings, and the rule that used to sit *under* this pane was deleted for
+    /// less, on the ground that a rule between two rows is what separates one
+    /// story from the next. What tells three points apart now is the air between
+    /// them and the step in the type, which is how the page tells its lead from
+    /// the rest.
+    static let pointAir: CGFloat = 18
+
+    /// How far the words stand in from the edge of the pane, on all four sides.
+    ///
+    /// **One number where there were three.** It was sixteen at the sides, four
+    /// at the top and bottom and thirteen more above and below every point, so
+    /// the air over the first word came to seventeen by an arithmetic nobody had
+    /// written down and which was right only for as long as the row padding
+    /// beside it stayed what it was. The rows have no padding of their own now.
+    ///
+    /// A shade wider than ``pointAir`` : an outer margin narrower than the gap
+    /// inside is a block that has slipped off its own paper.
+    static let paneInset: CGFloat = 20
+
+    /// The corner of the pane.
+    ///
+    /// Wide, because the pane holds a paragraph rather than a control : a corner
+    /// is read as a share of the shape it cuts, and this one runs the whole
+    /// column. Tighter and a shape this size reads as a dialog box, and the
+    /// material is at its best on a shape a page could have been cut from.
+    static let paneCorner: CGFloat = 28
+
+    /// How far the page scrolls before the pane has gone entirely, at the
+    /// reader's ordinary type size.
+    ///
+    /// **A travel and not a measurement.** It used to claim to be the height of
+    /// the pane, which it never quite was and, now that a point runs to as many
+    /// lines as it needs, is not close : what it says is how much scrolling it
+    /// takes for the head to be finished with. It is scaled with the reader's
+    /// type where it is read, since the pane grows with the type and a fixed
+    /// travel faded the head out while most of it was still on the screen. See
+    /// ``EditionSinking``.
     static let sinking: CGFloat = 200
 
     /// What share of the scroll the pane is held back by.
     ///
-    /// Half, so it drifts up at half the speed of the news going past it,
-    /// which is what reads as depth rather than as a view that is stuck.
+    /// Half, so it drifts up at half the speed of the news going past it, which
+    /// is what reads as depth rather than as a view that is stuck.
     static let lag: CGFloat = 0.5
 
     /// How far the pane shrinks on its way out.
     static let shrink: CGFloat = 0.14
+}
 
-    /// How far out of focus the pane goes on its way out.
+extension View {
+    /// Lays this on the pane an edition's head stands on.
     ///
-    /// Affordable now that the pane is a fill : a blur is one pass off screen
-    /// over a bitmap rasterized once, rather than a pass over a material being
-    /// resolved again on every frame.
-    static let softening: CGFloat = 6
-
-    /// The gap between a mark and the words it stands in front of.
-    static let columnGap: CGFloat = 12
-
-    /// The air above and below one point inside the pane.
-    static let rowAir: CGFloat = 13
-
-    /// How far the words stand in from the edge of the pane.
-    static let paneInset: CGFloat = 16
-
-    /// The corner of the pane.
+    /// **A modifier, so there is one pane and no second place for a number to
+    /// drift in.** The front page's head, a back number's head and the skeleton
+    /// that stands in for either all ask for the pane in the same words, and a
+    /// change to the inset or the corner moves all three by construction. The
+    /// skeleton in particular has to have it : drawn as a bare list where the
+    /// edition arrives on a pane, it is the wrong height and the wrong shape,
+    /// and the page moves twice rather than not at all.
     ///
-    /// Wide, because the pane holds a paragraph rather than a control : a tight
-    /// corner on a shape this size reads as a dialog box, and the material is
-    /// at its best on a shape a page could have been cut from.
-    static let paneCorner: CGFloat = 28
+    /// **And no container round it.** A `GlassEffectContainer` exists to merge
+    /// the shadows of several shapes of glass and to hand their tints out by
+    /// identity, and there is one shape here : it merged nothing and identified
+    /// nothing.
+    ///
+    /// **And it is not tinted.** The pane sits over the colour the lead
+    /// photograph gives the page. A tint is an instruction, an instruction
+    /// overrides the material's own adaptation, and what it would override here
+    /// is a hue nobody chose.
+    func editionPane() -> some View {
+        padding(EditionHead.paneInset)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .glassEffect(.regular, in: .rect(cornerRadius: EditionHead.paneCorner))
+    }
 }
 
 /// What the head of the page does as the page is scrolled.
@@ -234,12 +314,40 @@ struct EditionHead: View {
 struct EditionSinking: ViewModifier {
     let offset: PageOffset
 
+    /// **The travel follows the reader's type, because the pane does.** It was
+    /// a constant, about the height of an ordinary pane at the ordinary size. A
+    /// point is no longer held to three lines, so at the larger sizes the pane
+    /// is two and three times that tall and a fixed travel faded it out while
+    /// most of it was still on the screen. A scaled metric is read from the
+    /// environment when the reader changes their type and never per frame, so
+    /// this costs the parallax nothing it was not already paying.
+    @ScaledMetric(wrappedValue: EditionHead.sinking, relativeTo: .body)
+    private var sinking: CGFloat
+
+    /// **A parallax is the motion a reader who asked for less of it meant.**
+    /// The fade stays, since what it says is that the head is behind the news
+    /// now, which is information ; the drift and the shrink are the movement
+    /// itself, and they stop. It is what the live dot does under the same
+    /// setting, and the skeleton's band of light, and the charts.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     @ViewBuilder
     func body(content: Content) -> some View {
         // Never below nought : a page pulled past its own top is a page being
         // refreshed, and the head has no business moving for that.
         let travelled = max(offset.scrolled, 0)
-        let gone = min(travelled / EditionHead.sinking, 1)
+        let gone = min(travelled / sinking, 1)
+        // **It holds, and then it goes.** The fade and the shrink ran straight
+        // off the distance travelled, so the pane was at half its ink after a
+        // hundred points of scroll, which is while it is still the thing the
+        // reader is looking at : something that begins to leave the instant the
+        // page is touched reads as something that was never quite there. Eased,
+        // it barely moves through the first third and is gone through the last,
+        // which is what the parallax was already claiming about it. The drift
+        // is not eased with them : it is the reader's own finger, and a
+        // parallax that ran ahead of the scroll it is held back against would
+        // be a pane sliding on its own.
+        let leaving = gone * gone * (3 - 2 * gone)
 
         // **Drawn only while it is there.** Once it has gone entirely the pane
         // was still a pane : a shape of glass, faded to nothing, sampling what
@@ -249,25 +357,31 @@ struct EditionSinking: ViewModifier {
         // leave it behind. `hidden` keeps the room it takes and stops the
         // drawing, so nothing moves and nothing is composited.
         //
+        // **And nothing rasterized over it.** Drawing the pane once and moving
+        // the picture of it is the right answer for something painted and the
+        // wrong one for the material : a bitmap is a snapshot, and what the
+        // material draws is whatever is behind it at this moment.
+        //
+        // **And it is not blurred.** A blur over the material is two passes off
+        // screen for every frame of the first two hundred points of every
+        // scroll, which is the one stretch of page a reader crosses every
+        // morning. What defended it was a doc comment saying the pane was a
+        // fill, and it has not been a fill for some time. The easing says what
+        // the blur was there to say and costs nothing.
+        //
         // A simulator draws glass cheaply and shows none of this ; a device
         // draws the real thing.
         if gone >= 1 {
             content.hidden()
+        } else if reduceMotion {
+            content.opacity(1 - leaving)
         } else {
-
-            // **And nothing rasterized over it.** Drawing the pane once and
-            // moving the picture of it is the right answer for something
-            // painted and the wrong one for the material : a bitmap is a
-            // snapshot, and what the material draws is whatever is behind it at
-            // this moment. It was rasterized while the pane was a fill, and the
-            // fill is gone.
             content
                 // Held back against the scroll, so it falls behind the page
                 // rather than travelling with it.
                 .offset(y: travelled * EditionHead.lag)
-                .scaleEffect(1 - gone * EditionHead.shrink, anchor: .top)
-                .blur(radius: gone * EditionHead.softening)
-                .opacity(1 - gone)
+                .scaleEffect(1 - leaving * EditionHead.shrink, anchor: .top)
+                .opacity(1 - leaving)
         }
     }
 }
@@ -349,7 +463,6 @@ struct TextPlaceholder: View {
 }
 
 /// The shape of an edition, before there is one.
-/// The shape of an edition, before there is one.
 ///
 /// **A page that fills in rather than one that appears.** An edition is not
 /// published until the model has written the whole of it, so the front page
@@ -367,56 +480,59 @@ struct TextPlaceholder: View {
 /// exactly as far as one that settled from nothing. Three is the fewest a list
 /// ever has, so the page only ever grows into it.
 struct EditionPlaceholder: View {
+    /// The bar that stands for a line of the lead point, and the air after it.
+    ///
+    /// **A bar and its air stand for a line of type and its leading.** The lead
+    /// point is set in the theme's face at the body step, where a line and the
+    /// six points of leading under it come to twenty-eight. Thin next to the
+    /// space around it, because what a skeleton is is thin, even rules light
+    /// enough to read as an absence rather than as content.
+    ///
+    /// **Scaled, because the type it stands for is.** Held at the size it is
+    /// drawn at today, the skeleton was the right height for a reader at the
+    /// default size and the wrong one for everybody else, and the page moved by
+    /// the difference for all of them when the words landed, which is the whole
+    /// of what this exists to stop.
+    @ScaledMetric(relativeTo: .body) private var leadBar: CGFloat = 11
+    @ScaledMetric(relativeTo: .body) private var leadAir: CGFloat = 28
+
+    /// The same, for the two points under the lead, which are set a step down.
+    @ScaledMetric(relativeTo: .subheadline) private var followBar: CGFloat = 9
+    @ScaledMetric(relativeTo: .subheadline) private var followAir: CGFloat = 26
+
     var body: some View {
-        GlassEffectContainer {
-            VStack(alignment: .leading, spacing: 0) {
-                // **Keyed by where it stands and not by what it holds.** These
-                // are three points of two, one and two lines, and `id: \.self`
-                // over that is the identity 2 twice : SwiftUI says so at
-                // runtime and then gives undefined results, which for a
-                // placeholder means a bar that flickers or does not animate out
-                // with its neighbours.
-                ForEach(Array(Self.points.enumerated()), id: \.offset) { index, lines in
-                    if index > 0 {
-                        Divider()
-                            .padding(.leading, EditionHead.markWidth + EditionHead.columnGap)
-                    }
-
-                    HStack(alignment: .top, spacing: EditionHead.columnGap) {
-                        // The room a mark takes, and no mark : a skeleton
-                        // claiming a subject before anything has been filed
-                        // under one would be a promise, and the page would
-                        // change shape twice.
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(.quaternary)
-                            .frame(width: 14, height: 14)
-                            .frame(width: EditionHead.markWidth)
-                            .padding(.top, 3)
-
-                        // The same room a line of the real thing takes : a bar
-                        // and the air after it come to the height of a line of
-                        // type plus its leading, or the page moves when the
-                        // words land.
-                        TextPlaceholder(
-                            lines: lines, last: lines > 1 ? 0.5 : 0.8, height: 9,
-                            spacing: EditionHead.leading + 11
-                        )
-                    }
-                    .padding(.vertical, EditionHead.rowAir)
-                }
+        VStack(alignment: .leading, spacing: EditionHead.pointAir) {
+            // **Keyed by where it stands and not by what it holds.** These are
+            // three points of two, one and two lines, and `id: \.self` over
+            // that is the identity 2 twice : SwiftUI says so at runtime and
+            // then gives undefined results, which for a placeholder means a bar
+            // that flickers or does not animate out with its neighbours.
+            ForEach(Array(Self.points.enumerated()), id: \.offset) { index, lines in
+                // **And the skeleton ranks them, because the pane does.** The
+                // first point is set a step up from the two under it, so three
+                // blocks of one bar height are the wrong total height before a
+                // word has landed, and they promise a flat list where the page
+                // is about to draw a lead.
+                TextPlaceholder(
+                    lines: lines,
+                    last: lines > 1 ? 0.5 : 0.8,
+                    height: index == 0 ? leadBar : followBar,
+                    spacing: index == 0 ? leadAir : followAir
+                )
             }
-            // **The same pane, and it has to be.** The skeleton exists to hold
-            // the room the thing it stands for will take : drawn as a bare list
-            // where the edition arrives on a pane, it is the wrong height and
-            // the wrong shape, and the page moves twice rather than not at all
-            // - once when the pane appears and once when the words land in it.
-            .padding(.horizontal, EditionHead.paneInset)
-            .padding(.vertical, 4)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .glassEffect(.regular, in: .rect(cornerRadius: EditionHead.paneCorner))
         }
-        .padding(.bottom, Editorial.rhythm)
-        // What tells a page that is filling in from a page that is broken.
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // **The same pane, asked for by name.** The skeleton exists to hold the
+        // room the thing it stands for will take, so it takes the pane the way
+        // the head takes it and there is no way for the two to drift : the same
+        // inset, the same corner, the same air between points, and the same
+        // rhythm above and below, which is what the page moved by when the
+        // words landed for as long as the head had a rhythm over it and this
+        // had none.
+        .editionPane()
+        .padding(.vertical, Editorial.rhythm)
+        // What tells a page that is filling in from a page that is broken. The
+        // real pane never does this.
         .shimmering()
         // One thing said once, rather than a set of bars read out as sentences
         // of nonsense.
@@ -430,6 +546,13 @@ struct EditionPlaceholder: View {
     /// claiming the exact shape of an answer nobody has yet is a second guess,
     /// so the middle one stands a single line where the two either side stand
     /// two : the page settles by a line rather than by a block.
+    ///
+    /// **And it settles by growing and never by shrinking.** A bar and the air
+    /// after it come to a line of type and its leading, and the last line of a
+    /// block has no air after it, so a block stands one leading short of the
+    /// type it replaces. That is about a dozen points across the three of them,
+    /// under the height of one word, and it is all in the same direction : the
+    /// page grows into its edition rather than shrinking onto it.
     private static let points = [2, 1, 2]
 }
 

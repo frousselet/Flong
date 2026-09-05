@@ -94,7 +94,7 @@ struct StorySummary: View {
             .foregroundStyle(.tertiary)
         return Text(
             "\(badge) \(Text(verbatim: summary))",
-            comment: "A machine-written summary, behind the mark that says who wrote it"
+            comment: "A line the model wrote, behind the mark that stands in front of it"
         )
     }
 
