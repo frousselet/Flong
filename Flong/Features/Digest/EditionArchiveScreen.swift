@@ -53,39 +53,24 @@ struct EditionArchiveScreen: View {
     let model: AppModel
     let open: (UUID) -> Void
 
-    @Environment(\.theme) private var theme
-
-    /// One back number, as a row : the two points the model put first, and how
-    /// much the edition carried.
+    /// One back number, as a row : the first two of its points, and how much it
+    /// carried.
     ///
-    /// The whole list would be one back number to a screenful. The first two are
-    /// the ones the model put first, which are the ones it thought mattered ;
-    /// the section above the row says which edition it is, so nothing here has
-    /// to name it.
-    ///
-    /// **It ranked its two points, and it stops.** It set the first in
-    /// `headline` and the second in `subheadline`, in the system's own face, at
-    /// a call site. Two points are two things worth knowing equally : nothing
-    /// scores them and nothing checks the order they came back in, so the
-    /// larger of the two was a hierarchy the row had invented. It draws them
-    /// the way the head of an edition draws them now, which also means it
-    /// changes face with the theme like everything around it and gains the
-    /// subject marks it never had, at no cost in width since they are inside
-    /// the line.
-    ///
-    /// **And it cuts nothing.** It held each point to two lines, which was one
-    /// of the places a point ended in an ellipsis. What keeps this row short is
-    /// the bound on the writing. See ``EditionSummarizer/maximumPointWords``.
-    ///
-    /// No pane here. Glass on a list row is one piece of it per row, which is
-    /// the card-per-point the pane exists instead of, at the scale of a whole
-    /// screen, and it would be glass laid on a grouped background besides.
+    /// The whole list would be five lines apiece and the archive would be one
+    /// edition to a screenful. The first two are the ones the model put first,
+    /// which are the ones it thought mattered ; the section above the row says
+    /// which edition it is, so nothing here has to name it.
     private func row(_ published: PublishedEdition) -> some View {
-        VStack(alignment: .leading, spacing: Editorial.tightRhythm) {
-            EditionPoints(published: published, showing: 2)
-
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(published.edition.points.prefix(2).enumerated()), id: \.offset) { index, point in
+                Text(verbatim: point)
+                    .font(index == 0 ? .headline : .subheadline)
+                    .foregroundStyle(index == 0 ? .primary : .secondary)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+            }
             Text("\(published.stories.count) stories")
-                .font(theme.metadata)
+                .font(.caption)
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -146,39 +131,53 @@ struct EditionScreen: View {
         model.editionArchive.first { $0.edition.id == id }
     }
 
+    /// The mark one point wears, or the tag where nothing was matched.
+    private func mark(of published: PublishedEdition, at index: Int) -> String {
+        guard index < published.marks.count else { return Topic.defaultSymbol }
+        return published.marks[index]
+    }
+
+    /// What an edition says, and never more than the bound : a back number
+    /// published before it came down carries five points. See ``EditionHead``.
+    private func said(of edition: Edition) -> [String] {
+        Array(edition.points.prefix(EditionSummarizer.mostPoints))
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                if let published, !published.edition.points.isEmpty {
-                    // **The same head as this morning's, and not a plainer copy
-                    // of it.** It was drawn again here by hand, with a mark set
-                    // at a different weight, a different gap after it, a
-                    // different spacing between points and the same cap of
-                    // three lines : a reader who opened yesterday's edition from
-                    // the calendar met a plainer version of the same three
-                    // sentences and nothing on the page explained why.
-                    //
-                    // **And the pane comes with it, which is not a fourth place
-                    // for the material.** `docs/technical/interface.md` licenses
-                    // it for the few points at the head of *an edition*, and
-                    // this is the head of an edition, with ten stories of body
-                    // type under it and the same problem of telling the page's
-                    // own voice from the news. It reads plainer here and it
-                    // should : the material resolves against the sheet's own
-                    // paper rather than against the colour a lead photograph
-                    // gives the front page, so what carries it here is its rim
-                    // and its inset rather than what shows through it.
-                    //
-                    // **What does not come with it is the sinking.** A masthead
-                    // held back against the scroll is right on a page the reader
-                    // lives on ; in a half-height sheet opened to read one
-                    // edition it would be gone before the sheet had finished
-                    // presenting, and this screen writes no ``PageOffset`` for
-                    // it to read.
-                    EditionPoints(published: published)
-                        .editionPane()
-                        .padding(.top, Editorial.tightRhythm)
-                        .padding(.bottom, Editorial.rhythm)
+                if let published, case let edition = published.edition {
+                    VStack(alignment: .leading, spacing: Editorial.tightRhythm) {
+                        if !edition.points.isEmpty {
+                            VStack(alignment: .leading, spacing: 18) {
+                                ForEach(Array(said(of: edition).enumerated()), id: \.offset) { index, point in
+                                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                        Image(systemName: mark(of: published, at: index))
+                                            .font(.system(.footnote, weight: .medium))
+                                            .foregroundStyle(.primary)
+                                            .frame(width: EditionHead.markWidth)
+                                            .accessibilityHidden(true)
+                                        // Three lines, and never cut : the
+                                        // bound is on what the model writes.
+                                        // See ``EditionHead``.
+                                        Text(verbatim: point)
+                                            .lineLimit(3)
+                                    }
+                                }
+                            }
+                            .font(.body)
+                            .lineSpacing(EditionHead.leading)
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 4)
+                            .padding(.bottom, Editorial.tightRhythm)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel(
+                                Text("Written by the model : \(said(of: edition).joined(separator: ". "))"))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, Editorial.rhythm)
                 }
 
                 ForEach(published?.stories ?? [], id: \.position) { story in
