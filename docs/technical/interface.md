@@ -194,6 +194,8 @@ Three addresses are tried, in order : **what one of its feeds states**, since th
 
 Nothing is asked for until a row is on screen, and what comes back is kept on disk, so a publisher costs one request rather than one per appearance. One that answers none of the three wears the generic mark : a list must keep its column of marks whether a publisher serves one or not, which is the one place a picture does not simply vanish when it fails.
 
+**A mark already decoded is drawn before its row is.** A list keeps a row's state only while the row is realized, so a reader running one back and forth arrives at the same publisher again and again with nothing in hand. Asking the store the asynchronous way costs a hop off the main actor even when the answer has been decoded for minutes, and a hop is a frame : long enough for the generic mark to be drawn, and it was followed by a fade, so every mark on the page blinked and faded back the moment its row came on screen. `ImageStore.held(at:maximumPixels:)` never fetches and never decodes, and it is what the marks and the pictures both read first.
+
 ## Every picture is credited
 
 **A picture on the page belongs to somebody, and the page says who.** Only the address is ever stored : the file stays the publisher's and is asked for from their own server when a screen shows it, so the least a screen owes them is a name saying whose it is. A story is several rooms and the picture is one room's, which the marks beside the headline do not answer.
