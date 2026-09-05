@@ -27,7 +27,7 @@ import SwiftUI
 /// page out of sight for the whole of that.
 ///
 /// It stands taller than the notices beside it, which are one switch, and it
-/// pulls up to the whole screen : fifty sections and however many of the
+/// pulls up to the whole screen : fifty-two sections and however many of the
 /// reader's own are a list to scroll, and a list to scroll wants the height a
 /// reader chooses.
 
@@ -63,7 +63,7 @@ struct TopicsPanel: View {
         .presentationDetents([.large])
         // **A sheet and not an alert, now that there is a mark to pick.** An
         // alert holds a field and two buttons and nothing else : a grid of
-        // fifty glyphs in one is not something the system will draw, and a
+        // fifty-odd glyphs in one is not something the system will draw, and a
         // subject added without a mark would wear the tag for ever unless the
         // reader found their way back to change it.
         .sheet(isPresented: $isAdding) {

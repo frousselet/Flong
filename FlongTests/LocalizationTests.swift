@@ -42,6 +42,29 @@ struct LocalizationTests {
         #expect(String(localized: "Subscribed sites", locale: french) == "Sites abonnés")
     }
 
+    /// The sections of the catalogue, which are English keys in the code and
+    /// French words on the page.
+    ///
+    /// **The two the catalogue took up last, and the one that nearly went.**
+    /// `Écologie` was moved onto `Environnement` once, on the grounds that in
+    /// French it names the political movement first ; it is a section of its
+    /// own again, and the two now stand side by side, which only works while
+    /// they are two different words.
+    @Test("The sections are named in French, and no two of them alike")
+    func sections() {
+        #expect(String(localized: "Photography", locale: french) == "Photographie")
+        #expect(String(localized: "Ecology", locale: french) == "Écologie")
+        #expect(String(localized: "Environment", locale: french) == "Environnement")
+        #expect(String(localized: "Climate", locale: french) == "Climat")
+
+        // A section missing its French falls back to the English key, silently,
+        // and two sections under one name are a pill the reader cannot tell
+        // from another.
+        let names = StandardTopics.names(for: french)
+        #expect(names.count == StandardTopics.all.count)
+        #expect(Set(names).count == names.count)
+    }
+
     /// The screen a reader arriving from another reader sees first.
     ///
     /// **The one word they must not misread is the password.** FreshRSS has two,

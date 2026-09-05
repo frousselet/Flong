@@ -264,21 +264,21 @@ It extracts tags from a text rather than choosing among labels, so it answers wi
 
 ## The mark a subject wears
 
-A row of pills reading `Politique · Économie · Cinéma · Sport` is four words a reader has to read on every scroll. The same row with a glyph in front of each is four shapes they recognize, and the reading is over before it started. Every subject has one : the fifty sections take theirs from the catalogue, and one the reader writes takes the one they pick.
+A row of pills reading `Politique · Économie · Cinéma · Sport` is four words a reader has to read on every scroll. The same row with a glyph in front of each is four shapes they recognize, and the reading is over before it started. Every subject has one : the fifty-two sections take theirs from the catalogue, and one the reader writes takes the one they pick.
 
 **The name and the mark are one value and never two lists.** A name in one array and a glyph at the same index in another is two places to forget one, and the day somebody inserts a section into the middle of the first the whole of the second is one out : every page still draws, with `Cinéma` wearing a tractor, and nobody notices. `StandardTopics.Section` carries both.
 
 **The mark is the thing and never the word.** `Justice` wears a closed book and not a pair of scales, `Immigration` somebody walking and not a border. A glyph that illustrates the word rather than the subject is a rebus, and a reader scanning a row of pills is reading shapes rather than solving them. Where a subject has no thing of its own, the section it belongs to lends one.
 
-**Every one of them is checked against the system at test time.** `Image(systemName:)` takes any string at all and draws nothing where the system has no such symbol, so a typo in the catalogue is a pill with a hole in it, on every page, in every language, and the compiler is perfectly happy about it. `TopicSymbolTests` asks the system for each of the fifty and for each of the palette.
+**Every one of them is checked against the system at test time.** `Image(systemName:)` takes any string at all and draws nothing where the system has no such symbol, so a typo in the catalogue is a pill with a hole in it, on every page, in every language, and the compiler is perfectly happy about it. `TopicSymbolTests` asks the system for each of the fifty-two and for each of the palette.
 
 **A reader picks from what the sections wear and from nothing else.** A picker of every symbol the system has is a thousand glyphs and a search field, which is a great deal of interface for a decision that takes a second ; and a subject wearing a mark from another family would be the one pill on the row that does not belong to the page. The palette is the catalogue's own marks, each once, in the catalogue's order, with the tag everything falls back to at its head.
 
-**The name and the mark are asked for together.** Adding a subject was an alert with a field in it, and an alert holds a field and two buttons and nothing else : a grid of fifty glyphs is not something the system will draw in one. It is a sheet now, and a subject added without a mark would have worn the tag until the reader found their way back. The same sheet changes a mark afterwards, opened from the glyph itself on the row, which is where a reader looks to see what a subject wears and therefore where they reach to change it.
+**The name and the mark are asked for together.** Adding a subject was an alert with a field in it, and an alert holds a field and two buttons and nothing else : a grid of fifty-odd glyphs is not something the system will draw in one. It is a sheet now, and a subject added without a mark would have worn the tag until the reader found their way back. The same sheet changes a mark afterwards, opened from the glyph itself on the row, which is where a reader looks to see what a subject wears and therefore where they reach to change it.
 
 **A section's mark is not the reader's to change.** It comes from the catalogue and is the same on every device ; one they could change here would be one more thing to carry between them, for a glyph nobody chose in the first place.
 
-**The marks are filled in on a store that already has the sections.** Every reader who was using Flong before there were marks has all fifty and needs none of them inserted, so a seeding that only ever wrote new rows would have left every one of them wearing the tag for good. It is not a change to the vocabulary, so it renames nothing, adds nothing, and asks about no story again.
+**The marks are filled in on a store that already has the sections.** Every reader who was using Flong before there were marks has every section already and needs none inserted, so a seeding that only ever wrote new rows would have left every one of them wearing the tag for good. It is not a change to the vocabulary, so it renames nothing, adds nothing, and asks about no story again.
 
 ## Two natures of subject
 
@@ -289,13 +289,15 @@ A row of pills reading `Politique · Économie · Cinéma · Sport` is four word
 
 Both are shown to the model, the reader's own first. There was a third, **smart**, coined by the model when nothing it was shown fitted, and it is gone.
 
+**A subject the reader wrote becomes the section where the catalogue takes up its name.** The catalogue reaching a name already in the store meets one subject under two spellings, which is what folding exists to prevent, and leaving theirs as it was would be a section nothing can be filed under, wearing the tag, sitting where the model will not look for it. Theirs takes the catalogue's spelling and mark instead, and its stories and what the reader said about it come with the name. It goes the one way only : a section is never handed back to the reader to delete.
+
 **The model no longer names anything.** What came of letting it was a drift of near synonyms of the sections that already existed : `Science` beside `Sciences`, `Sports` beside `Sport`, each one the English word for a section the reader already had, wearing the model's own mark and taking a pill of its own. The language was demanded twice, in the instructions and again after the headline, and it was not enough, for the reason recorded elsewhere on this page : a model answers in the language of the words nearest its answer, and the words nearest that answer were an English headline from the English press.
 
 Showing it the reader's own vocabulary fixed the language and would not have fixed the shape of the thing. A subject a reader cannot delete, cannot rename and did not ask for, invented one story at a time, is a vocabulary that grows in a direction nobody chose.
 
-**So the catalogue was widened instead, from thirteen to fifty.** Thirteen was a set of desks and everything finer landed on the nearest one, which is what the second pass was really reaching for. A gap in a list nothing may go outside of is a story misfiled for ever, so the list has to be deep enough that most stories meet something exact : `Intelligence artificielle`, `Cybersécurité`, `Vie privée`, `Réseaux sociaux`, `Jeux vidéo`, `Séries`, `Faits divers`, `Consommation`, `Météo` are sections a reader follows, not desks a newsroom has.
+**So the catalogue was widened instead, from thirteen to fifty-two.** Thirteen was a set of desks and everything finer landed on the nearest one, which is what the second pass was really reaching for. A gap in a list nothing may go outside of is a story misfiled for ever, so the list has to be deep enough that most stories meet something exact : `Intelligence artificielle`, `Cybersécurité`, `Vie privée`, `Réseaux sociaux`, `Jeux vidéo`, `Séries`, `Faits divers`, `Consommation`, `Météo` are sections a reader follows, not desks a newsroom has.
 
-Fifty is also few enough that a reader can hold an opinion about each name, which is the other half of what a vocabulary is for.
+Fifty-two is also few enough that a reader can hold an opinion about each name, which is the other half of what a vocabulary is for.
 
 **`Société` and `Culture` are last on purpose.** They are the two that sort nothing, and they are kept because they are the fallbacks and because existing stores carry them. The model reads the list in order and is told to prefer the most exact subject that fits, so it should meet them after everything that says something.
 
@@ -305,13 +307,15 @@ They are stored in the reader's language, and seeded at launch rather than in a 
 
 **A section that is renamed takes its stories and the reader's opinion with it.** A section is known by its name and by nothing else : `topic.name`, `story_topic.name` and `topic_preference.name` are all the resolved string, so renaming one without moving the other two leaves the stories filed under a name that no longer exists and the reader's word attached to it. A rename that would land on a section that already exists is left alone, since merging two sections is a different decision and not one a rename may take by itself.
 
-`Écologie` is the one that forced this. In French it names the political movement first, so a story about the party filed under it rather than under `Politique` ; and in English the same key was translated `Climate`, which would have folded a whole ecology backlog into the narrower `Climat` the catalogue now adds beside it.
+`Écologie` is the one that forced this, and the one that has since emptied the list of renamings. It was moved onto `Environnement`, on the grounds that in French it names the political movement first and that the same key was translated `Climate` in English, which would have folded a whole ecology backlog into the narrower `Climat` the catalogue adds beside it. It is a section of its own again, standing next to `Environnement` and `Climat`, so the renaming had to go : it would have taken a reader's ecology backlog off the section that holds it a moment before the catalogue put that section back. The mechanism stays for the next one.
+
+**`Photographie` and `Écologie` are the two the catalogue took up last**, and they are why the seeding takes a subject over rather than folding away from it. Both are names a reader may well have written themselves before the catalogue held them, and a catalogue that grew past a name already in the store would have left one subject under two spellings.
 
 **What the model had already named is dealt with by a migration.** A subject the reader had spoken about becomes theirs, since they pressed it up or down and a preference nobody can find is a preference nobody can undo. Everything else goes, and its filings with it : `story_topic` has no key on `topic`, so a filing left behind would be a pill the reader can see on the front page and cannot find, cannot manage and cannot remove. A story left under nothing has its stamp lifted, since it was answered by a vocabulary that no longer exists.
 
-The cost is stated plainly : rubrics lose their finer half, and `Politique · Réforme des retraites` becomes `Politique` until the catalogue happens to hold the finer name. That is the trade, and the fifty are what make it worth taking.
+The cost is stated plainly : rubrics lose their finer half, and `Politique · Réforme des retraites` becomes `Politique` until the catalogue happens to hold the finer name. That is the trade, and the fifty-two are what make it worth taking.
 
-**Filing is one pass, and it has no way out.** The list is the whole vocabulary, and a headline belonging under none of fifty sections is rare enough that an escape costs more than it saves : measured before this, the model took the escape constantly, and a page where half the stories are filed under nothing is a page whose pills say nothing. It cannot invent either, the schema being an enumeration of the names it was given.
+**Filing is one pass, and it has no way out.** The list is the whole vocabulary, and a headline belonging under none of fifty-two sections is rare enough that an escape costs more than it saves : measured before this, the model took the escape constantly, and a page where half the stories are filed under nothing is a page whose pills say nothing. It cannot invent either, the schema being an enumeration of the names it was given.
 
 Two subjects at most. Given more it uses more, and the page that prompted that limit carried four on one story, of which one was right.
 
@@ -331,7 +335,7 @@ The three answers are told apart now. The model choosing subjects, and the model
 
 Two subjects at most. Given more it uses more, and the page that prompted this carried four on one story, of which one was right.
 
-The list carries no way out. It did, and the model took it constantly ; then it named a subject of its own at the end of it, which is the pass that has since been removed altogether. Fifty sections are what stand in for both.
+The list carries no way out. It did, and the model took it constantly ; then it named a subject of its own at the end of it, which is the pass that has since been removed altogether. Fifty-two sections are what stand in for both.
 
 What comes back is folded against the vocabulary, case and accents ignored, so `cybersecurite` is filed under `Cybersécurité` rather than beside it.
 

@@ -1665,16 +1665,53 @@ struct TopicKindTests {
         #expect(known.allSatisfy { $0.kind == .standard })
     }
 
-    @Test("A section the reader had already written stays theirs")
+    @Test("A section the reader had already written becomes the section")
     func seedingFolds() async throws {
-        try await topics.add("écologie", at: now)
-        try await topics.seedStandards(["Écologie", "Politique"], at: now)
+        let story = UUID.v7(at: now)
+        try await topics.add("écologie", symbol: "leaf", at: now)
+        try await topics.adjust("écologie", by: 1)
+        try await database.writer.write { db in
+            try Story(id: story, title: "Une réforme", firstAt: now, lastAt: now, updatedAt: now).insert(db)
+            try StoryTopic(storyID: story, name: "écologie").insert(db)
+        }
 
+        try await topics.seedStandards(
+            ["Écologie", "Politique"],
+            marks: ["Écologie": "arrow.3.trianglepath"],
+            at: now
+        )
+
+        // Folded like everything else : one subject, and the catalogue's
+        // spelling and mark are the ones that stand.
         let known = try await topics.known()
-        // Folded like everything else : one subject, and it is the reader's.
         #expect(known.count == 2)
-        #expect(known.first { $0.name == "écologie" }?.kind == .own)
-        #expect(known.first { $0.name == "Écologie" } == nil)
+        #expect(known.first { $0.name == "écologie" } == nil)
+
+        let ecology = known.first { $0.name == "Écologie" }
+        #expect(ecology?.kind == .standard)
+        #expect(ecology?.isOwn == false)
+        #expect(ecology?.symbol == "arrow.3.trianglepath")
+
+        // And the reader loses neither the stories filed under it nor what
+        // they said about it.
+        #expect(ecology?.stories == 1)
+        #expect(try await topics.score(of: "Écologie") == 1)
+    }
+
+    @Test("A section already standard is left exactly as it is")
+    func seedingTakesOverOnlyTheReadersOwn() async throws {
+        try await topics.seedStandards(["Politique"], marks: ["Politique": "building.columns"], at: now)
+
+        // A second seeding costs nothing : there is no name to move, no kind to
+        // change, and nothing for the model to be asked again about.
+        let changed = try await topics.seedStandards(
+            ["Politique"],
+            marks: ["Politique": "building.columns"],
+            at: now
+        )
+
+        #expect(!changed)
+        #expect(try await topics.known().map(\.kind) == [.standard])
     }
 
     @Test("A section that has been renamed takes its stories and its preference with it")
