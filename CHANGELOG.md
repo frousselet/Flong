@@ -26,6 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - The ring in the corner reads the pass itself rather than being handed it, so a fetch of three hundred feeds no longer rebuilds the front page three hundred times to move it by a third of a per cent.
 - The window publishes what moved and nothing else : the sidebar, the exchange's status and the work ring were written back unchanged on every store tick, and each of them rebuilt the front page.
 - Scrolling while anything else is happening : every store and service the window waits on now runs off the main thread rather than on it, the window is read back at most every couple of seconds while iCloud catches up rather than twice a second, and the indexing lane stands aside between batches while somebody is looking at the page.
+- Both loading rings are system symbols rather than two circles drawn in a stack, so the ink cannot sit off the centre of its own track : a continuous sweep where the pass can be counted, twelve segments lit in turn where it cannot.
 
 - What an edition says stands on a pane of glass at the head of the page, which sinks away behind the news as the page is scrolled rather than sliding off the top of it, the points separated by a hairline : three at most, set at the size the page reads in, three lines apiece : the model is held to a hundred and twenty characters a point so nothing is ever cut or shrunk to fit, and it is told to say what happened rather than who said it.
 
