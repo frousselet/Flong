@@ -1493,6 +1493,28 @@ final class AppModel {
     private(set) var storyArticles: [UUID: [ArticleSummary]] = [:]
     var openStory: UUID?
 
+    /// The stories the front page shows, in the order the edition put them.
+    ///
+    /// **Joined once here rather than twice per render.** The edition holds a
+    /// frozen list of stories and the page holds the live ones ; drawing a row
+    /// needs both, since only the live story carries the marks, the count, the
+    /// dial and the subjects. The screen was doing that join in its body, which
+    /// is every render, and it did it twice : once for the rows and once for
+    /// the picture the wash is taken from. Here it runs when the page changes.
+    private(set) var frontPageStories: [DigestStory] = []
+
+    /// Works the join out again, from whatever the page and the edition are now.
+    private func resolveFrontPage() {
+        guard let published = edition else {
+            if !frontPageStories.isEmpty { frontPageStories = [] }
+            return
+        }
+
+        let byIdentity = Dictionary(digest.all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let resolved = published.stories.compactMap { byIdentity[$0.storyID] }
+        if resolved != frontPageStories { frontPageStories = resolved }
+    }
+
     func loadDigest() async {
         do {
             var fetched = try await digestService.digest(digestTopic)
@@ -1540,6 +1562,7 @@ final class AppModel {
             // edition and the archive is the ones before it.
             let editions = try await digestService.editions()
             if editions.current != edition { edition = editions.current }
+            resolveFrontPage()
             if editions.archive != editionArchive { editionArchive = editions.archive }
         } catch {
             Log.enrich.error("The digest could not be read : \(error, privacy: .public)")
@@ -2867,6 +2890,7 @@ final class AppModel {
         wantsNewStoryNotices = false
         wantsNewEditionNotices = false
         edition = nil
+        resolveFrontPage()
         editionArchive = []
         forgetSearches()
         contributesToPool = nil

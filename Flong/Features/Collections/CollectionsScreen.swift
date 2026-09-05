@@ -107,7 +107,7 @@ struct CollectionsScreen: View {
                     Label("New collection", systemImage: "plus")
                 }
             }
-            ReaderCorner(model: model, work: model.currentWork) { menu(.view($0)) }
+            ReaderCorner(model: model) { menu(.view($0)) }
         }
         .overlay {
             if model.collections.isEmpty {
