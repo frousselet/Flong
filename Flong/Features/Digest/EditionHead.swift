@@ -41,6 +41,8 @@ import SwiftUI
 struct EditionHead: View {
     let published: PublishedEdition
 
+    @Environment(\.colorScheme) private var scheme
+
     private var edition: Edition { published.edition }
 
     var body: some View {
@@ -131,14 +133,16 @@ struct EditionHead: View {
                         // is filed under a subject. The row says what kind of
                         // news each line is before the line is read.
                         //
-                        // The page's own colour, like the line beside it. A
-                        // mark set quieter than the words it stands in front of
-                        // reads as furniture ; this one says what kind of news
-                        // the line is, which is as much a part of the line as
-                        // the sentence.
+                        // In the colour of the kind of news it is, which is
+                        // the one thing on this pane that is not black on
+                        // glass. It was the page's own colour, on the argument
+                        // that a mark set quieter than the words it stands in
+                        // front of reads as furniture ; a colour says the same
+                        // thing louder and takes no more room than the glyph
+                        // already took.
                         Image(systemName: mark(at: index))
                             .font(.system(.footnote, weight: .semibold))
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(StandardTopics.family(of: mark(at: index)).color(in: scheme))
                             .frame(width: Self.markWidth)
                             .accessibilityHidden(true)
 

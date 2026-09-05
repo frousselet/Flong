@@ -38,6 +38,14 @@ import Foundation
 /// the way round it is meant to be ; it was the other way about, which made
 /// every section a French word hard-coded in Swift.
 ///
+/// **Eight colours across the fifty-two, and never one apiece.** A section
+/// belongs to a family and the family is what is printed : blue for the news of
+/// the state, teal for money, green for the land, red for the body, orange for
+/// ordinary life, violet for science, magenta for culture, and nothing at all
+/// for the two that sort nothing. Fifty-two hues cannot be told apart, and the
+/// colour is there to be recognized at a glance or ignored. See
+/// ``TopicFamily``.
+///
 /// **They are seeded and then ordinary.** Nothing keeps them apart afterwards
 /// except that the reader may not delete them : a story is filed under one the
 /// same way it is filed under any other, and a preference attached to one works
@@ -55,20 +63,25 @@ import Foundation
 /// for the model too, which would mean translating what it answers back. The
 /// cost is that a reader who changes language keeps the names they had.
 nonisolated enum StandardTopics {
-    /// One section : what it is called, and the mark it wears.
+    /// One section : what it is called, the mark it wears, and what kind of
+    /// news it is.
     ///
-    /// **The two together and never two lists.** A name in one array and a
+    /// **The three together and never three lists.** A name in one array and a
     /// glyph at the same index in another is two places to forget one, and the
     /// day somebody inserts a section into the middle of the first the whole of
     /// the second is one out and nobody notices : every page is still drawn,
-    /// with `Cinéma` wearing a tractor.
+    /// with `Cinéma` wearing a tractor and printed in the green of the fields.
     nonisolated struct Section: Sendable {
         let name: LocalizedStringResource
         let symbol: String
+        /// What kind of news it is, which is what decides its colour. See
+        /// ``TopicFamily``.
+        let family: TopicFamily
 
-        init(_ name: LocalizedStringResource, _ symbol: String) {
+        init(_ name: LocalizedStringResource, _ symbol: String, _ family: TopicFamily) {
             self.name = name
             self.symbol = symbol
+            self.family = family
         }
     }
 
@@ -86,69 +99,92 @@ nonisolated enum StandardTopics {
     /// in it is not something a build catches.
     static let all: [Section] = [
         // Public life
-        Section("Politics", "building.columns"),
-        Section("International", "globe"),
-        Section("European Union", "flag"),
-        Section("Elections", "list.bullet.rectangle"),
-        Section("Defence", "shield"),
-        Section("Justice", "book.closed"),
-        Section("Immigration", "figure.walk"),
-        Section("Human rights", "hand.raised"),
-        Section("Local news", "mappin.and.ellipse"),
+        Section("Politics", "building.columns", .publicLife),
+        Section("International", "globe", .publicLife),
+        Section("European Union", "flag", .publicLife),
+        Section("Elections", "list.bullet.rectangle", .publicLife),
+        Section("Defence", "shield", .publicLife),
+        Section("Justice", "book.closed", .publicLife),
+        Section("Immigration", "figure.walk", .publicLife),
+        Section("Human rights", "hand.raised", .publicLife),
+        Section("Local news", "mappin.and.ellipse", .publicLife),
 
         // Money and work
-        Section("Economy", "chart.line.uptrend.xyaxis"),
-        Section("Business", "briefcase"),
-        Section("Employment", "hammer"),
-        Section("Finance", "banknote"),
-        Section("Consumer", "cart"),
-        Section("Housing", "house"),
-        Section("Agriculture", "leaf"),
-        Section("Industry", "gearshape.2"),
-        Section("Energy", "bolt"),
-        Section("Transport", "tram"),
+        Section("Economy", "chart.line.uptrend.xyaxis", .money),
+        Section("Business", "briefcase", .money),
+        Section("Employment", "hammer", .money),
+        Section("Finance", "banknote", .money),
+        Section("Consumer", "cart", .money),
+        Section("Housing", "house", .money),
+        Section("Agriculture", "leaf", .land),
+        Section("Industry", "gearshape.2", .money),
+        Section("Energy", "bolt", .money),
+        Section("Transport", "tram", .money),
 
         // Living
-        Section("Education", "graduationcap"),
-        Section("Health", "heart"),
-        Section("Food", "fork.knife"),
-        Section("Religion", "hands.sparkles"),
-        Section("Crime", "exclamationmark.triangle"),
-        Section("Environment", "tree"),
-        Section("Ecology", "arrow.3.trianglepath"),
-        Section("Climate", "thermometer"),
-        Section("Weather", "cloud.sun"),
+        Section("Education", "graduationcap", .everyday),
+        Section("Health", "heart", .body),
+        Section("Food", "fork.knife", .everyday),
+        Section("Religion", "hands.sparkles", .everyday),
+        Section("Crime", "exclamationmark.triangle", .body),
+        Section("Environment", "tree", .land),
+        Section("Ecology", "arrow.3.trianglepath", .land),
+        Section("Climate", "thermometer", .land),
+        Section("Weather", "cloud.sun", .land),
 
         // Science and technology
-        Section("Science", "atom"),
-        Section("Technology", "cpu"),
-        Section("Artificial intelligence", "brain"),
-        Section("Software", "chevron.left.forwardslash.chevron.right"),
-        Section("Cybersecurity", "lock.shield"),
-        Section("Privacy", "eye.slash"),
-        Section("Social media", "bubble.left.and.bubble.right"),
-        Section("Telecoms", "antenna.radiowaves.left.and.right"),
-        Section("Space", "moon.stars"),
-        Section("Travel", "airplane"),
+        Section("Science", "atom", .science),
+        Section("Technology", "cpu", .science),
+        Section("Artificial intelligence", "brain", .science),
+        Section("Software", "chevron.left.forwardslash.chevron.right", .science),
+        Section("Cybersecurity", "lock.shield", .science),
+        Section("Privacy", "eye.slash", .science),
+        Section("Social media", "bubble.left.and.bubble.right", .science),
+        Section("Telecoms", "antenna.radiowaves.left.and.right", .science),
+        Section("Space", "moon.stars", .science),
+        Section("Travel", "airplane", .everyday),
 
         // Culture
-        Section("Media", "newspaper"),
-        Section("Cinema", "film"),
-        Section("TV series", "tv"),
-        Section("Music", "music.note"),
-        Section("Books", "books.vertical"),
-        Section("Art", "paintpalette"),
-        Section("Photography", "camera"),
-        Section("Architecture", "building.2"),
-        Section("Fashion", "tshirt"),
-        Section("Video games", "gamecontroller"),
-        Section("History", "hourglass"),
+        Section("Media", "newspaper", .culture),
+        Section("Cinema", "film", .culture),
+        Section("TV series", "tv", .culture),
+        Section("Music", "music.note", .culture),
+        Section("Books", "books.vertical", .culture),
+        Section("Art", "paintpalette", .culture),
+        Section("Photography", "camera", .culture),
+        Section("Architecture", "building.2", .culture),
+        Section("Fashion", "tshirt", .culture),
+        Section("Video games", "gamecontroller", .culture),
+        Section("History", "hourglass", .culture),
 
         // Sport, and the two that sort nothing
-        Section("Sport", "figure.run"),
-        Section("Society", "person.3"),
-        Section("Culture", "theatermasks"),
+        Section("Sport", "figure.run", .everyday),
+        Section("Society", "person.3", .plain),
+        Section("Culture", "theatermasks", .plain),
     ]
+
+    /// What kind of news each mark stands for, and therefore what colour it
+    /// is printed in.
+    ///
+    /// **Keyed by the mark and not by the name.** A subject is stored as a
+    /// string in the reader's own language, so one store carries
+    /// `Environnement` where another carries `Environment` ; the mark is the
+    /// same string in every store and in every language. It also answers for a
+    /// subject the reader wrote themselves, since what they pick from is this
+    /// catalogue's own marks : a subject wearing a leaf is green without
+    /// anybody having decided it.
+    static let families: [String: TopicFamily] = Dictionary(
+        uniqueKeysWithValues: all.map { ($0.symbol, $0.family) }
+    )
+
+    /// The family a subject wearing this mark belongs to.
+    ///
+    /// The tag everything falls back to belongs to none, and neither does a
+    /// mark from no catalogue at all : both are printed in the plain colour,
+    /// which is what the two sections that sort nothing wear.
+    static func family(of symbol: String) -> TopicFamily {
+        families[symbol] ?? .plain
+    }
 
     /// The marks a reader may pick from for a subject of their own.
     ///

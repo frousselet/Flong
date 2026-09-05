@@ -31,7 +31,7 @@ The headline face used to be serif and nothing else, which was a decision about 
 
 | Theme | Faces | Paper |
 | ----- | ----- | ----- |
-| `Défaut` | Serif headlines over a sans body | The system's own |
+| `Défaut` | Serif headlines over a sans body | The system's own, with the ink for a control |
 | `Papier` | The same faces | Warm cream, warm near-black at night, every colour in it warm and pulled back from the contrast a screen defaults to |
 | `Solarized` | Monospace headlines over a sans body | base3 and base03, base01 and base1 for the ink, violet for a control |
 
@@ -40,6 +40,10 @@ The headline face used to be serif and nothing else, which was a decision about 
 **Two faces for the three of them.** `Défaut` and `Papier` are set the same and are told apart by their colours alone ; only `Solarized` changes the headline face as well. That is the right shape rather than a shortfall. Serif headlines are what this application was set in before there was a choice, for the same reason the whole page is set the way it is, and a reader who asks for warm paper is asking about the paper. A theme obliged to change the face in order to justify being a theme would be changing it for that reason and no other.
 
 **The face is the loud half.** A reader can name a theme's colours after a while ; they tell the face apart in the first second, and it is what says whether this is a place where things are read or a place where things are managed. So the panel sets each theme's name in that theme's own headline face : a list of three words in one face asks the reader to remember what `Solarized` looked like, and a specimen asks them to remember nothing. The line under each name says what the colours do, which is the half a row cannot show.
+
+**`Défaut`'s accent is the ink, not the system's blue.** The standard theme paints nothing, which is the whole of what it means : it *is* the system's appearance, and a theme that restated the system's colours as literals would stop following them the first time the system changed one. It states one colour all the same. What can be pressed was the blue every application on the device shares, which is the one decision a reader notices first being taken by nobody ; it is `#1C1C1E` on paper and `#F2F2F7` at night, which is the ink the page is already set in. A page that says what can be pressed in its own two colours is a page with two colours in it, and the eight the subjects are printed in are then the only hues on it, which is what makes them read as a code rather than as decoration.
+
+**Type standing on the accent is set in the paper, and never in white.** White was right for as long as a control was blue in both appearances. The accent is the ink now, so at night it is very nearly white and a white word on it is a word nobody can read ; the same holds for the colours the subjects are printed in, which are dark on paper and light at night by design. `Theme.onAccent(in:)` answers with the theme's paper, which is the one colour that is always the far side of the ink, in either appearance and in all three themes. It is what the chosen pill, the chosen window on the figures page, and a reader's initials over their own circle are set in.
 
 **`Papier`'s accent is dark and barely coloured, rather than cool.** It began as a terracotta, `#9C5B33`, half saturated and at the lightness of a photograph, and the glyphs in the bar read as brown objects rather than as things that can be pressed.
 
@@ -86,7 +90,7 @@ At night it is the same violet raised in lightness, hue and saturation untouched
 
 Glass decides what to draw from what is behind it. That adaptation is the whole reason the controls on an article may float over a picture nobody chose, and it is the first thing a theme breaks : a tint is an instruction, an instruction overrides the adaptation, and the cross over a dark red photograph came out warm brown on dark red, which is a way out the reader cannot find.
 
-So a screen whose glass sits over a picture nobody chose hands the tint back with `tint(nil)`, and the glyphs go back to flipping between dark and light with what is behind them, exactly as they do under `Défaut`. `Theme.accent(in:)` answers `nil` for that as it does for the standard theme, which is the same answer for the same reason : the system is better placed to decide than the theme is. The article's own page did it while a photograph ran under its controls, and it has none now ; the rule is written down for the next screen that puts glass over one.
+So a screen whose glass sits over a picture nobody chose keeps its controls off the picture rather than tinting over one. `Theme.accent(in:)` used to answer `nil` for that, and for the standard theme, which was the same answer for the same reason : the system was better placed to decide than the theme was. Every theme states its accent now, `Défaut` included, so there is no handing back left to do and the rule has to be kept by where the glass is put. The article's own page was the screen that had the problem, and it has no photograph under its controls now ; the rule is written down for the next screen that puts glass over one.
 
 The rule generalizes and is worth stating as one : **the theme paints what the application drew, and hands back anything drawn over something it did not choose.** A photograph belongs to a publisher, its colours are unknown until it has been fetched, and nothing decided months earlier in a palette can be right over all of them.
 

@@ -43,6 +43,7 @@ struct TopicsPanel: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var scheme
 
     @State private var isAdding = false
     @State private var name = ""
@@ -238,11 +239,17 @@ struct TopicsPanel: View {
         }
     }
 
-    /// One subject's mark, at the size a row wears it.
+    /// One subject's mark, at the size a row wears it, in the colour of the
+    /// kind of news it is.
+    ///
+    /// **A column of colour down a list of fifty-two, which is where the colour
+    /// is learnt.** A page shows one subject's colour at a time ; this shows
+    /// them all at once, and a reader scrolling it finds out that green is the
+    /// land and blue the news of the state without being told.
     private func mark(_ symbol: String) -> some View {
         Image(systemName: symbol)
             .font(.system(.body, weight: .regular))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(StandardTopics.family(of: symbol).color(in: scheme))
             .frame(width: 28)
     }
 
@@ -281,6 +288,7 @@ struct TopicEditor: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var scheme
 
     /// Wide enough that the palette reads as a palette, narrow enough that no
     /// glyph is a hand's width from the one beside it.
@@ -304,6 +312,10 @@ struct TopicEditor: View {
                         .foregroundStyle(.secondary)
 
                     palette
+
+                    Text("A subject takes the colour of the mark you pick.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
                 .padding(20)
             }
@@ -332,6 +344,12 @@ struct TopicEditor: View {
 
     /// The marks a reader may pick from : what the sections wear, and nothing
     /// else. See ``StandardTopics/palette``.
+    ///
+    /// **Each glyph in the colour it will bring with it.** A subject takes the
+    /// colour of the family the mark belongs to, so a reader picking a leaf is
+    /// picking green, and the grid is the one place that can say so before they
+    /// pick. The line under it says it in words for whoever is not looking at
+    /// the colours.
     private var palette: some View {
         LazyVGrid(columns: Self.columns, spacing: 12) {
             ForEach(StandardTopics.palette, id: \.self) { mark in
@@ -341,7 +359,10 @@ struct TopicEditor: View {
                     Image(systemName: mark)
                         .font(.system(.title3, weight: .regular))
                         .frame(width: 54, height: 54)
-                        .foregroundStyle(mark == symbol ? Color.white : Color.primary)
+                        .foregroundStyle(
+                            mark == symbol
+                                ? theme.onAccent(in: scheme) : StandardTopics.family(of: mark).color(in: scheme)
+                        )
                         .background(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .fill(mark == symbol ? AnyShapeStyle(.tint) : AnyShapeStyle(.quaternary))

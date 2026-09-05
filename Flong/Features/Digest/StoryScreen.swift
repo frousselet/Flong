@@ -103,11 +103,7 @@ struct StoryScreen: View {
             }
 
             if !story.topics.isEmpty {
-                Text(verbatim: story.topics.joined(separator: " · "))
-                    .font(.system(.caption, weight: .semibold))
-                    .textCase(.uppercase)
-                    .kerning(0.6)
-                    .foregroundStyle(.tertiary)
+                Rubric(topics: story.topics, marks: model.digest.symbols, style: .caption, kerning: 0.6)
             }
 
             Text(verbatim: story.title)

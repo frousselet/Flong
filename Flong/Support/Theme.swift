@@ -181,8 +181,12 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
     /// the system's appearance, and a theme that restated the system's colours
     /// as literals would be a theme that stopped following them the first time
     /// the system changed one, or the reader turned the contrast up, or a
-    /// platform drew its windows in something other than white. Its palette
-    /// below is stated for the rendered article alone, which is a web page and
+    /// platform drew its windows in something other than white.
+    ///
+    /// It states one colour all the same, which is ``accent(in:)`` : what can
+    /// be pressed is the page's own ink, black on paper and white at night,
+    /// rather than the blue every application on the device shares. The rest of
+    /// its palette is stated for the rendered article, which is a web page and
     /// has no system colours to inherit.
     var paints: Bool { self != .standard }
 
@@ -191,14 +195,30 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
         scheme == .dark ? dark : light
     }
 
-    /// The colour a control takes, or nothing where the system's own is what
-    /// is wanted.
+    /// The colour a control takes.
     ///
-    /// Nothing under ``standard``, for the reason ``paints`` gives. A screen
-    /// whose glass sits over a picture nobody chose hands it back too : see
-    /// ``Themed``.
-    func accent(in scheme: ColorScheme) -> Color? {
-        paints ? palette(in: scheme).accent.color : nil
+    /// **Every theme states one, ``standard`` included.** It handed the tint
+    /// back to the system, which meant the one decision a reader notices first
+    /// was the blue every application on the device already uses ; it is the
+    /// ink now, black on paper and white at night, which is a page that says
+    /// what can be pressed in its own two colours rather than in a third
+    /// nobody chose. The two that paint keep the colour their palette names.
+    func accent(in scheme: ColorScheme) -> Color {
+        palette(in: scheme).accent.color
+    }
+
+    /// What type standing on the accent, or on a subject's own colour, is set
+    /// in.
+    ///
+    /// **The paper, and never white.** White was right for as long as what
+    /// could be pressed was a blue every theme shared. The standard theme's
+    /// accent is its ink now, so at night it is very nearly white and a white
+    /// word on it is a word nobody can read ; the same holds for the colours
+    /// the subjects are printed in, which are dark on paper and light at night
+    /// by design. The paper is the one colour that is always the far side of
+    /// the ink, in either appearance and in all three themes.
+    func onAccent(in scheme: ColorScheme) -> Color {
+        palette(in: scheme).paper.color
     }
 
     /// The ground a raised thing sits on : a card, a row of a form, a well.
@@ -225,13 +245,16 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
     private var light: Palette {
         switch self {
         // The system's own, as the stylesheet has always stated them.
+        // The system's own, as the stylesheet has always stated them, with one
+        // exception : what can be pressed is the ink rather than the blue. See
+        // ``accent(in:)``.
         case .standard:
             Palette(
                 paper: Ink(0xFFFFFF),
                 ink: Ink(0x1C1C1E),
                 muted: Ink(0x6C6C70),
                 rule: Ink(0xD8D8DC),
-                accent: Ink(0x0B6BCB),
+                accent: Ink(0x1C1C1E),
                 edge: Ink(0x3C3C43, alpha: 0.15),
                 surface: Ink(0xF2F2F7)
             )
@@ -298,7 +321,7 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
                 ink: Ink(0xF2F2F7),
                 muted: Ink(0x9C9CA1),
                 rule: Ink(0x3A3A3C),
-                accent: Ink(0x6FB2FF),
+                accent: Ink(0xF2F2F7),
                 edge: Ink(0x545458, alpha: 0.33),
                 surface: Ink(0x1C1C1E)
             )
@@ -422,11 +445,8 @@ struct Themed: ViewModifier {
                 // what it draws to whatever is behind it ; a tint is an
                 // instruction, and an instruction overrides the adaptation. A
                 // warm brown cross over a red photograph is a control the
-                // reader cannot find. So a screen whose glass sits over a
-                // picture nobody chose hands the tint back to the system with
-                // ``Theme/accent(in:)``. The article's page did that while a
-                // photograph ran under its controls ; it has none now, and the
-                // rule is here for the next screen that puts glass over one.
+                // reader cannot find, which is why the article's page kept its
+                // controls off a picture rather than tinting over one.
                 .tint(palette.accent.color)
                 // A list draws the system's grouped background, and a themed
                 // page with a grey trough down the middle of it is a page in
@@ -435,7 +455,10 @@ struct Themed: ViewModifier {
                 .scrollContentBackground(.hidden)
                 .background(palette.paper.color.ignoresSafeArea())
         } else {
-            content
+            // The standard theme paints nothing and still states what can be
+            // pressed : the ink, rather than the system's blue. See
+            // ``Theme/accent(in:)``.
+            content.tint(theme.accent(in: scheme))
         }
     }
 }

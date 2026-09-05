@@ -262,7 +262,7 @@ It extracts tags from a text rather than choosing among labels, so it answers wi
 
 **Private Cloud Compute is not on the list, because there is no list to be on.** The framework gives third-party applications the on-device model and nothing else : there is no cloud, server or remote option anywhere in its interface. Apple's own features route to Private Cloud Compute ; an application's own prompts cannot. Section 3 would not have it anyway.
 
-## The mark a subject wears
+## The mark and the colour a subject wears
 
 A row of pills reading `Politique · Économie · Cinéma · Sport` is four words a reader has to read on every scroll. The same row with a glyph in front of each is four shapes they recognize, and the reading is over before it started. Every subject has one : the fifty-two sections take theirs from the catalogue, and one the reader writes takes the one they pick.
 
@@ -279,6 +279,18 @@ A row of pills reading `Politique · Économie · Cinéma · Sport` is four word
 **A section's mark is not the reader's to change.** It comes from the catalogue and is the same on every device ; one they could change here would be one more thing to carry between them, for a glyph nobody chose in the first place.
 
 **The marks are filled in on a store that already has the sections.** Every reader who was using Flong before there were marks has every section already and needs none inserted, so a seeding that only ever wrote new rows would have left every one of them wearing the tag for good. It is not a change to the vocabulary, so it renames nothing, adds nothing, and asks about no story again.
+
+### Eight colours for fifty-two sections
+
+A colour per section is not a code. Fifty-two hues cannot be told apart, and a reader who has to learn which of four blues is `Immigration` is reading a legend rather than a page. Eight can be learnt without trying : a section belongs to a family of news and the family is what is printed. Blue for the news of the state, teal for money and work, green for the land, red for the body and the harm done to it, orange for ordinary life, violet for science, magenta for culture, and no colour at all for `Société` and `Culture`, which are the two that sort nothing. `TopicFamily` holds them, and `StandardTopics.Section` carries a section's family beside its name and its mark, so the three cannot come apart.
+
+**The colour is read from the mark and never from the name.** A subject is stored as a string in the reader's own language, so one store carries `Environnement` where another carries `Environment` and a lookup by name would answer for one reader and not the other ; the mark is the same string in every store. It also answers for a subject the reader wrote themselves, since what they pick from is the catalogue's own marks : a subject wearing a leaf is green without anybody having decided it, and the grid they pick from draws each glyph in the colour it will bring with it.
+
+**Where it is worn.** The mark, wherever a mark is drawn : the pills at the head of the page, the rows of the subjects panel, and the line in front of each point of an edition. The pill's own glass, tinted with the subject's colour at a fifth of its strength and with the full colour when it is the one chosen, so choosing deepens what was already there rather than swapping it for a colour that says nothing about the subject. And the rubric over a headline, each subject in its own colour with the punctuation between them in neither.
+
+**One set of hues for the three themes.** A hue restated per theme is twenty-four colours to keep true and to check against six papers, for a page that would not read differently. They are muted enough to sit on white, on `Papier`'s cream and on Solarized's base3 alike, and `TopicColourTests` holds every one of them to four and a half to one against all six papers, which is the floor for type at the size a rubric is set in.
+
+**Nothing is ever said in colour alone.** A pill says its subject in words and says it again in a shape ; the colour is a third telling, for the reader who is scanning rather than reading. A reader who cannot tell the red from the green reads exactly the page everybody else does.
 
 ## Two natures of subject
 
