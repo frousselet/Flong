@@ -226,6 +226,8 @@ And the name was the lead's own headline, so the page read the same sentence twi
 
 A story is one event ; a subject is the field several events belong to. The difference is the whole reason the pills are worth having : filtering by `Éducation` says something the list of stories underneath does not already say, whereas a pill per story would be the same page twice.
 
+**The row of pills is drawn whole, and never lazily.** Fifteen panes of glass resolved for the whole of every scroll is a real cost and the obvious answer is a lazy stack, and that answer is wrong here. The pills sit in a `GlassEffectContainer` and each carries a `glassEffectID`, which is what tells the container that the capsule it is drawing is the one it drew last frame. A pill that has not been realized has never been drawn, so scrolling it into view is not the row moving under the finger, it is a shape entering the container : an insertion, which the container animates, because animating one is what it is for. Every subject morphed into existence at the edge of the screen as the reader reached it. Fifteen capsules of type at the head of one page is not a cost worth that. What was actually expensive was `interactive()`, which follows a finger for as long as the row is on screen and this row is always on screen, and it is gone.
+
 ## What the model is asked with
 
 Everything the framework offers is used, and one thing it offers was measured and rejected. All of it is set in one place, `OnDeviceModel`, rather than at each call site.

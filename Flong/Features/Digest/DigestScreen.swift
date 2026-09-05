@@ -484,11 +484,26 @@ struct DigestScreen: View {
         if !model.digest.topics.isEmpty {
             ScrollView(.horizontal) {
                 GlassEffectContainer(spacing: 8) {
-                    // **Lazy, because the row is pinned.** Fifteen subjects is
-                    // fifteen panes of glass resolved for the whole of every
-                    // scroll, where four or five are on screen. What is not in
-                    // the viewport is not realized and samples nothing.
-                    LazyHStack(spacing: 8) {
+                    // **Eager, and it has to be.** The row was made lazy to
+                    // stop fifteen panes of glass being resolved for the whole
+                    // of every scroll, and it bought that at a price nobody
+                    // would have paid knowingly : a pill that is not realized
+                    // has not been laid out, so scrolling it into view is not
+                    // the row moving under the reader's finger, it is a shape
+                    // entering the glass container. Every pill here carries a
+                    // ``glassEffectID``, which is what tells the container the
+                    // shape is the same one it was drawing a moment ago, and a
+                    // shape it has never drawn before is an insertion. The
+                    // container animates an insertion, because that is what it
+                    // is for, so each subject morphed into existence at the
+                    // edge of the screen as the reader reached it.
+                    //
+                    // Fifteen capsules of type at the head of one page is not
+                    // the cost that was worth chasing anyway. What was
+                    // expensive was `interactive()`, which follows a finger for
+                    // as long as the row is on screen and this row is always on
+                    // screen ; that came off in the same change and stays off.
+                    HStack(spacing: 8) {
                         pill(.frontPage, title: Text("Front page"))
                         ForEach(model.digest.topics, id: \.self) { topic in
                             pill(.named(topic), title: Text(verbatim: topic))
