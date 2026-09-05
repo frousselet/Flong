@@ -652,10 +652,6 @@ struct StoryRow: View {
     let open: () -> Void
 
     @Environment(\.theme) private var theme
-    /// Which way round the page is, since what separates one lapped mark from
-    /// the next is a shadow on white paper and a halo on black. See
-    /// ``roomShadow``.
-    @Environment(\.colorScheme) private var scheme
 
     /// The width of the picture beside a story that is not the lead. Its
     /// height follows from the one ratio every picture is shown in.
@@ -670,23 +666,35 @@ struct StoryRow: View {
     /// its colour and both live at its edge as much as at its middle.
     private static let roomOverlap: CGFloat = 3.5
 
-    /// What a mark casts on the one it laps.
+    /// How wide a mark is drawn in the row of rooms.
+    private static let roomSide: CGFloat = 14
+
+    /// How much wider than the mark in front the bite is cut.
     ///
-    /// Slight, in both cases. What it separates is two discs of fourteen
-    /// points, so it is read at about the width of a hairline and anything
-    /// heavier is a row of stickers rather than a row of marks.
+    /// A hairline of the page, which is all a cut needs to read as one shape
+    /// in front of another. Wider and the row is a set of crescents.
+    private static let roomCut: CGFloat = 1
+
+    /// One mark, less the bite the mark in front of it takes out of it.
     ///
-    /// **Dark on paper and light on a black page**, which is not symmetry for
-    /// its own sake. A shadow separates by darkening what is behind it, and on
-    /// a dark page there is nothing left to darken : a publisher whose mark is
-    /// black, and several of the ones a French reader follows are, came out as
-    /// one shape with the disc behind it and the hairline every mark wears was
-    /// all that was left to tell them apart. Photographed, it did not. So the
-    /// dark page gets the halo, which separates the way the shadow does on
-    /// paper : by putting something between the two discs that is neither of
-    /// them.
-    private var roomShadow: Color {
-        scheme == .dark ? .white.opacity(0.35) : .black.opacity(0.22)
+    /// The first of the row is whole, having nothing in front of it. Every one
+    /// after it is its own shape with a circle removed where its neighbour
+    /// laps it, grown by ``roomCut`` so that what shows between the two is a
+    /// hairline of the page rather than two edges touching.
+    private func cutout(behind: Bool) -> some View {
+        Rectangle()
+            .overlay {
+                if behind {
+                    Circle()
+                        .frame(
+                            width: Self.roomSide + Self.roomCut * 2,
+                            height: Self.roomSide + Self.roomCut * 2
+                        )
+                        .offset(x: -(Self.roomSide - Self.roomOverlap))
+                        .blendMode(.destinationOut)
+                }
+            }
+            .compositingGroup()
     }
 
     var body: some View {
@@ -870,17 +878,22 @@ struct StoryRow: View {
             // front. `zIndex` is what says so, since a stack draws in the order
             // it is written and that order is the opposite one.
             ForEach(Array(story.feedMarks.enumerated()), id: \.element.id) { position, mark in
-                SourceStamp(domain: mark.room, side: 14, showsName: false)
-                    // **And each one is lifted off the one it laps.** The
-                    // hairline every mark wears tells a disc from the paper,
-                    // which is all it had to do while they stood apart. Lapped,
-                    // a mark has another mark behind it rather than paper, and
-                    // two favicons of a similar colour meeting under a hairline
-                    // read as one shape with a seam. A shadow is what says one
-                    // is in front of the other : it is cast on the disc behind
-                    // and not on the page, which is the whole of what the row
-                    // needs said.
-                    .shadow(color: roomShadow, radius: 1.5, y: scheme == .dark ? 0 : 0.5)
+                // **The one in front cuts the one behind.** Two favicons
+                // meeting under a hairline read as one shape with a seam, and
+                // several of the marks a French reader follows are black discs.
+                // The obvious answer is a shadow, and it is only half an
+                // answer : a shadow separates by darkening what is behind it,
+                // so on a dark page, where the disc behind is already black,
+                // it does nothing at all. The answer after that is a light halo
+                // on dark pages, and that is a sticker.
+                //
+                // What the row wants is a hole. Every mark but the first is
+                // masked by its own shape less the shape of the one lapping it,
+                // grown by a hair, so the gap between two discs is the page
+                // itself and it is the page whatever colour the page is. There
+                // is nothing to tune for an appearance and nothing to draw.
+                SourceStamp(domain: mark.room, side: Self.roomSide, showsName: false)
+                    .mask { cutout(behind: position > 0) }
                     .zIndex(Double(story.feedMarks.count - position))
             }
 
