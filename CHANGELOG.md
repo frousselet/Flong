@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - The indexing lane runs off the main thread at last : a background priority is not a background thread, and the named-entity passes and the sentence embeddings ran on it for twenty seconds after every catch-up.
+- What is still waiting for a vector is asked of the store rather than read back from it : the queue used to be the whole kept corpus fetched, decoded and filtered in memory, twice per batch.
 - The wire is read back only where the reader is in it. Five hundred rows queried and decoded, plus a count per hour for the chart over them, ran on every store change whatever was on screen.
 - Pictures are decoded to the room they are drawn in rather than to the width of a column of type : the lead was an eleven megabyte bitmap for a slot a quarter of that. The decoded cache has a budget in bytes as well as in objects, an address that answered with something that is not a picture is remembered, and a row scrolled back into view draws what is already in hand without a hop or a fade.
 - The ring in the corner reads the pass itself rather than being handed it, so a fetch of three hundred feeds no longer rebuilds the front page three hundred times to move it by a third of a per cent.

@@ -53,33 +53,69 @@ nonisolated struct VectorStore: Sendable {
     /// answer questions about the few hundred somebody chose.
     @concurrent
     func itemsNeedingVectors(limit: Int = VectorStore.batchSize) async throws -> [Entry] {
-        let candidates = try await database.writer.read { db in
-            try Entry.fetchAll(
+        try await database.writer.read { db in
+            let (condition, arguments) = try self.waiting(in: db)
+            return try Entry.fetchAll(
                 db,
                 sql: """
                     SELECT * FROM entry
-                    WHERE is_hidden = 0 AND duplicate_of IS NULL
-                      AND (is_starred = 1 OR COALESCE(annotation, '') <> ''
-                           OR id IN (SELECT target_id FROM tag_binding WHERE target_kind = 'entry'))
+                    WHERE \(condition)
                     ORDER BY received_at DESC
-                    """
+                    LIMIT ?
+                    """,
+                arguments: arguments + [limit]
             )
         }
+    }
 
-        return
-            candidates
-            .filter { item in
-                // Already answered, even when the answer was that there is no
-                // model for this language.
-                guard item.vectorModel != Self.noModel else { return false }
+    /// Everything the reader kept, which is what is worth a vector at all.
+    private static let kept = """
+        is_hidden = 0 AND duplicate_of IS NULL
+        AND (is_starred = 1 OR COALESCE(annotation, '') <> ''
+             OR id IN (SELECT target_id FROM tag_binding WHERE target_kind = 'entry'))
+        """
 
-                guard let model = item.vectorModel, let revision = item.vectorRevision.flatMap(Int.init),
-                    item.vector != nil
-                else { return true }
-                return !embedder.isCurrent(model: model, revision: revision)
-            }
-            .prefix(limit)
-            .map { $0 }
+    /// What is still waiting for a vector, as a clause the store can answer.
+    ///
+    /// **Asked in SQL rather than by reading the corpus back.** It used to
+    /// fetch every article the reader had kept, decode all of them, and filter
+    /// the array : `outstandingCount()` did it with no limit at all, and the
+    /// runner asks for the count after every batch. On a corpus of any size
+    /// that is the whole of it decoded, twice a batch, on whatever thread the
+    /// lane happens to be on.
+    ///
+    /// Whether a stored vector is still current is a question for `NLEmbedding`
+    /// and not for SQLite, so it is asked once per distinct model and revision
+    /// present in the table - a handful of rows - and the answer is pushed back
+    /// into the clause as a list of pairs to keep.
+    private func waiting(in db: Database) throws -> (String, StatementArguments) {
+        let stored = try Row.fetchAll(
+            db,
+            sql: """
+                SELECT DISTINCT vector_model AS model, vector_revision AS revision FROM entry
+                WHERE \(Self.kept) AND vector IS NOT NULL
+                  AND vector_model IS NOT NULL AND vector_revision IS NOT NULL
+                """
+        )
+
+        let current = stored.compactMap { row -> String? in
+            guard let model = row["model"] as String?, let revision = row["revision"] as String?,
+                let number = Int(revision), embedder.isCurrent(model: model, revision: number)
+            else { return nil }
+            return "\(model)|\(revision)"
+        }
+
+        let stale =
+            current.isEmpty
+            ? "1"
+            : "(vector_model || '|' || vector_revision) NOT IN (\(current.map { _ in "?" }.joined(separator: ", ")))"
+
+        let condition = """
+            \(Self.kept)
+            AND COALESCE(vector_model, '') <> ?
+            AND (vector IS NULL OR vector_model IS NULL OR vector_revision IS NULL OR \(stale))
+            """
+        return (condition, StatementArguments([Self.noModel] + current))
     }
 
     /// Computes and stores the vectors of a batch.
@@ -130,7 +166,11 @@ nonisolated struct VectorStore: Sendable {
     /// How many kept articles are still waiting for a vector.
     @concurrent
     func outstandingCount() async throws -> Int {
-        try await itemsNeedingVectors(limit: .max).count
+        try await database.writer.read { db in
+            let (condition, arguments) = try self.waiting(in: db)
+            return try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM entry WHERE \(condition)", arguments: arguments)
+                ?? 0
+        }
     }
 
     // MARK: - Reading

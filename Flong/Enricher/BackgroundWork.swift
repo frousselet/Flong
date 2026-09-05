@@ -167,6 +167,7 @@ nonisolated struct JobRunner: Sendable {
         onProgress: @Sendable (Int, Int) -> Void = { _, _ in }
     ) async -> Outcome {
         var outcome = Outcome()
+        outcome.remaining = (try? await job.remaining()) ?? 0
 
         while !Task.isCancelled {
             if let deadline, Date() >= deadline { break }
@@ -176,7 +177,12 @@ nonisolated struct JobRunner: Sendable {
                 guard done > 0 else { break }
 
                 outcome.done += done
-                outcome.remaining = try await job.remaining()
+                // **Counted down rather than asked for again.** The count is
+                // only there to draw a fraction, and asking the job for it
+                // after every batch is a second pass over the queue per batch :
+                // for the vectors that was the whole kept corpus read back. The
+                // authoritative count is taken once when the loop ends.
+                outcome.remaining = max(outcome.remaining - done, 0)
                 onProgress(outcome.done, outcome.done + outcome.remaining)
 
                 // Always let go of the thread between two batches, and stand
