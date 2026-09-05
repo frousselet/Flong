@@ -678,6 +678,67 @@ struct DigestTests {
         #expect(try await preferences.scores().isEmpty)
     }
 
+    /// **A row of pills that rearranges itself under the reader's finger.**
+    /// Two subjects filed on the same story cover the same number of stories
+    /// and moved at the same instant, so every key the order is made of ties ;
+    /// the sort is not a stable one and what it sorts came out of a dictionary,
+    /// so the pair came back one way round and then the other. Tapping a pill
+    /// reads the page again, which is where a reader met it.
+    @Test("Subjects that tie exactly are in the same order however they were read")
+    func tiesAreBrokenByName() {
+        let filed = Self.filed(["Transport", "Régions", "Économie", "Agriculture", "Sport", "Justice"], at: now)
+        let read = Self.filed(["Justice", "Sport", "Agriculture", "Économie", "Régions", "Transport"], at: now)
+
+        // The reader's own alphabet, so `Économie` files under E rather than
+        // after Z, and six subjects that tie have one order rather than seven
+        // hundred and twenty.
+        let expected = ["Agriculture", "Économie", "Justice", "Régions", "Sport", "Transport"]
+        #expect(DigestStore.topics(of: [filed]) == expected)
+        #expect(DigestStore.topics(of: [read]) == expected)
+    }
+
+    /// A story filed under one subject, for an order that has nothing else to
+    /// go on.
+    private static func filed(_ topics: [String], at date: Date) -> DigestStory {
+        DigestStory(
+            id: UUID.v7(at: date),
+            title: "Une réforme",
+            summary: nil,
+            isGenerated: false,
+            isTranslated: false,
+            articleCount: 2,
+            feedMarks: [],
+            feedCount: 2,
+            firstAt: date,
+            lastAt: date,
+            arrivals: [1],
+            isLive: false,
+            imageURL: nil,
+            imageCredit: nil,
+            topics: topics
+        )
+    }
+
+    /// **The order a story's subjects are read in is the order they were
+    /// filed.** It is the order the rubric over a headline is set in and the
+    /// order an edition's point takes its mark from, and a `SELECT` with no
+    /// `ORDER BY` is in no order at all.
+    @Test("A story's subjects come back in the order they were filed")
+    func filingsKeepTheirOrder() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await put(["calendrier": "Éducation"])
+
+        let filed = try await database.writer.write { db -> UUID in
+            let story = try #require(try Story.fetchAll(db).first { $0.title.contains("calendrier") })
+            try StoryTopic(storyID: story.id, name: "Société").insert(db, onConflict: .ignore)
+            return story.id
+        }
+
+        let page = try await service.digest(now: now)
+        let story = try #require(page.all.first { $0.id == filed })
+        #expect(story.topics == ["Éducation", "Société"])
+    }
+
     @Test("A subject the reader wrote is on the page before anything is filed under it")
     func ownSubjectsAreOnThePage() async throws {
         try await StoryBuilder(database).build(now: now)
