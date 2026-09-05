@@ -1518,6 +1518,33 @@ struct ModelFailureTests {
 
     // MARK: - What a headline has to be
 
+    /// **A title is not a sentence of the article.** The instruction says so
+    /// and a small model obeys it most of the time, which is the shape of every
+    /// rule that lives only in a prompt : one headline in a list came back with
+    /// a full stop where no other had one, and the row read as a mistake.
+    @Test("A headline gives up the full stop a model puts at the end of it")
+    func headlineLosesItsFullStop() {
+        #expect(
+            StorySummarizer.untailed("Teddy Riner forfait aux Mondiaux de judo.")
+                == "Teddy Riner forfait aux Mondiaux de judo"
+        )
+        #expect(
+            StorySummarizer.untailed("Pierre Gasly décroche la pole position")
+                == "Pierre Gasly décroche la pole position"
+        )
+    }
+
+    /// A question mark and an exclamation are headlines this file has other
+    /// rules about, and an ellipsis is three characters that mean something :
+    /// trimming any of them would be an opinion about the writing rather than
+    /// about the punctuation.
+    @Test("It leaves every other ending alone")
+    func headlineKeepsItsOtherEndings() {
+        for ending in ["Où sont passés les fonds ?", "Il a gagné !", "Et la suite..."] {
+            #expect(StorySummarizer.untailed(ending) == ending)
+        }
+    }
+
     @Test("A headline stops being one somewhere past a dozen words")
     func headlineLength() {
         // Up to about ten sits in a reader's immediate memory. Twelve is where

@@ -792,20 +792,12 @@ struct StoryRow: View {
     @ViewBuilder
     private func whatHappened(standfirst: Font.TextStyle = .subheadline) -> some View {
         if let summary = story.summary, !summary.isEmpty {
-            // **No cap on the lines, here as at the head of the page.** It
-            // stood at three, which is what a row could spare, and a standfirst
-            // is written to forty-five words : the two do not meet on a phone,
-            // and what the reader got was a sentence stopping at an ellipsis.
-            // A line count is a promise the writing cannot keep, since it
-            // depends on the column, the face and the type size the reader
-            // chose. So the row gives the line the room it needs and the bound
-            // stays where the words are written. See
-            // ``StorySummarizer/maximumSummaryWords``.
             StorySummary(
                 summary: summary,
                 isGenerated: story.isGenerated,
                 isTranslated: story.isTranslated,
-                style: standfirst
+                style: standfirst,
+                lines: 3
             )
         } else {
             // A story the model said nothing about still has its picture at
