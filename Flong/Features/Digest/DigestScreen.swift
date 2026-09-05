@@ -59,6 +59,12 @@ struct DigestScreen: View {
                     stories
                 } header: {
                     topics
+                        // Pinned is not the same as in front : without this the
+                        // rows pass over the pills rather than under them, and
+                        // a headline crossing the row is drawn on top of it.
+                        // The wire's chart carries the same line for the same
+                        // reason.
+                        .zIndex(1)
                 }
             }
             .editorialColumn()
