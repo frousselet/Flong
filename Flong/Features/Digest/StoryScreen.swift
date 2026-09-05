@@ -196,19 +196,12 @@ struct StoryScreen: View {
                 LiveDot()
             }
 
-            // The same marks the row carried, so the page a reader tapped
-            // into opens on what they tapped.
-            HStack(spacing: 3) {
-                ForEach(story.feedMarks) { mark in
-                    SourceStamp(domain: mark.room, side: 15, showsName: false)
-                }
-                if story.feedCount > story.feedMarks.count {
-                    Text(verbatim: "+\(story.feedCount - story.feedMarks.count)")
-                        .padding(.leading, 1)
-                }
-            }
-            .accessibilityElement()
-            .accessibilityLabel(Text("\(story.feedCount) rooms"))
+            // **The same marks the row carried, and now the same drawing.**
+            // The sentence above was true of the intention and false of the
+            // code : this page set them out by hand, at its own size and its
+            // own spacing, so the row learnt to lap them and to keep its count
+            // on one line and this did neither. See ``RoomMarks``.
+            RoomMarks(marks: story.feedMarks, count: story.feedCount, side: 15)
 
             Text("\(story.articleCount) articles")
 
