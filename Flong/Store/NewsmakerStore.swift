@@ -90,6 +90,7 @@ nonisolated struct NewsmakerStore: Sendable {
     /// anywhere, so a person named in one would be a row leading to nothing. A
     /// duplicate whose original is later purged stops being one, and its date
     /// is still `nil`, so it is read then.
+    @concurrent
     func unread(limit: Int = batchSize) async throws -> [Reading] {
         try await database.writer.read { db in
             try Row.fetchAll(
@@ -119,6 +120,7 @@ nonisolated struct NewsmakerStore: Sendable {
     }
 
     /// How many articles are still waiting to be read.
+    @concurrent
     func outstandingCount() async throws -> Int {
         try await database.writer.read { db in
             try Int.fetchOne(
@@ -137,6 +139,7 @@ nonisolated struct NewsmakerStore: Sendable {
     ///
     /// Returns how many articles were read, which is what the runner counts.
     @discardableResult
+    @concurrent
     func read(_ items: [Reading], at date: Date = Date()) async throws -> Int {
         for item in items {
             let people = Newsmaker.people(

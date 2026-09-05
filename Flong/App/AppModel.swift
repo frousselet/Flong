@@ -870,8 +870,16 @@ final class AppModel {
         }
     }
 
+    /// Publishes the plan where what is drawn of it has moved.
+    ///
+    /// **A fraction and not a plan.** The ring in the corner draws one number,
+    /// and the progress callbacks arrive one per feed fetched, one per headline
+    /// written, one per article read : each of them republished a whole plan,
+    /// and every view that reads the work rebuilt. A fetch of three hundred
+    /// feeds was three hundred rebuilds of the front page.
     private func mirror() {
         guard work != nil else { return }
+        guard plan?.fraction != work?.fraction || plan?.phase != work?.phase else { return }
         work = plan
     }
 
@@ -912,7 +920,12 @@ final class AppModel {
     /// `working` is a beginning, and only `working` needs somebody to notice
     /// that its end never came.
     func report(_ status: SyncStatus) {
-        syncStatus = status
+        // **Only where it moved.** `CKSyncEngine` reports an event per batch,
+        // and most of them say what the last one said : `working` after
+        // `working`, `idle` after `idle`. Written back each time, the status is
+        // a page rebuilt per batch for the whole of an exchange, since the
+        // front page reads it.
+        if syncStatus != status { syncStatus = status }
         settlingExchange?.cancel()
         settlingExchange = nil
 
@@ -1496,11 +1509,20 @@ final class AppModel {
             // the list under a reader who is scrolled into it, and a pinned
             // header rebuilt mid-gesture is a page that does not settle back
             // where it was.
-            if fetched != digest { digest = fetched }
 
             // What is worth searching for is what the page is full of, so it
             // is worked out where the page is read and nowhere else.
-            searchSubjects = SearchSubjects.subjects(in: fetched.all.map(\.title))
+            //
+            // **Behind the same guard as the page, and off the main thread.**
+            // It is a named-entity pass over every headline on the page, and it
+            // sat outside the check above : an article marked read, or any of
+            // the store ticks a synchronization brings, ran the whole pass
+            // again for a page that had not moved, in front of the reader.
+            if fetched != digest || searchSubjects.isEmpty {
+                let subjects = await digestService.subjects(in: fetched.all.map(\.title))
+                if subjects != searchSubjects { searchSubjects = subjects }
+                digest = fetched
+            }
 
             // **And nothing is asked of the indexing lane from here.** This is
             // the read behind every render and every store tick, and almost
@@ -3115,20 +3137,32 @@ final class AppModel {
                 )
             }
 
-            sidebar = items
+            // **Written only where the value moved.** `@Observable` notifies
+            // on the assignment and not on the value : writing back an
+            // identical sidebar rebuilds every view that reads any of these,
+            // and `publishers` is an environment value the whole window hangs
+            // off while `feedCount` reaches the front page through
+            // ``isEmpty``. This runs on every store tick, and a synchronization
+            // is a store tick per batch, so the page was being rebuilt under a
+            // thumb for a list that had not changed since the last one.
+            if sidebar != items { sidebar = items }
+
             // What every list in the window shows about where an article came
             // from, worked out once here rather than read off each row : the
             // name and the mark belong to the publisher, and five hundred rows
             // of one paper are one name and one favicon.
-            publishers = Dictionary(
+            let identities = Dictionary(
                 groups.map { ($0.domain, $0.identity) },
                 uniquingKeysWith: { first, _ in first }
             )
-            feedCount = feeds.count
+            if publishers != identities { publishers = identities }
+            if feedCount != feeds.count { feedCount = feeds.count }
+
             // The panel that lists everything Flong may interrupt the reader
             // for reads them here : they have just been fetched, and a handful
             // of rows out of hundreds is not a second query.
-            announcingSources = feeds.filter(\.notifiesNewArticles)
+            let announcing = feeds.filter(\.notifiesNewArticles)
+            if announcingSources != announcing { announcingSources = announcing }
         } catch {
             Log.store.error("The sidebar could not be built : \(error, privacy: .public)")
         }

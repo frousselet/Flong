@@ -105,6 +105,7 @@ nonisolated struct ReadStateStore: Sendable {
     ///
     /// An article fetched today may have been read on another device last week,
     /// and it has to land read rather than announce itself as new.
+    @concurrent
     func fingerprints() async throws -> Set<ArticleFingerprint> {
         try await blocks().reduce(into: Set<ArticleFingerprint>()) { $0.formUnion($1.fingerprints) }
     }

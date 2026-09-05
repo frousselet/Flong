@@ -88,6 +88,7 @@ nonisolated struct StreamArchive: Sendable {
     /// Today's file is rewritten as the day fills and sealed by the day ending,
     /// which is the only file that is ever written more than once.
     @discardableResult
+    @concurrent
     func write(since: Date = .distantPast) async throws -> Int {
         guard let root else { return 0 }
 
@@ -126,6 +127,7 @@ nonisolated struct StreamArchive: Sendable {
     /// what makes this cheap to run often : the ledger is kept locally, since
     /// what one device has ingested is nobody else's business.
     @discardableResult
+    @concurrent
     func ingest(read: Set<ArticleFingerprint>, at now: Date = Date()) async throws -> Int {
         guard let root, FileManager.default.fileExists(atPath: root.path()) else { return 0 }
 

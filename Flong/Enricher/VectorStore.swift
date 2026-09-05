@@ -51,6 +51,7 @@ nonisolated struct VectorStore: Sendable {
     /// thirty days of articles and is now every article there has ever been, so
     /// asking for all of them would be embedding a hundred thousand pieces to
     /// answer questions about the few hundred somebody chose.
+    @concurrent
     func itemsNeedingVectors(limit: Int = VectorStore.batchSize) async throws -> [Entry] {
         let candidates = try await database.writer.read { db in
             try Entry.fetchAll(
@@ -83,6 +84,7 @@ nonisolated struct VectorStore: Sendable {
 
     /// Computes and stores the vectors of a batch.
     @discardableResult
+    @concurrent
     func vectorize(_ items: [Entry]) async throws -> Int {
         // Computed before the transaction opens, and handed in as one value :
         // embedding is the slow part, and a write transaction is the last place
@@ -126,6 +128,7 @@ nonisolated struct VectorStore: Sendable {
     }
 
     /// How many kept articles are still waiting for a vector.
+    @concurrent
     func outstandingCount() async throws -> Int {
         try await itemsNeedingVectors(limit: .max).count
     }
