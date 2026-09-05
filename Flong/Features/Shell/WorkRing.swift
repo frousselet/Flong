@@ -31,6 +31,17 @@ import SwiftUI
 /// than filling and emptying at every stage. Where nothing in the pass can be
 /// counted the ring goes round instead, and the words that used to sit over the
 /// rule are what it says to VoiceOver and to a pointer resting on it.
+///
+/// **And the ring says what is being brought in, not only how much of it.** The
+/// stage's own mark stands inside the circle the measure is drawn on : the
+/// arrow while the feeds come down, the paper while what arrived is grouped,
+/// the cloud while iCloud is caught up with. It is one symbol rather than a
+/// glyph beside a ring, since every mark is of the `.circle` family and that
+/// family's enclosure is what answers to the variable value. The mark changes
+/// under Magic Replace, which is what that transition is for : the circle is
+/// common to both symbols, so it stays put and the thing inside it is the only
+/// part that moves, and a measure that jumped a frame at every stage would be a
+/// measure the reader stops believing.
 struct WorkRing: View {
     let work: WorkPlan
 
@@ -66,9 +77,18 @@ struct WorkRing: View {
     private var ring: some View {
         if let fraction = work.fraction {
             // The dial the application always drew, drawn by the system : a
-            // hairline track with the ink running round it from the top.
-            Image(systemName: Self.dial, variableValue: max(fraction, Self.least))
+            // hairline track with the ink running round it from the top, and
+            // the stage's own mark standing in the middle of it.
+            Image(systemName: work.phase.mark, variableValue: max(fraction, Self.least))
+                // **Magic Replace, and the fallback it asks for.** Every mark
+                // shares the circle the measure is drawn on, which is exactly
+                // the case that transition exists for : the enclosure holds and
+                // the thing inside it is replaced. Where two marks share
+                // nothing the system falls back to one going down and the next
+                // coming up, which is the plainest replacement there is.
+                .contentTransition(.symbolEffect(.replace.magic(fallback: .downUp)))
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: fraction)
+                .animation(reduceMotion ? nil : .default, value: work.phase)
         } else if reduceMotion {
             // Still, the way ``LiveDot`` stops its pulse : a ring going round
             // for ever is motion for its own sake, and a part-inked ring says
@@ -94,7 +114,7 @@ struct WorkRing: View {
 }
 
 extension WorkRing {
-    /// The ring where the pass can be counted.
+    /// The rings where the pass can be counted, one per stage.
     ///
     /// **The system's own glyph, rather than two circles in a stack.** It was a
     /// `Circle` for the track with a trimmed, round-capped `Circle` over it for
@@ -106,11 +126,13 @@ extension WorkRing {
     ///
     /// A symbol cannot : it is one glyph, there is no second shape to disagree
     /// with, and nothing to centre against anything. Given a variable value the
-    /// system draws this one as exactly what was being drawn by hand, a pale
-    /// track with the ink running round it from the top, and it draws it
+    /// system draws these as exactly what was being drawn by hand, a pale track
+    /// with the ink running round it from the top, and it draws it
     /// **continuously** rather than in steps, which is what a measure owes the
-    /// thing it measures.
-    static let dial = "circle"
+    /// thing it measures. What the plain circle did for every stage alike,
+    /// ``WorkPhase/mark`` now does for each of them in turn, the circle being
+    /// the part of the mark the value reaches.
+    static let dials = WorkPhase.allCases.map(\.mark)
 
     /// The ring where it cannot.
     ///
@@ -129,11 +151,12 @@ extension WorkRing {
     /// different, since one is a quantity and the other is not.
     static let chase = "ring.dashed"
 
-    /// Both are checked against the system by `WorkRingSymbolTests`, for the
-    /// reason every other symbol in the application is : `Image(systemName:)`
-    /// takes any string at all and draws nothing where the system has no such
-    /// glyph, and the compiler is perfectly happy about it.
-    static let symbols = [dial, chase]
+    /// Every one of them is checked against the system by
+    /// `WorkRingSymbolTests`, for the reason every other symbol in the
+    /// application is : `Image(systemName:)` takes any string at all and draws
+    /// nothing where the system has no such glyph, and the compiler is
+    /// perfectly happy about it.
+    static let symbols = dials + [chase]
 
     /// The least a measured ring ever shows.
     ///
