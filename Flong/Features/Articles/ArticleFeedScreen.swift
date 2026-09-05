@@ -144,7 +144,7 @@ struct ArticleFeedScreen: View {
         .navigationTitle(title)
         .toolbar {
             if menu != nil {
-                ReaderCorner(model: model, work: model.currentWork) { menu?(.view($0)) }
+                ReaderCorner(model: model) { menu?(.view($0)) }
             } else {
                 ToolbarItem(placement: .primaryAction) {
                     Button {

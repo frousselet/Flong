@@ -71,26 +71,12 @@ struct ReaderButton: View {
 /// was.
 struct ReaderCorner: ToolbarContent {
     let model: AppModel
-    /// The pass as it stands, or nothing at all when nothing is running.
-    let work: WorkPlan?
     /// Where a source leads, once the reader's panel is out of the way.
     var open: ((SidebarItem.Kind) -> Void)?
 
     var body: some ToolbarContent {
-        if let work {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    // Nothing. It reports and does not act : the pull is the
-                    // gesture, and a control that did both would be one the
-                    // reader cannot aim.
-                } label: {
-                    WorkRing(work: work)
-                }
-                .disabled(true)
-                // What the ring cannot say in a shape, said in words to a
-                // pointer resting on it.
-                .help(Text(work.phase.title))
-            }
+        ToolbarItem(placement: .primaryAction) {
+            WorkRingItem(model: model)
         }
         ToolbarItem(placement: .primaryAction) {
             ReaderButton(model: model, open: open)
@@ -182,5 +168,33 @@ nonisolated extension ToolbarItemPlacement {
         #else
             .navigation
         #endif
+    }
+}
+
+/// The ring, reading the pass itself.
+///
+/// **It was handed the pass, and that is what cost the page.** A screen that
+/// reads `currentWork` to pass it in is a screen subscribed to it, and the pass
+/// moves on every feed fetched, every headline written, every article read : a
+/// fetch of three hundred feeds was three hundred rebuilds of the front page,
+/// its ten rows and its pinned header, to move a ring by a third of a per cent.
+/// Reading it here puts the whole of that inside one small view.
+private struct WorkRingItem: View {
+    let model: AppModel
+
+    var body: some View {
+        if let work = model.currentWork {
+            Button {
+                // Nothing. It reports and does not act : the pull is the
+                // gesture, and a control that did both would be one the reader
+                // cannot aim.
+            } label: {
+                WorkRing(work: work)
+            }
+            .disabled(true)
+            // What the ring cannot say in a shape, said in words to a pointer
+            // resting on it.
+            .help(Text(work.phase.title))
+        }
     }
 }

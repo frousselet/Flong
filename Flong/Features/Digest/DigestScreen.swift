@@ -142,7 +142,7 @@ struct DigestScreen: View {
             ToolbarItem(placement: .sectionLeading) {
                 EditionsButton(model: model)
             }
-            ReaderCorner(model: model, work: model.currentWork) { open(.view($0)) }
+            ReaderCorner(model: model) { open(.view($0)) }
         }
         // Not while something is being brought in. `Nothing has come in yet`
         // over a page that is at that moment fetching sixty feeds is untrue,
@@ -219,7 +219,10 @@ struct DigestScreen: View {
                 // slides over it.
                 .modifier(EditionSinking(offset: offset))
 
-            let shown = stories(of: published, on: page)
+            // Joined on the model, where the page and the edition are both
+            // settled, rather than here where the body runs. See
+            // ``AppModel/frontPageStories``.
+            let shown = model.frontPageStories
             ForEach(shown) { story in
                 row(story, isLead: story.id == shown.first?.id, isFirst: story.id == shown.first?.id)
             }
@@ -352,11 +355,6 @@ struct DigestScreen: View {
     /// linear scans of up to sixty stories, and `Digest.all` is
     /// `live + stories` : a fresh array of the whole page allocated on each of
     /// the ten. That is ten copies of the page to resolve ten identifiers,
-    /// every time the body is evaluated.
-    private func stories(of published: PublishedEdition, on page: Digest) -> [DigestStory] {
-        let byIdentity = Dictionary(page.all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        return published.stories.compactMap { byIdentity[$0.storyID] }
-    }
 
     /// The stories the page is showing, by identity.
     ///
@@ -365,10 +363,10 @@ struct DigestScreen: View {
     /// article marked read included, and animating on that would run a
     /// transition every time somebody opened something.
     private var shownStories: [UUID] {
-        guard model.digestTopic == .frontPage, let published = model.edition else {
+        guard model.digestTopic == .frontPage, model.edition != nil else {
             return model.digest.all.map(\.id)
         }
-        return published.stories.map(\.storyID)
+        return model.frontPageStories.map(\.id)
     }
 
     /// The picture the head of the page is washed in the colours of.
@@ -384,11 +382,11 @@ struct DigestScreen: View {
     /// there is not, which is a subject narrowed to a pill and the wire behind
     /// a device with no model.
     private var leadPicture: URL? {
-        guard model.digestTopic == .frontPage, let published = model.edition else {
+        guard model.digestTopic == .frontPage, model.edition != nil else {
             return model.digest.lead?.imageURL
         }
 
-        return stories(of: published, on: model.digest).first?.imageURL
+        return model.frontPageStories.first?.imageURL
     }
 
     /// Whether an edition is on its way rather than absent for good.
@@ -486,7 +484,11 @@ struct DigestScreen: View {
         if !model.digest.topics.isEmpty {
             ScrollView(.horizontal) {
                 GlassEffectContainer(spacing: 8) {
-                    HStack(spacing: 8) {
+                    // **Lazy, because the row is pinned.** Fifteen subjects is
+                    // fifteen panes of glass resolved for the whole of every
+                    // scroll, where four or five are on screen. What is not in
+                    // the viewport is not realized and samples nothing.
+                    LazyHStack(spacing: 8) {
                         pill(.frontPage, title: Text("Front page"))
                         ForEach(model.digest.topics, id: \.self) { topic in
                             pill(.named(topic), title: Text(verbatim: topic))
@@ -951,8 +953,13 @@ private struct PillShape: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // **Not `interactive`.** Interactive glass follows a touch, which
+            // means it is live for as long as the row is on screen, and this
+            // row is pinned : it is on screen for the whole of every scroll. A
+            // pill answers a tap ; it does not need to answer a finger passing
+            // over it.
             .glassEffect(
-                isCurrent ? .regular.tint(.accentColor).interactive() : .regular.interactive(),
+                isCurrent ? .regular.tint(.accentColor) : .regular,
                 in: .capsule
             )
             .glassEffectID(topic, in: namespace)

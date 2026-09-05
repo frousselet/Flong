@@ -241,6 +241,7 @@ struct EditionHead: View {
 struct EditionSinking: ViewModifier {
     let offset: PageOffset
 
+    @ViewBuilder
     func body(content: Content) -> some View {
         // Never below nought : a page pulled past its own top is a page being
         // refreshed, and the head has no business moving for that.
@@ -258,21 +259,20 @@ struct EditionSinking: ViewModifier {
         // A simulator draws glass cheaply and shows none of this ; a device
         // draws the real thing.
         if gone >= 1 {
-            return AnyView(content.hidden())
-        }
+            content.hidden()
+        } else {
 
-        // **Drawn once, then moved as a picture of itself.** Everything below
-        // this line is a transform : a shift, a scale, a blur and a fade, all
-        // of them changing on every frame of a scroll and none of them changing
-        // what the pane says. `drawingGroup` rasterizes the pane the once and
-        // hands the four of them a bitmap, so a frame of the parallax is a
-        // texture being moved rather than a rounded rectangle, three lines of
-        // type and a rule being laid out and drawn again.
-        //
-        // It is also what makes the blur affordable. A blur is an off-screen
-        // pass over whatever it is given ; given a live material it is a pass
-        // over a pass, which is why the pane is a fill now and not glass.
-        return AnyView(
+            // **Drawn once, then moved as a picture of itself.** Everything below
+            // this line is a transform : a shift, a scale, a blur and a fade, all
+            // of them changing on every frame of a scroll and none of them changing
+            // what the pane says. `drawingGroup` rasterizes the pane the once and
+            // hands the four of them a bitmap, so a frame of the parallax is a
+            // texture being moved rather than a rounded rectangle, three lines of
+            // type and a rule being laid out and drawn again.
+            //
+            // It is also what makes the blur affordable. A blur is an off-screen
+            // pass over whatever it is given ; given a live material it is a pass
+            // over a pass, which is why the pane is a fill now and not glass.
             content
                 // **Room round it before it is rasterized.** `drawingGroup`
                 // draws into a bitmap the size of what it is given, and a
@@ -289,7 +289,7 @@ struct EditionSinking: ViewModifier {
                 .scaleEffect(1 - gone * EditionHead.shrink, anchor: .top)
                 .blur(radius: gone * EditionHead.softening)
                 .opacity(1 - gone)
-        )
+        }
     }
 }
 

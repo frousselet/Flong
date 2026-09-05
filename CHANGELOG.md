@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - The indexing lane runs off the main thread at last : a background priority is not a background thread, and the named-entity passes and the sentence embeddings ran on it for twenty seconds after every catch-up.
+- The ring in the corner reads the pass itself rather than being handed it, so a fetch of three hundred feeds no longer rebuilds the front page three hundred times to move it by a third of a per cent.
 - The window publishes what moved and nothing else : the sidebar, the exchange's status and the work ring were written back unchanged on every store tick, and each of them rebuilt the front page.
 - Scrolling while anything else is happening : every store and service the window waits on now runs off the main thread rather than on it, the window is read back at most every couple of seconds while iCloud catches up rather than twice a second, and the indexing lane stands aside between batches while somebody is looking at the page.
 

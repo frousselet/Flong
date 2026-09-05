@@ -109,7 +109,7 @@ struct SearchScreen: View {
         .navigationTitle(Text("Search"))
         .toolbar {
             if let menu {
-                ReaderCorner(model: model, work: model.currentWork) { menu(.view($0)) }
+                ReaderCorner(model: model) { menu(.view($0)) }
             }
         }
         .searchable(
