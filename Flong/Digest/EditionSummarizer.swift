@@ -26,11 +26,7 @@ nonisolated struct EditionBrief: Hashable, Sendable {
 /// The shape the model fills in for a whole page.
 @Generable
 nonisolated struct GeneratedEditionPoints {
-    @Guide(
-        description:
-            "The two or three things worth knowing, one short sentence of at most 100 characters each, no numbering",
-        .maximumCount(EditionSummarizer.mostPoints)
-    )
+    @Guide(description: EditionSummarizer.pointGuide, .maximumCount(EditionSummarizer.mostPoints))
     var points: [String]
 }
 
@@ -71,20 +67,52 @@ nonisolated struct EditionSummarizer: Sendable {
     /// page that came back with one is a page to ask about again.
     static let leastPoints = 2
 
-    /// How many characters one point may run to.
+    /// What the model is asked for, written once.
     ///
-    /// **Characters and not words, because the page is measured in lines.** A
-    /// point stands on three lines at most, and what fills a line is letters :
-    /// asked in words, the model wrote twenty-five short ones or twenty-five
-    /// long ones and the page had no way of knowing which was coming. Three
-    /// lines of body across this column hold about a hundred and thirty
-    /// characters, and the bound is set under that so a point never reaches
-    /// the end of the third line.
+    /// **Interpolated rather than typed out.** The guide said `at most 100
+    /// characters` as a literal while the constant under it said a hundred and
+    /// the page's own documentation said a hundred and twenty : a bound written
+    /// in three places is a bound that stopped agreeing with itself the first
+    /// time one of the three was changed, and it had.
+    static let pointGuide =
+        "The two or three things worth knowing, one short sentence of at most "
+        + "\(maximumPointWords) words each, no numbering"
+
+    /// How many words one point may run to.
     ///
-    /// It is the model that is held to it rather than the page : a page that
-    /// cut a point to fit would be a page throwing away the end of a sentence,
-    /// and one that set it smaller to fit would be a page whispering the news.
-    static let maximumPointCharacters = 100
+    /// **Words and not characters, because nothing cuts a point any more.** The
+    /// old bound was a hundred characters and its argument went : a point
+    /// stands on three lines, a line is filled with letters, so count letters.
+    /// It was measured across the six hundred and eighty point measure, where
+    /// three lines of body hold about two hundred characters ; the page it
+    /// shipped to was a phone, where the same three lines hold about a hundred
+    /// and ten, and a reader above the default type size met a sentence ending
+    /// in an ellipsis, which is the one thing the bound existed to stop. A line
+    /// count is a promise the writing cannot keep : it depends on the column,
+    /// the face, the type size and the platform, none of which the model can be
+    /// told and all of which the reader may change while the edition is on the
+    /// screen. So the words bound the thought and the lines are left to the
+    /// layout, which is the only thing that knows how wide the page is.
+    ///
+    /// **And a bound in characters was quietly two different bounds.** A word
+    /// and the space after it come to about six characters in French and five
+    /// and a half in English, so a hundred characters was sixteen French words
+    /// and seventeen or eighteen English ones : the same rule gave a French
+    /// reader less to be told than an English one, for no reason anybody chose.
+    ///
+    /// **Eighteen, and the arithmetic is the old bound's own.** A hundred
+    /// characters was about sixteen or seventeen words all along, so this is the
+    /// same length said in the unit that survives a change of column, with a
+    /// word of slack : rejecting a good point of seventeen words costs the
+    /// reader a real line for nothing, since what replaces a rejected point is a
+    /// worse one. It is the generosity ``StorySummarizer/maximumSummaryWords``
+    /// is set with, and for the same reason.
+    ///
+    /// It is still the model that is held to it rather than the page : a page
+    /// that cut a point to fit would be a page throwing away the end of a
+    /// sentence, and one that set it smaller to fit would be a page whispering
+    /// the news.
+    static let maximumPointWords = 18
 
     /// What is kept for the answer, whatever the prompt costs.
     static let reservedTokens = 500
@@ -245,7 +273,7 @@ nonisolated struct EditionSummarizer: Sendable {
         }
         if let long = points.first(where: { !isBrief($0) }) {
             return
-                "This point is too long : \(long). Write every point again in one sentence of at most \(maximumPointCharacters) characters."
+                "This point is too long : \(long). Write every point again in one sentence of at most \(maximumPointWords) words."
         }
         return nil
     }
@@ -289,8 +317,12 @@ nonisolated struct EditionSummarizer: Sendable {
     static let sameThing = 0.66
 
     /// Whether one point has stayed one thing worth knowing.
+    ///
+    /// Counted on whitespace, exactly as a headline and a standfirst are, so an
+    /// elision is the one word it is : `l'étude` is not two. Two bounds that
+    /// counted differently would be counting two different things.
     static func isBrief(_ point: String) -> Bool {
-        point.count <= maximumPointCharacters
+        point.split(whereSeparator: \.isWhitespace).count <= maximumPointWords
     }
 
     /// What comes back, put in the shape the page draws.
@@ -360,9 +392,19 @@ nonisolated struct EditionSummarizer: Sendable {
         matter. Every word carries information : a fact, a figure, a named actor or a verb of action. \
         No jargon, no abstraction, no wordplay.
 
+        **Every point reports something that happened.** A condition that was already true yesterday is \
+        not news and never a point : never write `Russia and Ukraine are at war`, `the climate is \
+        warming` or `the election campaign is under way`. Write what moved in it today. If a story only \
+        tells you that a situation exists, it is not one of the things worth knowing, and you leave it \
+        out rather than restating it.
+
         Say what happened, not who said it. Write `A Russian drone hit the SBU headquarters in Kyiv`, \
         never `The president says a Russian drone hit the SBU headquarters in Kyiv`. Name the speaker only \
         where the speaking is itself the news, as in a resignation, a denial or a decision announced.
+
+        Name the actor and name the thing. `Two workers were pulled alive from a tunnel in Nepal` is a \
+        point ; `there was an incident abroad` is the same sentence with the news taken out. Prefer the \
+        specific noun to the category, the number to `several`, and the verb to the noun made from it.
 
         No numbering and no bullet characters, the page draws its own. Never say more than these stories \
         say. Never give a date, a year or a day. Never end a line with `and more` or anything like it.
@@ -382,8 +424,15 @@ nonisolated struct EditionSummarizer: Sendable {
         Two or three of them, restated, one short sentence each, one to a line, in the order they matter. \
         Restate what happened rather than who reported it : `A Russian drone hit the SBU headquarters in \
         Kyiv`, never `The president says a Russian drone hit the SBU headquarters in Kyiv`. Name the \
-        speaker only where the speaking is itself the news. No numbering and no bullet characters. Never \
-        say more than these headlines say. Never give a date, a year or a day.
+        speaker only where the speaking is itself the news.
+
+        Restate a development and never a standing condition. `Russia and Ukraine are at war` is true, \
+        was true yesterday, and tells the reader nothing these headlines have just said : restate what \
+        happened in it. Name the actor and the thing rather than the category, and give the number where \
+        the headlines give one.
+
+        No numbering and no bullet characters. Never say more than these headlines say. Never give a \
+        date, a year or a day.
         """
 }
 

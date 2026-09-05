@@ -67,7 +67,11 @@ struct EditionArchiveScreen: View {
                     .font(index == 0 ? .headline : .subheadline)
                     .foregroundStyle(index == 0 ? .primary : .secondary)
                     .multilineTextAlignment(.leading)
-                    .lineLimit(2)
+                    // Never cut, here as at the head of a page : it is the
+                    // same sentence and the bound on it is the same one. A row
+                    // of a `List` clips what it was not told to make room for,
+                    // which is what this asks it to do.
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Text("\(published.stories.count) stories")
                 .font(.caption)
@@ -157,11 +161,11 @@ struct EditionScreen: View {
                                             .foregroundStyle(.primary)
                                             .frame(width: EditionHead.markWidth)
                                             .accessibilityHidden(true)
-                                        // Three lines, and never cut : the
-                                        // bound is on what the model writes.
-                                        // See ``EditionHead``.
+                                        // Never cut, and no cap on the lines :
+                                        // the bound is on what the model
+                                        // writes. See ``EditionHead``.
                                         Text(verbatim: point)
-                                            .lineLimit(3)
+                                            .fixedSize(horizontal: false, vertical: true)
                                     }
                                 }
                             }

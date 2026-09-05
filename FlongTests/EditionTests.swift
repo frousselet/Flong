@@ -356,10 +356,59 @@ struct EditionBriefChecksTests {
         #expect(EditionSummarizer.fault(["Deux ouvriers sauvés au Népal."], over: page) != nil)
     }
 
+    /// Forty words is a paragraph however short the words are.
     @Test("A point that runs to a paragraph is asked for again")
     func aPointThatIsAParagraph() {
         let long = String(repeating: "mot ", count: 40)
         #expect(EditionSummarizer.fault([long, "Court."], over: page) != nil)
+    }
+
+    /// **The bound is on the thought and not on the letters.** A hundred
+    /// characters was sixteen French words and eighteen English ones, so the
+    /// same rule gave a French reader less to be told than an English one. Long
+    /// words that fit pass where a hundred characters did not, and a run of
+    /// short ones fails where a hundred characters did.
+    @Test("A point is bounded in words and not in letters")
+    func boundIsInWords() {
+        let longWords = Array(repeating: "circonstanciel", count: EditionSummarizer.maximumPointWords)
+            .joined(separator: " ")
+        let manyShort = Array(repeating: "un", count: EditionSummarizer.maximumPointWords + 1)
+            .joined(separator: " ")
+
+        #expect(longWords.count > 100)
+        #expect(EditionSummarizer.isBrief(longWords))
+        #expect(manyShort.count < 100)
+        #expect(!EditionSummarizer.isBrief(manyShort))
+    }
+
+    /// Counted on whitespace, so an elision is the one word it is : `l'étude` is
+    /// not two. The story briefs count the same way, and two bounds that counted
+    /// differently would be counting two different things.
+    @Test("An elision is the one word it is")
+    func elisionIsOneWord() {
+        let point = Array(repeating: "l'étude", count: EditionSummarizer.maximumPointWords)
+            .joined(separator: " ")
+        #expect(EditionSummarizer.isBrief(point))
+    }
+
+    /// A bound written in the guide and again in the constant is a bound that
+    /// stops agreeing with itself the first time one of the two is changed, and
+    /// it had : the guide said a hundred characters while the page's own
+    /// documentation said a hundred and twenty.
+    @Test("What the model is asked for names the bound it is held to")
+    func guideNamesTheBound() {
+        #expect(EditionSummarizer.pointGuide.contains("\(EditionSummarizer.maximumPointWords) words"))
+    }
+
+    /// **A standing condition is not news.** `La Russie et l'Ukraine sont en
+    /// guerre` was true yesterday and will be true tomorrow, and a front page
+    /// that spends one of its three lines on it has told the reader nothing
+    /// about today. The rule lives in both voices, so both are held to it.
+    @Test("Both voices refuse a point that only says a situation exists")
+    func bothVoicesRefuseAStandingFact() {
+        for voice in [EditionSummarizer.instructions, EditionSummarizer.condensing] {
+            #expect(voice.contains("Russia and Ukraine are at war"))
+        }
     }
 
     /// The model is shown headlines and standfirsts and nothing else, so it has
