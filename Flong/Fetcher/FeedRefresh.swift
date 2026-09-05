@@ -137,6 +137,7 @@ nonisolated struct FeedRefresh: Sendable {
     ///
     /// A quarantined feed is never due, and a reader with nothing but
     /// quarantined feeds has nothing to wake for.
+    @concurrent
     func nextDue() async -> Date? {
         let device = DeviceStagger.deviceIdentifier()
         let feeds = (try? await allFeeds()) ?? []
@@ -222,6 +223,7 @@ nonisolated struct FeedRefresh: Sendable {
 
     /// Refreshes one feed, and writes down what happened either way.
     @discardableResult
+    @concurrent
     func refresh(_ feed: Feed) async -> RefreshResult {
         // A feed the reader pays for is fetched with what proves they do. A
         // keychain that will not answer is a feed fetched without, which the

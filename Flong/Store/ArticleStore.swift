@@ -307,6 +307,7 @@ nonisolated struct ArticleStore: Sendable {
     /// sender's three hundred characters of it would be showing them less than
     /// they have. ``ArticleKey`` is what answers whether the two are one piece,
     /// and it is already computed on every row at ingestion.
+    @concurrent
     func summaries(matchingKeys keys: [String]) async throws -> [String: ArticleSummary] {
         guard !keys.isEmpty else { return [:] }
 
@@ -343,6 +344,7 @@ nonisolated struct ArticleStore: Sendable {
     }
 
     /// One article of the stream, with its body and the feed it came from.
+    @concurrent
     func article(id: UUID) async throws -> Article? {
         try await database.writer.read { db in
             guard let entry = try Entry.fetchOne(db, key: id),
@@ -371,6 +373,7 @@ nonisolated struct ArticleStore: Sendable {
     }
 
     /// How many unread articles each feed holds, feeds with none excluded.
+    @concurrent
     func unreadCounts() async throws -> [UUID: Int] {
         try await counts(unreadOnly: true)
     }
@@ -401,6 +404,7 @@ nonisolated struct ArticleStore: Sendable {
         }
     }
 
+    @concurrent
     func count(_ filter: ArticleFilter, matching query: QueryNode? = nil, now: Date = Date()) async throws -> Int {
         let (condition, arguments) = self.condition(filter, query: query, now: now)
 
@@ -428,6 +432,7 @@ nonisolated struct ArticleStore: Sendable {
     /// corpus is tens of thousands of rows and all that is wanted from them is
     /// one number per hour : fetching the dates to count them here would carry
     /// the whole stream across for the sake of a few dozen integers.
+    @concurrent
     func hourlyCounts(
         _ filter: ArticleFilter,
         matching query: QueryNode? = nil,
@@ -479,6 +484,7 @@ nonisolated struct ArticleStore: Sendable {
     ///
     /// An empty note is no note : it takes the article out of the notes rather
     /// than putting an empty string in them.
+    @concurrent
     func annotate(_ entryID: UUID, with note: String?) async throws {
         let note = note?.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -490,6 +496,7 @@ nonisolated struct ArticleStore: Sendable {
         }
     }
 
+    @concurrent
     func annotation(of entryID: UUID) async throws -> String? {
         try await database.writer.read { db in
             try String.fetchOne(db, sql: "SELECT annotation FROM entry WHERE id = ?", arguments: [entryID])
@@ -498,6 +505,7 @@ nonisolated struct ArticleStore: Sendable {
 
     /// The collections every reader has, which are questions the articles
     /// answer about themselves.
+    @concurrent
     func builtInCollections() async throws -> [ArticleCollection] {
         let counted: [Counted] = try await database.writer.read { db in
             let deliberate: [(ArticleCollection.BuiltIn, String, String)] = [
@@ -626,6 +634,7 @@ nonisolated struct ArticleStore: Sendable {
     /// A dynamic one is not here : it is a description, answered by the ordinary
     /// query path, and it would be strange for a description to be a case in a
     /// list of memberships.
+    @concurrent
     func summaries(in collection: ArticleCollection.Kind, limit: Int = 500) async throws -> [ArticleSummary] {
         let (condition, arguments) = Self.condition(for: collection)
 
@@ -679,6 +688,7 @@ nonisolated struct ArticleStore: Sendable {
     ///
     /// In the store's own order, which is the identifier, so that two readings
     /// of one unchanged store are two identical answers.
+    @concurrent
     func choices(perFavourite: Int = ArticleStore.perFavourite) async throws -> [Choice] {
         try await database.writer.read { db in
             try Row.fetchAll(
@@ -698,6 +708,7 @@ nonisolated struct ArticleStore: Sendable {
     ///
     /// Narrowed to a few of them when only a few changed, so that starring one
     /// article does not read every mark there is back out of the database.
+    @concurrent
     func chosen(_ ids: [UUID]? = nil, perFavourite: Int = ArticleStore.perFavourite) async throws -> [Chosen] {
         let narrowing = ids.map { " WHERE e.id IN (\(databaseQuestionMarks(count: $0.count)))" } ?? ""
         let arguments = StatementArguments(ids ?? [])
@@ -789,6 +800,7 @@ nonisolated struct ArticleStore: Sendable {
     /// A sample rather than all of them. A parameter a feed uses is on every
     /// link it serves, so a hundred answers the question as well as a hundred
     /// thousand and costs nothing.
+    @concurrent
     func addresses(ofFeed feedID: UUID, limit: Int = 100) async throws -> [URL] {
         try await database.writer.read { db in
             try String.fetchAll(
@@ -921,6 +933,7 @@ nonisolated struct ArticleStore: Sendable {
     /// - Parameter limit: how many are posted at most in one go. A bound on the
     ///   burst rather than on the news : what it does not reach stays in the
     ///   queue and is said by the next pass, which is seconds away.
+    @concurrent
     func unannounced(
         fromEveryFeed everyFeed: Bool = false,
         limit: Int = mostBeforeAnnouncing
@@ -987,6 +1000,7 @@ nonisolated struct ArticleStore: Sendable {
     /// way. A reader looking at the page an article lands on has seen it, and
     /// being told tomorrow about what they read today is worse than not being
     /// told at all.
+    @concurrent
     func markAnnounced(_ ids: [UUID], at date: Date = Date()) async throws {
         guard !ids.isEmpty else { return }
 
@@ -1007,6 +1021,7 @@ nonisolated struct ArticleStore: Sendable {
     /// What a switch turned on for the first time does : a source's back
     /// catalogue is not news, and the reader asking to hear about a publisher
     /// is asking about what that publisher does next.
+    @concurrent
     func markEverythingAnnounced(at date: Date = Date()) async throws {
         try await database.writer.write { db in
             try db.execute(
@@ -1021,6 +1036,7 @@ nonisolated struct ArticleStore: Sendable {
     /// Section 5 of the specification asks the interface never to wait on the
     /// network to reflect a tap ; nothing here does, and there is no server to
     /// wait for in the first place.
+    @concurrent
     func setRead(_ ids: [UUID], to isRead: Bool, at date: Date = Date()) async throws {
         guard !ids.isEmpty else { return }
 
@@ -1032,6 +1048,7 @@ nonisolated struct ArticleStore: Sendable {
         }
     }
 
+    @concurrent
     func setStarred(_ ids: [UUID], to isStarred: Bool) async throws {
         guard !ids.isEmpty else { return }
 
@@ -1042,6 +1059,7 @@ nonisolated struct ArticleStore: Sendable {
 
     /// Marks a whole view read, which is how a reader gives up on a backlog.
     @discardableResult
+    @concurrent
     func markRead(_ filter: ArticleFilter, at date: Date = Date(), now: Date = Date()) async throws -> Int {
         let (condition, arguments) = filter.condition(now: now)
 

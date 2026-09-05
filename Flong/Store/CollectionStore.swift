@@ -87,6 +87,7 @@ nonisolated struct CollectionStore: Sendable {
     /// put back in the order of ``ArticleCollection/BuiltIn``, which is the
     /// order of the page, so that where a square sits does not depend on which
     /// store happened to answer it.
+    @concurrent
     func builtIn() async throws -> [ArticleCollection] {
         let found =
             try await articles.builtInCollections() + authors.collections() + newsmakers.collections()
@@ -99,6 +100,7 @@ nonisolated struct CollectionStore: Sendable {
     // MARK: - Made, article by article
 
     @discardableResult
+    @concurrent
     func create(_ raw: String, at date: Date = Date()) async throws -> String? {
         guard let name = Self.name(from: raw) else { return nil }
 
@@ -111,6 +113,7 @@ nonisolated struct CollectionStore: Sendable {
         return name
     }
 
+    @concurrent
     func rename(_ name: String, to raw: String) async throws -> String? {
         guard let renamed = Self.name(from: raw), renamed != name else { return nil }
 
@@ -127,12 +130,14 @@ nonisolated struct CollectionStore: Sendable {
     ///
     /// The articles stay. A collection is a way of looking at what was kept,
     /// and putting a way of looking away is not throwing anything out.
+    @concurrent
     func delete(_ name: String) async throws {
         try await database.writer.write { db in
             try db.execute(sql: "DELETE FROM tag WHERE path = ?", arguments: [Self.path(of: name)])
         }
     }
 
+    @concurrent
     func add(_ itemIDs: [UUID], to name: String, at date: Date = Date()) async throws {
         guard !itemIDs.isEmpty else { return }
 
@@ -161,6 +166,7 @@ nonisolated struct CollectionStore: Sendable {
         }
     }
 
+    @concurrent
     func remove(_ itemIDs: [UUID], from name: String) async throws {
         guard !itemIDs.isEmpty else { return }
 
@@ -178,6 +184,7 @@ nonisolated struct CollectionStore: Sendable {
     }
 
     /// Which made collections one article is in.
+    @concurrent
     func collections(of itemID: UUID) async throws -> [String] {
         try await database.writer.read { db in
             try String.fetchAll(
@@ -199,6 +206,7 @@ nonisolated struct CollectionStore: Sendable {
     /// What arrives from another device is the whole truth about that article :
     /// a collection missing from the list is one it was taken out of, so the
     /// difference is applied rather than the additions alone.
+    @concurrent
     func set(_ names: [String], of itemID: UUID, at date: Date = Date()) async throws {
         let wanted = Set(names.compactMap { Self.name(from: $0) })
         let current = Set(try await collections(of: itemID))
@@ -212,6 +220,7 @@ nonisolated struct CollectionStore: Sendable {
     /// One pass rather than one query per article : synchronizing walks every
     /// mark there is, and a few thousand of them asked one at a time is a few
     /// thousand statements for an answer one join already holds.
+    @concurrent
     func memberships() async throws -> [UUID: [String]] {
         let rows: [Pair] = try await database.writer.read { db in
             try Row.fetchAll(
@@ -239,6 +248,7 @@ nonisolated struct CollectionStore: Sendable {
     /// An empty one is still a collection : the reader made it, and a page that
     /// hid it until something was put in it would lose the one they made a
     /// moment ago for exactly that purpose.
+    @concurrent
     func made() async throws -> [ArticleCollection] {
         let counted: [Counted] = try await database.writer.read { db in
             try Row.fetchAll(
@@ -282,6 +292,7 @@ nonisolated struct CollectionStore: Sendable {
     }
 
     /// Every made collection's name, empty ones included.
+    @concurrent
     func names() async throws -> [String] {
         try await database.writer.read { db in
             try String.fetchAll(
@@ -304,6 +315,7 @@ nonisolated struct CollectionStore: Sendable {
     /// refused where the reader wrote it, rather than accepted and found to be
     /// empty for ever.
     @discardableResult
+    @concurrent
     func createDynamic(_ raw: String, matching query: String, at date: Date = Date()) async throws -> String? {
         guard let name = Self.name(from: raw), Self.isUsable(query) else { return nil }
 
@@ -319,6 +331,7 @@ nonisolated struct CollectionStore: Sendable {
         return name
     }
 
+    @concurrent
     func deleteDynamic(_ name: String) async throws {
         try await database.writer.write { db in
             try db.execute(sql: "DELETE FROM saved_query WHERE name = ?", arguments: [name])
@@ -328,6 +341,7 @@ nonisolated struct CollectionStore: Sendable {
     /// Every description the reader has written, by the name they gave it.
     ///
     /// What synchronizing sends. The articles are never in it.
+    @concurrent
     func descriptions() async throws -> [String: String] {
         try await database.writer.read { db in
             try Row.fetchAll(db, sql: "SELECT name, query FROM saved_query")
@@ -338,6 +352,7 @@ nonisolated struct CollectionStore: Sendable {
     }
 
     /// What one dynamic collection is looking for.
+    @concurrent
     func query(of name: String) async throws -> String? {
         try await database.writer.read { db in
             try String.fetchOne(db, sql: "SELECT query FROM saved_query WHERE name = ?", arguments: [name])
@@ -350,6 +365,7 @@ nonisolated struct CollectionStore: Sendable {
     /// The count is asked of the articles rather than kept anywhere : a dynamic
     /// collection holds no list, and a number written down would be a list of
     /// one that goes stale the next time anything arrives.
+    @concurrent
     func dynamic(now: Date = Date()) async throws -> [ArticleCollection] {
         let described: [Described] = try await database.writer.read { db in
             try Row.fetchAll(db, sql: "SELECT name, query FROM saved_query")

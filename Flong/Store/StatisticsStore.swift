@@ -389,6 +389,7 @@ nonisolated struct StatisticsStore: Sendable {
     /// Reading is the one exception and has to be : when the reader read
     /// something is not when it was written, and a chart of their evenings
     /// drawn on publication dates would be a chart of somebody else's day.
+    @concurrent
     func report(
         for range: StatisticsRange,
         now: Date = Date(),
