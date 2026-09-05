@@ -80,6 +80,20 @@ struct WorkRing: View {
             // hairline track with the ink running round it from the top, and
             // the stage's own mark standing in the middle of it.
             Image(systemName: work.phase.mark, variableValue: max(fraction, Self.least))
+                // **Drawn, and not coloured, or the value never reaches the
+                // page.** A variable value means two different things to a
+                // symbol : `color` lights layers in turn, which is what the
+                // dashed ring below does with its twelve segments, and `draw`
+                // draws the glyph itself part of the way round, which is what
+                // an enclosure of the `.circle` family is for. Asked for
+                // neither, the system chose `color` here, and these symbols
+                // have nothing to light : the ring came out whole at a
+                // twentieth and whole at nine tenths, a measure that never
+                // moved, and the images the symbol tests compare are drawn by
+                // UIKit, which chooses `draw` on its own and showed nothing
+                // wrong. `RingLookTests` renders this view rather than the
+                // symbol, which is the only place the difference shows.
+                .symbolVariableValueMode(.draw)
                 // **Magic Replace, and the fallback it asks for.** Every mark
                 // shares the circle the measure is drawn on, which is exactly
                 // the case that transition exists for : the enclosure holds and
