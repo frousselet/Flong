@@ -194,6 +194,11 @@ nonisolated struct EditionStore: Sendable {
     }
 
     /// The subjects each of an edition's stories was filed under.
+    ///
+    /// In the order they were filed, which a query has to ask for : a `SELECT`
+    /// with no `ORDER BY` answers from whichever index SQLite decided to walk,
+    /// and a point whose mark is taken from the first of a story's subjects
+    /// would wear a different one each time the page was read.
     private static func filings(of editionID: UUID, in db: Database) throws -> [UUID: [String]] {
         try Row.fetchAll(
             db,
@@ -201,6 +206,7 @@ nonisolated struct EditionStore: Sendable {
                 SELECT es.story_id AS story_id, st.name AS name
                 FROM edition_story es JOIN story_topic st ON st.story_id = es.story_id
                 WHERE es.edition_id = ?
+                ORDER BY st.rowid
                 """,
             arguments: [editionID]
         )

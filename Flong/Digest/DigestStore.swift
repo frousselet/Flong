@@ -214,9 +214,20 @@ nonisolated struct DigestStore: Sendable {
 
             // One row per subject a story is under, folded back into a list
             // per story.
-            let topics = try StoryTopic.fetchAll(db).reduce(into: [UUID: [String]]()) { topics, row in
-                topics[row.storyID, default: []].append(row.name)
-            }
+            //
+            // **In the order they were filed, which means saying so.** A
+            // `SELECT` with no `ORDER BY` is in no order at all : SQLite
+            // answers from whichever index it decided to walk, and the answer
+            // changes between two reads of a table nothing has written to. It
+            // is the order a story's rubric is set in, and it decides which
+            // subject an edition's point takes its mark from, so a page read
+            // twice showed `SPORT · EUROPEAN UNION` and then the other way
+            // about. The rowid is the order the model gave them in, which is
+            // the most exact subject first.
+            let topics = try StoryTopic.order(Column.rowID).fetchAll(db)
+                .reduce(into: [UUID: [String]]()) { topics, row in
+                    topics[row.storyID, default: []].append(row.name)
+                }
 
             let members = try Row.fetchAll(
                 db,
@@ -524,7 +535,15 @@ nonisolated struct DigestStore: Sendable {
     /// cover anything yet or not.
     ///
     /// Ties are broken by what moved last, so a page whose subjects are evenly
-    /// matched still puts the live one first.
+    /// matched still puts the live one first, and then by the name.
+    ///
+    /// **The name is what makes the row hold still.** Two subjects filed on the
+    /// same story cover the same number of stories and moved at the same
+    /// instant, so the three keys above tie exactly ; the sort is not a stable
+    /// one and what it was given came out of a dictionary, so the pair came
+    /// back one way round and then the other. A reader who taps a pill has the
+    /// page read again underneath them, and the row they tapped rearranged
+    /// itself under their finger. An order that is not total is not an order.
     static func topics(
         of stories: [DigestStory],
         scores: [String: Int] = [:],
@@ -550,7 +569,8 @@ nonisolated struct DigestStore: Sendable {
             .sorted {
                 let left = (scores[$0.key] ?? 0, $0.value.stories, $0.value.lastAt)
                 let right = (scores[$1.key] ?? 0, $1.value.stories, $1.value.lastAt)
-                return left > right
+                guard left == right else { return left > right }
+                return $0.key.localizedStandardCompare($1.key) == .orderedAscending
             }
             .map(\.key)
     }
