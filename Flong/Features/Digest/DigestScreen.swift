@@ -657,6 +657,15 @@ struct StoryRow: View {
     /// height follows from the one ratio every picture is shown in.
     private static let thumbnailWidth: CGFloat = 96
 
+    /// How far one publisher's mark laps the next.
+    ///
+    /// A quarter of a fourteen point disc. Enough that the row reads as one
+    /// group and gives back the space four separate discs were spending on
+    /// gaps ; little enough that every mark still shows the side that says
+    /// which publisher it is, since a favicon is recognized by its shape and
+    /// its colour and both live at its edge as much as at its middle.
+    private static let roomOverlap: CGFloat = 3.5
+
     var body: some View {
         Button(action: open) {
             Group {
@@ -825,15 +834,42 @@ struct StoryRow: View {
     /// The count survives for anyone listening to the page rather than looking
     /// at it, and for the rooms there was no room to show.
     private var rooms: some View {
-        HStack(spacing: 3) {
-            ForEach(story.feedMarks) { mark in
+        HStack(spacing: -Self.roomOverlap) {
+            // **They overlap, and the first one is on top.** Four marks set
+            // apart is four discs and three gaps for a row that has to share a
+            // line with a count, a dial and a time, beside a picture. Lapped,
+            // the row gives back the gaps and a good part of a disc, and it
+            // reads as one group rather than as four things that happen to be
+            // adjacent, which is what it is : the rooms running one story.
+            //
+            // The leading mark laps the one after it, rather than the other way
+            // round : a row read left to right is a row whose first thing is in
+            // front. `zIndex` is what says so, since a stack draws in the order
+            // it is written and that order is the opposite one.
+            ForEach(Array(story.feedMarks.enumerated()), id: \.element.id) { position, mark in
                 SourceStamp(domain: mark.room, side: 14, showsName: false)
+                    .zIndex(Double(story.feedMarks.count - position))
             }
 
             if story.feedCount > story.feedMarks.count {
+                // **It may not be squeezed, and `lineLimit` does not say
+                // that.** A line limit caps how many lines a text may take and
+                // says nothing about the width it is given : this one sits at
+                // the end of a row that ``facts`` is already compressing to fit
+                // beside a picture, and offered less width than `+4` needs it
+                // broke between the sign and the figure. Two lines for two
+                // characters, in the corner of a row, reading as a stray `4`
+                // under a stray `+`. `fixedSize` is the one that refuses the
+                // squeeze : the count keeps the width it asks for, and what
+                // gives way is whatever else is on the line, which is what
+                // ``ViewThatFits`` is there to decide.
                 Text(verbatim: "+\(story.feedCount - story.feedMarks.count)")
                     .lineLimit(1)
-                    .padding(.leading, 1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    // The lap is negative space the whole row carries, and this
+                    // is not one of the marks : it takes the lap back and the
+                    // gap it had, or the count sits on the last disc.
+                    .padding(.leading, Self.roomOverlap + 3)
             }
         }
         .accessibilityElement()
