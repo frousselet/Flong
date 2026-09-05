@@ -227,11 +227,11 @@ struct NewsmakerRow: View {
     @ViewBuilder
     private var marks: some View {
         if !newsmaker.publishers.isEmpty {
-            HStack(spacing: 4) {
-                ForEach(newsmaker.publishers.prefix(Self.marks), id: \.self) { domain in
-                    SourceIconView(identity: publishers[domain], side: 14)
-                }
-            }
+            // Lapped and cut out of one another, the way the marks of the
+            // rooms running a story are : it is the same row asking the same
+            // question about a person rather than about a story. No count
+            // after them, for the reason above. See ``MarkRow``.
+            MarkRow(domains: Array(newsmaker.publishers.prefix(Self.marks)))
         }
     }
 

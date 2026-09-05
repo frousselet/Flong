@@ -201,7 +201,9 @@ struct StoryScreen: View {
             // code : this page set them out by hand, at its own size and its
             // own spacing, so the row learnt to lap them and to keep its count
             // on one line and this did neither. See ``RoomMarks``.
-            RoomMarks(marks: story.feedMarks, count: story.feedCount, side: 15)
+            MarkRow(domains: story.feedMarks.map(\.room), total: story.feedCount, side: 15)
+                .accessibilityElement()
+                .accessibilityLabel(Text("\(story.feedCount) rooms"))
 
             Text("\(story.articleCount) articles")
 
