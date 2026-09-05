@@ -111,7 +111,7 @@ struct EditionHead: View {
     /// inside it by a hairline, which is the vocabulary the rest of the page
     /// already uses between rows.
     private var points: some View {
-        Group {
+        GlassEffectContainer {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(said.enumerated()), id: \.offset) { index, point in
                     if index > 0 {
@@ -164,7 +164,7 @@ struct EditionHead: View {
             .padding(.horizontal, Self.paneInset)
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .modifier(PaneSurface())
+            .glassEffect(.regular, in: .rect(cornerRadius: Self.paneCorner))
         }
         // Room between what the edition says and the first story it leads on.
         // They are two different things and were a few points apart.
@@ -187,13 +187,6 @@ struct EditionHead: View {
 
     /// How far the pane shrinks on its way out.
     static let shrink: CGFloat = 0.14
-
-    /// How much room the shadow needs round the pane when it is rasterized.
-    ///
-    /// Over what the shadow reaches, since what the bitmap does not hold is
-    /// cut off at the pane's own edge and the page shows a shadow that stops in
-    /// a straight line.
-    static let shadowRoom: CGFloat = 44
 
     /// How far out of focus the pane goes on its way out.
     ///
@@ -262,27 +255,13 @@ struct EditionSinking: ViewModifier {
             content.hidden()
         } else {
 
-            // **Drawn once, then moved as a picture of itself.** Everything below
-            // this line is a transform : a shift, a scale, a blur and a fade, all
-            // of them changing on every frame of a scroll and none of them changing
-            // what the pane says. `drawingGroup` rasterizes the pane the once and
-            // hands the four of them a bitmap, so a frame of the parallax is a
-            // texture being moved rather than a rounded rectangle, three lines of
-            // type and a rule being laid out and drawn again.
-            //
-            // It is also what makes the blur affordable. A blur is an off-screen
-            // pass over whatever it is given ; given a live material it is a pass
-            // over a pass, which is why the pane is a fill now and not glass.
+            // **And nothing rasterized over it.** Drawing the pane once and
+            // moving the picture of it is the right answer for something
+            // painted and the wrong one for the material : a bitmap is a
+            // snapshot, and what the material draws is whatever is behind it at
+            // this moment. It was rasterized while the pane was a fill, and the
+            // fill is gone.
             content
-                // **Room round it before it is rasterized.** `drawingGroup`
-                // draws into a bitmap the size of what it is given, and a
-                // shadow falls outside that : rasterized flush, the pane came
-                // out with its shadow cut off at its own edge. The padding
-                // makes the bitmap big enough to hold it and is taken straight
-                // back, so the layout is what it was.
-                .padding(EditionHead.shadowRoom)
-                .drawingGroup()
-                .padding(-EditionHead.shadowRoom)
                 // Held back against the scroll, so it falls behind the page
                 // rather than travelling with it.
                 .offset(y: travelled * EditionHead.lag)
@@ -389,7 +368,7 @@ struct TextPlaceholder: View {
 /// ever has, so the page only ever grows into it.
 struct EditionPlaceholder: View {
     var body: some View {
-        Group {
+        GlassEffectContainer {
             VStack(alignment: .leading, spacing: 0) {
                 // **Keyed by where it stands and not by what it holds.** These
                 // are three points of two, one and two lines, and `id: \.self`
@@ -434,7 +413,7 @@ struct EditionPlaceholder: View {
             .padding(.horizontal, EditionHead.paneInset)
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .modifier(PaneSurface())
+            .glassEffect(.regular, in: .rect(cornerRadius: EditionHead.paneCorner))
         }
         .padding(.bottom, Editorial.rhythm)
         // What tells a page that is filling in from a page that is broken.
@@ -508,79 +487,5 @@ struct StoryPlaceholder: View {
             TextPlaceholder(lines: isLead ? 2 : 1, last: 0.45, height: 8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-/// The surface the head of the page stands on : white, a little of the page
-/// showing through it, and a hairline round it.
-///
-/// **Painted and not resolved.** Liquid Glass is worked out against whatever is
-/// behind it every time it moves, and this pane moves on every frame of every
-/// scroll and is blurred on the way out, which is one off-screen pass over
-/// another. A white veil is a colour : it lets the page through without asking
-/// what the page is, and it costs one composite.
-///
-/// **White in both appearances, and not the same amount of it.** The same veil
-/// over a dark page and over a light one is either a slab or nothing at all :
-/// what is constant is the white, and what follows the appearance is how much
-/// of the page is left showing through it.
-struct PaneSurface: ViewModifier {
-    @Environment(\.colorScheme) private var scheme
-
-    func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: EditionHead.paneCorner, style: .continuous)
-
-        return
-            content
-            // **The shadow belongs to the shape and not to the pane.** Put on
-            // the pane, `shadow` is a shadow of everything the pane draws :
-            // every letter of every point picked one up and the type came out
-            // soft and doubled. Put on the filled shape inside the background,
-            // it is the shape that casts and the words stand on it.
-            //
-            // The shadow itself is measured off the subject pills a few points
-            // above this on the same page : they are the system's own material,
-            // so what they throw is what a thing of that material at that
-            // height throws. Sampled under one on a light page, the paper drops
-            // about eight per cent directly under the edge and is back to
-            // itself twenty points down.
-            .background {
-                shape
-                    .fill(veil)
-                    .shadow(color: .black.opacity(scheme == .dark ? 0.35 : 0.30), radius: 22, y: 6)
-            }
-            // The rim, and it is what says the material more than the veil
-            // does : a bright hairline where the light would catch the top
-            // edge, fading round to almost nothing at the foot.
-            .overlay {
-                shape.strokeBorder(rim, lineWidth: 1)
-            }
-    }
-
-    /// The white the page shows through.
-    private var veil: Color {
-        .white.opacity(scheme == .dark ? 0.05 : 0.34)
-    }
-
-    /// The line round it : all the way round, and brightest at the top.
-    ///
-    /// **Lit and never drawn.** The foot was a dark hairline for a while, on
-    /// the reasoning that a white line at the bottom of a pane on a light page
-    /// is no line at all. What that produced was a grey rule under the box, and
-    /// the box does not need one : the shadow says where it ends.
-    ///
-    /// **And it does not fade away.** Graded to nothing at the foot, the pane
-    /// had an edge along its top and none anywhere else, which is a lit corner
-    /// rather than a lit object. The material's rim runs the whole way round :
-    /// brighter where the light would fall and never absent, which is what
-    /// makes the shape read as one thing lifted off the page.
-    private var rim: LinearGradient {
-        LinearGradient(
-            colors: scheme == .dark
-                ? [.white.opacity(0.14), .white.opacity(0.07)]
-                : [.white, .white.opacity(0.70)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
     }
 }
