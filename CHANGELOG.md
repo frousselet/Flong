@@ -49,6 +49,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The marks of the rooms running a story overlap, each cut out of the one behind it so the gap between two is the page itself, and they are drawn from one place rather than set out by hand on the front page and again on a story's own.
 - Nothing cuts a sentence any more : the points at the head of an edition and the line under a story ran to an ellipsis for any reader above the default type size, because a cap in lines was standing in for a bound on the writing. The model is held to eighteen words a point instead, and it is told that a condition which already held is not news, after an edition led on `La Russie et l'Ukraine sont en guerre`.
 - Reading the front page and the wire happens off the main thread. Both go through `nonisolated async` functions, which under approachable concurrency run on the actor that called them : the decoding, the scoring and the sorting ran in front of the reader, and the store changes with every batch a synchronization brings in.
 - The head of the page stops being drawn once it has sunk out of sight, and is no longer blurred on its way there : faded to nothing it was still a pane of glass sampling the page behind it, on every frame of every scroll.
