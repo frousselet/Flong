@@ -102,7 +102,7 @@ Flong broke it once. A hand-rolled floating bar in `safeAreaBar(edge: .bottom)`,
 
 The application draws glass of its own in three kinds of place. The first two are the same rule rather than exceptions to it ; the third is an exception, and is admitted as one.
 
-**The subject pills at the top of the digest** are controls floating over the page, which is the layer the material is for, and the row sits in the content and scrolls away with it rather than pinning itself under the tab bar, where it would be glass directly under glass.
+**The subject pills at the top of the digest** are controls floating over the page, which is the layer the material is for. The row is a pinned section header inside the content rather than a bar under the tab bar, where it would be glass directly under glass : it stays in reach without one material being stacked on another.
 
 **The credit in the corner of a picture** is the other case, and it is not a control. It is the one thing on the page that has to stay readable over an image nobody chose, and text laid straight on a photograph is unreadable on half the photographs there are. The usual answer is a scrim, which is a dark band across a picture the reader came to look at ; a pill the size of a name takes what is under it and leaves the picture whole around it. It is a handful per screen rather than one per row, which is what the hairline edge of a picture refused glass for.
 
@@ -666,7 +666,7 @@ There is no refresh button. The page refreshes itself on returning to the foregr
 
 The page opened on a day, week and month selector. A period is a question about the calendar, and nobody watching a subject asks it : they ask what is happening, and then what is happening about one thing. So the selector is gone and the pills are the subjects the model found across the page, the first of them being the front page itself.
 
-They are pills rather than type because they are a filter that changes what is below, which type would understate, and because there may be six of them and they have to scroll. The row scrolls horizontally, hides its indicator, and disables scroll clipping so a pill's glass is not shaved at the edge of the column.
+They are pills rather than type because they are a filter that changes what is below, which type would understate, and because there may be six of them and they have to scroll. The row scrolls horizontally, hides its indicator, and disables scroll clipping so a pill's glass is not shaved at the edge of the column. It is drawn whole rather than lazily, for the reason `docs/technical/digest.md` records.
 
 They stay at the head of the page as it scrolls, as a pinned section header. `safeAreaBar` was the first attempt and lays out under a large title while drawing itself two hundred points lower ; a pinned header is where this one belongs anyway, at the head of what it filters. A filter that leaves the screen is a filter a reader has to scroll back up to change.
 
