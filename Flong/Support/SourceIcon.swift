@@ -150,6 +150,24 @@ struct SourceIconView: View {
         guard !candidates.isEmpty else { return }
 
         let pixels = max(Int(side * displayScale), 1)
+
+        // **Already in hand : no hop off the actor, no generic mark, no fade.**
+        // A list keeps a row's state only while the row is realized, so a
+        // reader running one back and forth arrives at the same publisher again
+        // and again with nothing in hand, and the asynchronous path below costs
+        // a hop off the main actor even when the answer is a picture that has
+        // been decoded for minutes. That hop is a frame, and a frame is long
+        // enough for the radiowaves glyph to be drawn : every mark on the page
+        // blinked to the generic one and faded back the moment its row came on
+        // screen. ``ImageStore/held(at:maximumPixels:)`` never fetches and
+        // never decodes, which is what lets the mark be there before the row
+        // is. ``RemoteImage`` reads the same way, for the same reason.
+        for candidate in candidates {
+            guard let held = ImageStore.shared.held(at: candidate, maximumPixels: pixels) else { continue }
+            image = held
+            return
+        }
+
         for candidate in candidates {
             guard !Task.isCancelled else { return }
             guard let found = try? await ImageStore.shared.image(at: candidate, maximumPixels: pixels) else {
