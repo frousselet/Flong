@@ -117,6 +117,35 @@ struct EditionPoints: View {
 
     @Environment(\.theme) private var theme
 
+    /// The air between one point and the next, at the size the reader reads at.
+    ///
+    /// **The rhythm is a ratio, and it was two fixed numbers.** Six points of
+    /// leading inside a point against eighteen between two of them is the whole
+    /// of what tells three points apart, since the rule that used to do it was
+    /// deleted and nothing replaced it. Both were held at the size they were
+    /// written at while the type they space is not : at the accessibility sizes
+    /// a line stands three times as tall, the twelve points that separated two
+    /// points from two lines of one had stopped separating anything, and the
+    /// list read as one block of prose. That is worst exactly where it matters
+    /// most, since a reader at those sizes has fewer words on the screen and
+    /// more to hold on to.
+    ///
+    /// Read through the reader's own type the ratio holds at every size, and at
+    /// the ordinary one every number is what it was : nothing a reader at the
+    /// default size can see has moved. The environment is read when they change
+    /// their type and never on a frame of anything, which is what
+    /// ``EditionSinking`` already does with the travel and what
+    /// ``EditionPlaceholder`` already does with its bars.
+    @ScaledMetric(wrappedValue: EditionHead.pointAir, relativeTo: .body)
+    private var pointAir: CGFloat
+
+    /// The air a point carries between its own lines, scaled with the gap
+    /// between two of them and for the same reason : what the reader reads is
+    /// not either number but the ratio, and a ratio kept at one size and lost at
+    /// every other is a ratio nobody decided.
+    @ScaledMetric(wrappedValue: EditionHead.leading, relativeTo: .body)
+    private var leading: CGFloat
+
     /// What this edition says, and never more than the bound.
     ///
     /// Read here as well as written : an edition published before the bound
@@ -137,12 +166,12 @@ struct EditionPoints: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: EditionHead.pointAir) {
+        VStack(alignment: .leading, spacing: pointAir) {
             ForEach(Array(said.enumerated()), id: \.offset) { index, point in
                 line(point, wearing: mark(at: index))
             }
         }
-        .lineSpacing(EditionHead.leading)
+        .lineSpacing(leading)
         .multilineTextAlignment(.leading)
         .frame(maxWidth: .infinity, alignment: .leading)
         // One thing said once, rather than three sentences and three glyphs
@@ -185,6 +214,14 @@ struct EditionPoints: View {
     /// takes a step down from what the line is set at : read before the
     /// sentence, never instead of it. A step of the scale and not a size in
     /// points, so it grows with the reader's type.
+    ///
+    /// **And the step down is smaller than it was, which is what it was always
+    /// meant to be.** The mark is set semibold so that a glyph reads as a mark,
+    /// and against words at the face's own regular grade that came out as a
+    /// jump : the paragraph above asks for a mark read *before* the sentence and
+    /// it was being read *instead* of it. The words carry a grade now, the two
+    /// stand one step apart rather than two, and nothing about the mark changed
+    /// to get there.
     private func line(_ point: String, wearing symbol: String) -> some View {
         let badge = Text(Image(systemName: symbol))
             .font(.system(.footnote, weight: .semibold))
@@ -193,7 +230,7 @@ struct EditionPoints: View {
             "\(badge) \(Text(verbatim: point))",
             comment: "A line the model wrote, behind the mark that stands in front of it"
         )
-        .font(theme.standfirst(.body))
+        .font(theme.standfirst(.body).weight(EditionHead.pointGrade))
         .foregroundStyle(.primary)
         // **What makes `never cut` true rather than merely intended.** A row of
         // a `List` clips what it was not told to make room for, and one of the
@@ -204,11 +241,14 @@ struct EditionPoints: View {
 }
 
 extension EditionHead {
-    /// How much air a point carries between its own lines.
+    /// How much air a point carries between its own lines, at the reader's
+    /// ordinary type size.
     ///
     /// Set against the air between two points, which is three times it : two
     /// points set as openly as the lines inside one are two points a reader
-    /// cannot tell apart.
+    /// cannot tell apart. Both are read through the reader's own type where they
+    /// are used, so the three to one holds at every size and not only at this
+    /// one. See ``EditionPoints``.
     static let leading: CGFloat = 6
 
     /// The air between one point and the next.
@@ -219,10 +259,45 @@ extension EditionHead {
     /// hairlines in a rounded rectangle is the shape of a grouped table of
     /// settings, and the rule that used to sit *under* this pane was deleted for
     /// less, on the ground that a rule between two rows is what separates one
-    /// story from the next. What tells three points apart now is the air between
-    /// them and the step in the type, which is how the page tells its lead from
-    /// the rest.
+    /// story from the next. What tells three points apart is the air between
+    /// them and nothing else, since they are set at one size, one grade and one
+    /// colour and nothing here may rank them.
+    ///
+    /// Which is why it follows the reader's type. Air doing a rule's work has to
+    /// hold at every size the rule would have held at.
     static let pointAir: CGFloat = 18
+
+    /// The grade the three points are set in.
+    ///
+    /// **It belongs to the block and never to a line.** Nothing here ranks the
+    /// points and nothing may : they are three things worth knowing equally,
+    /// nothing scores them and nothing checks the order they come back in. A
+    /// grade carried by all three at once is not a ranking, it is what the pane
+    /// is set in, the way the measure and the leading are ; the moment it were
+    /// carried by one it would be the display face on the first point all over
+    /// again. There is one call site, in ``EditionPoints/line(_:wearing:)``, so
+    /// there is nowhere for a second answer to appear.
+    ///
+    /// **And it is what the ground asks for.** Body type at the face's own grade
+    /// is set for paper, which is what the ten stories under this are set on.
+    /// The pane is not paper : it resolves against a colour a publisher's
+    /// photograph gave the page that morning, it frosts for a reader who asked
+    /// for less transparency, it goes stark for one who asked for more contrast,
+    /// and how dense it is at all is a setting on the reader's own device rather
+    /// than a decision this file gets to make. It is the one block of type in
+    /// the application whose ground is different every day, and one grade of ink
+    /// holds on all of them where anything tuned to how much shows through holds
+    /// on one.
+    ///
+    /// **And a standfirst is set apart from the news it stands in front of.**
+    /// The pane exists because three sentences of body type above ten stories of
+    /// body type is a wall of grey, and the answer it gave was a container drawn
+    /// round the words. A newspaper answers in the setting as well, since the
+    /// line saying what is in the paper has never been set the same as the
+    /// paper. This is that half of the answer, and it is the half that costs no
+    /// material. Medium and not semibold : two grades over two or three
+    /// sentences is a heading, and the page is titled with its date already.
+    static let pointGrade: Font.Weight = .medium
 
     /// How far the words stand in from the edge of the pane, on all four sides.
     ///
@@ -286,6 +361,27 @@ extension View {
     /// photograph gives the page. A tint is an instruction, an instruction
     /// overrides the material's own adaptation, and what it would override here
     /// is a hue nobody chose.
+    ///
+    /// **And nothing is drawn on its edge.** A rim is the obvious way to make
+    /// the pane read more firmly where there is no wash behind it, and it is the
+    /// one thing that must not be added : the system already draws a contrasting
+    /// border round this material for a reader who asked for more contrast. A
+    /// line of our own is that line twice, for the readers least able to absorb
+    /// two. What may be laid on this material is a fill, a transparency or a
+    /// vibrancy, and nothing else : a second material on it is glass on glass.
+    ///
+    /// **And it is looked at where its own argument has been switched off.** Two
+    /// readers never see what this pane was designed against. Under Reduce
+    /// Transparency the material frosts and what is behind it stops showing
+    /// through, which is half the case for a pane here ; under Increase Contrast
+    /// it goes near black or near white behind a border of the system's drawing,
+    /// and ``PageWash`` lays down no colour at all, so the pane stands on plain
+    /// paper with nothing behind it. Neither is answered in code, deliberately :
+    /// the material already does the right thing to itself, and a branch of our
+    /// own would be this file second-guessing a setting the reader chose, which
+    /// is the argument ``Theme/paints`` already makes about the standard theme.
+    /// What carries the pane there is its inset and the grade its words are set
+    /// in, which is what a back number already relies on.
     func editionPane() -> some View {
         padding(EditionHead.paneInset)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -438,6 +534,17 @@ struct TextPlaceholder: View {
     /// skeleton read as ruled paper rather than as a wall.
     var height: CGFloat = 9
     var spacing: CGFloat = 11
+    /// What the bars are drawn in.
+    ///
+    /// **A rung up for the ones drawn on glass.** The lightest fill there is
+    /// reads as an absence on paper, which is what a skeleton is for, and the
+    /// same fill on the material came back at pure white : `interface.md` has
+    /// the measurement, taken over the arrivals strip, and not one pixel of a
+    /// bar differed from the paper it stood on. The bars inside an edition's
+    /// pane are the only ones in the application laid on the material rather
+    /// than on paper, and a skeleton nobody can see is the one thing the pane
+    /// must never be, an empty sheet of glass at the head of a page.
+    var fill: HierarchicalShapeStyle = .quaternary
 
     var body: some View {
         VStack(alignment: .leading, spacing: spacing) {
@@ -451,7 +558,7 @@ struct TextPlaceholder: View {
 
     @ViewBuilder
     private func bar(isLast: Bool) -> some View {
-        let shape = RoundedRectangle(cornerRadius: height / 2, style: .continuous).fill(.quaternary)
+        let shape = RoundedRectangle(cornerRadius: height / 2, style: .continuous).fill(fill)
 
         if isLast, lines > 1 {
             shape
@@ -510,7 +617,8 @@ struct EditionPlaceholder: View {
             // then gives undefined results, which for a placeholder means a bar
             // that flickers or does not animate out with its neighbours.
             ForEach(Array(Self.points.enumerated()), id: \.offset) { _, lines in
-                TextPlaceholder(lines: lines, last: lines > 1 ? 0.5 : 0.8, height: bar, spacing: air)
+                TextPlaceholder(
+                    lines: lines, last: lines > 1 ? 0.5 : 0.8, height: bar, spacing: air, fill: .tertiary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
