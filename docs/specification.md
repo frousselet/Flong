@@ -870,6 +870,8 @@ Automatic purge triggered when the volume cap is exceeded, with the user informe
 
 Distribution through the App Store on the three platforms. The application is free.
 
+Beta builds reach TestFlight from continuous integration : a version tag pushed to the repository builds, signs and uploads on a GitHub runner, with no Apple ID and no signing material on the author's machine. iOS only for now. The procedure, the secrets it needs and what it deliberately leaves to a human are in `docs/technical/deployment.md`.
+
 | Component | License |
 | --------- | ------- |
 | the application, in its entirety | MPL 2.0 |

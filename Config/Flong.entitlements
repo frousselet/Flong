@@ -2,10 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- `development` is the sandbox APNs, and a build signed for the App
+	     Store that asks for it is rejected at upload. The value follows the
+	     configuration through `APS_ENVIRONMENT`, so a Debug build keeps the
+	     sandbox and a Release build, which is what TestFlight and the store
+	     ever see, asks for the production service. -->
 	<key>aps-environment</key>
-	<string>development</string>
+	<string>$(APS_ENVIRONMENT)</string>
 	<key>com.apple.developer.aps-environment</key>
-	<string>development</string>
+	<string>$(APS_ENVIRONMENT)</string>
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>
 		<string>iCloud.com.rslt.Flong</string>

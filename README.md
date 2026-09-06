@@ -67,6 +67,8 @@ xcodebuild build -project Flong.xcodeproj -scheme Flong -destination 'platform=m
 
 [GRDB](https://github.com/groue/GRDB.swift) is the only dependency, for SQLite access, migrations and the full-text index. Everything else comes from the system frameworks.
 
+Beta builds go to TestFlight from continuous integration : pushing a version tag builds, signs and uploads on a GitHub runner. The procedure and the secrets it needs are in [`docs/technical/deployment.md`](docs/technical/deployment.md).
+
 ## Privacy
 
 Nothing leaves the device but your own private CloudKit database, a collection you chose to share, the requests to the feeds themselves, and the pictures those feeds point at. Flong asks for your contacts only to put a name on somebody you invited to a collection and who has not accepted yet, only when there is one, and what it finds never leaves the device. No telemetry, no tracker, no third-party service.
@@ -88,7 +90,7 @@ The import from FreshRSS is in : sign in with the API password, tick the subscri
 | Document | Contents |
 | -------- | -------- |
 | [`docs/specification.md`](docs/specification.md) | The product and technical specification : the reference for every decision |
-| [`docs/technical/`](docs/technical/) | One page per subject : feed identity, fetching, ingestion, search, marks, sync, sharing, popular feeds, the digest, authors, newsmakers, the statistics, the interface, erasure |
+| [`docs/technical/`](docs/technical/) | One page per subject : feed identity, fetching, ingestion, search, marks, sync, sharing, popular feeds, the digest, authors, newsmakers, the statistics, the interface, erasure, deployment |
 | [`CHANGELOG.md`](CHANGELOG.md) | Change history, following [Keep a Changelog](https://keepachangelog.com/) |
 | [`CLAUDE.md`](CLAUDE.md) | Working conventions : architecture, guidelines, git and release workflow |
 
