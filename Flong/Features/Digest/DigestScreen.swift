@@ -853,14 +853,23 @@ struct StoryRow: View {
     /// that wraps to hyphenate `rédac-tions` is worse than a line that says less.
     /// The sparkline goes first, then the article count : what is left is who is
     /// talking and when they last did, which is the irreducible part.
-    private var facts: some View {
-        ViewThatFits(in: .horizontal) {
-            factsLine()
-            factsLine(sparkline: false)
-            factsLine(sparkline: false, articles: false)
+    ///
+    /// **Nothing at all where there is nothing to say.** A back number keeps
+    /// its ten however a purge has thinned the stream underneath it, so a row
+    /// can outlive the story it was printed from. Drawn anyway it claimed
+    /// nought rooms, which VoiceOver reads out as a fact, an empty sparkline,
+    /// and a moment computed off the edition's own dateline standing in for a
+    /// date nobody knows. A headline with no figures is a headline.
+    @ViewBuilder private var facts: some View {
+        if story.hasFigures {
+            ViewThatFits(in: .horizontal) {
+                factsLine()
+                factsLine(sparkline: false)
+                factsLine(sparkline: false, articles: false)
+            }
+            .font(theme.metadata)
+            .foregroundStyle(.tertiary)
         }
-        .font(theme.metadata)
-        .foregroundStyle(.tertiary)
     }
 
     private func factsLine(sparkline: Bool = true, articles: Bool = true) -> some View {

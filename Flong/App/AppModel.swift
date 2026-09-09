@@ -1489,6 +1489,12 @@ final class AppModel {
     /// Every published edition, newest first. What the archive shows.
     private(set) var editionArchive: [PublishedEdition] = []
 
+    /// Reads the back numbers, for the calendar that shows them.
+    func loadEditionArchive() async {
+        let archive = (try? await digestService.editionArchive()) ?? []
+        if archive != editionArchive { editionArchive = archive }
+    }
+
     /// When each of the four editions comes out, as the reader has it.
     /// **Held rather than read.** The getter behind it opens the iCloud
     /// key-value store, opens `UserDefaults`, builds a `JSONDecoder` and decodes
@@ -1675,15 +1681,43 @@ final class AppModel {
     /// the picture the wash is taken from. Here it runs when the page changes.
     private(set) var frontPageStories: [DigestStory] = []
 
+    /// The figures of the stories the edition printed, read by identifier.
+    ///
+    /// **Not taken from the page.** The join used to be against `digest.all`,
+    /// which is the sixty newest stories of three days : a story that fell out
+    /// of those sixty took its article count, its rooms and its sparkline with
+    /// it, from a page that is not supposed to move. Ten rows on a primary key
+    /// have no window and no cap.
+    private(set) var frozenFigures: [UUID: DigestStory] = [:]
+
+    /// Reads them again, where the page the reader is looking at has changed.
+    private func loadFrozenFigures() async {
+        guard let published = edition else {
+            if !frozenFigures.isEmpty { frozenFigures = [:] }
+            return
+        }
+        let wanted = published.stories.map(\.storyID)
+        let figures = (try? await digestService.figures(of: wanted)) ?? [:]
+        if figures != frozenFigures { frozenFigures = figures }
+    }
+
     /// Works the join out again, from whatever the page and the edition are now.
+    ///
+    /// **Each half from the side that owns it.** See
+    /// ``EditionStory/printed(over:on:)`` for why the words are the page's and
+    /// the figures are the world's. A row whose story has gone is kept rather
+    /// than dropped : a `compactMap` here is a page that shrinks behind the
+    /// reader's back the first time a purge takes one of its stories, which is
+    /// the exact thing the frozen rows exist to prevent.
     private func resolveFrontPage() {
         guard let published = edition else {
             if !frontPageStories.isEmpty { frontPageStories = [] }
             return
         }
 
-        let byIdentity = Dictionary(digest.all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let resolved = published.stories.compactMap { byIdentity[$0.storyID] }
+        let resolved = published.stories.map {
+            $0.printed(over: frozenFigures[$0.storyID], on: published.edition.openedAt)
+        }
         if resolved != frontPageStories { frontPageStories = resolved }
     }
 
@@ -1729,13 +1763,17 @@ final class AppModel {
             // own turn, and once at launch. The page reaches Spotlight from
             // inside the lane, which reads it there.
 
-            // The editions are read from the same call, since they are the same
-            // page asked for at a different grain : the reader looks at one
-            // edition and the archive is the ones before it.
-            let editions = try await digestService.editions()
-            if editions.current != edition { edition = editions.current }
+            // **The current edition alone, and never the archive with it.**
+            // This is the read behind every render and every store tick, an
+            // article marked read included, and it asked for every published
+            // edition there is, each with its stories, its filings, the whole
+            // of the subject table and a term-set match per point, in order to
+            // take the first of them. The back numbers are read where they are
+            // shown.
+            let current = try await digestService.currentEdition()
+            if current != edition { edition = current }
+            await loadFrozenFigures()
             resolveFrontPage()
-            if editions.archive != editionArchive { editionArchive = editions.archive }
         } catch {
             Log.enrich.error("The digest could not be read : \(error, privacy: .public)")
         }
@@ -1796,7 +1834,7 @@ final class AppModel {
 
         moveWork(to: .grouping)
         await digestService.buildStories()
-        await digestService.buildEditions(preferences.editionSchedule)
+        await digestService.openEdition(preferences.editionSchedule)
         await loadDigest()
 
         // The headlines and the subjects, turn about and under a bound. They
@@ -2632,22 +2670,28 @@ final class AppModel {
         models.reconsiderEverything()
 
         await exclusively("The edition") {
-            let pass = await self.beginWork([.grouping, .naming])
+            let pass = await self.beginWork([.grouping, .writing, .filing, .naming])
             defer { self.endWork(pass) }
 
             self.moveWork(to: .grouping)
             await self.digestService.buildStories()
-            await self.digestService.buildEditions(self.preferences.editionSchedule)
 
-            // Filled again after the collection and the model have both had
-            // their turn, since only a story the model has written about may
-            // stand on a page.
-            await self.digestService.buildEditions(self.preferences.editionSchedule)
-
-            self.moveWork(to: .naming)
-            await self.digestService.briefEditions(
+            // **The whole of the model's work, and not the naming alone.**
+            // This is the one grant a phone gets that can both reach the
+            // network and ask the model : the opportunistic refresh may not run
+            // the model at all, and the full pass wants the mains, so on a
+            // phone that is never left on charge this is where a period's
+            // headlines get written. Asking only for the page's own points here
+            // was asking about a page whose stories nothing had written.
+            await self.digestService.enrich(
                 until: Date().addingTimeInterval(BackgroundScheduler.fullPassBudget),
-                onProgress: self.progress(of: .naming)
+                schedule: self.preferences.editionSchedule,
+                onWriting: self.progress(of: .writing),
+                onFiling: self.progress(of: .filing),
+                onNaming: self.progress(of: .naming),
+                onPhase: { [weak self] phase in
+                    Task { @MainActor [weak self] in self?.moveWork(to: phase) }
+                }
             )
 
             await self.announceNewEdition()
@@ -2724,7 +2768,7 @@ final class AppModel {
 
         moveWork(to: .grouping)
         await digestService.buildStories()
-        await digestService.buildEditions(preferences.editionSchedule)
+        await digestService.openEdition(preferences.editionSchedule)
 
         // Generous, and bounded all the same. The pass has minutes rather than
         // seconds, and the model's two halves share whatever it turns out to
@@ -4618,7 +4662,7 @@ final class AppModel {
         // now, so there is nothing to lay out against and nothing to except.
         moveWork(to: .grouping)
         await digestService.buildStories()
-        await digestService.buildEditions(preferences.editionSchedule)
+        await digestService.openEdition(preferences.editionSchedule)
         await load()
 
         // An article from a favourite source or a favourite writer is chosen

@@ -1122,6 +1122,106 @@ nonisolated extension AppDatabase {
             }
         }
 
+        /// An edition becomes the news of the period before it.
+        ///
+        /// The page opened at its hour and was filled afterwards, out of the
+        /// three days the front page reads, and it went on being refilled for
+        /// the whole of its life : the ten rows were dropped and written again
+        /// on every pass, and the model was asked afresh whenever any article
+        /// joined any story on the page. So the page still shifted under a
+        /// reader who had started reading it, which is the one thing an edition
+        /// exists to stop, and one page was paid for several times over.
+        ///
+        /// What replaces it is a page about a stretch of time that has ended :
+        /// it holds what arrived between the edition before it and its own
+        /// hour, it is asked about once, and once it has come out nothing about
+        /// it is ever written again. `covers_from` is where that stretch
+        /// begins, `asked_at` is when the model was really put the question,
+        /// and `brief_members` goes with the question it existed to re-open.
+        ///
+        /// A back number was made from three days rather than from a period, so
+        /// it claims none : it covers nothing before its own dateline and says
+        /// so. One still being made was made under a rule that no longer
+        /// exists, so it is closed rather than deleted : the archive reads
+        /// published rows only, nothing is shown for it, and the purge takes it
+        /// in three days. What a reader loses is the one period the upgrade
+        /// fell in, and the last page that came out stays on the screen
+        /// meanwhile.
+        migrator.registerMigration("v51.theNewsOfThePeriodBefore") { db in
+            let now = Date()
+
+            try db.alter(table: "edition") { table in
+                table.add(column: "covers_from", .datetime)
+                table.add(column: "asked_at", .datetime)
+                table.add(column: "point_topics", .jsonText).notNull().defaults(to: "[]")
+                table.drop(column: "brief_members")
+            }
+
+            // The credit belongs to the picture and freezes with it. A story
+            // takes both from one and the same article on purpose, so a frozen
+            // address beside a credit read live is a caption naming the wrong
+            // room, and nothing about it would look wrong.
+            try db.alter(table: "edition_story") { table in
+                table.add(column: "image_credit", .text)
+            }
+
+            // When the model was last put a question about this story, which is
+            // what holds the same question back to once a period. Distinct from
+            // `brief_members`, which says what it was asked about : a story
+            // that has not moved is not asked again at all, and one that has is
+            // asked again once.
+            try db.alter(table: "story") { table in
+                table.add(column: "brief_asked_at", .datetime)
+            }
+
+            try db.execute(
+                sql: """
+                    UPDATE edition SET covers_from = opened_at, asked_at = published_at
+                    WHERE published_at IS NOT NULL
+                    """
+            )
+            try db.execute(
+                sql: "UPDATE edition SET closed_at = ?, updated_at = ? WHERE published_at IS NULL",
+                arguments: [now, now]
+            )
+
+            // What is already known : a story carrying a language was asked
+            // about, and long enough ago that no period now being made covers
+            // it.
+            try db.execute(sql: "UPDATE story SET brief_asked_at = updated_at WHERE brief_locale IS NOT NULL")
+        }
+
+        /// A paper goes to press before it comes out.
+        ///
+        /// The period ran to the hour, so the model could not be asked until
+        /// the hour had passed, so the notice could not be posted until some
+        /// background pass happened to run. `BGTaskRequest.earliestBeginDate`
+        /// promises only that the system will not begin sooner than the moment
+        /// it is given, which makes an hour a wish : a reader whose phone was in
+        /// a pocket got their morning paper when the system felt like it, and
+        /// sometimes not until they opened Flong themselves.
+        ///
+        /// Written before its hour, an edition's notice is lodged with the
+        /// system ahead of time and delivered on the hour with nothing of ours
+        /// running. What it costs is the last twenty minutes of every period,
+        /// which are not lost : they open the period of the paper that follows.
+        ///
+        /// `pressed_at` is stored rather than worked out again, for the reason
+        /// `covers_from` is : it is a record of something that happened, and the
+        /// next edition's period reads it. Everything already in the store ran
+        /// to its own hour, that being what the moment meant until now, so it is
+        /// backfilled to `opened_at` rather than to a press that never took
+        /// place. That also tiles, which is the point : the first pressed
+        /// edition clamps its period to this, and this is exactly where the
+        /// edition before it stopped.
+        migrator.registerMigration("v52.aPaperGoesToPressBeforeItComesOut") { db in
+            try db.alter(table: "edition") { table in
+                table.add(column: "pressed_at", .datetime)
+            }
+            try db.execute(sql: "UPDATE edition SET pressed_at = opened_at WHERE pressed_at IS NULL")
+            try db.create(index: "edition_on_pressed_at", on: "edition", columns: ["pressed_at"])
+        }
+
         return migrator
     }
 
