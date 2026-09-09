@@ -69,11 +69,13 @@ xcodebuild build -project Flong.xcodeproj -scheme Flong -destination 'platform=m
 
 ## Privacy
 
-Nothing leaves the device but your own private CloudKit database, a collection you chose to share, the requests to the feeds themselves, and the pictures those feeds point at. Flong asks for your contacts only to put a name on somebody you invited to a collection and who has not accepted yet, only when there is one, and what it finds never leaves the device. No telemetry, no tracker, no third-party service.
+Nothing leaves the device but your own private CloudKit database, a collection you chose to share, the requests to the feeds themselves, the pictures those feeds point at, and the calls to a model service you configured yourself. Flong asks for your contacts only to put a name on somebody you invited to a collection and who has not accepted yet, only when there is one, and what it finds never leaves the device. No telemetry, no tracker, no third-party service.
 
 The popular feeds are the one thing you may publish to other readers, and only after saying so : a list of the addresses you follow, never a name, an article or anything you wrote. Turning it off takes your list back out.
 
-Feed credentials and secret feed addresses live in the keychain only. Where you say you read from is the name of a town and the code of a country, never a coordinate.
+Feed credentials, secret feed addresses and the key of any model service you configure live in the keychain only, and a key is written once and never shown again.
+
+Flong ships with the model on your device and no service of its own. If you have an account with one, you can point any of the four things a model does here at it : the headlines, the filing, what an edition says, and the reading of a search sentence. You are asked once and told what leaves and where it goes ; what leaves is headlines and the lines under them and never an article, and every call is written down on your device. Where you say you read from is the name of a town and the code of a country, never a coordinate.
 
 There is no account to close, so the reader's panel deletes everything instead, from the page it keeps for what this device and your iCloud hold : the database, the keychain, the preferences, the Spotlight index, the CloudKit zone, the archive, and the list of addresses you were offering the other readers.
 

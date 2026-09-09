@@ -93,7 +93,7 @@ struct ProviderSettingsTests {
         var settings = ProviderSettings()
         let mine = account("Mine")
         settings.accounts = [mine]
-        settings = settings.pointing(.headlines, at: mine.id)
+        settings = settings.pointing(.headlines, at: .provider(mine.id))
 
         // The assignment is made and the answer is still the device : the gate
         // is the consent and not the picker.
@@ -111,7 +111,7 @@ struct ProviderSettingsTests {
         let mine = account("Mine")
         settings.accounts = [mine]
         settings.sendsToProviders = true
-        settings = settings.pointing(.headlines, at: mine.id).pointing(.editions, at: mine.id)
+        settings = settings.pointing(.headlines, at: .provider(mine.id)).pointing(.editions, at: .provider(mine.id))
 
         settings = settings.without(mine.id)
 
@@ -126,7 +126,7 @@ struct ProviderSettingsTests {
         let mine = account("Mine")
         settings.accounts = [mine]
         settings.sendsToProviders = true
-        settings = settings.pointing(.search, at: mine.id)
+        settings = settings.pointing(.search, at: .provider(mine.id))
 
         settings = settings.withNothingSent()
 
@@ -146,10 +146,10 @@ struct ProviderSettingsTests {
         let mine = account("Mine")
         settings.accounts = [mine]
         settings.sendsToProviders = true
-        preferences.providers = settings.pointing(.subjects, at: mine.id)
+        preferences.providers = settings.pointing(.subjects, at: .provider(mine.id))
 
         #expect(preferences.providers.accounts.map(\.name) == ["Mine"])
-        #expect(preferences.providers.assignment[.subjects] == mine.id)
+        #expect(preferences.providers.choice(for: .subjects) == .provider(mine.id))
 
         preferences.forgetEverything()
 
@@ -195,5 +195,72 @@ struct KeychainProviderSecretTests {
 
         try store.setSecret(nil, for: id)
         #expect(try store.secret(for: id) == nil)
+    }
+}
+
+/// One account being written down or changed.
+@Suite("Writing down a model of the reader's own")
+struct ProviderDraftTests {
+    private let account = ProviderAccount(
+        kind: .openAICompatible,
+        name: "Mine",
+        origin: URL(string: "https://models.example.com/v1"),
+        model: "a-model"
+    )
+
+    /// **A key is minted by the service, shown once by the service, and
+    /// reissued at will.** There is nothing to compare it against, so showing
+    /// it again buys nothing and costs the one thing a keychain is for. A
+    /// secret feed address is shown in dots for the opposite reason, which
+    /// `docs/technical/credentials.md` sets out.
+    @Test("A stored key is never offered back, only replaced")
+    func aStoredKeyIsNeverShownAgain() {
+        let held = ProviderDraft(account, hasStoredKey: true)
+        #expect(held.hasStoredKey)
+        #expect(!held.isReplacingKey)
+
+        held.isReplacingKey = true
+        #expect(held.isReplacingKey, "and the field comes back only when they ask for it")
+
+        let fresh = ProviderDraft(nil, hasStoredKey: false)
+        #expect(!fresh.hasStoredKey, "a new one asks for a key")
+    }
+
+    @Test("A new draft starts on the kind's own address")
+    func aNewDraftStartsSomewhere() {
+        let fresh = ProviderDraft(nil, hasStoredKey: false)
+
+        #expect(fresh.isNew)
+        #expect(fresh.address == ProviderKind.openAICompatible.address)
+        #expect(!fresh.isComplete, "and is not saveable until it is finished")
+    }
+
+    @Test("A draft is finished when it has a name, an address and a model")
+    func aDraftKnowsWhenItIsFinished() {
+        let draft = ProviderDraft(account, hasStoredKey: true)
+
+        #expect(draft.isComplete)
+        #expect(draft.chosenModel == "a-model")
+        #expect(draft.account.origin?.absoluteString == "https://models.example.com/v1")
+    }
+
+    /// A model server the reader runs has no TLS and never will ; a public host
+    /// spoken to in the clear is a mistake the editor refuses with a sentence
+    /// rather than a number.
+    @Test("A plain address is warned about at home and refused abroad")
+    func plainAddressesAreJudged() {
+        let draft = ProviderDraft(nil, hasStoredKey: false)
+
+        draft.address = "http://192.168.1.20:11434/v1"
+        #expect(draft.isPlainAndPrivate)
+        #expect(!draft.isPlainAndPublic)
+
+        draft.address = "http://api.example.com/v1"
+        #expect(draft.isPlainAndPublic)
+        #expect(!draft.isPlainAndPrivate)
+
+        draft.address = "https://api.example.com/v1"
+        #expect(!draft.isPlainAndPublic)
+        #expect(!draft.isPlainAndPrivate)
     }
 }

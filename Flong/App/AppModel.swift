@@ -1540,6 +1540,125 @@ final class AppModel {
         models.reconsiderEverything()
     }
 
+    // MARK: - The models the reader brought of their own
+
+    /// The accounts they configured, in the order they added them.
+    private(set) var providers: [ProviderAccount] = []
+
+    /// Whether they have agreed that anything may be sent at all.
+    private(set) var sendsToProviders = false
+
+    /// The calls that have left this device, newest first.
+    private(set) var providerCalls: [ProviderCall] = []
+    private(set) var providerCallCount = 0
+
+    /// Where one task is pointed.
+    func choice(of task: ModelTask) -> ModelChoice {
+        preferences.providers.choice(for: task)
+    }
+
+    /// What went wrong last with one of their models, where anything did.
+    ///
+    /// Only a failure of the model itself : a story it declined is ordinary,
+    /// it is what the fallback exists for, and a row that complained about it
+    /// would be complaining about the news.
+    func trouble(with account: ProviderAccount) -> ProviderTrouble? {
+        models.trouble(with: account).flatMap(ProviderTrouble.init)
+    }
+
+    /// Whether a key is already held for one of them.
+    func hasKey(for account: ProviderAccount) -> Bool {
+        ((try? providerSecrets.secret(for: account.id)) ?? nil)?.key.isEmpty == false
+    }
+
+    func loadProviders() {
+        let settings = preferences.providers
+        providers = settings.accounts
+        sendsToProviders = settings.sendsToProviders
+    }
+
+    /// Points one task somewhere else.
+    ///
+    /// Nothing is sent until the reader has agreed, which the screen asks for
+    /// before it calls this ; the settings themselves refuse either way, since
+    /// they travel between devices and can arrive changed.
+    func point(_ task: ModelTask, at choice: ModelChoice) {
+        preferences.providers = preferences.providers.pointing(task, at: choice)
+        loadProviders()
+        Task { await rebuildDigest() }
+    }
+
+    /// Records that they have been asked and have said yes.
+    func agreeToSendToProviders() {
+        var settings = preferences.providers
+        settings.sendsToProviders = true
+        preferences.providers = settings
+        loadProviders()
+    }
+
+    /// Puts every task that was being sent away back on the device.
+    ///
+    /// The accounts and their keys are kept : a reader who is pausing has not
+    /// asked to type a key again.
+    func stopSendingToProviders() {
+        preferences.providers = preferences.providers.withNothingSent()
+        loadProviders()
+        Task { await rebuildDigest() }
+    }
+
+    /// Adds or replaces one account, and its key where a new one was typed.
+    func save(_ account: ProviderAccount, key: String?) {
+        preferences.providers = preferences.providers.keeping(account)
+        if let key {
+            var secret = ((try? providerSecrets.secret(for: account.id)) ?? nil) ?? ProviderSecret()
+            secret.key = key
+            try? providerSecrets.setSecret(secret, for: account.id)
+        }
+        loadProviders()
+    }
+
+    /// Takes one account out, and everything pointed at it with it.
+    ///
+    /// The two go together : a task aimed at an account that is gone is a state
+    /// nothing would ever repair, and a screen would have to have words for it.
+    func removeProvider(_ id: UUID) {
+        preferences.providers = preferences.providers.without(id)
+        try? providerSecrets.setSecret(nil, for: id)
+        loadProviders()
+        Task { await rebuildDigest() }
+    }
+
+    /// The models one account offers, asked of the service itself.
+    func models(of account: ProviderAccount, key: String?) async -> Result<[ProviderModel], ProviderTrouble> {
+        await ModelCatalogue().models(of: account, with: secret(of: account, key: key))
+    }
+
+    /// One cheap round trip that proves the key, the address and the model.
+    func test(_ account: ProviderAccount, key: String?) async -> ProviderProbe {
+        await ModelCatalogue().probe(account, with: secret(of: account, key: key))
+    }
+
+    /// The key as it stands : the one just typed, or the one already held.
+    private func secret(of account: ProviderAccount, key: String?) -> ProviderSecret {
+        guard let key, !key.isEmpty else {
+            return ((try? providerSecrets.secret(for: account.id)) ?? nil) ?? ProviderSecret()
+        }
+        var secret = ((try? providerSecrets.secret(for: account.id)) ?? nil) ?? ProviderSecret()
+        secret.key = key
+        return secret
+    }
+
+    func loadProviderCalls() async {
+        let log = ProviderCallLog(database)
+        providerCalls = (try? await log.recent()) ?? []
+        providerCallCount = (try? await log.count()) ?? 0
+    }
+
+    func clearProviderCalls() async {
+        try? await ProviderCallLog(database).removeEverything()
+        await loadProviderCalls()
+    }
+
     /// The articles of the story the reader opened, and of that one only : a
     /// digest that loaded every article of every story would be the list it
     /// exists to replace.

@@ -782,6 +782,8 @@ Each appearance is a fill over that one layer rather than a second drawing : bla
 
 The letter is glass. It is a material the system gives the layer rather than anything drawn into the artwork : the glyph takes the light of the plate it sits on, lets a little of it through, and casts its own shadow, which is what makes one flat square read as a mark lying on a surface. The same file still carries every platform and every appearance.
 
+**Amended : `Modèles` is a row in the reader's own panel.** It stands in the card holding what the reader offers and is offered outside this device, beside the popular feeds and the sites they are signed in to, being the third row there that involves an account of theirs somewhere else. It holds two lists : what the model does, four rows each naming the model that does it, and the services themselves, each a name, an address, a key in the keychain and a model. Behind them, the outgoing calls, and the one press that puts all four back on the device.
+
 ---
 
 ## 17. Accessibility and internationalization
@@ -921,6 +923,9 @@ Flong is not affiliated with any third-party service. Service names cited in the
 | articles missed by a switched-off device | functional | thirty-day catch-up headers |
 | Core Spotlight caps | design | use restricted to what the reader chose and to one page of stories, with each favourite worth its two hundred and fifty most recent articles so that a prolific publisher cannot fill the index on its own |
 | model divergence between devices | data | identifier and revision stored, local recomputation rather than mixing |
+| a provider's key leaking | blocking | the keychain only, never read back to the screen, no wire string in any error, a redirect that changes host refused |
+| a provider going down or refusing a key | comfort | three failures leave it alone for ten minutes, the device takes the work back, and the row says what happened |
+| what a provider costs | comfort | nothing asked twice, one call per story at a time, and every call written down where the reader can put a number beside their bill |
 | drift towards a mandatory Mac | product | no macOS-exclusive feature allowed, blocking install test on an iPhone alone |
 | traffic multiplied by device count | externality | systematic HTTP conditionality, pseudo-random stagger |
 | third-party dependency for newsletters | product | flagged in the interface, never mandatory |

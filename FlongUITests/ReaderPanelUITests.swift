@@ -103,7 +103,7 @@ final class ReaderPanelUITests: XCTestCase {
         let rows = [
             "sources", "subjects", "notifications",
             "statistics", "reader-profile", "reader-appearance", "reader-editions",
-            "reader-popular", "reader-sites", "reader-about",
+            "reader-popular", "reader-sites", "reader-models", "reader-about",
         ]
         for identifier in rows {
             let row = app.buttons[identifier].firstMatch

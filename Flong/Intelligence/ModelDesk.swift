@@ -68,6 +68,9 @@ nonisolated final class ModelDesk: Sendable {
     /// expired in the night must be visible rather than silently costing the
     /// reader the better half of their front page.
     func hand(for task: ModelTask) -> ModelHand {
+        guard preferences.providers.choice(for: task) != .nothing else {
+            return ModelHand(task: task, provider: NoModel(), patience: patience(with: NoModel()))
+        }
         guard let cloud = configured(for: task) else {
             return ModelHand(task: task, provider: local, patience: patience(with: local))
         }
@@ -81,6 +84,7 @@ nonisolated final class ModelDesk: Sendable {
 
     /// Why one task will not be done, or nothing where it will.
     func absence(of task: ModelTask) -> LocalizedStringResource? {
+        guard preferences.providers.choice(for: task) != .nothing else { return NoModel().absence }
         guard let cloud = configured(for: task) else { return local.absence }
         // A model of the reader's own that is failing is not an absence : the
         // device is writing instead, and the settings row is where that is

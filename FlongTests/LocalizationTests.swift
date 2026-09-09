@@ -516,6 +516,91 @@ struct LocalizationTests {
         )
     }
 
+    /// The row in the panel and the words the four pickers offer.
+    @Test("The models page reaches its French")
+    func modelsPage() {
+        #expect(inFrench(ReaderPage.models.title) == "Modèles")
+        #expect(inFrench(ReaderPage.providerCalls.title) == "Appels sortants")
+        #expect(String(localized: "What the model does", locale: french) == "Ce que fait le modèle")
+        #expect(String(localized: "On this device", locale: french) == "Sur cet appareil")
+        #expect(String(localized: "No model", locale: french) == "Aucun modèle")
+        #expect(String(localized: "Providers", locale: french) == "Fournisseurs")
+        #expect(String(localized: "Add a provider", locale: french) == "Ajouter un fournisseur")
+    }
+
+    /// What the editor promises about a secret, which is the half of it a
+    /// reader has to be able to read.
+    @Test("The provider editor reaches its French")
+    func providerEditor() {
+        #expect(String(localized: "A key is stored", locale: french) == "Une clé est enregistrée")
+        #expect(
+            String(localized: "The key goes to the keychain and is never shown again.", locale: french)
+                == "La clé va dans le trousseau et n'est plus jamais affichée."
+        )
+        #expect(String(localized: "Replace the key", locale: french) == "Remplacer la clé")
+        #expect(String(localized: "Test this provider", locale: french) == "Tester ce fournisseur")
+        #expect(String(localized: "Fetch the models", locale: french) == "Récupérer les modèles")
+        #expect(String(localized: "Another model", locale: french) == "Un autre modèle")
+        #expect(
+            String(localized: "The test sends one short sentence, and nothing of yours.", locale: french)
+                == "Le test envoie une phrase courte, et rien de vous."
+        )
+    }
+
+    /// **Every sentence of it**, by the argument `dangerZone` already makes :
+    /// this is one of two screens in the application a reader must read before
+    /// something irreversible or outbound happens, and the worst place to be
+    /// reading a language you may not have.
+    @Test("Every sentence of the consent reaches its French")
+    func providerConsent() {
+        #expect(String(localized: "What leaves this device", locale: french) == "Ce qui quitte cet appareil")
+        #expect(
+            String(
+                localized:
+                    "Flong sends headlines and the first lines under them, including those of papers you pay for. Never the whole article.",
+                locale: french
+            )
+                == "Flong envoie des titres et les premières lignes qui les suivent, y compris ceux des journaux auxquels vous êtes abonné. Jamais l'article entier."
+        )
+        #expect(
+            String(localized: "Search sends the sentence you type, and nothing else.", locale: french)
+                == "La recherche envoie la phrase que vous tapez, et rien d'autre."
+        )
+        #expect(
+            String(localized: "The account is yours. Flong has none, and pays for nothing.", locale: french)
+                == "Le compte est le vôtre. Flong n'en a aucun, et ne paie rien."
+        )
+        #expect(
+            String(localized: "Nothing is sent until you agree here. You can stop at any time.", locale: french)
+                == "Rien n'est envoyé tant que vous n'avez pas accepté ici. Vous pouvez arrêter quand vous voulez."
+        )
+        #expect(
+            String(localized: "Every call is written down on this device.", locale: french)
+                == "Chaque appel est consigné sur cet appareil."
+        )
+        // The one sentence that names where the news goes, and the one that
+        // was still in English because a `Text` interpolated into a `Text`
+        // builds a key the catalogue does not have.
+        #expect(
+            String(localized: "They go to \("models.example.com").", locale: french) == "Ils vont à models.example.com."
+        )
+        #expect(String(localized: "Start sending", locale: french) == "Commencer à envoyer")
+        #expect(String(localized: "Not now", locale: french) == "Pas maintenant")
+    }
+
+    /// French counts nought and one in the singular, so a plural written for
+    /// English alone reads wrong on the first call there is.
+    @Test("What a call cost counts in French")
+    func outgoingCalls() {
+        #expect(String(localized: "\(0) tokens", locale: french) == "0 jeton")
+        #expect(String(localized: "\(1) tokens", locale: french) == "1 jeton")
+        #expect(String(localized: "\(420) tokens", locale: french) == "420 jetons")
+        #expect(
+            String(localized: "What was sent is counted, never kept. Calls are kept for 90 days.", locale: french)
+                == "Ce qui a été envoyé est compté, jamais conservé. Les appels sont gardés 90 jours."
+        )
+    }
+
     /// The four things a model does here, named in the pickers that point them
     /// somewhere. Two of the four share a key with a panel row and with the tab
     /// bar, which is deliberate : one thing, one name.

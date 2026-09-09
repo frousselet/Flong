@@ -622,6 +622,29 @@
         }
       }
     },
+    "%lld models available": {
+      "comment": "How many models a service offers, after a successful test.",
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld modèle disponible"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld modèles disponibles"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld new articles": {
       "extractionState": "stale",
       "localizations": {
@@ -1075,6 +1098,29 @@
         }
       }
     },
+    "%lld tokens": {
+      "comment": "What one call to a model service cost, in tokens.",
+      "localizations": {
+        "fr": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld jeton"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld jetons"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "1 month": {
       "localizations": {
         "fr": {
@@ -1162,6 +1208,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Un lecteur de flux sans serveur, sans compte et sans rien à quoi se connecter. Chaque appareil récupère les flux lui-même et les garde dans sa propre base."
+          }
+        }
+      }
+    },
+    "A key is stored": {
+      "comment": "Shown in place of a key that is already in the keychain, which is never displayed again.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une clé est enregistrée"
           }
         }
       }
@@ -1292,6 +1349,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ajoutez un flux, importez un fichier OPML, ou voyez ce que suivent les autres lecteurs."
+          }
+        }
+      }
+    },
+    "Add a provider": {
+      "comment": "Button that opens the editor for a new model service.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter un fournisseur"
           }
         }
       }
@@ -1519,6 +1587,17 @@
         }
       }
     },
+    "An address outside your own network has to start with https.": {
+      "comment": "Why a plain address to a public host is refused.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une adresse hors de votre réseau doit commencer par https."
+          }
+        }
+      }
+    },
     "An edition appears here once it has come out and been written.": {
       "localizations": {
         "fr": {
@@ -1535,6 +1614,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Un import attend d'être terminé"
+          }
+        }
+      }
+    },
+    "Another model": {
+      "comment": "The choice that offers a free field for a model the service did not list.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Un autre modèle"
           }
         }
       }
@@ -1885,6 +1975,17 @@
         }
       }
     },
+    "Busy": {
+      "comment": "How a call ended : the service asked to be tried again later.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Occupé"
+          }
+        }
+      }
+    },
     "By month": {
       "extractionState": "stale",
       "localizations": {
@@ -1975,6 +2076,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Effacer"
+          }
+        }
+      }
+    },
+    "Clear the log": {
+      "comment": "Button that empties the list of outgoing calls.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effacer le journal"
           }
         }
       }
@@ -2245,6 +2357,17 @@
         }
       }
     },
+    "Each of these uses Apple Intelligence, one of your providers, or nothing at all.": {
+      "comment": "Footer under the four things a model does.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chacun utilise Apple Intelligence, un de vos fournisseurs, ou rien du tout."
+          }
+        }
+      }
+    },
     "Ecology": {
       "localizations": {
         "fr": {
@@ -2271,6 +2394,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Modifier"
+          }
+        }
+      }
+    },
+    "Edit the provider": {
+      "comment": "Title of the sheet where an existing model service is changed.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifier le fournisseur"
           }
         }
       }
@@ -2395,6 +2529,28 @@
         }
       }
     },
+    "Every call is written down here, on this device.": {
+      "comment": "Footer under the row leading to the outgoing calls.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chaque appel est consigné ici, sur cet appareil."
+          }
+        }
+      }
+    },
+    "Every call is written down on this device.": {
+      "comment": "Consent sheet : that every call is logged locally.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chaque appel est consigné sur cet appareil."
+          }
+        }
+      }
+    },
     "Every source here is one your iCloud still has.": {
       "comment": "The message shown when the tidying found nothing to remove.",
       "localizations": {
@@ -2412,6 +2568,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Toutes ses sources partent, et leurs articles avec elles, y compris ceux que vous avez mis en favori, annotés ou classés. C'est sans retour."
+          }
+        }
+      }
+    },
+    "Every task goes back to this device. Your providers and their keys are kept.": {
+      "comment": "Said before every task is put back on the device.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chaque tâche revient sur cet appareil. Vos fournisseurs et leurs clés sont conservés."
           }
         }
       }
@@ -2443,6 +2610,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Échange avec vos autres appareils"
+          }
+        }
+      }
+    },
+    "Failed": {
+      "comment": "How a call ended : it did not come back.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Échec"
           }
         }
       }
@@ -2517,6 +2695,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Les flux qui indiquent qui a écrit un article y placent son auteur, et vous pouvez garder ceux que vous suivez."
+          }
+        }
+      }
+    },
+    "Fetch the models": {
+      "comment": "Button that asks a service which models it offers.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Récupérer les modèles"
           }
         }
       }
@@ -2652,6 +2841,17 @@
         }
       }
     },
+    "Flong asks the service which models it offers. Type a name if it does not answer.": {
+      "comment": "Footer under the model picker.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flong demande au service quels modèles il propose. Tapez un nom s'il ne répond pas."
+          }
+        }
+      }
+    },
     "Flong checks the address before following it, as it does one you type.": {
       "localizations": {
         "fr": {
@@ -2728,6 +2928,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Flong lit les personnes dans les articles eux-mêmes, en arrière-plan. Quelqu'un apparaît ici dès que cinq articles l'ont cité."
+          }
+        }
+      }
+    },
+    "Flong sends headlines and the first lines under them, including those of papers you pay for. Never the whole article.": {
+      "comment": "Consent sheet : what leaves.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flong envoie des titres et les premières lignes qui les suivent, y compris ceux des journaux auxquels vous êtes abonné. Jamais l'article entier."
           }
         }
       }
@@ -3219,6 +3430,28 @@
         }
       }
     },
+    "Key": {
+      "comment": "The API key of a model service.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clé"
+          }
+        }
+      }
+    },
+    "Kind": {
+      "comment": "Which wire format a model service speaks.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type"
+          }
+        }
+      }
+    },
     "Languages": {
       "localizations": {
         "fr": {
@@ -3404,12 +3637,45 @@
         }
       }
     },
+    "Model": {
+      "comment": "Which model of a service answers.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèle"
+          }
+        }
+      }
+    },
+    "Models": {
+      "comment": "The row in the reader's panel leading to which model writes what.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèles"
+          }
+        }
+      }
+    },
     "Morning edition": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Édition du matin"
+          }
+        }
+      }
+    },
+    "Most services speak the OpenAI API. Anthropic has one of its own.": {
+      "comment": "Footer under the kind of a model service.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La plupart des services parlent l'API OpenAI. Anthropic a la sienne."
           }
         }
       }
@@ -3577,6 +3843,17 @@
         }
       }
     },
+    "No calls yet": {
+      "comment": "Shown when nothing has been sent to a model service.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun appel"
+          }
+        }
+      }
+    },
     "No edition yet": {
       "localizations": {
         "fr": {
@@ -3603,6 +3880,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aucun flux"
+          }
+        }
+      }
+    },
+    "No model": {
+      "comment": "One choice in the picker for a thing a model does : nobody does it.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun modèle"
           }
         }
       }
@@ -3664,6 +3952,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aucun"
+          }
+        }
+      }
+    },
+    "Not encrypted. This only works on your own network.": {
+      "comment": "Warning under a plain address to the reader's own machine.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non chiffré. Cela ne fonctionne que sur votre propre réseau."
           }
         }
       }
@@ -3749,6 +4048,17 @@
         }
       }
     },
+    "Nothing has been sent from this device.": {
+      "comment": "Shown under `No calls yet`.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien n'a été envoyé depuis cet appareil."
+          }
+        }
+      }
+    },
     "Nothing has come in yet": {
       "localizations": {
         "fr": {
@@ -3775,6 +4085,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rien dedans pour l’instant"
+          }
+        }
+      }
+    },
+    "Nothing is sent until you agree here. You can stop at any time.": {
+      "comment": "Consent sheet : that nothing is sent by default.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien n'est envoyé tant que vous n'avez pas accepté ici. Vous pouvez arrêter quand vous voulez."
           }
         }
       }
@@ -3922,6 +4243,17 @@
         }
       }
     },
+    "On this device": {
+      "comment": "One choice in the picker for a thing a model does : Apple Intelligence.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sur cet appareil"
+          }
+        }
+      }
+    },
     "Only addresses. Never your name, a secret address or a source behind a password.": {
       "localizations": {
         "fr": {
@@ -3992,6 +4324,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ouvre l’article sur son site"
+          }
+        }
+      }
+    },
+    "Outgoing calls": {
+      "comment": "The page listing what has been sent to a model service.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appels sortants"
           }
         }
       }
@@ -4090,6 +4433,17 @@
         }
       }
     },
+    "Providers": {
+      "comment": "Header over the model services the reader configured.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fournisseurs"
+          }
+        }
+      }
+    },
     "Published on": {
       "localizations": {
         "fr": {
@@ -4116,6 +4470,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Publié le %@. Modifié le %@"
+          }
+        }
+      }
+    },
+    "Puts every task back on this device.": {
+      "comment": "Footer under the button that stops sending.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remet chaque tâche sur cet appareil."
           }
         }
       }
@@ -4199,6 +4564,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Récentes"
+          }
+        }
+      }
+    },
+    "Refused": {
+      "comment": "How a call ended : the key, the model or the address was refused.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refusé"
           }
         }
       }
@@ -4304,6 +4680,17 @@
         }
       }
     },
+    "Remove this provider": {
+      "comment": "Button that deletes a model service.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retirer ce fournisseur"
+          }
+        }
+      }
+    },
     "Remove where you are": {
       "localizations": {
         "fr": {
@@ -4320,6 +4707,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Renommer"
+          }
+        }
+      }
+    },
+    "Replace the key": {
+      "comment": "Button that offers the key field again.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remplacer la clé"
           }
         }
       }
@@ -4392,6 +4790,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Rechercher une personnalité"
+          }
+        }
+      }
+    },
+    "Search sends the sentence you type, and nothing else.": {
+      "comment": "Consent sheet : what the search field sends.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La recherche envoie la phrase que vous tapez, et rien d'autre."
           }
         }
       }
@@ -4483,6 +4892,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Titres à empattements, dans les couleurs du système."
+          }
+        }
+      }
+    },
+    "Service": {
+      "comment": "Header over what a model service is : its kind, its name and its address.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Service"
           }
         }
       }
@@ -4833,6 +5253,17 @@
         }
       }
     },
+    "Start sending": {
+      "comment": "The answer that agrees to a model service being spoken to.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commencer à envoyer"
+          }
+        }
+      }
+    },
     "Statistics": {
       "localizations": {
         "fr": {
@@ -4870,6 +5301,50 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ne plus notifier les nouveaux articles"
+          }
+        }
+      }
+    },
+    "Stop sending": {
+      "comment": "The answer that puts every task back on the device.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne plus envoyer"
+          }
+        }
+      }
+    },
+    "Stop sending anything": {
+      "comment": "Button that puts every task back on the device.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne plus rien envoyer"
+          }
+        }
+      }
+    },
+    "Stop sending anything?": {
+      "comment": "Title of the alert before every task is put back on the device.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne plus rien envoyer ?"
+          }
+        }
+      }
+    },
+    "Stopped": {
+      "comment": "How a call ended : the reader left before it came back.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interrompu"
           }
         }
       }
@@ -5066,6 +5541,28 @@
         }
       }
     },
+    "Test this provider": {
+      "comment": "Button that proves the key, the address and the model in one call.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tester ce fournisseur"
+          }
+        }
+      }
+    },
+    "Testing": {
+      "comment": "Read out while the test of a model service is running.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Test en cours"
+          }
+        }
+      }
+    },
     "That file is not an image": {
       "localizations": {
         "fr": {
@@ -5082,6 +5579,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cette ville n'a pas pu être lue. Essayez-en une autre."
+          }
+        }
+      }
+    },
+    "The account is yours. Flong has none, and pays for nothing.": {
+      "comment": "Consent sheet : whose account it is.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le compte est le vôtre. Flong n'en a aucun, et ne paie rien."
           }
         }
       }
@@ -5164,6 +5672,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Le titre et la ligne ci-dessus ont été écrits sur cet appareil, à partir des articles ci-dessous. Rien n'a été envoyé nulle part."
+          }
+        }
+      }
+    },
+    "The key goes to the keychain and is never shown again.": {
+      "comment": "Footer under the key field.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La clé va dans le trousseau et n'est plus jamais affichée."
           }
         }
       }
@@ -5261,6 +5780,17 @@
         }
       }
     },
+    "The service answered.": {
+      "comment": "Shown when the test of a model service worked.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le service a répondu."
+          }
+        }
+      }
+    },
     "The service could not be reached.": {
       "comment": "What a reader is told when nothing answered at a model service's address.",
       "localizations": {
@@ -5268,6 +5798,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Le service n'a pas pu être joint."
+          }
+        }
+      }
+    },
+    "The service did not say which models it offers.": {
+      "comment": "Shown when a service does not answer the list of its models.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le service n'a pas dit quels modèles il propose."
           }
         }
       }
@@ -5336,6 +5877,28 @@
         }
       }
     },
+    "The tasks using it go back to this device. The key is deleted from the keychain.": {
+      "comment": "Said before a model service is deleted.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les tâches qui l'utilisent reviennent sur cet appareil. La clé est supprimée du trousseau."
+          }
+        }
+      }
+    },
+    "The test sends one short sentence, and nothing of yours.": {
+      "comment": "Footer under the test button.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le test envoie une phrase courte, et rien de vous."
+          }
+        }
+      }
+    },
     "Theme": {
       "localizations": {
         "fr": {
@@ -5353,6 +5916,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ce modèle n'existe pas."
+          }
+        }
+      }
+    },
+    "They go to %@.": {
+      "comment": "Consent sheet : the host a model service is reached at. The host is not translated.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ils vont à %@."
           }
         }
       }
@@ -5465,6 +6039,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ce serveur n'a pas répondu comme une instance FreshRSS."
+          }
+        }
+      }
+    },
+    "This service does not hold a model to a schema. Answers are checked here instead.": {
+      "comment": "Shown when a service took a looser form of the question.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce service ne tient pas un modèle à un schéma. Les réponses sont vérifiées ici à la place."
           }
         }
       }
@@ -5798,12 +6383,34 @@
         }
       }
     },
+    "What leaves this device": {
+      "comment": "Title of the sheet asking whether anything may be sent to a model service.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce qui quitte cet appareil"
+          }
+        }
+      }
+    },
     "What named them has been purged, or has not arrived yet.": {
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
             "value": "Ce qui les citait a été purgé, ou n'est pas encore arrivé."
+          }
+        }
+      }
+    },
+    "What the model does": {
+      "comment": "Header over the four things a model is asked to do.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce que fait le modèle"
           }
         }
       }
@@ -5844,6 +6451,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ce qui était lu reste lu, et rien de ce que vous avez déjà lu ici n'est défait. Tout peut représenter des dizaines de milliers d'articles et prendre plusieurs minutes."
+          }
+        }
+      }
+    },
+    "What was sent is counted, never kept. Calls are kept for 90 days.": {
+      "comment": "Footer under the list of outgoing calls.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce qui a été envoyé est compté, jamais conservé. Les appels sont gardés 90 jours."
           }
         }
       }
@@ -5949,6 +6567,17 @@
         }
       }
     },
+    "Would not write about it": {
+      "comment": "How a call ended : the model declined this story.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "N'a pas voulu en écrire"
+          }
+        }
+      }
+    },
     "Writing the headlines": {
       "localizations": {
         "fr": {
@@ -6022,6 +6651,17 @@
         }
       }
     },
+    "You have switched this off.": {
+      "comment": "Why one of the four things a model does will not be done : the reader turned it off.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vous l'avez désactivé."
+          }
+        }
+      }
+    },
     "You shared this": {
       "comment": "Under the reader's own name in a shared collection, which reads `Vous` above it : the French agrees with it where the English cannot.",
       "localizations": {
@@ -6081,6 +6721,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Votre nom"
+          }
+        }
+      }
+    },
+    "Your own account, on a service you pay for. Flong has none and sends nothing on its own.": {
+      "comment": "Footer under the list of model services.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Votre propre compte, sur un service que vous payez. Flong n'en a aucun et n'envoie rien de lui-même."
           }
         }
       }
@@ -6153,6 +6804,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Le stockage iCloud est plein"
+          }
+        }
+      }
+    },
+    "iOS is not letting Flong reach your network. Settings, Flong, Local Network.": {
+      "comment": "Shown when the system refused a request to the reader's own network.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS ne laisse pas Flong joindre votre réseau. Réglages, Flong, Réseau local."
           }
         }
       }

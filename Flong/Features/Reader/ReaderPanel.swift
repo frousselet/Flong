@@ -81,9 +81,9 @@ struct ReaderPanel: View {
     /// none of them, and one that stood at the height of none would put `À
     /// propos` under the fold for the reader who has them all.
     private var height: CGFloat {
-        /// The rows themselves, and the air around them. Ten of them now, and
-        /// the four cards' worth of air between them.
-        var height: CGFloat = 452 + 5 * 56 + 16
+        /// The rows themselves, and the air around them. Eleven of them now,
+        /// and the four cards' worth of air between them.
+        var height: CGFloat = 452 + 6 * 56 + 16
         if model.picture != nil { height += 126 }
         if model.name != nil { height += 32 }
         if model.place != nil { height += 28 }
@@ -238,7 +238,7 @@ struct ReaderPanel: View {
         VStack(spacing: 16) {
             card(open == nil ? [.subjects, .notifications] : [.sources, .subjects, .notifications])
             card([.statistics, .profile, .appearance, .editions])
-            card([.popular, .sites])
+            card([.popular, .sites, .models])
             card([.data])
             card([.about])
         }
@@ -312,6 +312,8 @@ struct ReaderPanel: View {
         case .editions: EditionSettings(model: model)
         case .popular: PoolSettings(model: model, close: close)
         case .sites: SiteSettings(model: model, close: close)
+        case .models: ModelSettings(model: model, close: close)
+        case .providerCalls: ProviderCallsScreen(model: model, close: close)
         case .data: DataSettings(model: model, close: close)
         case .about: AboutScreen(close: close)
         }
@@ -346,6 +348,11 @@ enum ReaderPage: Hashable, CaseIterable {
     case popular
     /// The sites they pay for and are signed in to.
     case sites
+    /// Which model writes what, and the accounts they brought of their own.
+    case models
+    /// What has been sent to one of those accounts. Reached from the page
+    /// above and never from the panel itself, which is why it is not in a card.
+    case providerCalls
     /// What this device and the reader's iCloud hold, down to taking it all
     /// back.
     case data
@@ -364,6 +371,8 @@ enum ReaderPage: Hashable, CaseIterable {
         case .editions: "Editions"
         case .popular: "Popular feeds"
         case .sites: "Subscribed sites"
+        case .models: "Models"
+        case .providerCalls: "Outgoing calls"
         case .data: "Your data"
         case .about: "About"
         }
@@ -380,6 +389,8 @@ enum ReaderPage: Hashable, CaseIterable {
         case .editions: "newspaper"
         case .popular: "person.2"
         case .sites: "key"
+        case .models: "text.line.3.summary"
+        case .providerCalls: "arrow.up.forward"
         case .data: "icloud"
         case .about: "info.circle"
         }
@@ -397,6 +408,8 @@ enum ReaderPage: Hashable, CaseIterable {
         case .editions: "reader-editions"
         case .popular: "reader-popular"
         case .sites: "reader-sites"
+        case .models: "reader-models"
+        case .providerCalls: "reader-provider-calls"
         case .data: "reader-data"
         case .about: "reader-about"
         }
