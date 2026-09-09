@@ -47,6 +47,10 @@ nonisolated final class ModelPatience: Sendable {
     private nonisolated struct Refusals: Sendable {
         var count = 0
         var gaveUpAt: Date?
+        /// The last thing that went wrong with the model itself, which is what
+        /// a settings row says out loud : a key that expired must be visible
+        /// rather than silently costing the reader the better half of a page.
+        var lastFault: ModelFault?
     }
 
     private let refusals = Mutex(Refusals())
@@ -69,6 +73,11 @@ nonisolated final class ModelPatience: Sendable {
             }
             return true
         }
+    }
+
+    /// What went wrong last, where anything did.
+    var trouble: ModelFault? {
+        refusals.withLock { $0.lastFault }
     }
 
     func succeeded() {
@@ -101,6 +110,7 @@ nonisolated final class ModelPatience: Sendable {
         }
 
         let count = refusals.withLock { refusals -> Int in
+            refusals.lastFault = fault
             refusals.count += 1
             if refusals.count == Self.refusalsBeforeGivingUp { refusals.gaveUpAt = now }
             return refusals.count

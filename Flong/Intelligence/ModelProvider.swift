@@ -22,6 +22,13 @@ nonisolated protocol ModelProvider: Sendable {
     /// What the settings screen and the log line call it.
     var name: String { get }
 
+    /// What this model is, as opposed to what the reader called it.
+    ///
+    /// The patience is kept under this : two names can be the same word and two
+    /// tasks pointed at one account must share a circuit breaker, since a model
+    /// that has stopped answering has stopped answering both of them.
+    var identity: String { get }
+
     /// The host that will be spoken to, or nothing where nothing leaves the
     /// device. The consent names it and the log records it, so it can never be
     /// a secret.

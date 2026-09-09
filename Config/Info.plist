@@ -21,8 +21,23 @@
 	     address the invitation went to, which draws as a bare telephone
 	     number. The reader knows who that is, because it is in their address
 	     book. Nothing found there ever leaves the device. -->
+	<!-- A reader running a model server on their own machine points Flong at
+	     http://192.168.1.20:11434, which has no TLS and never will : it is a
+	     process on their own network. It is also the one configuration of the
+	     provider feature that sends nothing to anybody, and refusing it would
+	     cut off the most private option there is. `NSAllowsLocalNetworking`
+	     carries plain HTTP to the private ranges, to link-local addresses and
+	     to `.local`, and to nothing else : every public host keeps App
+	     Transport Security in full. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSContactsUsageDescription</key>
 	<string>Flong looks up the people you invite to a shared collection, so they show under the name and the face you have for them rather than as a phone number. It stays on this device and is never shared.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Flong talks to the model server you run on your own network, at the address you gave it. Nothing goes anywhere else.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Flong fills in the city and country of your profile from where you are. The town is kept, never the coordinate, and it goes nowhere but your own iCloud.</string>
 	<key>UIBackgroundModes</key>
