@@ -65,6 +65,8 @@ The seven places of `docs/technical/erasure.md` are still seven. A provider's ke
 
 **Four turns and no more.** Every turn carries every turn before it, so a loop that asked one more time would cost more each time it did. Four is what the writing actually uses : the brief, one complaint, the headline alone and the line alone.
 
+**Anthropic's format has no ladder.** There is no `response_format` there and nothing to discover : the shape goes over as the input schema of one tool, the answer is required to be a call to it, and prose coming back instead is this story declining rather than the service failing. What the model wrote is replayed as its own words in a plain assistant turn rather than as the tool call it was : a `tool_use` in a transcript has to be answered by a `tool_result`, which would mean inventing a result for a tool that does nothing, and the tool is forced again on every turn anyway.
+
 ## What the transport does that a feed's does not
 
 | | A feed | A model |
