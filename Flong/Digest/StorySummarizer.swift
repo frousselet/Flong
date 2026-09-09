@@ -191,17 +191,17 @@ nonisolated struct StorySummarizer: Sendable {
     /// writes are in the reader's language.
     let locale: Locale
 
-    /// Where the question is put.
+    /// Who answers this question, and how patient to be with them.
     ///
     /// Injected rather than reached for, so a test can put a story to something
     /// that is not a model at all : `SystemLanguageModel` is not injectable,
     /// and until this parameter existed only the path with no model could be
     /// exercised end to end.
-    let provider: any ModelProvider
+    let hand: ModelHand
 
-    init(locale: Locale = .current, provider: any ModelProvider = LocalProvider()) {
+    init(locale: Locale = .current, hand: ModelHand = ModelDesk.shared.hand(for: .headlines)) {
         self.locale = locale
-        self.provider = provider
+        self.hand = hand
     }
 
     /// What a headline is for, put to a model that has never worked on a desk.
@@ -264,7 +264,7 @@ nonisolated struct StorySummarizer: Sendable {
     var instructions: String {
         """
         You write the headline and the standfirst for a group of news articles about one event.
-        \(OnDeviceModel.languageInstruction(for: locale))
+        \(ModelLanguage.languageInstruction(for: locale))
 
         The headline says what happened, in the fewest words that are still precise.
         Every word must carry information. No jargon, no abstractions.
@@ -310,7 +310,7 @@ nonisolated struct StorySummarizer: Sendable {
     var condensing: String {
         """
         You condense published news headlines into one headline and one standfirst.
-        \(OnDeviceModel.languageInstruction(for: locale))
+        \(ModelLanguage.languageInstruction(for: locale))
 
         What you are given has already been published by news organisations.
         You are not writing about the event : you are saying what these published headlines say, in fewer words.
@@ -352,7 +352,7 @@ nonisolated struct StorySummarizer: Sendable {
     /// publisher wrote it.
     func brief(forArticles articles: [(title: String, excerpt: String?)]) async -> StoryBrief {
         let fallback = Self.fallback(for: articles, readIn: locale)
-        guard provider.isAvailable, !articles.isEmpty else { return fallback }
+        guard hand.isAvailable, !articles.isEmpty else { return fallback }
 
         // **Two voices where a refusal means the guardrail, one where it does
         // not.** A third of a news reader's stories come back refused by the
@@ -360,7 +360,7 @@ nonisolated struct StorySummarizer: Sendable {
         // headlines condensed recovers four of every ten. A service that
         // declines declines for its own reasons, and a second call for the same
         // story would be the reader's money spent on the same answer.
-        let voices = provider.triesASecondVoice ? [instructions, condensing] : [instructions]
+        let voices = hand.triesASecondVoice ? [instructions, condensing] : [instructions]
 
         for voice in voices {
             switch await attempt(articles, saying: voice, keeping: fallback) {
@@ -391,7 +391,7 @@ nonisolated struct StorySummarizer: Sendable {
         saying voice: String,
         keeping fallback: StoryBrief
     ) async -> Attempt {
-        let conversation = provider.conversation(saying: voice)
+        let conversation = hand.conversation(saying: voice)
         // Free, and the one place it buys anything : the assets load while the
         // prompt is being measured below, which is a real await rather than a
         // wait invented to give this something to overlap with.
@@ -402,7 +402,7 @@ nonisolated struct StorySummarizer: Sendable {
         // its answer, and three English headlines are nearer than an
         // instruction at the top : that is how a French reader of the English
         // security press ended up with English headlines.
-        let prompt = Self.prompt(for: articles, language: OnDeviceModel.languageReminder(for: locale))
+        let prompt = Self.prompt(for: articles, language: ModelLanguage.languageReminder(for: locale))
 
         // The window holds the prompt and the answer together, and a prompt
         // that leaves no room for an answer is not sent : the cost of asking
@@ -415,115 +415,95 @@ nonisolated struct StorySummarizer: Sendable {
             return .unusable
         }
 
-        do {
-            let generated = try await conversation.answer(
-                to: prompt,
-                as: GeneratedBrief.self,
-                keeping: Self.reservedTokens
-            )
-
-            let title = Self.untailed(generated.title.trimmingCharacters(in: .whitespacesAndNewlines))
-            let summary = generated.summary.trimmingCharacters(in: .whitespacesAndNewlines)
-            // An empty headline is the model answering nothing, which is not
-            // the same as the model being unusable : the same rule as the
-            // catch below, said once.
-            guard !title.isEmpty else { return .declined }
-
-            OnDeviceModel.succeeded()
-
-            // A headline in the wrong language is worse than the article's own,
-            // which is at least the language somebody chose to write it in.
-            // Asked again in the same language it would answer the same way, so
-            // the fallback is kept and the story is not asked about again until
-            // the reader changes language.
-            // A year the articles never mention is a year the model made up.
-            // It has nothing to date anything by : what it is shown is
-            // headlines and standfirsts, and a model of this size fills the
-            // gap rather than leaving it.
-            if let invented = Self.inventedYear(title: title, summary: summary, from: articles) {
-                Log.enrich.notice("A brief carried a year nothing said : \(invented, privacy: .public)")
-                return await retry(
-                    in: conversation,
-                    saying: "That answer gave a date. Write it again with no date, no year and no day."
-                )
-            }
-
-            // A headline of twenty words is a sentence, and the instruction
-            // alone does not hold a small model to ten.
-            guard Self.isShort(title) else {
-                return await retry(
-                    in: conversation,
-                    saying: """
-                        That headline is too long. Write it again in at most \(Self.maximumTitleWords) words, \
-                        keeping only the words that carry information.
-                        """
-                )
-            }
-
-            // The headline and the line under it are one piece of furniture and
-            // divide the work between them. A standfirst that says the headline
-            // again has spent the only line the story gets saying nothing.
-            guard !Self.repeats(title, in: summary) else {
-                return await retry(
-                    in: conversation,
-                    saying: """
-                        That standfirst repeats the headline. Write it again saying what the headline \
-                        left out : who, what, where, why.
-                        """
-                )
-            }
-
-            // A standfirst that runs to a paragraph is the article, and the
-            // article is one tap away.
-            guard Self.isBrief(summary) else {
-                return await retry(
-                    in: conversation,
-                    saying: """
-                        That standfirst is too long. Write it again in one or two sentences, \
-                        keeping the angle and what the headline left out.
-                        """
-                )
-            }
-
-            // Only when the reader's language is what was asked for. A model
-            // that does not write it is asked for the articles' language
-            // instead, deliberately, and demanding the reader's language of an
-            // answer nobody asked in that language rejected every brief and
-            // left the whole page wearing its articles' own headlines.
-            guard !OnDeviceModel.writes(locale) || Self.isWritten(in: locale, title: title, summary: summary) else {
-                // Asked once more, in the same conversation so the model can
-                // see what it just wrote. Measured : the first answer comes
-                // back in the language of the articles about half the time
-                // whatever the prompt says, and being told so fixes most of
-                // those.
-                return await retry(
-                    in: conversation,
-                    saying: "That answer was not in the right language. \(OnDeviceModel.languageReminder(for: locale))"
-                )
-            }
-
-            // **An empty standfirst is half an answer, and the two guards
-            // above let it through** : nothing repeats a headline, and nothing
-            // runs to a paragraph. The headline is settled, so what is asked
-            // for is the line and not the brief again.
-            let line = summary.isEmpty ? await self.line(under: title, in: conversation) : summary
-
-            return .wrote(
-                StoryBrief(
-                    title: title,
-                    summary: line,
-                    isGenerated: true,
-                    askedIn: locale
-                )
-            )
-        } catch let fault as ModelFault {
-            OnDeviceModel.refused(fault)
-            return Attempt(failing: fault)
-        } catch {
-            // The answer was not the shape asked for, which is this story and
-            // not the model.
-            return .declined
+        // The ask, with the patience and the reading of a failure already round
+        // it : what comes back is one of the same three every caller draws.
+        let generated: GeneratedBrief
+        switch await hand.asking(conversation, prompt, as: GeneratedBrief.self, keeping: Self.reservedTokens) {
+        case .wrote(let written): generated = written
+        case .declined: return .declined
+        case .unusable: return .unusable
         }
+
+        let title = Self.untailed(generated.title.trimmingCharacters(in: .whitespacesAndNewlines))
+        let summary = generated.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        // An empty headline is the model answering nothing, which is not the
+        // same as the model being unusable.
+        guard !title.isEmpty else { return .declined }
+
+        // A year the articles never mention is a year the model made up. It has
+        // nothing to date anything by : what it is shown is headlines and
+        // standfirsts, and a model of this size fills the gap rather than
+        // leaving it.
+        if let invented = Self.inventedYear(title: title, summary: summary, from: articles) {
+            Log.enrich.notice("A brief carried a year nothing said : \(invented, privacy: .public)")
+            return await retry(
+                in: conversation,
+                saying: "That answer gave a date. Write it again with no date, no year and no day."
+            )
+        }
+
+        // A headline of twenty words is a sentence, and the instruction alone
+        // does not hold a small model to ten.
+        guard Self.isShort(title) else {
+            return await retry(
+                in: conversation,
+                saying: """
+                    That headline is too long. Write it again in at most \(Self.maximumTitleWords) words, \
+                    keeping only the words that carry information.
+                    """
+            )
+        }
+
+        // The headline and the line under it are one piece of furniture and
+        // divide the work between them. A standfirst that says the headline
+        // again has spent the only line the story gets saying nothing.
+        guard !Self.repeats(title, in: summary) else {
+            return await retry(
+                in: conversation,
+                saying: """
+                    That standfirst repeats the headline. Write it again saying what the headline \
+                    left out : who, what, where, why.
+                    """
+            )
+        }
+
+        // A standfirst that runs to a paragraph is the article, and the article
+        // is one tap away.
+        guard Self.isBrief(summary) else {
+            return await retry(
+                in: conversation,
+                saying: """
+                    That standfirst is too long. Write it again in one or two sentences, \
+                    keeping the angle and what the headline left out.
+                    """
+            )
+        }
+
+        // A headline in the wrong language is worse than the article's own,
+        // which is at least the language somebody chose to write it in. Only
+        // when the reader's language is what was asked for : a model that does
+        // not write it is asked for the articles' language instead,
+        // deliberately, and demanding the reader's language of an answer nobody
+        // asked in that language rejected every brief and left the whole page
+        // wearing its articles' own headlines.
+        guard !hand.writes(locale) || Self.isWritten(in: locale, title: title, summary: summary) else {
+            // Asked once more, in the same conversation so the model can see
+            // what it just wrote. Measured : the first answer comes back in the
+            // language of the articles about half the time whatever the prompt
+            // says, and being told so fixes most of those.
+            return await retry(
+                in: conversation,
+                saying: "That answer was not in the right language. \(ModelLanguage.languageReminder(for: locale))"
+            )
+        }
+
+        // **An empty standfirst is half an answer, and the two guards above let
+        // it through** : nothing repeats a headline, and nothing runs to a
+        // paragraph. The headline is settled, so what is asked for is the line
+        // and not the brief again.
+        let line = summary.isEmpty ? await self.line(under: title, in: conversation) : summary
+
+        return .wrote(StoryBrief(title: title, summary: line, isGenerated: true, askedIn: locale))
     }
 
     /// What a story is called when no model is available.
@@ -628,61 +608,49 @@ nonisolated struct StorySummarizer: Sendable {
         in conversation: any ModelConversation,
         saying complaint: String
     ) async -> Attempt {
-        do {
-            let generated = try await conversation.answer(
-                to: complaint,
-                as: GeneratedBrief.self,
-                keeping: Self.reservedTokens
-            )
-            var title = Self.untailed(generated.title.trimmingCharacters(in: .whitespacesAndNewlines))
-            let summary = generated.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        let generated: GeneratedBrief
+        switch await hand.asking(conversation, complaint, as: GeneratedBrief.self, keeping: Self.reservedTokens) {
+        case .wrote(let written): generated = written
+        case .declined: return .declined
+        case .unusable: return .unusable
+        }
 
-            // **A headline still too long is asked for on its own.** Told twice
-            // that a headline runs to a sentence, a model of this size writes
-            // the sentence again : eight briefs in thirty died here, and half
-            // of them were the condensing voice answering about a story the
-            // writing voice had refused outright. The smaller question gets the
-            // better answer, exactly as it does for the standfirst.
-            if !title.isEmpty, !Self.isShort(title), let shorter = await headline(in: conversation) {
-                title = shorter
-            }
+        var title = Self.untailed(generated.title.trimmingCharacters(in: .whitespacesAndNewlines))
+        let summary = generated.summary.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            // Said one rule at a time : `wrong twice` was true of eight briefs
-            // in thirty and named none of the three things it could have been,
-            // which is a measurement nobody can act on.
-            guard !title.isEmpty else {
-                Log.enrich.notice("A brief came back with no headline twice, so the other voice is tried")
-                return .declined
-            }
-            guard Self.isShort(title) else {
-                Log.enrich.notice("A headline stayed too long twice, so the other voice is tried")
-                return .declined
-            }
-            guard !OnDeviceModel.writes(locale) || Self.isWritten(in: locale, title: title, summary: summary) else {
-                Log.enrich.notice("A brief stayed in the wrong language twice, so the other voice is tried")
-                return .declined
-            }
+        // **A headline still too long is asked for on its own.** Told twice
+        // that a headline runs to a sentence, a model of this size writes the
+        // sentence again : eight briefs in thirty died here, and half of them
+        // were the condensing voice answering about a story the writing voice
+        // had refused outright. The smaller question gets the better answer,
+        // exactly as it does for the standfirst.
+        if !title.isEmpty, !Self.isShort(title), let shorter = await headline(in: conversation) {
+            title = shorter
+        }
 
-            // A standfirst that is still the headline, or still a paragraph,
-            // is asked for one more time, alone : the headline is settled by
-            // here, and what is missing is the line under it.
-            let usable = !summary.isEmpty && !Self.repeats(title, in: summary) && Self.isBrief(summary)
-            let line = usable ? summary : await self.line(under: title, in: conversation)
-
-            return .wrote(
-                StoryBrief(
-                    title: title,
-                    summary: line,
-                    isGenerated: true,
-                    askedIn: locale
-                )
-            )
-        } catch let fault as ModelFault {
-            OnDeviceModel.refused(fault)
-            return Attempt(failing: fault)
-        } catch {
+        // Said one rule at a time : `wrong twice` was true of eight briefs in
+        // thirty and named none of the three things it could have been, which
+        // is a measurement nobody can act on.
+        guard !title.isEmpty else {
+            Log.enrich.notice("A brief came back with no headline twice, so the other voice is tried")
             return .declined
         }
+        guard Self.isShort(title) else {
+            Log.enrich.notice("A headline stayed too long twice, so the other voice is tried")
+            return .declined
+        }
+        guard !hand.writes(locale) || Self.isWritten(in: locale, title: title, summary: summary) else {
+            Log.enrich.notice("A brief stayed in the wrong language twice, so the other voice is tried")
+            return .declined
+        }
+
+        // A standfirst that is still the headline, or still a paragraph, is
+        // asked for one more time, alone : the headline is settled by here, and
+        // what is missing is the line under it.
+        let usable = !summary.isEmpty && !Self.repeats(title, in: summary) && Self.isBrief(summary)
+        let line = usable ? summary : await self.line(under: title, in: conversation)
+
+        return .wrote(StoryBrief(title: title, summary: line, isGenerated: true, askedIn: locale))
     }
 
     /// The publisher's own head, carried across into the reader's language.
@@ -712,14 +680,14 @@ nonisolated struct StorySummarizer: Sendable {
         // line keeps its publisher's headline in its publisher's language.
         guard let line = brief.summary, !line.isEmpty else { return nil }
 
-        guard OnDeviceModel.writes(locale),
+        guard hand.writes(locale),
             !Self.isWritten(in: locale, title: brief.title, summary: line)
         else { return nil }
 
-        let conversation = provider.conversation(
+        let conversation = hand.conversation(
             saying: """
                 You translate a published news headline, and the line under it, into the reader's language.
-                \(OnDeviceModel.languageInstruction(for: locale))
+                \(ModelLanguage.languageInstruction(for: locale))
 
                 You are carrying across what somebody else wrote. Say what it says, in as many words as it takes.
                 Keep the proper nouns, the numbers and the quotations exactly as they are.
@@ -727,41 +695,29 @@ nonisolated struct StorySummarizer: Sendable {
                 """
         )
 
-        do {
-            let carriedAcross = try await conversation.answer(
-                to: """
-                    Headline : \(brief.title)
-                    Line : \(line)
-                    \(OnDeviceModel.languageReminder(for: locale))
-                    """,
-                as: CarriedAcross.self,
-                keeping: Self.reservedTokens
-            )
+        let question = """
+            Headline : \(brief.title)
+            Line : \(line)
+            \(ModelLanguage.languageReminder(for: locale))
+            """
 
-            let title = Self.untailed(carriedAcross.title.trimmingCharacters(in: .whitespacesAndNewlines))
-            let carried = carriedAcross.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard
+            case .wrote(let carriedAcross) = await hand.asking(
+                conversation, question, as: CarriedAcross.self, keeping: Self.reservedTokens)
+        else { return nil }
 
-            // A translation that came back in the language it started in is not
-            // one, and it is the shape that actually comes back : the model
-            // returning what it was shown.
-            guard !title.isEmpty, !carried.isEmpty, Self.isWritten(in: locale, title: title, summary: carried) else {
-                Log.enrich.notice("A headline would not carry across, so the story keeps its publisher's words")
-                return nil
-            }
+        let title = Self.untailed(carriedAcross.title.trimmingCharacters(in: .whitespacesAndNewlines))
+        let carried = carriedAcross.summary.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            return StoryBrief(
-                title: title,
-                summary: carried,
-                isGenerated: true,
-                isTranslated: true,
-                askedIn: locale
-            )
-        } catch let fault as ModelFault {
-            OnDeviceModel.refused(fault)
-            return nil
-        } catch {
+        // A translation that came back in the language it started in is not
+        // one, and it is the shape that actually comes back : the model
+        // returning what it was shown.
+        guard !title.isEmpty, !carried.isEmpty, Self.isWritten(in: locale, title: title, summary: carried) else {
+            Log.enrich.notice("A headline would not carry across, so the story keeps its publisher's words")
             return nil
         }
+
+        return StoryBrief(title: title, summary: carried, isGenerated: true, isTranslated: true, askedIn: locale)
     }
 
     /// Asks for the headline alone, once, where the story is settled and the
@@ -779,22 +735,14 @@ nonisolated struct StorySummarizer: Sendable {
             """
         guard await conversation.hasRoom(for: question, keeping: Self.reservedLineTokens) else { return nil }
 
-        do {
-            let generated = try await conversation.answer(
-                to: question,
-                as: GeneratedHeadline.self,
-                keeping: Self.reservedLineTokens
-            )
-            let title = Self.untailed(generated.title.trimmingCharacters(in: .whitespacesAndNewlines))
+        guard
+            case .wrote(let generated) = await hand.asking(
+                conversation, question, as: GeneratedHeadline.self, keeping: Self.reservedLineTokens)
+        else { return nil }
 
-            guard !title.isEmpty, Self.isShort(title) else { return nil }
-            return title
-        } catch let fault as ModelFault {
-            OnDeviceModel.refused(fault)
-            return nil
-        } catch {
-            return nil
-        }
+        let title = Self.untailed(generated.title.trimmingCharacters(in: .whitespacesAndNewlines))
+        guard !title.isEmpty, Self.isShort(title) else { return nil }
+        return title
     }
 
     /// Asks for the line alone, once, where the headline is settled and the
@@ -842,38 +790,35 @@ nonisolated struct StorySummarizer: Sendable {
             return nil
         }
 
-        do {
-            let generated = try await conversation.answer(
-                to: question,
-                as: GeneratedLine.self,
-                keeping: Self.reservedLineTokens
-            )
-            let line = generated.summary.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            switch Self.fault(of: line, under: title, in: locale) {
-            case nil:
-                return line
-
-            // Asked three times and long every time is a model writing the way
-            // it writes, so what comes back is cut rather than refused again.
-            case .tooLong:
-                if let kept = Self.shortened(line), Self.fault(of: kept, under: title, in: locale) == nil {
-                    return kept
-                }
-                Log.enrich.notice("A standfirst was a paragraph three times and would not cut to a line")
-                return nil
-
-            case .some(let wrong):
-                Log.enrich.notice(
-                    "A standfirst came back \(wrong.rawValue, privacy: .public) three times, so the story goes without one"
-                )
-                return nil
-            }
-        } catch let fault as ModelFault {
-            OnDeviceModel.refused(fault)
+        guard
+            case .wrote(let generated) = await hand.asking(
+                conversation, question, as: GeneratedLine.self, keeping: Self.reservedLineTokens)
+        else {
             Log.enrich.notice("The model would not write a standfirst for a story it had already named")
             return nil
-        } catch {
+        }
+
+        let line = generated.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        switch Self.fault(of: line, under: title, in: locale, writes: hand.writes) {
+        case nil:
+            return line
+
+        // Asked three times and long every time is a model writing the way it
+        // writes, so what comes back is cut rather than refused again.
+        case .tooLong:
+            if let kept = Self.shortened(line),
+                Self.fault(of: kept, under: title, in: locale, writes: hand.writes) == nil
+            {
+                return kept
+            }
+            Log.enrich.notice("A standfirst was a paragraph three times and would not cut to a line")
+            return nil
+
+        case .some(let wrong):
+            Log.enrich.notice(
+                "A standfirst came back \(wrong.rawValue, privacy: .public) three times, so the story goes without one"
+            )
             return nil
         }
     }
@@ -894,11 +839,16 @@ nonisolated struct StorySummarizer: Sendable {
     }
 
     /// What is wrong with a standfirst, or nothing where it will do.
-    static func fault(of summary: String, under title: String, in locale: Locale) -> Fault? {
+    static func fault(
+        of summary: String,
+        under title: String,
+        in locale: Locale,
+        writes: (Locale) -> Bool = LocalProvider.writes
+    ) -> Fault? {
         if summary.isEmpty { return .empty }
         if repeats(title, in: summary) { return .headlineAgain }
         if !isBrief(summary) { return .tooLong }
-        if OnDeviceModel.writes(locale), !isWritten(in: locale, title: title, summary: summary) {
+        if writes(locale), !isWritten(in: locale, title: title, summary: summary) {
             return .wrongLanguage
         }
         return nil

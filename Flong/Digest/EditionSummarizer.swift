@@ -145,12 +145,12 @@ nonisolated struct EditionSummarizer: Sendable {
 
     let locale: Locale
 
-    /// Where the question is put.
-    let provider: any ModelProvider
+    /// Who answers this question, and how patient to be with them.
+    let hand: ModelHand
 
-    init(locale: Locale = .current, provider: any ModelProvider = LocalProvider()) {
+    init(locale: Locale = .current, hand: ModelHand = ModelDesk.shared.hand(for: .editions)) {
         self.locale = locale
-        self.provider = provider
+        self.hand = hand
     }
 
     /// What one ask came to.
@@ -168,7 +168,7 @@ nonisolated struct EditionSummarizer: Sendable {
     /// of ten published headlines said in five lines is a transformation of
     /// published text, and saying so is what gets it written.
     func brief(over stories: [(title: String, summary: String?)], of slot: EditionSlot) async -> Outcome {
-        guard provider.isAvailable, stories.count > 1 else { return .unusable }
+        guard hand.isAvailable, stories.count > 1 else { return .unusable }
 
         for voice in [Self.instructions, Self.condensing] {
             switch await attempt(stories, of: slot, saying: voice) {
@@ -185,10 +185,10 @@ nonisolated struct EditionSummarizer: Sendable {
         of slot: EditionSlot,
         saying voice: String
     ) async -> Outcome {
-        let conversation = provider.conversation(saying: voice)
+        let conversation = hand.conversation(saying: voice)
         conversation.prewarm()
 
-        let prompt = Self.prompt(for: stories, language: OnDeviceModel.languageReminder(for: locale))
+        let prompt = Self.prompt(for: stories, language: ModelLanguage.languageReminder(for: locale))
 
         // The window holds the prompt and the answer together, and a prompt
         // that leaves no room for an answer is not sent : the cost of asking
@@ -199,53 +199,45 @@ nonisolated struct EditionSummarizer: Sendable {
             return .unusable
         }
 
-        do {
-            let generated = try await conversation.answer(
-                to: prompt,
-                as: GeneratedEditionPoints.self,
-                keeping: Self.reservedTokens
-            )
-
-            let points = Self.tidied(generated.points)
-
-            // An empty answer is the model answering nothing about this page,
-            // which is not the model being unusable.
-            guard !points.isEmpty else { return .declined }
-            OnDeviceModel.succeeded()
-
-            // **One ask about what is wrong, and never a second** : sampling is
-            // greedy, and a model asked a third time answers what it answered
-            // the first, the conversation holding the two asks that did not
-            // work.
-            var list = points
-            if Self.fault(list, over: stories) != nil,
-                let better = await listed(again: list, in: conversation, over: stories)
-            {
-                list = better
-            }
-
-            // **What is in hand stands if the asking did not improve it.** The
-            // length of a point is style, and the rule over it is not : every
-            // edition carries a list the model wrote, without exception, and an
-            // edition declined is a front page that does not exist.
-            //
-            // The language is the one that is not style. A page in a language
-            // the reader does not read is not a page they can use, and there is
-            // no floor under it to fall back to : an edition exists only where
-            // the model wrote it.
-            guard Self.languageFault(list, in: locale) == nil else { return .declined }
-
-            return .wrote(EditionBrief(points: list, askedIn: locale))
-        } catch let fault as ModelFault {
-            // A rate limit, an asset still downloading or a language this model
-            // does not write says nothing about this page, and stamping the
-            // edition would leave it unwritten for good on a device that was
-            // busy for a second.
-            OnDeviceModel.refused(fault)
-            return Outcome(failing: fault)
-        } catch {
-            return .declined
+        let generated: GeneratedEditionPoints
+        switch await hand.asking(conversation, prompt, as: GeneratedEditionPoints.self, keeping: Self.reservedTokens) {
+        case .wrote(let written): generated = written
+        // A rate limit, an asset still downloading or a language this model
+        // does not write says nothing about this page, and stamping the edition
+        // would leave it unwritten for good on a device that was busy for a
+        // second.
+        case .declined: return .declined
+        case .unusable: return .unusable
         }
+
+        let points = Self.tidied(generated.points)
+
+        // An empty answer is the model answering nothing about this page, which
+        // is not the model being unusable.
+        guard !points.isEmpty else { return .declined }
+
+        // **One ask about what is wrong, and never a second** : sampling is
+        // greedy, and a model asked a third time answers what it answered the
+        // first, the conversation holding the two asks that did not work.
+        var list = points
+        if Self.fault(list, over: stories) != nil,
+            let better = await listed(again: list, in: conversation, over: stories)
+        {
+            list = better
+        }
+
+        // **What is in hand stands if the asking did not improve it.** The
+        // length of a point is style, and the rule over it is not : every
+        // edition carries a list the model wrote, without exception, and an
+        // edition declined is a front page that does not exist.
+        //
+        // The language is the one that is not style. A page in a language the
+        // reader does not read is not a page they can use, and there is no
+        // floor under it to fall back to : an edition exists only where the
+        // model wrote it.
+        guard Self.languageFault(list, in: locale, writes: hand.writes) == nil else { return .declined }
+
+        return .wrote(EditionBrief(points: list, askedIn: locale))
     }
 
     /// The list asked for again, once.
@@ -256,25 +248,19 @@ nonisolated struct EditionSummarizer: Sendable {
     ) async -> [String]? {
         guard let fault = Self.fault(points, over: stories) else { return nil }
 
-        do {
-            let generated = try await conversation.answer(
-                to: "\(fault) Write only the points : two or three things worth knowing, one short sentence "
-                    + "each, no numbering.",
-                as: GeneratedEditionPoints.self,
-                keeping: Self.reservedTokens
-            )
+        let question =
+            "\(fault) Write only the points : two or three things worth knowing, one short sentence "
+            + "each, no numbering."
 
-            let better = Self.tidied(generated.points)
-            guard !better.isEmpty, Self.fault(better, over: stories) == nil else { return nil }
+        guard
+            case .wrote(let generated) = await hand.asking(
+                conversation, question, as: GeneratedEditionPoints.self, keeping: Self.reservedTokens)
+        else { return nil }
 
-            OnDeviceModel.succeeded()
-            return better
-        } catch let fault as ModelFault {
-            OnDeviceModel.refused(fault)
-            return nil
-        } catch {
-            return nil
-        }
+        let better = Self.tidied(generated.points)
+        guard !better.isEmpty, Self.fault(better, over: stories) == nil else { return nil }
+
+        return better
     }
 
     /// The first thing wrong with a list, said as the sentence that asks for it
@@ -303,10 +289,14 @@ nonisolated struct EditionSummarizer: Sendable {
     }
 
     /// Whether what came back is in the language it was asked in.
-    static func languageFault(_ points: [String], in locale: Locale) -> String? {
-        guard OnDeviceModel.writes(locale) else { return nil }
+    static func languageFault(
+        _ points: [String],
+        in locale: Locale,
+        writes: (Locale) -> Bool = LocalProvider.writes
+    ) -> String? {
+        guard writes(locale) else { return nil }
         let written = StorySummarizer.isWritten(in: locale, title: "", summary: points.joined(separator: " "))
-        return written ? nil : OnDeviceModel.languageReminder(for: locale)
+        return written ? nil : ModelLanguage.languageReminder(for: locale)
     }
 
     /// Whether two points are about the same thing.

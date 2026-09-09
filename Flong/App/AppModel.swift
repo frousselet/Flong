@@ -220,6 +220,12 @@ final class AppModel {
     private let credentials: CredentialStoring
     private let sessions: SessionStoring
     private let preferences: Preferences
+
+    /// Who answers each of the four things a model is asked here.
+    ///
+    /// Held rather than reached for, so a test builds its own and does not
+    /// share a circuit breaker with every other test in the process.
+    private let models: ModelDesk
     private let announcer: Announcing
     private let locator: Locating
     private let sharing: CollectionSharing
@@ -1176,6 +1182,7 @@ final class AppModel {
         credentials: CredentialStoring = KeychainCredentials(),
         sessions: SessionStoring = KeychainSessions(),
         preferences: Preferences = Preferences(),
+        models: ModelDesk = .shared,
         announcer: Announcing = Notifier(),
         locator: Locating = DeviceLocator(),
         exchangeStandsFor: Duration = AppModel.exchangeStandsFor
@@ -1185,6 +1192,7 @@ final class AppModel {
         self.credentials = credentials
         self.sessions = sessions
         self.preferences = preferences
+        self.models = models
         self.announcer = announcer
         self.locator = locator
         self.articleBody = preferences.articleBody
@@ -1494,6 +1502,34 @@ final class AppModel {
     }
 
     private var heldSchedule = EditionSchedule.standard
+
+    // MARK: - Who writes what
+
+    /// Why one of the four things a model does here will not be done, or
+    /// nothing where it will.
+    ///
+    /// **A question about a task and not about the device.** It asked the
+    /// system whether Apple Intelligence was there and answered for all four at
+    /// once, which was right while there was one model to answer for.
+    func absence(of task: ModelTask) -> LocalizedStringResource? {
+        models.absence(of: task)
+    }
+
+    /// Whether an edition will ever be written.
+    ///
+    /// Two places on the front page ask it, one to decide whether a page is on
+    /// its way and one to decide whether the bar carries a dateline at the
+    /// first frame. Written twice they drifted ; written here they cannot.
+    var writesEditions: Bool { absence(of: .editions) == nil }
+
+    /// Forgets every run of failures, everywhere.
+    ///
+    /// The reader coming back to the application is a moment when what made a
+    /// model fail an hour ago may well have changed : Apple Intelligence
+    /// switched on, a rate limit lifted, an account put right.
+    func reconsiderTheModels() {
+        models.reconsiderEverything()
+    }
 
     /// The articles of the story the reader opened, and of that one only : a
     /// digest that loaded every article of every story would be the list it
@@ -2465,7 +2501,7 @@ final class AppModel {
         // Whatever made the model fail hours ago is worth trying again : an
         // edition is a page the model has to write, and one it was too busy to
         // write at seven is one worth asking about at five past.
-        OnDeviceModel.reconsider()
+        models.reconsiderEverything()
 
         await exclusively("The edition") {
             let pass = await self.beginWork([.grouping, .naming])
@@ -2530,7 +2566,7 @@ final class AppModel {
         // Whatever made the model fail hours ago is worth trying again now :
         // the assets may have finished downloading, the reader may have
         // switched Apple Intelligence on, a rate limit has certainly lifted.
-        OnDeviceModel.reconsider()
+        models.reconsiderEverything()
         await exclusively("The full pass") { await self.fullPass() }
     }
 
@@ -2701,7 +2737,7 @@ final class AppModel {
         // three failures from an hour ago would rebuild the page and leave it
         // with no headlines and no subjects, which is most of what a reader
         // asking for a repair is looking at.
-        OnDeviceModel.reconsider()
+        models.reconsiderEverything()
 
         let pass = await beginWork([
             .synchronizing, .fetching, .indexing, .reading, .grouping, .writing, .filing, .tidying, .exchanging,

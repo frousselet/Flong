@@ -37,7 +37,7 @@ import Testing
 /// was measured : thirty real stories written on one. So the question is the
 /// only one worth asking, which is whether there is a model here.
 private var hasWorkingModel: Bool {
-    OnDeviceModel.isAvailable
+    LocalProvider().isAvailable
 }
 
 @Suite("The digest, against the real model", .enabled(if: hasWorkingModel), .serialized)
@@ -47,13 +47,13 @@ struct TopicNamerLiveTests {
     ///
     /// **A model can go away in the middle of a suite.** Hundreds of calls in a
     /// row and the system unloads the assets : `assetsUnavailable` three times
-    /// over, and ``OnDeviceModel`` leaves it alone for a while, exactly as it
+    /// over, and ``ModelPatience`` leaves it alone for a while, exactly as it
     /// does on a device. Every answer after that is the path without a model,
     /// which is the right behaviour and not something to assert against. What
     /// these tests are for is what a working model writes, so they say so and
     /// stop rather than reporting the machine's mood as a fault in the code.
     private func modelIsStillThere(_ what: String) -> Bool {
-        guard OnDeviceModel.isAvailable else {
+        guard LocalProvider().isAvailable else {
             print("=== the model went away while checking \(what), so nothing was judged")
             return false
         }

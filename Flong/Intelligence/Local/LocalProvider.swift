@@ -14,7 +14,7 @@ import FoundationModels
 
 /// The model on this device, as one provider among the ones a reader may have.
 ///
-/// Everything here was a static on ``OnDeviceModel`` and is unchanged in
+/// Everything here was a static on one shared namespace and is unchanged in
 /// substance : the guardrails, the sampling, the cap, and the reading of what
 /// the framework means by each of its failures. What changes is that it is a
 /// value conforming to ``ModelProvider``, so a call site can be handed it or
@@ -40,11 +40,53 @@ nonisolated struct LocalProvider: ModelProvider {
     /// call here, where a call is free.
     let triesASecondVoice = true
 
-    var isAvailable: Bool { OnDeviceModel.isAvailable }
+    /// Whether the system will answer at all.
+    ///
+    /// The run of failures that leaves a model alone for a while is not asked
+    /// about here : that is ``ModelPatience``, which is per provider and lives
+    /// beside the task rather than inside the model.
+    var isAvailable: Bool { SystemLanguageModel.default.availability == .available }
 
-    var absence: LocalizedStringResource? { OnDeviceModel.absence }
+    /// What to tell the reader when there is no model, or `nil` when there is.
+    ///
+    /// A page whose stories are all named after their own articles and which
+    /// carries no subjects is a page working exactly as section 14 says it
+    /// should, and it looks exactly like a page that is broken. One line is
+    /// what separates the two, and it says what the reader can do about it,
+    /// which for most of these is nothing.
+    var absence: LocalizedStringResource? {
+        guard case .unavailable(let reason) = SystemLanguageModel.default.availability else { return nil }
 
-    func writes(_ locale: Locale) -> Bool { OnDeviceModel.writes(locale) }
+        switch reason {
+        case .deviceNotEligible:
+            return "Apple Intelligence is not available on this device. Stories keep the headline of their own article."
+        case .appleIntelligenceNotEnabled:
+            return "Apple Intelligence is switched off. Stories keep the headline of their own article."
+        case .modelNotReady:
+            return
+                "Apple Intelligence is still downloading. Stories keep the headline of their own article until it is ready."
+        @unknown default:
+            return "Apple Intelligence is not available. Stories keep the headline of their own article."
+        }
+    }
+
+    func writes(_ locale: Locale) -> Bool { Self.writes(locale) }
+
+    /// Whether the model writes the language the reader reads in.
+    ///
+    /// **Not a reason to stop asking.** A language the model does not write is
+    /// one it is not asked for : ``ModelLanguage/languageInstruction(for:supports:)``
+    /// asks for the articles' own language instead, and the reader gets a
+    /// written headline over an article in the language they were going to read
+    /// anyway. That is worth having and is not what this gates.
+    ///
+    /// What it gates is the check on the answer. Demanding the reader's
+    /// language of an answer that was never asked in it rejects every brief and
+    /// leaves the whole page wearing its articles' own headlines, which is the
+    /// one outcome both halves of this were written to avoid.
+    static func writes(_ locale: Locale) -> Bool {
+        SystemLanguageModel.default.supportsLocale(locale)
+    }
 
     func conversation(saying instructions: String) -> any ModelConversation {
         LocalConversation(model: Self.model(), instructions: instructions)

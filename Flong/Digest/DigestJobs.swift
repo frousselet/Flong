@@ -90,7 +90,7 @@ nonisolated struct FileStoriesJob: ResumableJob {
     }
 
     func step() async throws -> Int {
-        guard namer.provider.isAvailable else { return 0 }
+        guard namer.hand.isAvailable else { return 0 }
         let since = self.since
 
         let stories = try await database.writer.read { db in
@@ -137,7 +137,7 @@ nonisolated struct FileStoriesJob: ResumableJob {
         var asked = 0
 
         for story in stories {
-            guard namer.provider.isAvailable else { break }
+            guard namer.hand.isAvailable else { break }
 
             // **One pass, and one question.** There were two : the story was
             // filed under something a reader recognizes, and then the model was
@@ -288,7 +288,7 @@ nonisolated struct BriefStoriesJob: ResumableJob {
     /// Without a model the summary is filled from the article's own standfirst,
     /// so the count reaches zero and the job stops rather than asking for ever.
     private var work: (sql: String, arguments: StatementArguments) {
-        Self.work(locale: summarizer.locale, hasModel: summarizer.provider.isAvailable, since: since)
+        Self.work(locale: summarizer.locale, hasModel: summarizer.hand.isAvailable, since: since)
     }
 
     static func work(locale: Locale, hasModel: Bool, since: Date) -> (
@@ -437,7 +437,7 @@ nonisolated struct BriefEditionsJob: ResumableJob {
     }
 
     func remaining() async throws -> Int {
-        guard summarizer.provider.isAvailable else { return 0 }
+        guard summarizer.hand.isAvailable else { return 0 }
         let work = self.work
         return try await database.writer.read { db in
             try Int.fetchOne(
@@ -446,7 +446,7 @@ nonisolated struct BriefEditionsJob: ResumableJob {
     }
 
     func step() async throws -> Int {
-        guard summarizer.provider.isAvailable else { return 0 }
+        guard summarizer.hand.isAvailable else { return 0 }
         let work = self.work
 
         // The one being made first, then whatever closed without ever being

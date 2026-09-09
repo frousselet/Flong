@@ -65,12 +65,12 @@ nonisolated struct TopicNamer: Sendable {
 
     let locale: Locale
 
-    /// Where the question is put.
-    let provider: any ModelProvider
+    /// Who answers this question, and how patient to be with them.
+    let hand: ModelHand
 
-    init(locale: Locale = .current, provider: any ModelProvider = LocalProvider()) {
+    init(locale: Locale = .current, hand: ModelHand = ModelDesk.shared.hand(for: .subjects)) {
         self.locale = locale
-        self.provider = provider
+        self.hand = hand
     }
 
     private var instructions: String {
@@ -101,7 +101,7 @@ nonisolated struct TopicNamer: Sendable {
     /// to the vocabulary : it is the seeded catalogue and the reader's own, and
     /// nothing else.
     func file(_ headline: String, summary: String?, into vocabulary: [String]) async -> Filing {
-        guard provider.isAvailable else { return .unusable }
+        guard hand.isAvailable else { return .unusable }
 
         // **An empty vocabulary is not an answer about this story.** It used to
         // give back an empty choice, which reads as the model having considered
@@ -115,22 +115,23 @@ nonisolated struct TopicNamer: Sendable {
             return .unusable
         }
 
+        // The general model, and not `contentTagging`, which looks like the
+        // obvious choice and was measured to be worse. See
+        // ``LocalProvider/model(for:)``.
+        let conversation = hand.conversation(saying: instructions)
+
         do {
-            // The general model, and not `contentTagging`, which looks like the
-            // obvious choice and was measured to be worse. See
-            // ``LocalProvider/model(for:)``.
-            let conversation = provider.conversation(saying: instructions)
             let answer = try await conversation.answer(
                 to: Self.prompt(headline, summary: summary),
                 shaped: Self.shape(for: vocabulary),
                 keeping: Self.filingTokens
             )
             let chosen = try answer.strings(Called.subjects)
-            OnDeviceModel.succeeded()
+            hand.patience.succeeded()
 
             return .wrote(chosen.filter { vocabulary.contains($0) })
         } catch let fault as ModelFault {
-            OnDeviceModel.refused(fault)
+            hand.patience.refused(fault)
             return Filing(failing: fault)
         } catch {
             // The answer was not the shape asked for, which is this headline
