@@ -1650,6 +1650,17 @@
         }
       }
     },
+    "Answered %@": {
+      "comment": "How a call to a model service ended, with when it answered.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Répondu %@"
+          }
+        }
+      }
+    },
     "Answered not modified": {
       "localizations": {
         "fr": {
