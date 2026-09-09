@@ -1904,8 +1904,12 @@ struct TopicKindTests {
 struct ModelPatienceTests {
     init() { OnDeviceModel.reconsider() }
 
+    /// Through the framework's own error and the triage that reads it, so this
+    /// suite covers both halves : what the framework said, and what it was
+    /// taken to mean.
     private func refuse(_ error: LanguageModelSession.GenerationError, times: Int, at moment: Date) {
-        for _ in 0..<times { OnDeviceModel.refused(error, now: moment) }
+        let fault = LocalProvider.fault(of: error)
+        for _ in 0..<times { OnDeviceModel.refused(fault, now: moment) }
     }
 
     @Test("Three failures of the model itself are enough to leave it alone")
@@ -1939,8 +1943,8 @@ struct ModelPatienceTests {
         #expect(!OnDeviceModel.hasGivenUp(now: now))
         // Still no answer about this story, so nothing is stamped as answered.
         #expect(
-            OnDeviceModel.isTheModelItself(
-                LanguageModelSession.GenerationError.rateLimited(.init(debugDescription: ""))))
+            LocalProvider.fault(of: LanguageModelSession.GenerationError.rateLimited(.init(debugDescription: "")))
+                .isTheModelItself)
     }
 
     @Test("A story the model will not write about does not count against it")
@@ -1959,8 +1963,8 @@ struct ModelPatienceTests {
         let now = Date()
         refuse(.assetsUnavailable(.init(debugDescription: "")), times: 2, at: now)
         OnDeviceModel.succeeded()
-        OnDeviceModel.refused(
-            LanguageModelSession.GenerationError.assetsUnavailable(.init(debugDescription: "")), now: now)
+        let unavailable = LanguageModelSession.GenerationError.assetsUnavailable(.init(debugDescription: ""))
+        OnDeviceModel.refused(LocalProvider.fault(of: unavailable), now: now)
 
         #expect(!OnDeviceModel.hasGivenUp(now: now))
     }

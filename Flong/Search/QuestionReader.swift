@@ -10,12 +10,14 @@
 //
 
 import Foundation
-import FoundationModels
 import OSLog
 
 /// Whether the reader asked about articles they have or have not read.
-@Generable
-nonisolated enum QuestionState: Hashable, Sendable {
+///
+/// The cases are the choices the model is offered, by name : a shape says
+/// `one of these words and no other`, so a raw value is what the answer is
+/// read back through.
+nonisolated enum QuestionState: String, Hashable, Sendable, CaseIterable {
     /// The sentence says nothing about it, which is the usual answer.
     case any
     case unread
@@ -30,8 +32,7 @@ nonisolated enum QuestionState: Hashable, Sendable {
 }
 
 /// How far back the reader asked to look.
-@Generable
-nonisolated enum QuestionPeriod: Hashable, Sendable {
+nonisolated enum QuestionPeriod: String, Hashable, Sendable, CaseIterable {
     /// The sentence names no moment, which is the usual answer.
     case any
     case today
@@ -47,40 +48,87 @@ nonisolated enum QuestionPeriod: Hashable, Sendable {
 /// turns those into a ``QueryNode``. A model that emitted `site:lemonde.fr` would
 /// be a model writing the thing that compiles to SQL, and the whole point of
 /// section 12 is that nothing but the parser and the compiler ever does that.
-@Generable
-nonisolated struct ReadQuestion: Hashable, Sendable {
-    @Guide(
-        description: """
-            What to look for in the articles themselves : the subject, in the reader's own words. \
-            Take out the name of any publication, any writer, any moment in time, and any word about \
-            whether an article has been read. Empty when the sentence names no subject.
-            """
-    )
+nonisolated struct ReadQuestion: Hashable, Sendable, ModelAnswer {
+    /// The names of the fields, written once and used by both halves.
+    ///
+    /// The shape says them and the reading reads them, and a field renamed in
+    /// one and not the other would be an answer that decodes to nothing at run
+    /// time and to nothing anybody notices at review time.
+    private enum Called {
+        static let words = "words"
+        static let source = "source"
+        static let author = "author"
+        static let state = "state"
+        static let period = "period"
+    }
+
     var words: String
-
-    @Guide(
-        description: """
-            The publication or website the sentence names, exactly as the reader wrote it and with no \
-            article in front of it. Empty when the sentence names none. Never a subject, never a person.
-            """
-    )
     var source: String
-
-    @Guide(
-        description: """
-            The writer the sentence names as the author of what is being looked for. Empty when the \
-            sentence names none. Never somebody an article is merely about.
-            """
-    )
     var author: String
-
-    @Guide(
-        description: "Whether the sentence asks about read, unread, starred, kept, annotated articles, or says nothing."
-    )
     var state: QuestionState
-
-    @Guide(description: "The moment the sentence names, or nothing when it names none.")
     var period: QuestionPeriod
+
+    /// Written out because the reading below takes the memberwise one away, and
+    /// the tests build one of these by hand to say what a sentence should have
+    /// been read as.
+    init(words: String, source: String, author: String, state: QuestionState, period: QuestionPeriod) {
+        self.words = words
+        self.source = source
+        self.author = author
+        self.state = state
+        self.period = period
+    }
+
+    static let shape = ResponseShape.object(
+        named: "ReadQuestion",
+        fields: [
+            .init(
+                Called.words,
+                """
+                What to look for in the articles themselves : the subject, in the reader's own words. \
+                Take out the name of any publication, any writer, any moment in time, and any word about \
+                whether an article has been read. Empty when the sentence names no subject.
+                """
+            ),
+            .init(
+                Called.source,
+                """
+                The publication or website the sentence names, exactly as the reader wrote it and with no \
+                article in front of it. Empty when the sentence names none. Never a subject, never a person.
+                """
+            ),
+            .init(
+                Called.author,
+                """
+                The writer the sentence names as the author of what is being looked for. Empty when the \
+                sentence names none. Never somebody an article is merely about.
+                """
+            ),
+            .init(
+                Called.state,
+                "Whether the sentence asks about read, unread, starred, kept, annotated articles, or says nothing.",
+                .oneOf(named: "QuestionState", choices: QuestionState.allCases.map(\.rawValue))
+            ),
+            .init(
+                Called.period,
+                "The moment the sentence names, or nothing when it names none.",
+                .oneOf(named: "QuestionPeriod", choices: QuestionPeriod.allCases.map(\.rawValue))
+            ),
+        ]
+    )
+
+    /// **A word outside the list is the sentence naming nothing**, which is the
+    /// usual answer anyway. The shape forbids it and a service that honours a
+    /// schema loosely may still send one, so it is read as `any` rather than
+    /// refused : a search narrowed by a state nobody asked for is worse than a
+    /// search not narrowed at all.
+    init(_ answer: Answer) throws(AnswerFault) {
+        words = try answer.string(Called.words)
+        source = try answer.string(Called.source)
+        author = try answer.string(Called.author)
+        state = QuestionState(rawValue: try answer.string(Called.state)) ?? .any
+        period = QuestionPeriod(rawValue: try answer.string(Called.period)) ?? .any
+    }
 }
 
 /// What the sentence was understood to mean, and what to say it meant.
@@ -147,8 +195,17 @@ nonisolated struct QuestionReader: Sendable {
 
     let locale: Locale
 
-    init(locale: Locale = .current) {
+    /// Where the question is put.
+    ///
+    /// Injected rather than reached for, so a test can put a sentence to
+    /// something that is not a model at all : the framework's own model is not
+    /// injectable, and until this parameter existed only the path with no model
+    /// could be exercised end to end.
+    let provider: any ModelProvider
+
+    init(locale: Locale = .current, provider: any ModelProvider = LocalProvider()) {
         self.locale = locale
+        self.provider = provider
     }
 
     private var instructions: String {
@@ -166,24 +223,24 @@ nonisolated struct QuestionReader: Sendable {
     /// What one sentence asks for, or nothing when the model has nothing to add.
     func read(_ sentence: String, in vocabulary: Vocabulary, now: Date = Date()) async -> QuestionReading? {
         let sentence = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard OnDeviceModel.isAvailable else { return nil }
+        guard provider.isAvailable else { return nil }
         guard sentence.split(separator: " ").count >= Self.fewestWords else { return nil }
 
-        do {
-            let session = LanguageModelSession(model: OnDeviceModel.model(), instructions: instructions)
-            session.prewarm()
+        let conversation = provider.conversation(saying: instructions)
+        conversation.prewarm()
 
-            let response = try await session.respond(
+        do {
+            let read = try await conversation.answer(
                 to: "The sentence : \(sentence)",
-                generating: ReadQuestion.self,
-                options: OnDeviceModel.options(maximumTokens: Self.reservedTokens)
+                as: ReadQuestion.self,
+                keeping: Self.reservedTokens
             )
             OnDeviceModel.succeeded()
 
-            return Self.reading(of: response.content, said: sentence, in: vocabulary, now: now)
+            return Self.reading(of: read, said: sentence, in: vocabulary, now: now)
         } catch {
             OnDeviceModel.refused(error)
-            Log.enrich.notice("A sentence could not be read : \(String(describing: type(of: error)), privacy: .public)")
+            Log.enrich.notice("A sentence could not be read : \(LocalProvider.kind(of: error), privacy: .public)")
             return nil
         }
     }

@@ -10,7 +10,6 @@
 //
 
 import Foundation
-import FoundationModels
 import OSLog
 
 /// What came of asking the model to file one story.
@@ -22,21 +21,10 @@ import OSLog
 /// left a story unfiled for good : it is never asked again, and the reader sees
 /// a fil with no thématique and no way to give it one.
 ///
-/// ``OnDeviceModel/isTheModelItself(_:)`` already draws exactly this line, and
-/// the summarizer already acts on it. This is the same distinction, carried far
-/// enough to be acted on here too.
-nonisolated enum Filing: Sendable {
-    /// The model answered. Possibly with nothing, which is an answer : this
-    /// story falls under none of the subjects it was shown.
-    case chosen([String])
-    /// The model would not write about this story. It will not next time
-    /// either, so there is no point asking again.
-    case declined
-    /// The model could not be used at all : unloaded, rate limited, busy. The
-    /// next pass may well find it working, so the story keeps its place in the
-    /// queue.
-    case unusable
-}
+/// It is ``Answered`` now, and the two other callers draw the same three : the
+/// distinction was written out three times in three files, and derived from the
+/// same line of triage each time.
+typealias Filing = Answered<[String]>
 
 /// Files stories under the subjects the reader already has.
 ///
@@ -77,8 +65,12 @@ nonisolated struct TopicNamer: Sendable {
 
     let locale: Locale
 
-    init(locale: Locale = .current) {
+    /// Where the question is put.
+    let provider: any ModelProvider
+
+    init(locale: Locale = .current, provider: any ModelProvider = LocalProvider()) {
         self.locale = locale
+        self.provider = provider
     }
 
     private var instructions: String {
@@ -109,10 +101,10 @@ nonisolated struct TopicNamer: Sendable {
     /// to the vocabulary : it is the seeded catalogue and the reader's own, and
     /// nothing else.
     func file(_ headline: String, summary: String?, into vocabulary: [String]) async -> Filing {
-        guard OnDeviceModel.isAvailable else { return .unusable }
+        guard provider.isAvailable else { return .unusable }
 
         // **An empty vocabulary is not an answer about this story.** It used to
-        // give back `.chosen([])`, which reads as the model having considered
+        // give back an empty choice, which reads as the model having considered
         // the story and placed it under nothing : the caller stamped it as
         // asked and never came back to it. Nothing had been asked at all. A
         // migration that left every existing subject marked as the model's own
@@ -123,53 +115,60 @@ nonisolated struct TopicNamer: Sendable {
             return .unusable
         }
 
-        // Built before the session, and its failure is neither the model's nor
-        // this story's : a schema that will not build is a mistake here. It
-        // used to be thrown inside the same `do`, where anything that is not a
-        // `GenerationError` counts as the model being unusable, so three
-        // stories in a row silenced the model for the rest of the run, briefs
-        // included.
-        guard let schema = try? Self.schema(for: vocabulary) else {
-            Log.enrich.error("The filing schema could not be built from \(vocabulary.count) subjects")
-            return .unusable
-        }
-
         do {
             // The general model, and not `contentTagging`, which looks like the
             // obvious choice and was measured to be worse. See
-            // ``OnDeviceModel/model(for:)``.
-            let session = LanguageModelSession(model: OnDeviceModel.model(), instructions: instructions)
-            let response = try await session.respond(
+            // ``LocalProvider/model(for:)``.
+            let conversation = provider.conversation(saying: instructions)
+            let answer = try await conversation.answer(
                 to: Self.prompt(headline, summary: summary),
-                schema: schema,
-                options: OnDeviceModel.options(maximumTokens: Self.filingTokens)
+                shaped: Self.shape(for: vocabulary),
+                keeping: Self.filingTokens
             )
-
-            let chosen = try response.content.value([String].self, forProperty: "subjects")
+            let chosen = try answer.strings(Called.subjects)
             OnDeviceModel.succeeded()
 
-            return .chosen(chosen.filter { vocabulary.contains($0) })
+            return .wrote(chosen.filter { vocabulary.contains($0) })
+        } catch let fault as ModelFault {
+            OnDeviceModel.refused(fault)
+            return Filing(failing: fault)
         } catch {
-            OnDeviceModel.refused(error)
-            return OnDeviceModel.isTheModelItself(error) ? .unusable : .declined
+            // The answer was not the shape asked for, which is this headline
+            // and not the model.
+            return .declined
         }
     }
 
-    /// A schema the model cannot answer outside of.
+    /// A shape the model cannot answer outside of.
     ///
-    /// The subjects are the values of an enumeration rather than words in a
+    /// The subjects are the choices of the answer rather than words in a
     /// prompt, so `Cybersécurité` cannot come back as `Cyber sécurité` and a
     /// subject nobody has cannot come back at all.
-    static func schema(for vocabulary: [String]) throws -> GenerationSchema {
-        let choice = DynamicGenerationSchema(name: "Subject", anyOf: vocabulary)
-        let list = DynamicGenerationSchema(arrayOf: choice, minimumElements: 1, maximumElements: subjectsPerStory)
-        let root = DynamicGenerationSchema(
-            name: "Filing",
-            properties: [
-                .init(name: "subjects", description: "The subjects this headline is about", schema: list)
+    ///
+    /// **Read back through the vocabulary all the same.** A shape is a promise
+    /// about the form of an answer and not about its values, and a service that
+    /// honours a schema loosely will send a word that was never offered. The
+    /// filter below is what makes that harmless, and it is why it stays.
+    static func shape(for vocabulary: [String]) -> ResponseShape {
+        .object(
+            named: "Filing",
+            fields: [
+                .init(
+                    Called.subjects,
+                    "The subjects this headline is about",
+                    .list(
+                        of: .oneOf(named: "Subject", choices: vocabulary),
+                        least: 1,
+                        most: subjectsPerStory
+                    )
+                )
             ]
         )
-        return try GenerationSchema(root: root, dependencies: [])
+    }
+
+    /// The name of the one field, written once and read once.
+    private enum Called {
+        static let subjects = "subjects"
     }
 
     private static func prompt(_ headline: String, summary: String?) -> String {

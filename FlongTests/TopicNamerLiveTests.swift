@@ -114,7 +114,7 @@ struct TopicNamerLiveTests {
         ]
 
         for (headline, subject) in expected {
-            guard case .chosen(let filed) = await namer.file(headline, summary: nil, into: vocabulary) else {
+            guard case .wrote(let filed) = await namer.file(headline, summary: nil, into: vocabulary) else {
                 if modelIsStillThere("a filing") { Issue.record("The model would not file \(headline)") }
                 continue
             }
@@ -141,7 +141,7 @@ struct TopicNamerLiveTests {
         // either, which is why the catalogue is fifty-two names deep : what a
         // reader actually follows should be in it.
         guard
-            case .chosen(let filed) = await namer.file(
+            case .wrote(let filed) = await namer.file(
                 "Les macros Swift, deux ans après",
                 summary: "Ce que les macros ont changé au code que nous écrivons.",
                 into: ["Jardinage", "Cuisine"]
