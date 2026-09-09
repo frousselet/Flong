@@ -37,6 +37,13 @@ protocol Announcing {
     func status() async -> UNAuthorizationStatus
     func authorize() async -> Bool
     func post(_ announcement: Announcement) async
+    /// Takes back one thing, said or not yet said.
+    ///
+    /// **Pending and delivered both.** A notice lodged for eleven whose edition
+    /// stopped existing at half past ten and a banner still sitting in the
+    /// centre for a page that was unmade are the same mistake : one leads
+    /// nowhere in a minute, the other leads nowhere now.
+    func withdraw(_ name: String) async
     /// Takes back everything already said, for a reset.
     func withdrawEverything() async
 }
@@ -111,24 +118,18 @@ struct Notifier: Announcing {
         defer {
             if let written { try? FileManager.default.removeItem(at: written) }
         }
-        if let story = announcement.story {
+        if announcement.opensTheDigest {
+            content.userInfo = [Key.digest: true]
+        } else if let story = announcement.story {
             content.userInfo = [Key.story: story.uuidString]
         } else if let article = announcement.article {
             content.userInfo = [Key.article: article.uuidString]
         }
 
-        // No trigger : a trigger of nil is delivered immediately, and there is
-        // nothing here worth scheduling for later.
-        // **The article's own identifier where there is one.** A notice about
-        // one article is about one article for ever, so posting it twice should
-        // replace it rather than stack a second copy : the system keys on this,
-        // and a fresh `UUID` every time meant nothing could ever be corrected
-        // or de-duplicated. Everything else keeps a new one, having nothing
-        // stable to be known by.
         let request = UNNotificationRequest(
-            identifier: announcement.article?.uuidString ?? UUID().uuidString,
+            identifier: Self.identifier(of: announcement),
             content: content,
-            trigger: nil
+            trigger: Self.trigger(for: announcement)
         )
 
         do {
@@ -136,6 +137,67 @@ struct Notifier: Announcing {
         } catch {
             Log.notify.error("A notification could not be posted : \(error, privacy: .public)")
         }
+    }
+
+    /// What the system knows this notice by.
+    ///
+    /// **The article's own identifier where there is one, and a name where the
+    /// thing has one.** A notice about one article is about one article for
+    /// ever, so posting it twice should replace it rather than stack a second
+    /// copy : the system keys on this, and a fresh `UUID` every time meant
+    /// nothing could ever be corrected or de-duplicated. An edition's name is
+    /// its boundary, which is what lets one lodged ahead of its hour be
+    /// replaced, or taken back by a path that no longer has the row. Everything
+    /// else keeps a new one, having nothing stable to be known by.
+    static func identifier(of announcement: Announcement) -> String {
+        announcement.name ?? announcement.article?.uuidString ?? UUID().uuidString
+    }
+
+    /// How close to its moment a notice is simply said.
+    ///
+    /// A second either side of an hour is a race between a trigger and a clock,
+    /// and losing it means the notice waits for ever : a full set of components
+    /// naming a moment already gone matches nothing, and the request sits
+    /// pending until something takes it back.
+    static let soonest: TimeInterval = 5
+
+    /// When the system is to deliver it, or `nil` for now.
+    ///
+    /// `UNCalendarNotificationTrigger` is the only kind that names a moment : a
+    /// trigger the system delivers at a specific date and time, with nothing of
+    /// ours running. `BGTaskRequest.earliestBeginDate` promises only that the
+    /// system will not begin sooner than the moment it is given, so a notice
+    /// posted by code that has to be running is a notice that arrives when the
+    /// system feels like it.
+    ///
+    /// **The zone is pinned into the components.** A trigger matches wall-clock
+    /// components in whatever calendar holds when it fires : a reader who flew
+    /// west between the press and the hour would have had eleven o'clock fire
+    /// hours after the page it announces came out, and the page is decided on
+    /// the instant. With the zone in the components the moment is absolute, and
+    /// the banner and the page agree wherever the reader is. The year is in
+    /// them and `repeats` is false, so it matches exactly once ; a set without
+    /// a year repeats for ever.
+    ///
+    /// **A moment already gone is now.** That is the late paper, and which of
+    /// the two a paper is comes down to this comparison.
+    static func trigger(
+        for announcement: Announcement,
+        now: Date = Date(),
+        in calendar: Calendar = .current
+    ) -> UNNotificationTrigger? {
+        guard let at = announcement.at, at > now.addingTimeInterval(soonest) else { return nil }
+
+        var parts = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: at)
+        parts.timeZone = calendar.timeZone
+        return UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
+    }
+
+    /// Takes back one notice, whether it has been said or is still waiting.
+    func withdraw(_ name: String) async {
+        let centre = UNUserNotificationCenter.current()
+        centre.removePendingNotificationRequests(withIdentifiers: [name])
+        centre.removeDeliveredNotifications(withIdentifiers: [name])
     }
 
     /// Takes back every notice this device has posted.
@@ -164,6 +226,7 @@ struct Notifier: Announcing {
     enum Key {
         static let story = "story"
         static let article = "article"
+        static let digest = "digest"
     }
 }
 
@@ -175,6 +238,9 @@ struct Notifier: Announcing {
 /// that is exactly what this records.
 final class MemoryAnnouncer: Announcing {
     private(set) var posted: [Announcement] = []
+    /// The names taken back, so a test can read a withdrawal as well as a
+    /// posting.
+    private(set) var withdrawn: [String] = []
     var granted = true
     var stated = UNAuthorizationStatus.authorized
 
@@ -187,9 +253,27 @@ final class MemoryAnnouncer: Announcing {
         return granted
     }
 
-    func post(_ announcement: Announcement) async { posted.append(announcement) }
+    /// **A name replaces rather than stacks, exactly as the system does.**
+    /// `add(_:)` replaces a request carrying an identifier it already holds, so
+    /// a test that saw two rows where a device shows one would be testing
+    /// something that cannot happen.
+    func post(_ announcement: Announcement) async {
+        if let name = announcement.name, let seen = posted.firstIndex(where: { $0.name == name }) {
+            posted[seen] = announcement
+            return
+        }
+        posted.append(announcement)
+    }
 
-    func withdrawEverything() async { posted.removeAll() }
+    func withdraw(_ name: String) async {
+        withdrawn.append(name)
+        posted.removeAll { $0.name == name }
+    }
+
+    func withdrawEverything() async {
+        posted.removeAll()
+        withdrawn.removeAll()
+    }
 }
 
 /// Holds what a tapped notification asked for, until there is a window to show
@@ -212,6 +296,9 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     nonisolated enum Tap: Hashable, Sendable {
         case story(UUID)
         case article(UUID)
+        /// The front page itself, which is where an edition is : the edition
+        /// *is* the digest, so there is nowhere deeper to go.
+        case digest
     }
 
     /// What was tapped before anything was listening.
@@ -238,11 +325,48 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     /// opened it, or by a pass that started while they were away. Those are
     /// worth showing, and the reader is the one who decides whether a banner
     /// interrupts them, not this.
+    ///
+    /// **The edition is the one that is held back, and only the edition.** Its
+    /// notice is lodged twenty minutes before it fires, so nothing at lodging
+    /// time can know where the reader will be, and this is the only place that
+    /// runs at the moment the system offers the banner. A banner and a sound
+    /// over the page they are about is telling somebody something they are
+    /// looking at.
+    ///
+    /// **Filed rather than dropped.** It said nothing at all before, because
+    /// posting was itself the interruption ; the notice exists now whichever
+    /// way this answers, and Flong being open is not the same as the front page
+    /// being read. A reader three articles deep should find the paper in the
+    /// centre when they come up. A row, without a banner and without a sound.
+    ///
+    /// **Keyed on what it is about rather than on how it arrived.** Asking
+    /// whether the trigger was a calendar one would give the paper on time and
+    /// the paper late two different behaviours, which is the one thing the
+    /// press exists not to have.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+        Self.presentation(
+            thread: notification.request.content.threadIdentifier,
+            isReading: isReading?() ?? false
+        )
+    }
+
+    /// What the window is doing, asked at the moment a notice is offered.
+    ///
+    /// A closure rather than the window itself : the router is made before
+    /// there is one, exactly as it holds a tap from a cold start.
+    private var isReading: (() -> Bool)?
+
+    /// Says how to answer the question above, once there is a window to ask.
+    func presenting(while isReading: @escaping () -> Bool) {
+        self.isReading = isReading
+    }
+
+    static func presentation(thread: String, isReading: Bool) -> UNNotificationPresentationOptions {
+        guard thread == Announcement.Thread.newEdition, isReading else { return [.banner, .list, .sound] }
+        return [.list]
     }
 
     func userNotificationCenter(
@@ -251,7 +375,9 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     ) async {
         let information = response.notification.request.content.userInfo
         let tapped: Tap? =
-            if let named = information[Notifier.Key.story] as? String, let story = UUID(uuidString: named) {
+            if information[Notifier.Key.digest] != nil {
+                .digest
+            } else if let named = information[Notifier.Key.story] as? String, let story = UUID(uuidString: named) {
                 .story(story)
             } else if let named = information[Notifier.Key.article] as? String, let article = UUID(uuidString: named) {
                 .article(article)

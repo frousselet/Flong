@@ -1223,6 +1223,17 @@
         }
       }
     },
+    "A new edition is written before its hour, so its notice can arrive on the hour.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une nouvelle édition est écrite avant son heure, pour que son avis arrive à l'heure dite."
+          }
+        }
+      }
+    },
     "A source is suggested once ten readers follow it, or once a trusted reader does.": {
       "localizations": {
         "fr": {
@@ -2064,7 +2075,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Votre édition"
+            "value": "Ville et pays"
           }
         }
       }
@@ -2353,6 +2364,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Collections dynamiques"
+          }
+        }
+      }
+    },
+    "Each edition is closed shortly before its hour and comes out on the hour, with the ten stories that matter most. What arrives after that leads the next edition, and everything stays in the wire.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chaque édition est bouclée peu avant son heure et paraît à l'heure dite, avec les dix sujets qui comptent le plus. Ce qui arrive ensuite fait la une de l'édition suivante, et tout reste dans le fil."
           }
         }
       }
@@ -3797,7 +3819,7 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nouvelle veille"
+            "value": "Nouvelle édition"
           }
         }
       }
@@ -5620,16 +5642,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Les articles restent où ils sont."
-          }
-        }
-      }
-    },
-    "The digest is made afresh at each of these hours, with the ten stories that matter most. What does not fit stays in the wire.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La veille est refaite à chacune de ces heures, avec les dix actualités qui comptent le plus. Ce qui ne tient pas reste dans le fil."
           }
         }
       }

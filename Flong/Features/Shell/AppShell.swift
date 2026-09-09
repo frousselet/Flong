@@ -234,18 +234,29 @@ struct AppShell: View {
             // window existed, and the reader is looking at the wrong page
             // until it is claimed.
             NotificationRouter.shared.listen { tapped in
-                // The two things a notice can be about are not opened the same
-                // way, exactly as the two a system search result can be about
-                // are not : a story is a page in the digest, an article is read
-                // over everything.
+                // The three things a notice can be about are not opened the
+                // same way, exactly as the two a system search result can be
+                // about are not : a story is a page in the digest, an article
+                // is read over everything, and an edition *is* the front page.
                 switch tapped {
                 case .story(let id):
                     section = .digest
                     digestPath = [.story(id)]
                 case .article(let id):
                     reading = Reading(id: id)
+                case .digest:
+                    section = .digest
+                    digestPath = []
+                    Task { await model.loadDigest() }
                 }
             }
+
+            // **The window answers for itself, at the moment a banner is
+            // offered.** An edition's notice is lodged twenty minutes before it
+            // fires, so nothing at lodging time can know where the reader will
+            // be. The router is made before there is a window, which is why it
+            // is told rather than asked.
+            NotificationRouter.shared.presenting { model.isReading }
 
             // The background tasks were registered while the application
             // launched, before there was a window or a model to do the work.
@@ -265,7 +276,7 @@ struct AppShell: View {
             // And the next edition, at the hour the reader asked for it. Only
             // this side knows that hour : the handler is registered before
             // there is a store to read a schedule out of.
-            model.scheduleTheNextEdition()
+            await model.scheduleTheNextEdition()
 
             // A window that opens in the background has no phase change to
             // learn from, and `onChange` only fires on a change.

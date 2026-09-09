@@ -182,7 +182,16 @@ struct NotificationsPanel: View {
                     set: { wanted in Task { await model.setWantsNewEditionNotices(wanted) } }
                 )
             ) {
-                Label("New edition", systemImage: "newspaper")
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("New edition", systemImage: "newspaper")
+                    // **What is true on both platforms and every night**, which
+                    // is what Flong does rather than what the system promises :
+                    // a Mac with its window closed has no wake to press in, and
+                    // no phone is promised one either.
+                    Text("A new edition is written before its hour, so its notice can arrive on the hour.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
             .accessibilityIdentifier("notify-new-edition")
             .disabled(isRefused)
