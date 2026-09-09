@@ -57,7 +57,7 @@ struct ArticleCollectionTests {
             receivedAt: published ?? now
         )
         stored.imageURL = image.flatMap(URL.init(string:))
-        try await database.writer.write { db in try stored.insert(db) }
+        try await database.writer.write { [stored] db in try stored.insert(db) }
         return stored.id
     }
 

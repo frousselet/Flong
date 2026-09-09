@@ -575,7 +575,7 @@ struct SubscriptionStoreTests {
         var written = Entry(feedID: feed.id, guid: "urn:example:written", title: "Written on")
         written.annotation = "A note"
         let plain = Entry(feedID: feed.id, guid: "urn:example:plain", title: "Nothing said")
-        try await database.writer.write { db in
+        try await database.writer.write { [starred, written] db in
             try starred.insert(db)
             try written.insert(db)
             try plain.insert(db)

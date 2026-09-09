@@ -47,7 +47,7 @@ struct ArticleStoreTests {
             receivedAt: received
         )
         entry.hasMedia = false
-        try await database.writer.write { db in try entry.insert(db) }
+        try await database.writer.write { [entry] db in try entry.insert(db) }
         return entry.id
     }
 
@@ -124,7 +124,7 @@ struct ArticleStoreTests {
         entry.hasMedia = false
         entry.author = author
 
-        try await database.writer.write { db in
+        try await database.writer.write { [entry] db in
             try entry.insert(db)
             if let body {
                 try EntryBody(entryID: entry.id, sanitizedHTML: body, plainText: body).insert(db)
@@ -243,7 +243,7 @@ struct ArticleStoreTests {
         let feed = try await feed("https://feeds.example.com/rss.xml", title: "Example")
         var entry = Entry(feedID: feed.id, guid: "urn:1", title: "Un titre", author: "Claire Ancelin et Paul Rey")
         entry.hasMedia = false
-        try await database.writer.write { db in try entry.insert(db) }
+        try await database.writer.write { [entry] db in try entry.insert(db) }
 
         let article = try #require(try await articles.article(id: entry.id))
         let html = ArticleDocument.html(for: article, publisher: "Le Monde")

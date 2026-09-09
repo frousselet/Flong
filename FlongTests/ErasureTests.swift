@@ -22,6 +22,7 @@ import Testing
 /// survives it is a working application rather than a broken one.
 @Suite("Deleting everything")
 struct ErasureTests {
+    @discardableResult
     private func seeded(_ database: AppDatabase) async throws -> Feed {
         let feed = try await SubscriptionStore(database)
             .subscribe(to: Subscription(address: "https://feeds.example.com/atom.xml", title: "Example"))
@@ -37,7 +38,7 @@ struct ErasureTests {
         )
         entry.hasMedia = false
 
-        try await database.writer.write { db in
+        try await database.writer.write { [entry] db in
             try entry.insert(db)
             try EntryBody(entryID: entry.id, sanitizedHTML: "<p>One</p>").insert(db)
             // The machinery's own memory of iCloud, which has to go with the
@@ -189,7 +190,7 @@ struct ErasedWindowTests {
             publishedAt: Date()
         )
         entry.hasMedia = false
-        try await database.writer.write { db in try entry.insert(db) }
+        try await database.writer.write { [entry] db in try entry.insert(db) }
 
         try credentials.setCredential(FeedCredential.basic(user: "reader", password: "hunter2"), for: feed.id)
         try sessions.setSession(

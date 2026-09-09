@@ -118,7 +118,7 @@ struct ReadStateStoreTests {
             isRead: isRead
         )
         entry.hasMedia = false
-        try await database.writer.write { db in try entry.insert(db) }
+        try await database.writer.write { [entry] db in try entry.insert(db) }
         return entry
     }
 

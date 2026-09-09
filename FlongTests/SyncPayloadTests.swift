@@ -56,7 +56,7 @@ private struct Device {
         )
         entry.hasMedia = false
 
-        try await database.writer.write { db in
+        try await database.writer.write { [entry] db in
             try entry.insert(db)
             try EntryBody(entryID: entry.id, sanitizedHTML: "<p>\(body)</p>", plainText: body).insert(db)
         }
