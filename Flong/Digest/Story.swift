@@ -32,6 +32,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         case briefLocale = "brief_locale"
         case topicsAskedAt = "topics_asked_at"
         case briefMembers = "brief_members"
+        case briefAskedAt = "brief_asked_at"
         case topicsAskedFor = "topics_asked_for"
         case signature
         case articleCount = "article_count"
@@ -114,6 +115,21 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
     /// the oldest of them is a new question.
     var briefMembers: String?
 
+    /// When the model was last put a question about this story, where it
+    /// answered one.
+    ///
+    /// **What holds the same question back to once a period.** A story whose
+    /// articles have not moved is not asked about again at all, which
+    /// ``briefMembers`` already settles ; one that has moved was asked again on
+    /// every pass that reached it, so a story the press is busy with cost a
+    /// call an hour all day for a headline that changed by a word. It is asked
+    /// again once per period now, which is once per page it could stand on.
+    ///
+    /// Written only where the model answered : an unusable model has said
+    /// nothing about this story, and stamping it would be a silence bought with
+    /// the reader's next headline.
+    var briefAskedAt: Date?
+
     /// The vocabulary its articles share, which is what a new article is
     /// compared against.
     var signature: TextSignature?
@@ -135,6 +151,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         briefLocale: String? = nil,
         topicsAskedAt: Date? = nil,
         briefMembers: String? = nil,
+        briefAskedAt: Date? = nil,
         topicsAskedFor: String? = nil,
         signature: TextSignature? = nil,
         articleCount: Int = 0,
@@ -153,6 +170,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         self.briefLocale = briefLocale
         self.topicsAskedAt = topicsAskedAt
         self.briefMembers = briefMembers
+        self.briefAskedAt = briefAskedAt
         self.topicsAskedFor = topicsAskedFor
         self.signature = signature
         self.articleCount = articleCount

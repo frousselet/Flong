@@ -92,6 +92,20 @@ nonisolated struct DigestStory: Identifiable, Hashable, Sendable {
     /// several : a story is rarely about one thing.
     let topics: [String]
 
+    /// Whether anything is known about the story behind the headline.
+    ///
+    /// **A frozen row whose story has gone is a headline and nothing more.** A
+    /// back number keeps its ten however a purge has thinned the stream, so a
+    /// row can outlive the story it was printed from ; drawn from the frozen
+    /// half alone it would otherwise claim nought rooms, an empty sparkline and
+    /// a moment computed off a date nobody knows. Where this is false the page
+    /// draws the headline and stops.
+    ///
+    /// A `var` with a default among a struct of `let`s, deliberately : it is
+    /// what keeps the memberwise initializer's parameter optional, so the one
+    /// place that ever says otherwise is the one place that prints a page.
+    var hasFigures = true
+
     /// What the reader has said about this story, taken from its subjects.
     ///
     /// Asking for more of anything wins : a reader who wants more of one of
@@ -199,8 +213,56 @@ nonisolated struct DigestStore: Sendable {
         self.database = database
     }
 
+    /// What a story has to have to belong to a period, as SQL.
+    ///
+    /// **An article inside it, and not a story whose last article is inside
+    /// it.** The two are different questions and only the first is the one a
+    /// page asks : a story that broke at ten and gained one more article at ten
+    /// past eleven belongs on the eleven o'clock page, and a `last_at` test
+    /// would have dropped it for having moved on.
+    ///
+    /// Open at the bottom and closed at the top, so an article landing exactly
+    /// on a boundary belongs to the page that boundary closes and to that one
+    /// only, and a page can never lead on something dated after its own
+    /// dateline.
+    ///
+    /// The second arm is the story's own key, which is a UUIDv7 minted where
+    /// the grouping runs. A publisher that stamps this morning's item with last
+    /// week's date, and a fetch that arrives long after the fact, both reach
+    /// the page of the period they were *grouped* in rather than falling out of
+    /// every page there is. It is a comparison on the primary key, answered by
+    /// the index, and it is exact to the millisecond the floor names.
+    static let withinThePeriod = """
+        (EXISTS (SELECT 1 FROM story_member m JOIN entry e ON e.id = m.entry_id
+                 WHERE m.story_id = story.id AND e.duplicate_of IS NULL
+                   AND COALESCE(e.published_at, e.received_at) >  ?
+                   AND COALESCE(e.published_at, e.received_at) <= ?)
+         OR (story.id > ? AND story.id < ?))
+        """
+
+    /// The four values ``withinThePeriod`` reads, in the order it reads them.
+    ///
+    /// Positional and not named, so this composes with the story work set,
+    /// which is positional : one statement cannot hold both kinds.
+    static func periodArguments(_ period: Range<Date>) -> StatementArguments {
+        [
+            period.lowerBound, period.upperBound,
+            UUID.v7Floor(at: period.lowerBound), UUID.v7Floor(at: period.upperBound),
+        ]
+    }
+
+    /// The same, for the period a page carries.
+    static func periodArguments(of edition: Edition) -> StatementArguments {
+        periodArguments(edition.periodStart..<edition.periodEnd)
+    }
+
     @concurrent
-    func digest(_ topic: DigestTopic = .frontPage, now: Date = Date(), limit: Int = 60) async throws -> Digest {
+    func digest(
+        _ topic: DigestTopic = .frontPage,
+        now: Date = Date(),
+        limit: Int = 60,
+        during period: Range<Date>? = nil
+    ) async throws -> Digest {
         let since = now.addingTimeInterval(-Self.window)
         let preferences = TopicPreferences(database)
         let scores = try await preferences.scores()
@@ -208,12 +270,32 @@ nonisolated struct DigestStore: Sendable {
         let symbols = try await preferences.symbols()
 
         let (stories, topics, members) = try await database.writer.read { db in
-            let stories =
-                try Story
-                .filter(Story.Columns.lastAt >= since)
-                .order(Story.Columns.lastAt.desc)
-                .limit(limit)
-                .fetchAll(db)
+            // **The period narrows the stories and nothing else.** What follows
+            // reads every member of the three days on purpose : the counts, the
+            // marks, the sparkline, the picture and its credit are facts about
+            // a story's whole life, and `members.count > 1` means two articles
+            // make a story over three days rather than over five hours. Held to
+            // the period, an ordinary evening would fail to publish because a
+            // running story took exactly one new article in it.
+            let stories: [Story]
+            if let period {
+                stories = try Story.fetchAll(
+                    db,
+                    sql: """
+                        SELECT * FROM story
+                        WHERE last_at >= ? AND \(Self.withinThePeriod)
+                        ORDER BY last_at DESC LIMIT \(limit)
+                        """,
+                    arguments: [since] + Self.periodArguments(period)
+                )
+            } else {
+                stories =
+                    try Story
+                    .filter(Story.Columns.lastAt >= since)
+                    .order(Story.Columns.lastAt.desc)
+                    .limit(limit)
+                    .fetchAll(db)
+            }
 
             // One row per subject a story is under, folded back into a list
             // per story.
@@ -308,6 +390,82 @@ nonisolated struct DigestStore: Sendable {
 
         digest.leadID = digest.live.first?.id ?? digest.stories.first?.id
         return digest
+    }
+
+    /// The figures of a named handful of stories, whatever the page holds.
+    ///
+    /// **A keyed read, because a frozen page is not a window into the live
+    /// one.** The front page joined its ten frozen rows against the digest,
+    /// which is the sixty newest stories of three days : a story that fell out
+    /// of that sixty took its article count, its rooms and its sparkline with
+    /// it, on a page that is supposed not to move. Asked for by identifier
+    /// there is no window and no cap, and ten rows on a primary key cost
+    /// nothing.
+    ///
+    /// The same roll-up as ``digest(_:now:limit:during:)`` so the two cannot
+    /// come to say different things about one story, and the same three days
+    /// for the members : what a row shows is how far the story has got, which
+    /// is a fact about the world and not about the page.
+    @concurrent
+    func stories(_ ids: [UUID], now: Date = Date()) async throws -> [UUID: DigestStory] {
+        guard !ids.isEmpty else { return [:] }
+        let since = now.addingTimeInterval(-Self.window)
+
+        let (stories, topics, members) = try await database.writer.read { db in
+            let stories = try Story.filter(keys: ids).fetchAll(db)
+            let topics = try StoryTopic.filter(ids.contains(Column("story_id")))
+                .order(Column.rowID)
+                .fetchAll(db)
+                .reduce(into: [UUID: [String]]()) { found, row in
+                    found[row.storyID, default: []].append(row.name)
+                }
+
+            let members = try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT m.story_id AS story_id, f.title AS feed_title,
+                           f.site_url AS site_url, f.url AS feed_url,
+                           e.image_url AS image_url,
+                           COALESCE(e.published_at, e.received_at) AS date
+                    FROM story_member m
+                    JOIN entry e ON e.id = m.entry_id
+                    JOIN feed f ON f.id = e.feed_id
+                    WHERE m.story_id IN (\(databaseQuestionMarks(count: ids.count)))
+                      AND e.duplicate_of IS NULL
+                      AND COALESCE(e.published_at, e.received_at) >= ?
+                    """,
+                arguments: StatementArguments(ids) + [since]
+            )
+            .map { row in
+                StoryArticle(
+                    storyID: row["story_id"],
+                    feedTitle: row["feed_title"],
+                    feedSiteURL: (row["site_url"] as String?).flatMap(URL.init(string:)),
+                    feedURL: (row["feed_url"] as String?).flatMap(URL.init(string:)),
+                    date: row["date"],
+                    imageURL: (row["image_url"] as String?).flatMap(URL.init(string:))
+                )
+            }
+
+            return (stories, topics, members)
+        }
+
+        let grouped = Dictionary(grouping: members, by: \.storyID)
+        let live = now.addingTimeInterval(-Self.liveWindow)
+
+        // **Kept even where it has one article left.** The `members.count > 1`
+        // of the page is what decides whether something is a story at all ; a
+        // row already printed is a story whatever a purge has since done to it,
+        // and answering nothing here would take its figures away rather than
+        // its place on the page.
+        return stories.reduce(into: [UUID: DigestStory]()) { found, story in
+            found[story.id] = Self.story(
+                story,
+                members: grouped[story.id] ?? [],
+                topics: topics[story.id] ?? [],
+                liveSince: live
+            )
+        }
     }
 
     /// How many stories the page is looking at.

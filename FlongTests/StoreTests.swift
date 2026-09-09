@@ -78,6 +78,8 @@ struct StoreTests {
                 "v48.aMarkForEverySubject",
                 "v49.whatWasSentAway",
                 "v50.whoWroteTheHeadline",
+                "v51.theNewsOfThePeriodBefore",
+                "v52.aPaperGoesToPressBeforeItComesOut",
             ]
         )
     }

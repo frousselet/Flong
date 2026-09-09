@@ -87,7 +87,16 @@ struct EditionScheduleTests {
 struct EditionStoreTests {
     private let database: AppDatabase
     private let editions: EditionStore
+
+    /// A Saturday, twenty to one in the afternoon, in Paris.
+    ///
+    /// The boundary that has gone is noon and the one in press is still the
+    /// evening's, so a page made here is the midday edition and its period ends
+    /// at midday. Everything below is said in hours before that hour rather
+    /// than before this moment, since what a page holds is a question about its
+    /// period.
     private let now = Date(timeIntervalSince1970: 1_788_000_000)
+    private var noon: Date { now.addingTimeInterval(-40 * 60) }
 
     private let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
@@ -100,7 +109,8 @@ struct EditionStoreTests {
         editions = EditionStore(database)
     }
 
-    /// A story of several articles from several rooms, ending some hours ago.
+    /// A story of several articles from several rooms, ending some hours before
+    /// the midday boundary.
     ///
     /// Written straight into the store : what these tests pin is which stories
     /// reach a page and in what order, and grouping a corpus to get there would
@@ -108,14 +118,22 @@ struct EditionStoreTests {
     @discardableResult
     private func story(
         _ title: String,
-        endingHoursAgo hours: Double,
+        endingHoursBeforeNoon hours: Double,
         articles count: Int = 2,
-        written: Bool = true
+        written: Bool = true,
+        groupedHoursBeforeNoon grouped: Double? = nil
     ) async throws -> UUID {
-        let last = now.addingTimeInterval(-hours * 3600)
-        var story = Story(id: .v7(at: last), title: title, firstAt: last, lastAt: last, updatedAt: last)
+        let last = noon.addingTimeInterval(-hours * 3600)
+        // The key is minted where the grouping runs, which is not where the
+        // articles are dated : a publisher may stamp this morning's item with
+        // last week's date.
+        let minted = grouped.map { noon.addingTimeInterval(-$0 * 3600) } ?? last
+        var story = Story(id: .v7(at: minted), title: title, firstAt: last, lastAt: last, updatedAt: last)
         story.isGenerated = written
         story.summary = written ? "Ce qui s'est passé, en une ligne." : nil
+        // Asked about and answered, so nothing here is a story the coming page
+        // is still waiting on : the readiness of a period is its own suite.
+        story.briefLocale = written ? Locale.current.identifier : nil
 
         try await database.writer.write { db in
             try story.insert(db)
@@ -127,7 +145,7 @@ struct EditionStoreTests {
 
                 // Spread backwards, so nothing is recent enough to be live and
                 // the order under test is the ordinary one.
-                let date = last.addingTimeInterval(-Double(index) * 3600)
+                let date = last.addingTimeInterval(-Double(index) * 60)
                 var entry = Entry(
                     feedID: feed.id,
                     guid: "urn:\(host):\(index)",
@@ -152,18 +170,28 @@ struct EditionStoreTests {
         }
     }
 
+    /// Opens the page being made and chooses what stands on it, which is what
+    /// every pass does.
+    @discardableResult
+    private func make(at moment: Date? = nil) async throws -> Edition {
+        let moment = moment ?? now
+        let edition = try #require(await editions.open(.standard, now: moment, calendar: calendar))
+        try await editions.compose(edition, now: moment)
+        return edition
+    }
+
     @Test("An edition holds ten stories, and the rest is the wire")
     func tenAndNoMore() async throws {
         for index in 0..<14 {
-            try await story("Actualité \(index)", endingHoursAgo: Double(index))
+            try await story("Actualité \(index)", endingHoursBeforeNoon: Double(index) + 1)
         }
 
-        let edition = try #require(await editions.build(.standard, now: now, calendar: calendar))
+        let edition = try await make()
         let held = try await rows(of: edition.id)
 
         #expect(held.count == EditionStore.mostStories)
         // The page's own order : the most recent first, since nothing here has
-        // a subject the reader has spoken about.
+        // a subject the reader has spoken about and every story weighs the same.
         #expect(held.first?.title == "Actualité 0")
     }
 
@@ -174,13 +202,12 @@ struct EditionStoreTests {
     /// day.
     @Test("A story the model would not write about does not reach the page")
     func onlyWhatTheModelWrote() async throws {
-        try await story("Écrite", endingHoursAgo: 1)
-        try await story("Refusée", endingHoursAgo: 0.5, written: false)
+        try await story("Écrite", endingHoursBeforeNoon: 1)
+        try await story("Refusée", endingHoursBeforeNoon: 0.5, written: false)
 
-        let edition = try #require(await editions.build(.standard, now: now, calendar: calendar))
-        let held = try await rows(of: edition.id)
+        let edition = try await make()
 
-        #expect(held.map(\.title) == ["Écrite"])
+        #expect(try await rows(of: edition.id).map(\.title) == ["Écrite"])
     }
 
     /// A device with no model writes about no story, so it builds no edition at
@@ -188,79 +215,299 @@ struct EditionStoreTests {
     /// putting a publisher's headline over a page and calling it written.
     @Test("With nothing written there is an edition holding nothing, and nothing to publish")
     func noModelNoPage() async throws {
-        try await story("Une", endingHoursAgo: 1, written: false)
-        try await story("Deux", endingHoursAgo: 2, written: false)
+        try await story("Une", endingHoursBeforeNoon: 1, written: false)
+        try await story("Deux", endingHoursBeforeNoon: 2, written: false)
 
-        let edition = try #require(await editions.build(.standard, now: now, calendar: calendar))
+        let edition = try await make()
 
         #expect(try await rows(of: edition.id).isEmpty)
         #expect(edition.points.isEmpty)
-        #expect(try await editions.current() == nil)
+        #expect(try await editions.current(now: now) == nil)
     }
 
-    @Test("Building twice at one boundary is one edition")
+    @Test("Opening twice at one boundary is one edition")
     func idempotent() async throws {
-        try await story("Une", endingHoursAgo: 1)
-        try await story("Deux", endingHoursAgo: 2)
+        try await story("Une", endingHoursBeforeNoon: 1)
+        try await story("Deux", endingHoursBeforeNoon: 2)
 
-        let first = try #require(await editions.build(.standard, now: now, calendar: calendar))
-        let second = try #require(await editions.build(.standard, now: now, calendar: calendar))
+        let first = try await make()
+        let second = try await make()
 
         #expect(first.id == second.id)
         let count = try await database.writer.read { db in try Edition.fetchCount(db) }
         #expect(count == 1)
     }
 
+    // MARK: - What a period holds
+
+    /// The page is about a stretch of time that has ended, and a story older
+    /// than it belongs to a paper the reader has already had.
+    @Test("An edition holds what happened in its period and nothing older")
+    func thePeriod() async throws {
+        try await story("Ce matin", endingHoursBeforeNoon: 2)
+        try await story("Aussi ce matin", endingHoursBeforeNoon: 3)
+
+        // A page that came out at seven, so the midday period runs from seven.
+        let morning = try await make(at: noon.addingTimeInterval(-5 * 3600 + 60))
+        try await publish(morning.id)
+        try await story("Avant-hier", endingHoursBeforeNoon: 30)
+
+        let midday = try await make()
+        #expect(midday.coversFrom == noon.addingTimeInterval(-5 * 3600))
+        #expect(try await rows(of: midday.id).map(\.title) == ["Ce matin", "Aussi ce matin"])
+    }
+
+    /// **An article inside the period, and not a story whose last article is
+    /// inside it.** A story that broke at ten and gained one more article at ten
+    /// past noon is still the midday page's story.
+    @Test("A story that broke in the period and moved after it is still on the page")
+    func movedAfterwards() async throws {
+        let id = try await story("En cours", endingHoursBeforeNoon: 1)
+        let after = noon.addingTimeInterval(20 * 60)
+        try await database.writer.write { db in
+            try db.execute(sql: "UPDATE story SET last_at = ? WHERE id = ?", arguments: [after, id])
+        }
+
+        let edition = try await make()
+        #expect(try await rows(of: edition.id).map(\.title) == ["En cours"])
+    }
+
+    /// A page can never lead on something dated after its own dateline.
+    @Test("A page holds nothing that arrived after its hour")
+    func nothingAfterTheHour() async throws {
+        try await story("Après", endingHoursBeforeNoon: -0.5)
+        try await story("Avant", endingHoursBeforeNoon: 1)
+
+        let edition = try await make()
+        #expect(try await rows(of: edition.id).map(\.title) == ["Avant"])
+    }
+
+    /// A publisher that stamps this morning's item with last week's date is an
+    /// ordinary publisher. The story's own key is minted where the grouping
+    /// runs, so it reaches the page of the period it was grouped in.
+    @Test("A story grouped in the period is on the page though its articles are dated last week")
+    func backDated() async throws {
+        try await story("Antidatée", endingHoursBeforeNoon: 60, groupedHoursBeforeNoon: 0.5)
+        try await story("Ordinaire", endingHoursBeforeNoon: 1)
+
+        let edition = try await make()
+        #expect(try await rows(of: edition.id).map(\.title).contains("Antidatée"))
+    }
+
+    /// A quiet night is a short paper and never a blank one.
+    @Test("A quiet period gives a short edition")
+    func aShortPage() async throws {
+        try await story("Une", endingHoursBeforeNoon: 1)
+        try await story("Deux", endingHoursBeforeNoon: 2)
+
+        let edition = try await make()
+        #expect(try await rows(of: edition.id).count == EditionStore.leastStories)
+    }
+
+    /// One story under a dateline is a headline rather than an edition, and the
+    /// paper before it stays on the table.
+    @Test("Below two there is no edition, and nothing is stamped")
+    func belowTheFloor() async throws {
+        try await story("Seule", endingHoursBeforeNoon: 1)
+
+        let edition = try await make()
+        #expect(try await rows(of: edition.id).count == 1)
+
+        let work = BriefEditionsJob.work(locale: .current, now: now)
+        let waiting = try await database.writer.read { db in
+            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM edition WHERE \(work.sql)", arguments: work.arguments)
+        }
+        #expect(waiting == 0)
+
+        let row = try await database.writer.read { db in try Edition.fetchOne(db, key: edition.id) }
+        #expect(row?.publishedAt == nil)
+        #expect(row?.briefLocale == nil)
+        #expect(row?.askedAt == nil)
+    }
+
+    // MARK: - Where a period begins
+
+    /// A boundary the device slept through was closed and never published, so
+    /// its news folds into the page that follows rather than falling between
+    /// two of them.
+    @Test("A period nobody published is folded into the next one")
+    func foldedForward() async throws {
+        try await story("Hier soir", endingHoursBeforeNoon: 14)
+        try await story("Hier soir encore", endingHoursBeforeNoon: 15)
+
+        // Seven o'clock, published, then the noon boundary with nothing in
+        // between having come out.
+        let morning = try await make(at: noon.addingTimeInterval(-5 * 3600 + 60))
+        try await publish(morning.id)
+
+        let midday = try await make()
+        #expect(midday.coversFrom == morning.openedAt)
+        #expect(try await rows(of: midday.id).isEmpty)
+    }
+
+    /// A slot the reader switched off never published, so the next period
+    /// stretches back over it rather than leaving a hole.
+    @Test("A slot switched off lengthens the next period")
+    func aSlotSwitchedOff() async throws {
+        var schedule = EditionSchedule.standard
+        schedule.hours[.noon] = nil
+
+        try await story("Ce matin", endingHoursBeforeNoon: 2)
+        try await story("Aussi ce matin", endingHoursBeforeNoon: 3)
+
+        let morning = try #require(
+            await editions.open(schedule, now: noon.addingTimeInterval(-5 * 3600 + 60), calendar: calendar))
+        try await publish(morning.id)
+
+        let evening = try #require(
+            await editions.open(schedule, now: noon.addingTimeInterval(6 * 3600 + 60), calendar: calendar))
+        #expect(evening.slot == .evening)
+        #expect(evening.coversFrom == morning.openedAt)
+    }
+
+    /// A store with nothing published takes the three days the stories are held
+    /// to, which is the right first page for somebody who has just imported a
+    /// thousand feeds.
+    @Test("The first edition of a store covers the three days")
+    func theFirstPage() async throws {
+        try await story("Une", endingHoursBeforeNoon: 1)
+
+        let edition = try await make()
+        #expect(edition.coversFrom == edition.openedAt.addingTimeInterval(-DigestStore.window))
+    }
+
+    /// A slot moved backwards, a flight west and a schedule naming an hour
+    /// already covered are one case, and minting a row for it would be a page
+    /// with an inverted period that nothing can ever show.
+    @Test("A boundary earlier than the last page that came out mints nothing")
+    func neverBehindTheLastPage() async throws {
+        try await story("Une", endingHoursBeforeNoon: 1)
+        try await story("Deux", endingHoursBeforeNoon: 2)
+
+        let midday = try await make()
+        try await publish(midday.id)
+
+        var moved = EditionSchedule.standard
+        moved.hours[.noon] = 11 * 60
+        #expect(try await editions.open(moved, now: now, calendar: calendar) == nil)
+
+        let count = try await database.writer.read { db in try Edition.fetchCount(db) }
+        #expect(count == 1)
+    }
+
+    // MARK: - What freezes, and when
+
     /// An edition stops being the current one when the next boundary passes,
     /// and it keeps the ten it had rather than being rewritten by the page as
     /// it stands afterwards.
     @Test("The next boundary closes the one before it, which keeps its ten")
     func closing() async throws {
-        try await story("Ce matin", endingHoursAgo: 1)
-        try await story("Aussi ce matin", endingHoursAgo: 2)
+        try await story("Ce matin", endingHoursBeforeNoon: 1)
+        try await story("Aussi ce matin", endingHoursBeforeNoon: 2)
 
-        let morning = try #require(await editions.build(.standard, now: now, calendar: calendar))
-        let held = try await rows(of: morning.id).map(\.title)
+        let midday = try await make()
+        try await publish(midday.id)
+        let held = try await rows(of: midday.id).map(\.title)
 
-        // Five hours on, past the next boundary, with a newer story in the
-        // store.
         let later = now.addingTimeInterval(6 * 3600)
-        try await story("Cet après-midi", endingHoursAgo: -5.5)
-        let next = try #require(await editions.build(.standard, now: later, calendar: calendar))
+        try await story("Cet après-midi", endingHoursBeforeNoon: -5.5)
+        let next = try await make(at: later)
 
-        #expect(next.id != morning.id)
-        #expect(try await rows(of: morning.id).map(\.title) == held)
+        #expect(next.id != midday.id)
+        #expect(try await rows(of: midday.id).map(\.title) == held)
 
-        let closed = try await database.writer.read { db in try Edition.fetchOne(db, key: morning.id) }
+        let closed = try await database.writer.read { db in try Edition.fetchOne(db, key: midday.id) }
         #expect(closed?.closedAt != nil)
     }
 
-    /// **The newest published one, and not the newest one.** The edition of the
-    /// moment is being written for the first minutes of its life, and a page
-    /// that emptied while the model worked would go blank four times a day.
+    /// **Composed again until it comes out, and never after.** Choosing again
+    /// while a page is unpublished is what stops it being frozen from the first
+    /// thirty seconds of a five-minute pass ; the freeze is at publication and
+    /// it is total.
+    @Test("The ten are chosen again until the page comes out, and never after")
+    func composedUntilPublished() async throws {
+        try await story("Une", endingHoursBeforeNoon: 3)
+        try await story("Deux", endingHoursBeforeNoon: 4)
+
+        let edition = try await make()
+        try await story("Plus récente", endingHoursBeforeNoon: 1)
+        try await editions.compose(edition, now: now)
+        #expect(try await rows(of: edition.id).first?.title == "Plus récente")
+
+        try await publish(edition.id)
+        let published = try #require(
+            await database.writer.read { db in try Edition.fetchOne(db, key: edition.id) })
+        try await story("Plus récente encore", endingHoursBeforeNoon: 0.5)
+        try await editions.compose(published, now: now)
+        #expect(try await rows(of: edition.id).first?.title == "Plus récente")
+    }
+
+    /// The idle cost, asserted. A pass over a page nothing has changed writes
+    /// nothing at all, on two tables the store watcher follows.
+    @Test("A settled edition is read and never written")
+    func idle() async throws {
+        try await story("Une", endingHoursBeforeNoon: 1)
+        try await story("Deux", endingHoursBeforeNoon: 2)
+
+        let edition = try await make()
+        let stamped = try #require(
+            await database.writer.read { db in try Edition.fetchOne(db, key: edition.id)?.updatedAt })
+
+        try await editions.compose(edition, now: now.addingTimeInterval(60))
+        let again = try #require(
+            await database.writer.read { db in try Edition.fetchOne(db, key: edition.id)?.updatedAt })
+
+        #expect(again == stamped)
+    }
+
+    /// **The newest one that has come out, and not the newest one written.**
     @Test("A page still being written does not take the last one off the screen")
     func theLastOneStands() async throws {
-        try await story("Hier soir", endingHoursAgo: 10)
-        try await story("Hier soir encore", endingHoursAgo: 11)
+        try await story("Ce matin", endingHoursBeforeNoon: 1)
+        try await story("Aussi ce matin", endingHoursBeforeNoon: 2)
 
-        let evening = try #require(await editions.build(.standard, now: now, calendar: calendar))
-        try await publish(evening.id)
+        let midday = try await make()
+        try await publish(midday.id)
 
         let later = now.addingTimeInterval(6 * 3600)
-        let next = try #require(await editions.build(.standard, now: later, calendar: calendar))
+        let next = try await make(at: later)
         #expect(next.publishedAt == nil)
 
         let current = try #require(await editions.current(now: later))
-        #expect(current.edition.id == evening.id)
+        #expect(current.edition.id == midday.id)
         #expect(current.edition.points.count == 2)
     }
 
-    @Test("The archive holds what was published and nothing else")
-    func archiveIsPublishedOnly() async throws {
-        try await story("Une", endingHoursAgo: 1)
-        try await story("Deux", endingHoursAgo: 2)
+    /// A page written ahead of its hour is tomorrow's paper : it must not
+    /// arrive on the table twenty minutes early under a dateline saying
+    /// otherwise.
+    @Test("A page written before its hour is not on the table until its hour")
+    func writtenIsNotOut() async throws {
+        try await story("Ce matin", endingHoursBeforeNoon: 1)
+        try await story("Aussi ce matin", endingHoursBeforeNoon: 2)
 
-        let edition = try #require(await editions.build(.standard, now: now, calendar: calendar))
+        let midday = try await make()
+        try await publish(midday.id)
+
+        // Ten to six, so the evening edition is in press and its hour has not
+        // come.
+        let inPress = noon.addingTimeInterval(6 * 3600 - 10 * 60)
+        try await story("Cet après-midi", endingHoursBeforeNoon: -3)
+        try await story("Aussi cet après-midi", endingHoursBeforeNoon: -4)
+        let evening = try await make(at: inPress)
+        try await publish(evening.id)
+
+        #expect(try await editions.current(now: inPress)?.edition.id == midday.id)
+        #expect(try await editions.offThePress()?.id == evening.id)
+        #expect(try await editions.current(now: evening.openedAt)?.edition.id == evening.id)
+    }
+
+    @Test("The archive holds what has come out and nothing else")
+    func archiveIsPublishedOnly() async throws {
+        try await story("Une", endingHoursBeforeNoon: 1)
+        try await story("Deux", endingHoursBeforeNoon: 2)
+
+        let edition = try await make()
         #expect(try await editions.archive(now: now).isEmpty)
 
         try await publish(edition.id)
@@ -268,28 +515,102 @@ struct EditionStoreTests {
     }
 
     /// An edition older than the window its stories are held to is a page of
-    /// headlines whose articles have gone, and one that closed without ever
-    /// being written is not an edition at all.
+    /// headlines whose articles have gone.
     @Test("The purge takes what has fallen out of the window")
     func purge() async throws {
-        try await story("Une", endingHoursAgo: 1)
-        try await story("Deux", endingHoursAgo: 2)
+        try await story("Une", endingHoursBeforeNoon: 1)
+        try await story("Deux", endingHoursBeforeNoon: 2)
 
-        let edition = try #require(await editions.build(.standard, now: now, calendar: calendar))
+        let edition = try await make()
+        try await publish(edition.id)
+
+        // A newer page, so the one under test is no longer the paper on the
+        // table and the purge may take it.
+        let later = now.addingTimeInterval(6 * 3600)
+        try await story("Ce soir", endingHoursBeforeNoon: -5)
+        try await story("Ce soir encore", endingHoursBeforeNoon: -5.5)
+        let evening = try await make(at: later)
+        try await publish(evening.id, at: later)
+
+        let muchLater = later.addingTimeInterval(EditionStore.archived + 24 * 3600)
+        _ = try await editions.purge(now: muchLater)
+
+        #expect(try await editions.archive(now: muchLater).map(\.edition.id) == [evening.id])
+    }
+
+    /// A quiet reader whose periods keep failing to fill two stories keeps one
+    /// page for days, and the age would eventually take it and leave the front
+    /// page blank.
+    @Test("The purge never takes the page on the table")
+    func purgeSparesTheCurrent() async throws {
+        try await story("Une", endingHoursBeforeNoon: 1)
+        try await story("Deux", endingHoursBeforeNoon: 2)
+
+        let edition = try await make()
         try await publish(edition.id)
 
         let muchLater = now.addingTimeInterval(EditionStore.archived + 24 * 3600)
         _ = try await editions.purge(now: muchLater)
 
-        #expect(try await editions.archive(now: muchLater).isEmpty)
+        #expect(try await editions.current(now: muchLater)?.edition.id == edition.id)
     }
 
-    private func publish(_ id: UUID) async throws {
+    /// The model call sits between the choosing and the stamping, and a page
+    /// published with a list describing rows it no longer holds would be final.
+    @Test("A list is not written over a page that has moved under it")
+    func composedOf() async throws {
+        try await story("Une", endingHoursBeforeNoon: 3)
+        try await story("Deux", endingHoursBeforeNoon: 4)
+
+        let edition = try await make()
+        let asked = try await rows(of: edition.id).map(\.storyID)
+
+        try await story("Plus récente", endingHoursBeforeNoon: 1)
+        try await editions.compose(edition, now: now)
+
+        let written = try await editions.publish(
+            edition.id,
+            points: ["Une chose.", "Une autre."],
+            topics: ["", ""],
+            in: Locale(identifier: "fr_FR"),
+            composedOf: asked
+        )
+        #expect(written == false)
+        #expect(try await editions.current(now: now) == nil)
+    }
+
+    /// A page whose hour has not come has never been seen by anybody, so
+    /// retracting the hour is retracting the paper.
+    @Test("An hour the reader retracts unmakes the page waiting for it")
+    func unmade() async throws {
+        try await story("Ce matin", endingHoursBeforeNoon: 1)
+        try await story("Aussi ce matin", endingHoursBeforeNoon: 2)
+        let midday = try await make()
+        try await publish(midday.id)
+
+        let inPress = noon.addingTimeInterval(6 * 3600 - 10 * 60)
+        try await story("Cet après-midi", endingHoursBeforeNoon: -3)
+        try await story("Aussi cet après-midi", endingHoursBeforeNoon: -4)
+        let evening = try await make(at: inPress)
+        try await publish(evening.id)
+
+        var without = EditionSchedule.standard
+        without.hours[.evening] = nil
+        let gone = try await editions.unmakeWhatIsNotWanted(
+            against: without, locale: Locale(identifier: "fr_FR"), now: inPress, calendar: calendar)
+
+        #expect(gone == [evening.openedAt])
+        #expect(try await editions.current(now: evening.openedAt)?.edition.id == midday.id)
+    }
+
+    private func publish(_ id: UUID, at moment: Date? = nil) async throws {
         try await database.writer.write { db in
             guard var edition = try Edition.fetchOne(db, key: id) else { return }
             edition.points = ["Deux ouvriers sauvés au Népal.", "Gaël Monfils quitte l'US Open."]
+            edition.pointTopics = ["", ""]
             edition.briefLocale = Locale(identifier: "fr_FR").identifier
-            edition.publishedAt = Date()
+            edition.askedAt = moment ?? self.now
+            edition.publishedAt = moment ?? self.now
             try edition.update(db)
         }
     }
@@ -304,21 +625,22 @@ struct EditionBriefWorkTests {
         database = try AppDatabase.inMemory()
     }
 
-    /// The rule is the story's rule, over a whole page : has the model been
-    /// asked about *these articles*, in *this language*?
-    @Test("A page asked about in this language, over these articles, is not asked again")
+    /// **Nothing invalidates a page, because a page is asked about once.** The
+    /// rule was the story's rule said over a whole page : has the model been
+    /// asked about *these articles*. It was right for a page that lived while
+    /// its news was still arriving and wrong for a page about a period that has
+    /// ended, where there is nothing underneath left to change.
+    @Test("A page that has come out is never asked about again")
     func settled() async throws {
-        let locale = Locale(identifier: "fr_FR")
-        let work = BriefEditionsJob.work(locale: locale, since: now.addingTimeInterval(-EditionStore.archived))
+        let work = BriefEditionsJob.work(locale: Locale(identifier: "fr_FR"), now: now)
 
+        #expect(work.sql.contains("published_at IS NULL"))
+        #expect(work.sql.contains("closed_at IS NULL"))
         #expect(work.sql.contains("brief_locale"))
-        #expect(work.sql.contains("brief_members"))
-        // Every article of every story on the page, and not a sample of them :
-        // an article joining any story is a slightly different page, and the
-        // sentence over it is a question worth putting again.
-        #expect(BriefEditionsJob.membersKey.contains("story_member"))
-        #expect(BriefEditionsJob.membersKey.contains("edition_story"))
-        #expect(!BriefEditionsJob.membersKey.contains("LIMIT"))
+        #expect(work.sql.contains("asked_at"))
+        // The key that re-opened the question is gone with the question.
+        #expect(!work.sql.contains("brief_members"))
+        #expect(!work.sql.contains("story_member"))
     }
 
     /// Without a model there is nothing to ask, so the queue is empty rather

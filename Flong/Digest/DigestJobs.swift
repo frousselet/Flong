@@ -367,11 +367,19 @@ nonisolated struct BriefStoriesJob: ResumableJob {
     }
 }
 
-/// Names the editions and writes the lines under them.
+/// Writes the few points over an edition, once, when its period has been
+/// written.
 ///
 /// A job like the briefs and the filings, and resumable for the same reason :
 /// one call to the model apiece, and what one turn does not get through the
 /// next one does.
+///
+/// **What it no longer does is ask again.** It compared every article of every
+/// story on the page against a stored key, so one article joining any of the
+/// ten re-opened the question and a page was written and rewritten for the
+/// whole of its life : twenty to fifty asks a day for something that needs
+/// four. A page about a period that has ended has nothing underneath it left to
+/// change, so the key is gone and with it the question it existed to re-open.
 nonisolated struct BriefEditionsJob: ResumableJob {
     let name = "brief-editions"
 
@@ -381,163 +389,172 @@ nonisolated struct BriefEditionsJob: ResumableJob {
     /// than after ten.
     static let batchSize = 1
 
+    /// How long an edition waits for a story of its own period that still has
+    /// no headline, before going to press without it.
+    ///
+    /// **Without this the earliest beat wins.** Only a story the model has
+    /// written about may stand on a page, and a background refresh five seconds
+    /// past the press that happened to have got two stories written would
+    /// freeze a two-story morning edition for five hours while forty properly
+    /// written ones sat underneath it. The page is asked about when its period
+    /// has been written, or when this has gone by.
+    ///
+    /// **Capped by the run, and it has to be.** Twenty minutes was right for a
+    /// page with no deadline ; a page that goes to press cannot wait longer
+    /// than half the time it has, or the wait eats the ask it exists to
+    /// improve. What makes a short one safe is the other half of the same test :
+    /// it is skipped outright the moment nothing is outstanding, so it only
+    /// bites when the model is failing, and a failing model is not made to
+    /// answer by being waited on.
+    static var grace: TimeInterval { min(20 * 60, EditionSchedule.pressRun / 2) }
+
+    /// How long a page whose model was unusable waits before being put again.
+    ///
+    /// ``ModelPatience/refusalPause``, deliberately and for the same reason :
+    /// what stopped the last ask was the model rather than the page, and the
+    /// interval a model is given to come back is the interval worth waiting
+    /// before asking it anything.
+    static let askAgainAfter: TimeInterval = 10 * 60
+
     private let database: AppDatabase
     private let summarizer: EditionSummarizer
-    private let since: Date
+    private let now: Date
 
     init(_ database: AppDatabase, summarizer: EditionSummarizer = EditionSummarizer(), now: Date = Date()) {
         self.database = database
         self.summarizer = summarizer
-        self.since = now.addingTimeInterval(-EditionStore.archived)
+        self.now = now
     }
 
-    /// Every article of every story on the page, as one value to compare.
+    /// Which pages could want their points written, before readiness is asked.
     ///
-    /// **Every article, and not the six the model was shown.** A story's own
-    /// brief is invalidated by the articles it was written from ; an edition is
-    /// invalidated by anything at all changing underneath it, which is what was
-    /// asked for : an article joining any story on the page makes it a slightly
-    /// different page, and the sentence over it is a question worth putting
-    /// again.
+    /// Every clause is a decision, and together they are most of the frugality :
     ///
-    /// Sorted, so the key is a set : the same articles in another order is the
-    /// same page and costs nothing, and one arriving anywhere is a new question.
-    static let membersKey = """
-        (SELECT group_concat(id) FROM (
-            SELECT DISTINCT hex(m.entry_id) AS id
-            FROM edition_story es
-            JOIN story_member m ON m.story_id = es.story_id
-            JOIN entry e ON e.id = m.entry_id
-            WHERE es.edition_id = edition.id AND e.duplicate_of IS NULL
-            ORDER BY id))
-        """
-
-    /// Which editions want a headline of their own.
+    /// - `published_at IS NULL` is the rule itself. A page that has come off
+    ///   the press is not in the work set and can never be asked about again.
+    /// - `closed_at IS NULL` is the bound on a late paper : a page whose
+    ///   successor has gone to press has missed its hour for good.
+    /// - the press has come, so a page is asked about when it is finished
+    ///   rather than when it is opened.
+    /// - a language is a durable answer : asked and refused about ten stories
+    ///   that can no longer move is the same answer next time, and only a
+    ///   reader changing language is a different question.
+    /// - the ask-again floor holds a model that was merely unusable to one
+    ///   attempt per pause, inside the page's own window.
+    /// - two stories at the least, so a quiet period leaves the row unstamped
+    ///   and unpublished : an article arriving at twenty past can still make the
+    ///   page, and the ring says nothing about a stage that will never finish.
     ///
-    /// The same rule the stories are held to : has the model been asked about
-    /// this page, in this language? One it answered, refused, or answered in
-    /// the wrong language has been asked ; a reader who changes language has
-    /// changed the question ; and a page whose stories have moved is a new one.
-    ///
-    /// Held to the window the archive keeps, so an edition nobody can reach any
-    /// more is not worth a model call.
-    static func work(locale: Locale, since: Date) -> (sql: String, arguments: StatementArguments) {
+    /// Readiness is the seventh and is not here, being a question about a row's
+    /// own period : see ``isReady(_:in:)``.
+    static func work(locale: Locale, now: Date = Date()) -> (sql: String, arguments: StatementArguments) {
         (
             """
-            opened_at >= ? AND (
-                brief_locale IS NULL OR brief_locale <> ?
-                OR brief_members IS NOT \(membersKey)
-            )
+            closed_at IS NULL AND published_at IS NULL
+            AND COALESCE(pressed_at, opened_at) <= ?
+            AND (brief_locale IS NULL OR brief_locale <> ?)
+            AND (asked_at IS NULL OR asked_at <= ?)
+            AND (SELECT COUNT(*) FROM edition_story WHERE edition_id = edition.id) >= \(EditionStore.leastStories)
             """,
-            [since, locale.identifier]
+            [now, locale.identifier, now.addingTimeInterval(-askAgainAfter)]
         )
     }
 
-    private var work: (sql: String, arguments: StatementArguments) {
-        Self.work(locale: summarizer.locale, since: since)
+    /// Whether a page's own period has been written, or has waited long enough.
+    ///
+    /// **Asked of the row rather than of the query.** The condition is about
+    /// this page's period, and a named parameter cannot vary from row to row, so
+    /// the cheap terms narrow to the one or two pages that are open at all and
+    /// this is asked of each. It is the same rule ``BriefStoriesJob`` works to,
+    /// read from the same function, so what counts as a story still waiting
+    /// cannot come to mean two things.
+    static func isReady(_ edition: Edition, in db: Database, locale: Locale, now: Date = Date()) throws -> Bool {
+        guard edition.periodEnd > now.addingTimeInterval(-grace) else { return true }
+
+        let stories = BriefStoriesJob.work(
+            locale: locale, hasModel: true, since: now.addingTimeInterval(-DigestStore.window))
+
+        let waiting =
+            try Int.fetchOne(
+                db,
+                sql: """
+                    SELECT COUNT(*) FROM story
+                    WHERE (\(stories.sql)) AND \(DigestStore.withinThePeriod)
+                    """,
+                arguments: stories.arguments + DigestStore.periodArguments(of: edition)
+            ) ?? 0
+
+        return waiting == 0
     }
 
     func remaining() async throws -> Int {
         guard summarizer.hand.isAvailable else { return 0 }
-        let work = self.work
-        return try await database.writer.read { db in
-            try Int.fetchOne(
-                db, sql: "SELECT COUNT(*) FROM edition WHERE \(work.sql)", arguments: work.arguments) ?? 0
-        }
+        return try await due() == nil ? 0 : 1
     }
 
     func step() async throws -> Int {
         guard summarizer.hand.isAvailable else { return 0 }
-        let work = self.work
+        guard let edition = try await due() else { return 0 }
 
-        // The one being made first, then whatever closed without ever being
-        // written : a reader is looking at the current page, and last night's
-        // is only worth writing so the archive is not full of holes.
-        let editions = try await database.writer.read { db in
+        let store = EditionStore(database)
+        let rows = try await store.rows(of: edition.id)
+        let heads = rows.map { (title: $0.title, summary: $0.summary) }
+
+        switch await summarizer.brief(over: heads, of: edition.slot) {
+        case .wrote(let brief):
+            let filings = try await store.filings(of: edition.id)
+            let published = try await store.publish(
+                edition.id,
+                points: brief.points,
+                topics: EditionStore.subjects(for: brief.points, over: rows, filedAs: filings),
+                in: brief.askedIn,
+                composedOf: rows.map(\.storyID)
+            )
+            // A page that moved under the question is a page the answer is not
+            // about. Nothing is written and the next turn asks again, which is
+            // one call spent rather than a page describing rows it no longer
+            // holds, for ever.
+            if !published {
+                Log.enrich.notice("An edition moved while the model wrote about it, so it will be asked again")
+            }
+            return 1
+
+        case .declined:
+            // The model has read this page and will not write about it. A
+            // durable answer about ten stories that can no longer move, so it
+            // is stamped : asking again would get the same refusal.
+            try await store.stamp(edition.id, refusedIn: summarizer.locale)
+            return 1
+
+        case .unusable:
+            // Not an answer about this page at all. Only the moment is written,
+            // and the next turn inside the window finds it still waiting.
+            Log.enrich.notice("An edition was left unwritten : the model was not usable")
+            try await store.stamp(edition.id, refusedIn: nil)
+            return 0
+        }
+    }
+
+    /// The page that wants writing, if any.
+    ///
+    /// The one being made comes first, then whatever is still open behind it :
+    /// a reader is looking at the current page, and an older one is only worth
+    /// writing so the archive is not full of holes.
+    private func due() async throws -> Edition? {
+        let work = Self.work(locale: summarizer.locale, now: now)
+        let locale = summarizer.locale
+        let now = self.now
+
+        return try await database.writer.read { db in
             try Edition.fetchAll(
                 db,
-                sql: "SELECT * FROM edition WHERE \(work.sql) ORDER BY opened_at DESC LIMIT \(Self.batchSize)",
+                sql: "SELECT * FROM edition WHERE \(work.sql) ORDER BY opened_at DESC",
                 arguments: work.arguments
             )
-        }
-        guard !editions.isEmpty else { return 0 }
-
-        var asked = 0
-        for edition in editions {
-            let stories = try await heads(of: edition.id)
-            guard stories.count > 1 else {
-                // A page of one story is not a page. It is stamped all the
-                // same, or the job would offer it again at every turn.
-                try await stamp(edition.id, brief: nil)
-                asked += 1
-                continue
-            }
-
-            switch await summarizer.brief(over: stories, of: edition.slot) {
-            case .wrote(let brief):
-                try await stamp(edition.id, brief: brief)
-                asked += 1
-            case .declined:
-                // The model has read this page and will not write about it.
-                // A durable answer about this page, so it is stamped : asking
-                // again about the same ten would get the same refusal, and the
-                // page changing is what re-opens the question.
-                try await stamp(edition.id, brief: nil)
-                asked += 1
-            case .unusable:
-                // Not an answer about this page at all. Nothing is stamped and
-                // the next turn finds it still waiting.
-                Log.enrich.notice("An edition was left unwritten : the model was not usable")
-                return asked
-            }
-        }
-        return asked
-    }
-
-    /// The ten heads, in the order the page shows them.
-    private func heads(of editionID: UUID) async throws -> [(title: String, summary: String?)] {
-        try await database.writer.read { db in
-            try EditionStory
-                .filter(Column("edition_id") == editionID)
-                .order(Column("position"))
-                .fetchAll(db)
-                .map { (title: $0.title, summary: $0.summary) }
-        }
-    }
-
-    /// Writes what came back, and the key that says what it was written from.
-    ///
-    /// **`published_at` is set once and never cleared.** An edition whose
-    /// stories move is re-asked and its headline is replaced, and clearing the
-    /// moment would take the page off the screen while the model wrote the next
-    /// one : the front page would go blank several times a day, which is
-    /// exactly what a page made at an hour exists to stop.
-    private func stamp(_ editionID: UUID, brief: EditionBrief?) async throws {
-        try await database.writer.write { db in
-            guard var edition = try Edition.fetchOne(db, key: editionID) else { return }
-
-            if let brief {
-                edition.points = brief.points
-                edition.briefLocale = brief.askedIn.identifier
-                if edition.publishedAt == nil { edition.publishedAt = Date() }
-            } else {
-                edition.briefLocale = summarizer.locale.identifier
-                edition.points = []
-            }
-            edition.updatedAt = Date()
-            try edition.update(db)
-
-            // Written in the same transaction and written whatever the answer
-            // was : it is what says this page has been asked about, and one
-            // left without it comes back at every turn.
-            try db.execute(
-                sql: "UPDATE edition SET brief_members = \(Self.membersKey) WHERE id = ?",
-                arguments: [editionID]
-            )
+            .first { try Self.isReady($0, in: db, locale: locale, now: now) }
         }
     }
 }
-
 /// Puts the digest together : vectors, then stories, then briefs.
 nonisolated struct DigestService: Sendable {
     private let database: AppDatabase
@@ -560,23 +577,47 @@ nonisolated struct DigestService: Sendable {
         (try? await StoryBuilder(database).build(now: now)) ?? StoryBuilder.Summary()
     }
 
-    /// Makes the edition of the moment, and closes whatever came before it.
+    /// Opens the edition being made, and closes whatever it supersedes.
     ///
-    /// Cheap : one read of the front page and ten rows. It runs wherever the
-    /// stories are grouped, so an edition is never later than the moment its
-    /// boundary passed plus however long it takes the reader to open Flong.
+    /// Cheap, and cheap by construction : one read, and a write only where a
+    /// boundary opens or closes. It is what has to run before the model does,
+    /// so the writing knows which period it is working for.
     @discardableResult
     @concurrent
-    func buildEditions(_ schedule: EditionSchedule, now: Date = Date()) async -> Edition? {
-        let store = EditionStore(database)
+    func openEdition(_ schedule: EditionSchedule, now: Date = Date()) async -> Edition? {
         do {
-            let edition = try await store.build(schedule, now: now)
-            try await store.purge(now: now)
-            return edition
+            return try await EditionStore(database).open(schedule, now: now)
         } catch {
-            Log.enrich.error("The edition could not be made : \(error, privacy: .public)")
+            Log.enrich.error("The edition could not be opened : \(error, privacy: .public)")
             return nil
         }
+    }
+
+    /// Chooses the page and asks the model about it, once.
+    ///
+    /// Composing runs on every pass and writes only where the ten have moved ;
+    /// the asking runs when the period has been written, and never again once
+    /// the page has come out.
+    @discardableResult
+    @concurrent
+    func makeTheEdition(
+        _ schedule: EditionSchedule,
+        now: Date = Date(),
+        until deadline: Date? = nil,
+        onNaming: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
+    ) async -> Int {
+        let store = EditionStore(database)
+        do {
+            if let edition = try await store.open(schedule, now: now) {
+                try await store.compose(edition, now: now)
+            }
+            try await store.purge(now: now)
+        } catch {
+            Log.enrich.error("The edition could not be made : \(error, privacy: .public)")
+        }
+
+        return await JobRunner(BriefEditionsJob(database, summarizer: EditionSummarizer(locale: locale), now: now))
+            .run(until: deadline, onProgress: onNaming).done
     }
 
     /// Names the editions. One call to the model per page.
@@ -597,9 +638,10 @@ nonisolated struct DigestService: Sendable {
     @concurrent
     func brief(
         until deadline: Date? = nil,
+        now: Date = Date(),
         onProgress: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
     ) async -> Int {
-        await JobRunner(BriefStoriesJob(database)).run(until: deadline, onProgress: onProgress).done
+        await JobRunner(BriefStoriesJob(database, now: now)).run(until: deadline, onProgress: onProgress).done
     }
 
     /// How long one turn of the model's work is given when nobody named a
@@ -645,37 +687,45 @@ nonisolated struct DigestService: Sendable {
     ) async {
         let end = deadline ?? Date().addingTimeInterval(Self.enrichmentTurn)
 
+        // **Opened before anything is written, and made after everything is.**
+        // The row and its period have to exist first, since what the writing is
+        // ordered by is which stories the coming page could lead on ; and the
+        // page cannot be chosen and asked about until that writing has
+        // happened, only a story the model has written about being eligible.
+        //
+        // It used to be filled inside the loop, on every slice, which was one
+        // answer to that ordering and a poor one : the ten rows were dropped
+        // and written again every forty-five seconds on two tables the store
+        // watcher follows, and the page went on moving under a reader for the
+        // whole of its life. Once before and once after is the same ordering
+        // said properly.
+        await openEdition(schedule, now: now)
+
         while !Task.isCancelled, Date() < end {
             onPhase(.writing)
             let slice = min(Date().addingTimeInterval(Self.enrichmentSlice), end)
-            let written = await brief(until: slice, onProgress: onWriting)
+            let written = await brief(until: slice, now: now, onProgress: onWriting)
 
             onPhase(.filing)
             let next = min(Date().addingTimeInterval(Self.enrichmentSlice), end)
             let filed = await nameTopics(until: next, now: now, onProgress: onFiling)
 
-            // **Last of the three, and it has to be.** The page is named over
-            // the headlines of the stories on it, so a page named before they
-            // were written would be named over the titles of whichever articles
-            // happened to be nearest the middle of each group. It is also the
-            // cheapest of the three, being one call for the whole page, so
-            // going last costs it nothing : what the other two leave it is
-            // always enough for one ask.
-            //
-            // The page is filled again first. Only a story the model has
-            // written about may stand on an edition, and the pass that fills
-            // the page runs at grouping time, before a word has been written :
-            // built once and never again, the morning edition found nothing
-            // eligible, stayed empty for the whole of its life, and was stamped
-            // as a page the model had declined to name.
-            await buildEditions(schedule, now: now)
-
-            onPhase(.naming)
-            let named = await briefEditions(
-                until: min(Date().addingTimeInterval(Self.enrichmentSlice), end), now: now, onProgress: onNaming)
-
-            guard written > 0 || filed > 0 || named > 0 else { break }
+            guard written > 0 || filed > 0 else { break }
         }
+
+        // **Last, and it has to be.** The page is named over the headlines of
+        // the stories on it, so a page named before they were written would be
+        // named over the titles of whichever articles happened to be nearest
+        // the middle of each group. It is also the cheapest of the three, being
+        // one call for a whole page, so going last costs it nothing : what the
+        // other two leave it is always enough for one ask.
+        onPhase(.naming)
+        await makeTheEdition(
+            schedule,
+            now: now,
+            until: min(Date().addingTimeInterval(Self.enrichmentSlice), end),
+            onNaming: onNaming
+        )
     }
 
     @discardableResult
@@ -736,6 +786,44 @@ nonisolated struct DigestService: Sendable {
     @concurrent
     func subjects(in headlines: [String]) async -> [String] {
         SearchSubjects.subjects(in: headlines)
+    }
+
+    /// The edition the front page shows, and nothing else.
+    ///
+    /// Read behind every store tick, so it is one row and its ten rather than
+    /// every back number there is.
+    @concurrent
+    func currentEdition(now: Date = Date()) async throws -> PublishedEdition? {
+        try await EditionStore(database).current(now: now)
+    }
+
+    /// Every edition that has come out, newest first, for the back numbers.
+    @concurrent
+    func editionArchive(now: Date = Date()) async throws -> [PublishedEdition] {
+        try await EditionStore(database).archive(now: now)
+    }
+
+    /// The newest page off the press, whether or not its hour has come.
+    ///
+    /// The one read that looks past the hour, and it is the notice's.
+    @concurrent
+    func offThePress() async throws -> Edition? {
+        try await EditionStore(database).offThePress()
+    }
+
+    /// Takes back the pages whose hour the reader has retracted.
+    @concurrent
+    func unmakeEditions(
+        against schedule: EditionSchedule,
+        now: Date = Date()
+    ) async throws -> [Date] {
+        try await EditionStore(database).unmakeWhatIsNotWanted(against: schedule, locale: locale, now: now)
+    }
+
+    /// The figures of a named handful of stories, for a page that is frozen.
+    @concurrent
+    func figures(of ids: [UUID], now: Date = Date()) async throws -> [UUID: DigestStory] {
+        try await DigestStore(database).stories(ids, now: now)
     }
 
     @concurrent

@@ -71,6 +71,28 @@ nonisolated struct EditionSchedule: Codable, Hashable, Sendable {
 
     var slots: [EditionSlot] { EditionSlot.allCases.filter { hours[$0] != nil } }
 
+    /// How long before its hour an edition goes to press.
+    ///
+    /// **A paper goes to press before it comes out, and that is the whole of
+    /// this.** The period used to run to the hour, so the model could not be
+    /// asked until the hour had passed, so the notice could not be posted until
+    /// some background pass happened to run. `BGTaskRequest.earliestBeginDate`
+    /// promises only that the system will not begin sooner than the moment it
+    /// is given, which makes an hour a wish. Written before its hour, an
+    /// edition's notice is lodged with the system ahead of time and delivered
+    /// on the hour with nothing of ours running at all.
+    ///
+    /// **Twenty minutes, and the reader pays for every one of them.** It is the
+    /// shortest run that holds the whole of the writing : the wait for a
+    /// straggling headline, and one further ask after it. Longer buys a wider
+    /// window for a background grant to land in and costs the reader news
+    /// minute for minute, and no width is a promise, so buying probability
+    /// against a scheduler that promises nothing is a bad trade paid for in
+    /// news. What the run guarantees is not the paper : it is the notice, which
+    /// is exact once lodged. The run only gives the writing somewhere to
+    /// happen.
+    static let pressRun: TimeInterval = 20 * 60
+
     /// The moment of the boundary a given slot falls on, on a given day.
     private func moment(of slot: EditionSlot, on day: Date, in calendar: Calendar) -> Date? {
         guard let minutes = hours[slot] else { return nil }
@@ -111,6 +133,53 @@ nonisolated struct EditionSchedule: Codable, Hashable, Sendable {
             .filter { $0 > now }
             .min()
     }
+
+    /// The moment the edition of a boundary is closed and written.
+    ///
+    /// **Never before the paper in front of it.** A reader who sets two
+    /// editions twenty minutes apart would otherwise have the second written
+    /// before the first came out, over hours the first already covered.
+    /// Clamped, a packed schedule degrades to what this all used to be : the
+    /// paper is made at the boundary in front of it, comes out at its own, and
+    /// has no run to be early in.
+    func press(for boundary: Date, in calendar: Calendar = .current) -> Date {
+        let previous = current(at: boundary.addingTimeInterval(-1), in: calendar)?.opened ?? .distantPast
+        return max(boundary.addingTimeInterval(-Self.pressRun), previous)
+    }
+
+    /// The edition in the press : the newest boundary whose press has come.
+    ///
+    /// **Not the same question as ``current(at:in:)``.** That one asks which
+    /// paper is on the table, and is answered by the newest boundary that has
+    /// gone. This asks which one is being made, and in the twenty minutes
+    /// before an hour the answer is a boundary that has not come yet.
+    ///
+    /// It is also what makes a late paper need no path of its own. A pass at
+    /// twenty to eleven and a pass at twenty past midnight are given the same
+    /// answer, eleven o'clock, its press having come and no later boundary's
+    /// having come : the first publishes on time and the second publishes late,
+    /// out of one call and one comparison.
+    func inPress(at now: Date = Date(), in calendar: Calendar = .current)
+        -> (slot: EditionSlot, opened: Date, pressed: Date)?
+    {
+        let days = [-1, 0, 1].map { calendar.date(byAdding: .day, value: $0, to: now) ?? now }
+
+        return
+            days
+            .flatMap { day in slots.compactMap { slot in moment(of: slot, on: day, in: calendar).map { (slot, $0) } } }
+            .map { (slot: $0.0, opened: $0.1, pressed: press(for: $0.1, in: calendar)) }
+            .filter { $0.pressed <= now }
+            .max { $0.opened < $1.opened }
+    }
+
+    /// Whether this schedule still produces a given boundary.
+    ///
+    /// The one question the reconciliation asks : a paper whose hour the reader
+    /// has retracted is a paper to unmake, and a notice to take back.
+    func names(_ boundary: Date, in calendar: Calendar = .current) -> Bool {
+        let days = [-1, 0, 1].map { calendar.date(byAdding: .day, value: $0, to: boundary) ?? boundary }
+        return days.contains { day in slots.contains { moment(of: $0, on: day, in: calendar) == boundary } }
+    }
 }
 
 /// A page made at a moment, and the ten stories on it.
@@ -126,21 +195,66 @@ nonisolated struct Edition: Identifiable, Hashable, StoredRecord {
         case id
         case slot
         case openedAt = "opened_at"
+        case coversFrom = "covers_from"
+        case pressedAt = "pressed_at"
         case closedAt = "closed_at"
         case points
+        case pointTopics = "point_topics"
         case briefLocale = "brief_locale"
-        case briefMembers = "brief_members"
+        case askedAt = "asked_at"
         case publishedAt = "published_at"
         case updatedAt = "updated_at"
     }
 
     var id: UUID
     var slot: EditionSlot
-    /// The boundary this edition belongs to, which is also its identity : two
-    /// devices working from one schedule mint the same moment and never two
-    /// editions for one morning.
+
+    /// The boundary this edition closes and comes out at.
+    ///
+    /// **Three things at once, and it was already two of them.** It is the
+    /// dateline, so a page that arrives at ten past seven still reads
+    /// `Édition du matin · 07:00` ; it is the identity two devices working from
+    /// one schedule agree on without speaking, which is what the unique index
+    /// on it says ; and it is now the deadline, the hour the page is written
+    /// for rather than the hour it starts being filled at.
+    ///
+    /// The name is left as it was on purpose. The unique index keys on it, the
+    /// order of the archive keys on it, and so does the watermark that says
+    /// which edition was announced : a truer word would cost a migration and
+    /// buy a doc comment, which is what this one is for.
     var openedAt: Date
-    /// When the next boundary froze it. `nil` is the one being made.
+
+    /// Where the period this page condenses begins, open at the bottom.
+    ///
+    /// An article landing exactly on it belonged to the edition before. It is
+    /// written once, when the row is made, and never worked out again : the
+    /// schedule travels through the key-value store, so the reader may move an
+    /// hour or switch a slot off while a page is being made, and a period
+    /// recomputed against a schedule that has since changed would claim a
+    /// stretch of time nobody lived through.
+    ///
+    /// `nil` is a page made before the periods existed.
+    var coversFrom: Date?
+
+    /// When the period closed and the page was made, which is before it comes
+    /// out.
+    ///
+    /// The upper bound of the period, and the moment the reader pays for : what
+    /// arrives between this and ``openedAt`` opens the period of the paper that
+    /// follows. See ``EditionSchedule/pressRun``.
+    ///
+    /// `nil` is a page made before the press existed, and every predicate reads
+    /// `COALESCE(pressed_at, opened_at)` so such a row falls back to the hour
+    /// rather than out of the work set.
+    var pressedAt: Date?
+
+    /// What the row is once it is no longer the one being made.
+    ///
+    /// With ``publishedAt`` set it means what it always meant : a back number.
+    /// With ``publishedAt`` null it means **abandoned** : a later boundary went
+    /// to press while this page had still not come out, so its hour has gone
+    /// and it will never be written. What is lost there is the page and never
+    /// the news, the period folding into the one that follows.
     var closedAt: Date?
 
     /// What is on the page, as a few points rather than a paragraph.
@@ -165,52 +279,98 @@ nonisolated struct Edition: Identifiable, Hashable, StoredRecord {
     /// says which edition, and what is on the page is what is on the page.
     var points: [String]
 
+    /// The subject each point is about, one entry per point, in that order.
+    ///
+    /// **Worked out once, where the page is written.** It was worked out on
+    /// every read instead, from a live join, so the marks beside a back
+    /// number's points drifted as the filing caught up behind it and every
+    /// archive page changed its marks at once when a reader edited a subject.
+    /// A page is what it was, and what it was includes what each of its lines
+    /// was about.
+    ///
+    /// The name and not the glyph : the glyph belongs to the subject, so a
+    /// reader who changes it sees it change everywhere, which is right. An
+    /// empty string is a point that matched nothing, and an empty list is a
+    /// page written before this, for which the match is still worked out where
+    /// it is read.
+    var pointTopics: [String]
+
     /// The language the model was asked in, exactly as a story records it : a
     /// refusal has no language, and counting one as unanswered asks for ever.
+    ///
+    /// Set with ``publishedAt`` still null, it is the durable answer that the
+    /// model has read this page and will not write about it. The ten cannot
+    /// move any more, so asking again would get the same refusal.
     var briefLocale: String?
 
-    /// Every article of every story on the page, as one value to compare.
+    /// When the model was really put the question about this page.
     ///
-    /// **Every article, and not a sample of them.** A story's own brief is
-    /// written from as many of its articles as the window holds ; the edition's
-    /// is written from the ten headlines, and what invalidates it is any change
-    /// anywhere underneath. An article joining any story on the page is a page
-    /// that says something slightly different, so the headline over it is a
-    /// question worth putting again.
-    var briefMembers: String?
+    /// A fact about the edition exactly as `story.topics_asked_at` is a fact
+    /// about a story, and written only where a call actually left. It is the
+    /// one brake on the retry that remains : a model that was unusable is worth
+    /// asking again inside the page's own window, and not on every pass.
+    var askedAt: Date?
 
-    /// When the edition became something the reader may be shown, which is when
-    /// the model had written the whole of it.
+    /// When the page was finished, which is before it comes out.
     ///
-    /// `nil` is an edition still being made. The screen shows the newest
-    /// published one, so a page is never half written.
+    /// **Written is not out.** A paper goes to press before its hour : this is
+    /// the press, and ``openedAt`` is the hour. Between the two the edition is
+    /// whole, sitting in the store, and no reader sees it. What decides whether
+    /// it may be shown is ``isOut(at:)``, and never this on its own.
+    ///
+    /// `nil` is an edition still being made. Set once and never cleared, and
+    /// there is nothing left that could clear it : a published page is not
+    /// composed again, not written again and not asked about again, whatever
+    /// arrives underneath it.
     var publishedAt: Date?
 
     var updatedAt: Date
 
+    /// Whether the model has written it. A question about a page being made.
     var isPublished: Bool { publishedAt != nil }
+
+    /// Whether it has come out : written, and its hour has gone.
+    ///
+    /// The question to ask about a page being shown. See ``Edition/out(by:)``,
+    /// which is the only place a query should ask it.
+    func isOut(at now: Date = Date()) -> Bool { isPublished && openedAt <= now }
 
     init(
         id: UUID = .v7(),
         slot: EditionSlot,
         openedAt: Date,
+        coversFrom: Date? = nil,
+        pressedAt: Date? = nil,
         closedAt: Date? = nil,
         points: [String] = [],
+        pointTopics: [String] = [],
         briefLocale: String? = nil,
-        briefMembers: String? = nil,
+        askedAt: Date? = nil,
         publishedAt: Date? = nil,
         updatedAt: Date = Date()
     ) {
         self.id = id
         self.slot = slot
         self.openedAt = openedAt
+        self.coversFrom = coversFrom
+        self.pressedAt = pressedAt
         self.closedAt = closedAt
         self.points = points
+        self.pointTopics = pointTopics
         self.briefLocale = briefLocale
-        self.briefMembers = briefMembers
+        self.askedAt = askedAt
         self.publishedAt = publishedAt
         self.updatedAt = updatedAt
     }
+
+    /// The moment the period of this page begins, however old the row is.
+    ///
+    /// A page written before the periods existed claims none, so it covers
+    /// nothing before its own dateline.
+    var periodStart: Date { coversFrom ?? openedAt }
+
+    /// The moment the period of this page ends, however old the row is.
+    var periodEnd: Date { pressedAt ?? openedAt }
 }
 
 nonisolated extension Edition {
@@ -218,8 +378,41 @@ nonisolated extension Edition {
         static let id = Column(CodingKeys.id)
         static let slot = Column(CodingKeys.slot)
         static let openedAt = Column(CodingKeys.openedAt)
+        static let coversFrom = Column(CodingKeys.coversFrom)
+        static let pressedAt = Column(CodingKeys.pressedAt)
         static let closedAt = Column(CodingKeys.closedAt)
+        static let askedAt = Column(CodingKeys.askedAt)
         static let publishedAt = Column(CodingKeys.publishedAt)
+    }
+
+    /// The editions that have come out by a moment, newest first.
+    ///
+    /// **One place, and every reader goes through it.** An edition written at
+    /// twenty to eleven for eleven o'clock is in the store, complete, and is
+    /// nobody's paper yet : a query asking only whether it had been written
+    /// would hand the reader their eleven o'clock page at twenty to eleven and
+    /// take back the six o'clock one they were reading.
+    ///
+    /// There are two readers and they must not come to disagree, which is why
+    /// this exists rather than a filter written twice.
+    static func out(by now: Date) -> QueryInterfaceRequest<Edition> {
+        Edition
+            .filter(Columns.publishedAt != nil && Columns.openedAt <= now)
+            .order(Columns.openedAt.desc)
+    }
+
+    /// What the notice for a boundary is known by.
+    ///
+    /// **Derived from the boundary and from nothing else.** The name has to be
+    /// worked out by a path that may no longer have the row : a notice lodged
+    /// for eleven and then unwanted, because the reader moved the schedule at
+    /// half past ten, is taken back by name, and the name is all that is left
+    /// of it. The boundary is the edition's identity on every device, so it is
+    /// the right thing to spell. Seconds since the epoch rather than the row's
+    /// own key, a key being this device's and an integer being legible in a
+    /// log line.
+    static func notice(for boundary: Date) -> String {
+        "edition-\(Int(boundary.timeIntervalSince1970))"
     }
 }
 
@@ -268,6 +461,7 @@ nonisolated struct EditionStory: Hashable, Codable, FetchableRecord, Persistable
         case isGenerated = "is_generated"
         case isTranslated = "is_translated"
         case imageURL = "image_url"
+        case imageCredit = "image_credit"
     }
 
     var editionID: UUID
@@ -279,4 +473,62 @@ nonisolated struct EditionStory: Hashable, Codable, FetchableRecord, Persistable
     var isGenerated: Bool
     var isTranslated: Bool
     var imageURL: String?
+
+    /// The room the picture came with.
+    ///
+    /// **Frozen beside the picture, and it has to be.** A story is several
+    /// rooms and the photograph is one room's, so the two are taken from one
+    /// and the same article on purpose. A frozen address beside a credit read
+    /// live is a caption naming the wrong paper, and nothing about it would
+    /// look wrong.
+    var imageCredit: String?
+
+    /// This row as the page printed it, over whatever the world has since done.
+    ///
+    /// **The words are the page's and the figures are the world's.** The front
+    /// page joined its frozen rows against the live stories and then threw the
+    /// frozen half away, so a headline the model rewrote in the afternoon
+    /// changed on a page printed that morning, and a story that fell out of the
+    /// sixty newest vanished from it altogether. But a page frozen whole is a
+    /// page whose article count is wrong within the hour, and the count is not
+    /// a claim about the page : it is a claim about the story, which is still
+    /// moving and which the reader can still open.
+    ///
+    /// So the split is by what a thing is about. What the page said - the
+    /// headline, the line under it, who wrote them, the picture and the room it
+    /// came from, and the order - is what it said and does not move again.
+    /// What the story is - how many articles, how many rooms, when the last one
+    /// came, its shape over time, and the subjects it is filed under - goes on
+    /// being read live. The subjects are deliberately on that side : a rubric is
+    /// a fact about the story, the reader may re-file it, and the marks beside
+    /// the points are read from the same filing, so freezing one and not the
+    /// other would put two answers on one page.
+    ///
+    /// - Parameter live: the story as it is now, or `nil` where a purge has
+    ///   taken it. A row whose story has gone is kept and drawn from its frozen
+    ///   half alone, with ``DigestStory/hasFigures`` false : a back number that
+    ///   lost a row would be an archive nobody could trust.
+    /// - Parameter dateline: the edition's own hour, which stands in for the
+    ///   dates of a story that is no longer there.
+    func printed(over live: DigestStory?, on dateline: Date) -> DigestStory {
+        DigestStory(
+            id: storyID,
+            title: title,
+            summary: summary,
+            isGenerated: isGenerated,
+            isTranslated: isTranslated,
+            generatedBy: live?.generatedBy,
+            articleCount: live?.articleCount ?? 0,
+            feedMarks: live?.feedMarks ?? [],
+            feedCount: live?.feedCount ?? 0,
+            firstAt: live?.firstAt ?? dateline,
+            lastAt: live?.lastAt ?? dateline,
+            arrivals: live?.arrivals ?? [],
+            isLive: live?.isLive ?? false,
+            imageURL: imageURL.flatMap(URL.init(string:)),
+            imageCredit: imageCredit,
+            topics: live?.topics ?? [],
+            hasFigures: live != nil
+        )
+    }
 }

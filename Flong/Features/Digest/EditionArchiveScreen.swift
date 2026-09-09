@@ -35,6 +35,13 @@ struct EditionsPanel: View {
     var body: some View {
         NavigationStack(path: $opened) {
             EditionArchiveScreen(model: model) { opened.append($0) }
+                // **Read where they are shown.** The back numbers were read
+                // behind every store tick, with every page's stories, filings
+                // and marks, so that the front page could take the first of
+                // them : an article marked read cost the whole archive. The
+                // front page asks for the one edition it draws, and this asks
+                // for the rest when somebody opens the calendar.
+                .task { await model.loadEditionArchive() }
                 // What a test presses and reads, since every name here is
                 // translated.
                 .accessibilityIdentifier("edition-archive-list")
