@@ -34,6 +34,12 @@ nonisolated final class ModelDesk: Sendable {
     private let secrets: ProviderSecretStoring
     private let transport: CloudTransport
     private let patiences: Mutex<[String: ModelPatience]>
+    /// Where every outgoing call is written down.
+    ///
+    /// Installed once the window has a store rather than handed in here : the
+    /// desk is reached by a default argument at four call sites, and none of
+    /// them has a database to give it.
+    private let log: Mutex<ProviderCallLog?>
 
     init(
         local: LocalProvider = LocalProvider(),
@@ -46,6 +52,12 @@ nonisolated final class ModelDesk: Sendable {
         self.secrets = secrets
         self.transport = transport
         self.patiences = Mutex([:])
+        self.log = Mutex(nil)
+    }
+
+    /// Where to write down what leaves. Section 14 asks for it.
+    func writes(to log: ProviderCallLog) {
+        self.log.withLock { $0 = log }
     }
 
     /// The model that answers one question, with everything that goes with it.
@@ -106,7 +118,14 @@ nonisolated final class ModelDesk: Sendable {
         guard let wire = Self.wire(of: account.kind) else { return nil }
         guard let secret = try? secrets.secret(for: account.id) ?? ProviderSecret() else { return nil }
 
-        let provider = CloudProvider(account: account, secret: secret, wire: wire, transport: transport)
+        let provider = CloudProvider(
+            account: account,
+            task: task,
+            secret: secret,
+            wire: wire,
+            transport: transport,
+            log: log.withLock { $0 }
+        )
         return provider.isAvailable ? provider : nil
     }
 

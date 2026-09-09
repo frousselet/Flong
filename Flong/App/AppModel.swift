@@ -1230,6 +1230,11 @@ final class AppModel {
         self.marks = MarkStore(database)
         self.spotlight = SpotlightIndex(articles, subscriptions)
         self.digestService = DigestService(database)
+        // Section 14 asks that every call to a model of the reader's own be
+        // written down here. The desk is reached by a default argument at the
+        // call sites, none of which has a store to hand it, so it is told once
+        // where to write.
+        models.writes(to: ProviderCallLog(database))
         self.refresher = FeedRefresh(database: database, fetcher: fetcher, credentials: credentials)
         self.retention = Retention(database)
         self.finder = FeedFinder(fetcher: fetcher)

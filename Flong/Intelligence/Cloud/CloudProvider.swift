@@ -97,9 +97,17 @@ nonisolated enum TokenField: String, Hashable, Sendable {
 /// A model the reader configured, seen as one provider among the others.
 nonisolated struct CloudProvider: ModelProvider {
     let account: ProviderAccount
+    /// Which of the four things a model does this one was built to answer.
+    ///
+    /// A provider is made per task by the desk, so this is known before any
+    /// exchange is opened and the log never has to guess at it.
+    let task: ModelTask
     let secret: ProviderSecret
     let wire: any CloudWire
     let transport: CloudTransport
+    /// Where each call is written down. Section 14 asks for it, and nothing
+    /// but a test leaves it out.
+    let log: ProviderCallLog?
 
     var name: String { account.name }
 
@@ -136,8 +144,24 @@ nonisolated struct CloudProvider: ModelProvider {
     /// reader's money spent on the same answer.
     var triesASecondVoice: Bool { false }
 
+    init(
+        account: ProviderAccount,
+        task: ModelTask = .headlines,
+        secret: ProviderSecret,
+        wire: any CloudWire,
+        transport: CloudTransport,
+        log: ProviderCallLog? = nil
+    ) {
+        self.account = account
+        self.task = task
+        self.secret = secret
+        self.wire = wire
+        self.transport = transport
+        self.log = log
+    }
+
     func conversation(saying instructions: String) -> any ModelConversation {
-        CloudConversation(provider: self, instructions: instructions)
+        CloudConversation(provider: self, instructions: instructions, task: task)
     }
 
     /// The whole address, which is in the keychain where the reader called it a

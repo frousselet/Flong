@@ -94,6 +94,26 @@ The seven places of `docs/technical/erasure.md` are still seven. A provider's ke
 
 **It sends a fixed sentence and nothing of the reader's**, which is what makes it honest to offer before any consent has been given : somebody checking that their key works has not yet decided that their news may leave, and making them decide first would be asking them to agree to something they cannot yet check.
 
+## The log
+
+Section 14 asks for one clause : *outgoing calls are logged locally*. What the clause implies is a table with almost nothing in it.
+
+| What a row holds | What no row holds |
+| ---------------- | ----------------- |
+| The moment, the duration | The prompt |
+| Whose model, by name and by identifier | The articles |
+| Which task, which host, which model | The answer |
+| How it ended, and the status a server answered with | The key |
+| What the service said it cost, where it said | The body of an error |
+
+**The absence of the column is what enforces it**, and a test names the whole list so a column added later has to be added there too. A log that recorded the prompt would be a second copy of everything the consent was careful about, kept on the reader's own disk where nothing would ever purge it. A log that recorded an error body would be worse : several services echo the prompt there and one of them echoes the key.
+
+**The provider is named twice on purpose.** The identifier points at an account the reader may delete tomorrow ; the name, the host and the model are copied onto the row. It is the rule an edition already follows against a story : a record of what happened must not change when the thing it happened to is edited or removed.
+
+**One row per request and not per question.** A question that dropped a rung of the ladder cost two calls, and a log that hid the first would be one the reader could not reconcile with their bill.
+
+**Two thousand rows and ninety days, whichever comes first**, trimmed once in a hundred inserts rather than on every one : a delete that scanned the table would run two hundred times during one filing pass for a bound nothing crosses in a night. It is not synchronized, and that costs no work : a table is only carried into CloudKit when the sync layer is told about it, and it will not be. What one device sent is a fact about that device.
+
 ## What is never in an error
 
 **Nothing from the wire.** A service is free to put anything in the body of its own error and several put the prompt there ; one of them puts the key back. So the failures are a small closed set of five, the body is neither shown nor logged, and what a reader is told is one of five sentences written here. That is what makes `a key never reaches a message` a property a test can prove rather than a habit that decays.

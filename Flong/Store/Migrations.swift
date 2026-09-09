@@ -1109,7 +1109,50 @@ nonisolated extension AppDatabase {
             }
         }
 
+        migrator.registerMigration("v49.whatWasSentAway", migrate: createProviderCall)
+
         return migrator
+    }
+
+    /// Every call that left this device for a model that is not the system's
+    /// own.
+    ///
+    /// Section 14 asks for it in one clause, and what the clause implies is a
+    /// table with almost nothing in it : the moment, whose model, which task,
+    /// which host, which model, what it cost and how it ended, and not one word
+    /// of what was asked or what came back. A log that recorded the prompt
+    /// would be a second copy of everything the consent was careful about, kept
+    /// on the reader's own disk where nothing would ever purge it.
+    ///
+    /// **The provider is named twice on purpose.** `provider_id` points at an
+    /// account the reader may delete tomorrow ; the name, the host and the
+    /// model are copied onto the row, which is the rule `edition_story` already
+    /// follows against `story` : a record of what happened must not change when
+    /// the thing it happened to is edited or removed.
+    private static func createProviderCall(_ db: Database) throws {
+        try db.create(table: "provider_call") { table in
+            table.primaryKey("id", .blob)
+            table.column("started_at", .datetime).notNull()
+            table.column("provider_id", .blob).notNull()
+            table.column("provider_name", .text).notNull()
+            table.column("kind", .text).notNull()
+            // The host and nothing else of the address : a private endpoint
+            // keeps its path, and the host is what the consent named out loud.
+            table.column("host", .text).notNull()
+            table.column("task", .text).notNull()
+            table.column("model", .text).notNull()
+            table.column("outcome", .text).notNull()
+            // Null is `the service did not say`, which is a different fact from
+            // nought and reads differently in a month's total.
+            table.column("prompt_tokens", .integer)
+            table.column("answer_tokens", .integer)
+            table.column("duration", .double).notNull()
+            // The status a server answered with, and never a message body : a
+            // service is free to echo the prompt inside its own error, and
+            // several do.
+            table.column("status", .integer)
+        }
+        try db.create(index: "provider_call_on_started_at", on: "provider_call", columns: ["started_at"])
     }
 
     /// An import of a remote account, written down so it can be finished later.
