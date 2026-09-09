@@ -183,11 +183,11 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
     /// the system changed one, or the reader turned the contrast up, or a
     /// platform drew its windows in something other than white.
     ///
-    /// It states one colour all the same, which is ``accent(in:)`` : what can
-    /// be pressed is the page's own ink, black on paper and white at night,
-    /// rather than the blue every application on the device shares. The rest of
-    /// its palette is stated for the rendered article, which is a web page and
-    /// has no system colours to inherit.
+    /// Its palette below is stated for the rendered article alone, which is a
+    /// web page and has no system colours to inherit. What can be pressed on a
+    /// screen of the application is what the system says it is, which is
+    /// Apple's blue until the reader picks another for themselves. See
+    /// ``accent(in:)``.
     var paints: Bool { self != .standard }
 
     /// The colours, in one appearance.
@@ -197,26 +197,31 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
 
     /// The colour a control takes.
     ///
-    /// **Every theme states one, ``standard`` included.** It handed the tint
-    /// back to the system, which meant the one decision a reader notices first
-    /// was the blue every application on the device already uses ; it is the
-    /// ink now, black on paper and white at night, which is a page that says
-    /// what can be pressed in its own two colours rather than in a third
-    /// nobody chose. The two that paint keep the colour their palette names.
+    /// **``standard`` hands it to the system, and the two that paint state
+    /// their own.** The blue every application on the device shares is part of
+    /// what that theme is. It stated the ink for a while, which left a page
+    /// where what can be pressed is the colour everything else is already
+    /// printed in, and nothing on it saying where to press. A theme that
+    /// paints keeps the colour its palette names, a page in its own warmth
+    /// having no room for a blue from outside it.
+    ///
+    /// The subjects are what the blue costs, and they pay it by leaving it
+    /// alone : none of the eight is a blue, so nothing printed on the page can
+    /// be taken for something to press. See ``TopicFamily``.
     func accent(in scheme: ColorScheme) -> Color {
-        palette(in: scheme).accent.color
+        paints ? palette(in: scheme).accent.color : .accentColor
     }
 
     /// What type standing on the accent, or on a subject's own colour, is set
     /// in.
     ///
-    /// **The paper, and never white.** White was right for as long as what
-    /// could be pressed was a blue every theme shared. The standard theme's
-    /// accent is its ink now, so at night it is very nearly white and a white
-    /// word on it is a word nobody can read ; the same holds for the colours
-    /// the subjects are printed in, which are dark on paper and light at night
-    /// by design. The paper is the one colour that is always the far side of
-    /// the ink, in either appearance and in all three themes.
+    /// **The paper, which is white by day and black at night.** It cannot be
+    /// white in both : the accent of a theme that paints is a shade of its own
+    /// ink, the blue the standard theme takes at night is a light one, and the
+    /// colours the subjects are printed in are dark on paper and light at
+    /// night by design. The paper is the one colour that is always the far
+    /// side of whatever is printed on it, in either appearance and in all
+    /// three themes.
     func onAccent(in scheme: ColorScheme) -> Color {
         palette(in: scheme).paper.color
     }
@@ -244,17 +249,18 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
 
     private var light: Palette {
         switch self {
-        // The system's own, as the stylesheet has always stated them.
-        // The system's own, as the stylesheet has always stated them, with one
-        // exception : what can be pressed is the ink rather than the blue. See
-        // ``accent(in:)``.
+        // The system's own, as the stylesheet has always stated them. The
+        // accent among them is the rendered article's link and nothing else :
+        // a web page cannot be handed the accent the system hands a screen, so
+        // the blue is written out here and asked for through ``accent(in:)``
+        // everywhere else.
         case .standard:
             Palette(
                 paper: Ink(0xFFFFFF),
                 ink: Ink(0x1C1C1E),
                 muted: Ink(0x6C6C70),
                 rule: Ink(0xD8D8DC),
-                accent: Ink(0x1C1C1E),
+                accent: Ink(0x0B6BCB),
                 edge: Ink(0x3C3C43, alpha: 0.15),
                 surface: Ink(0xF2F2F7)
             )
@@ -321,7 +327,7 @@ nonisolated enum Theme: String, CaseIterable, Hashable, Sendable, Identifiable {
                 ink: Ink(0xF2F2F7),
                 muted: Ink(0x9C9CA1),
                 rule: Ink(0x3A3A3C),
-                accent: Ink(0xF2F2F7),
+                accent: Ink(0x6FB2FF),
                 edge: Ink(0x545458, alpha: 0.33),
                 surface: Ink(0x1C1C1E)
             )
@@ -455,10 +461,10 @@ struct Themed: ViewModifier {
                 .scrollContentBackground(.hidden)
                 .background(palette.paper.color.ignoresSafeArea())
         } else {
-            // The standard theme paints nothing and still states what can be
-            // pressed : the ink, rather than the system's blue. See
-            // ``Theme/accent(in:)``.
-            content.tint(theme.accent(in: scheme))
+            // The standard theme paints nothing and tints nothing : what can
+            // be pressed is the accent the system hands down. See
+            // ``Theme/paints``.
+            content
         }
     }
 }
