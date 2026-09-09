@@ -48,59 +48,6 @@ nonisolated enum OnDeviceModel {
 
     private static let refusals = Mutex(Refusals())
 
-    // MARK: - The model, as a news reader needs it
-
-    /// The model, configured once here rather than at each call site.
-    ///
-    /// **The guardrails are the permissive ones.** The default set is built for
-    /// an application that generates content ; this one transforms content the
-    /// reader already chose to receive, which is the case Apple provides
-    /// ``SystemLanguageModel/Guardrails/permissiveContentTransformations`` for.
-    /// The default set refuses a great deal of ordinary news : a court report,
-    /// a war, a drug seizure, an epidemic. Every one of those refusals arrived
-    /// as a `guardrailViolation`, and every one left a story wearing its own
-    /// article's headline for no reason the reader could see.
-    ///
-    /// It is not a way round anything. What is asked of the model is a headline
-    /// and one line about articles a publisher has already published and a
-    /// reader has already subscribed to ; nothing is invented and nothing is
-    /// sought out.
-    ///
-    /// **The use case stays `general`, and `contentTagging` was measured.**
-    /// Filing one headline under a list of labels looks like exactly what
-    /// `contentTagging` is tuned for, and it is worse at it. Against the same
-    /// three headlines the live tests have always used :
-    ///
-    /// | Headline | `general` | `contentTagging` |
-    /// | -------- | --------- | ---------------- |
-    /// | `Une réforme du calendrier scolaire` | `Éducation` | nothing |
-    /// | `Les macros Swift, deux ans après` | `Logiciel` | `Sport · Cybersécurité` |
-    /// | shown only `Jardinage` and `Cuisine` | nothing | `Cuisine · Jardinage` |
-    ///
-    /// It extracts tags from a text rather than choosing among labels, so it
-    /// answers with something whatever it is shown and never takes the way out.
-    /// `Sport` is the same wrong answer the one-story-per-call design was
-    /// written to stop. The parameter stays so the choice is visible and
-    /// re-measurable, but nothing passes anything but the default.
-    static func model(for useCase: SystemLanguageModel.UseCase = .general) -> SystemLanguageModel {
-        SystemLanguageModel(useCase: useCase, guardrails: .permissiveContentTransformations)
-    }
-
-    /// How the model is asked to answer.
-    ///
-    /// **Greedy, and bounded.** A headline is not a place for invention : the
-    /// same story asked twice should come back the same, or a rebuild rewrites
-    /// a page the reader was reading. Greedy sampling is what makes it
-    /// deterministic, and it is free.
-    ///
-    /// The cap is the answer's share of the window, which the prompt is already
-    /// measured against. It is generous rather than tight : a structured answer
-    /// cut off in the middle comes back as a `decodingFailure`, which is a
-    /// worse outcome than a long one.
-    static func options(maximumTokens: Int) -> GenerationOptions {
-        GenerationOptions(sampling: .greedy, maximumResponseTokens: maximumTokens)
-    }
-
     // MARK: - Whether to ask at all
 
     static var isAvailable: Bool {
@@ -185,13 +132,14 @@ nonisolated enum OnDeviceModel {
     /// count towards giving up : a background pass is rate-limited hard, and
     /// three of those used to silence the model for the rest of the process,
     /// which is how a night of writing headlines ended with no subjects filed.
-    static func refused(_ error: Error, now: Date = Date()) {
-        guard isTheModelItself(error) else {
-            Log.enrich.notice("The model would not write about one story : \(Self.kind(of: error), privacy: .public)")
+    static func refused(_ fault: ModelFault, now: Date = Date()) {
+        guard fault.isTheModelItself else {
+            Log.enrich.notice(
+                "The model would not write about one story : \(LocalProvider.kind(of: fault), privacy: .public)")
             return
         }
-        guard !isBusy(error) else {
-            Log.enrich.info("The model is busy : \(Self.kind(of: error), privacy: .public)")
+        guard !fault.isBusy else {
+            Log.enrich.info("The model is busy : \(LocalProvider.kind(of: fault), privacy: .public)")
             return
         }
 
@@ -201,62 +149,8 @@ nonisolated enum OnDeviceModel {
             return refusals.count
         }
         guard count == refusalsBeforeGivingUp else { return }
-        Log.enrich.notice(
-            "The model failed \(count) times and is left alone for a while : \(Self.kind(of: error), privacy: .public)"
-        )
-    }
-
-    /// Whether the answer is the system asking for a moment rather than saying
-    /// it cannot help.
-    static func isBusy(_ error: Error) -> Bool {
-        guard let error = error as? LanguageModelSession.GenerationError else { return false }
-
-        switch error {
-        case .rateLimited, .concurrentRequests: return true
-        default: return false
-        }
-    }
-
-    /// Whether an error is the model being unusable, rather than the model
-    /// declining to write about one particular thing.
-    ///
-    /// A page of security advisories trips the guardrail on some of its
-    /// stories and not others. Counting those towards giving up meant three
-    /// awkward headlines in a row silenced the model for the rest of the run,
-    /// and every story after them kept whatever it already said, in whatever
-    /// language it already said it. That is the mixture of French and English
-    /// a reader of the security press was looking at.
-    static func isTheModelItself(_ error: Error) -> Bool {
-        guard let error = error as? LanguageModelSession.GenerationError else { return true }
-
-        switch error {
-        case .guardrailViolation, .refusal, .decodingFailure, .exceededContextWindowSize, .unsupportedGuide:
-            // This story, not the model.
-            return false
-        case .assetsUnavailable, .unsupportedLanguageOrLocale, .rateLimited, .concurrentRequests:
-            return true
-        @unknown default:
-            return true
-        }
-    }
-
-    /// The name of what went wrong, without the article that caused it.
-    private static func kind(of error: Error) -> String {
-        guard let error = error as? LanguageModelSession.GenerationError else {
-            return String(describing: type(of: error))
-        }
-        switch error {
-        case .guardrailViolation: return "guardrailViolation"
-        case .refusal: return "refusal"
-        case .decodingFailure: return "decodingFailure"
-        case .exceededContextWindowSize: return "exceededContextWindowSize"
-        case .unsupportedGuide: return "unsupportedGuide"
-        case .assetsUnavailable: return "assetsUnavailable"
-        case .unsupportedLanguageOrLocale: return "unsupportedLanguageOrLocale"
-        case .rateLimited: return "rateLimited"
-        case .concurrentRequests: return "concurrentRequests"
-        @unknown default: return "unknown"
-        }
+        let kind = LocalProvider.kind(of: fault)
+        Log.enrich.notice("The model failed \(count) times and is left alone for a while : \(kind, privacy: .public)")
     }
 
     /// Forgets the refusals, for the next launch or a deliberate retry.

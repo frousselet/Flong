@@ -10,7 +10,6 @@
 //
 
 import Foundation
-import FoundationModels
 import NaturalLanguage
 import OSLog
 
@@ -24,10 +23,30 @@ nonisolated struct EditionBrief: Hashable, Sendable {
 }
 
 /// The shape the model fills in for a whole page.
-@Generable
-nonisolated struct GeneratedEditionPoints {
-    @Guide(description: EditionSummarizer.pointGuide, .maximumCount(EditionSummarizer.mostPoints))
+nonisolated struct GeneratedEditionPoints: Sendable, ModelAnswer {
+    /// The name of the one field, written once and read once.
+    private enum Called {
+        static let points = "points"
+    }
+
     var points: [String]
+
+    init(points: [String]) { self.points = points }
+
+    static let shape = ResponseShape.object(
+        named: "GeneratedEditionPoints",
+        fields: [
+            .init(
+                Called.points,
+                EditionSummarizer.pointGuide,
+                .list(of: .words, most: EditionSummarizer.mostPoints)
+            )
+        ]
+    )
+
+    init(_ answer: Answer) throws(AnswerFault) {
+        points = try answer.strings(Called.points)
+    }
 }
 
 /// Writes the few points an edition wears over its ten stories.
@@ -126,8 +145,12 @@ nonisolated struct EditionSummarizer: Sendable {
 
     let locale: Locale
 
-    init(locale: Locale = .current) {
+    /// Where the question is put.
+    let provider: any ModelProvider
+
+    init(locale: Locale = .current, provider: any ModelProvider = LocalProvider()) {
         self.locale = locale
+        self.provider = provider
     }
 
     /// What one ask came to.
@@ -135,11 +158,7 @@ nonisolated struct EditionSummarizer: Sendable {
     /// The same three the stories are told apart by, and told apart in the same
     /// place : the model wrote something, this page was declined under this
     /// voice, or the model itself is unusable and nothing may be stamped.
-    enum Outcome {
-        case wrote(EditionBrief)
-        case declined
-        case unusable
-    }
+    typealias Outcome = Answered<EditionBrief>
 
     /// Says what is on the page, in a few points.
     ///
@@ -149,7 +168,7 @@ nonisolated struct EditionSummarizer: Sendable {
     /// of ten published headlines said in five lines is a transformation of
     /// published text, and saying so is what gets it written.
     func brief(over stories: [(title: String, summary: String?)], of slot: EditionSlot) async -> Outcome {
-        guard OnDeviceModel.isAvailable, stories.count > 1 else { return .unusable }
+        guard provider.isAvailable, stories.count > 1 else { return .unusable }
 
         for voice in [Self.instructions, Self.condensing] {
             switch await attempt(stories, of: slot, saying: voice) {
@@ -166,26 +185,26 @@ nonisolated struct EditionSummarizer: Sendable {
         of slot: EditionSlot,
         saying voice: String
     ) async -> Outcome {
+        let conversation = provider.conversation(saying: voice)
+        conversation.prewarm()
+
+        let prompt = Self.prompt(for: stories, language: OnDeviceModel.languageReminder(for: locale))
+
+        // The window holds the prompt and the answer together, and a prompt
+        // that leaves no room for an answer is not sent : the cost of asking
+        // anyway is a refusal, and the cost of a refusal is a page with nothing
+        // written over it.
+        guard await conversation.hasRoom(for: prompt, keeping: Self.reservedTokens) else {
+            Log.enrich.notice("An edition was too long to write, and was left unwritten")
+            return .unusable
+        }
+
         do {
-            let model = OnDeviceModel.model()
-            let session = LanguageModelSession(model: model, instructions: voice)
-            session.prewarm()
-
-            let prompt = Self.prompt(for: stories, language: OnDeviceModel.languageReminder(for: locale))
-
-            if #available(iOS 26.4, macOS 26.4, *) {
-                let cost = try await model.tokenCount(for: prompt)
-                guard cost + Self.reservedTokens < model.contextSize else {
-                    Log.enrich.notice("An edition was too long to write, and was left unwritten")
-                    return .unusable
-                }
-            }
-
-            let generated = try await session.respond(
+            let generated = try await conversation.answer(
                 to: prompt,
-                generating: GeneratedEditionPoints.self,
-                options: OnDeviceModel.options(maximumTokens: Self.reservedTokens)
-            ).content
+                as: GeneratedEditionPoints.self,
+                keeping: Self.reservedTokens
+            )
 
             let points = Self.tidied(generated.points)
 
@@ -194,12 +213,13 @@ nonisolated struct EditionSummarizer: Sendable {
             guard !points.isEmpty else { return .declined }
             OnDeviceModel.succeeded()
 
-            // One ask about what is wrong, and never a second : sampling is
+            // **One ask about what is wrong, and never a second** : sampling is
             // greedy, and a model asked a third time answers what it answered
-            // the first, the session holding the two asks that did not work.
+            // the first, the conversation holding the two asks that did not
+            // work.
             var list = points
             if Self.fault(list, over: stories) != nil,
-                let better = await listed(again: list, in: session, over: stories)
+                let better = await listed(again: list, in: conversation, over: stories)
             {
                 list = better
             }
@@ -216,39 +236,43 @@ nonisolated struct EditionSummarizer: Sendable {
             guard Self.languageFault(list, in: locale) == nil else { return .declined }
 
             return .wrote(EditionBrief(points: list, askedIn: locale))
-        } catch {
+        } catch let fault as ModelFault {
             // A rate limit, an asset still downloading or a language this model
             // does not write says nothing about this page, and stamping the
             // edition would leave it unwritten for good on a device that was
             // busy for a second.
-            OnDeviceModel.refused(error)
-            return OnDeviceModel.isTheModelItself(error) ? .unusable : .declined
+            OnDeviceModel.refused(fault)
+            return Outcome(failing: fault)
+        } catch {
+            return .declined
         }
     }
 
     /// The list asked for again, once.
     private func listed(
         again points: [String],
-        in session: LanguageModelSession,
+        in conversation: any ModelConversation,
         over stories: [(title: String, summary: String?)]
     ) async -> [String]? {
         guard let fault = Self.fault(points, over: stories) else { return nil }
 
         do {
-            let generated = try await session.respond(
+            let generated = try await conversation.answer(
                 to: "\(fault) Write only the points : two or three things worth knowing, one short sentence "
                     + "each, no numbering.",
-                generating: GeneratedEditionPoints.self,
-                options: OnDeviceModel.options(maximumTokens: Self.reservedTokens)
-            ).content
+                as: GeneratedEditionPoints.self,
+                keeping: Self.reservedTokens
+            )
 
             let better = Self.tidied(generated.points)
             guard !better.isEmpty, Self.fault(better, over: stories) == nil else { return nil }
 
             OnDeviceModel.succeeded()
             return better
+        } catch let fault as ModelFault {
+            OnDeviceModel.refused(fault)
+            return nil
         } catch {
-            OnDeviceModel.refused(error)
             return nil
         }
     }
