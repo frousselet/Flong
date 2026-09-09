@@ -115,7 +115,7 @@ nonisolated final class ModelDesk: Sendable {
         switch kind {
         case .appleIntelligence: nil
         case .openAICompatible: OpenAICompatible()
-        case .anthropic: nil
+        case .anthropic: AnthropicMessages()
         }
     }
 
