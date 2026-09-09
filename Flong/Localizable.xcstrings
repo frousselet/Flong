@@ -2893,6 +2893,17 @@
         }
       }
     },
+    "Headlines": {
+      "comment": "The task of writing a story's headline and the line under it, in the models page.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Titres"
+          }
+        }
+      }
+    },
     "Headlines in monospace, on the Solarized palette.": {
       "localizations": {
         "fr": {
@@ -5146,6 +5157,17 @@
         }
       }
     },
+    "The key was refused.": {
+      "comment": "What a reader is told when a model service refuses their key.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La clé a été refusée."
+          }
+        }
+      }
+    },
     "The last 100 of each": {
       "comment": "How much of each source's history an import brings.",
       "localizations": {
@@ -5217,6 +5239,39 @@
         }
       }
     },
+    "The service answered something Flong could not read.": {
+      "comment": "What a reader is told when a model service answered something of the wrong shape.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le service a répondu quelque chose que Flong n'a pas su lire."
+          }
+        }
+      }
+    },
+    "The service could not be reached.": {
+      "comment": "What a reader is told when nothing answered at a model service's address.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le service n'a pas pu être joint."
+          }
+        }
+      }
+    },
+    "The service is busy. Try again later.": {
+      "comment": "What a reader is told when a model service asked to be tried again later.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le service est occupé. Réessayez plus tard."
+          }
+        }
+      }
+    },
     "The session goes to the keychain, never a password.": {
       "localizations": {
         "fr": {
@@ -5276,6 +5331,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Thème"
+          }
+        }
+      }
+    },
+    "There is no such model.": {
+      "comment": "What a reader is told when a model service has no model of the name they typed.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce modèle n'existe pas."
           }
         }
       }
@@ -5367,6 +5433,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ce nom et ce mot de passe ont été refusés. FreshRSS attend le mot de passe API de votre profil, pas celui avec lequel vous vous connectez au site."
+          }
+        }
+      }
+    },
+    "This provider has no address or no model yet.": {
+      "comment": "Why a model the reader configured cannot be used : it is not finished.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce fournisseur n'a pas encore d'adresse ou de modèle."
           }
         }
       }

@@ -84,6 +84,16 @@ The seven places of `docs/technical/erasure.md` are still seven. A provider's ke
 
 **Plain HTTP goes to the reader's own network and nowhere else.** A model server they run has no TLS and never will : it is a process on their own machine, and it is the one configuration of this feature that sends nothing to anybody. `NSAllowsLocalNetworking` carries it to the private ranges, to link-local addresses and to `.local`, and every public host keeps App Transport Security in full. The editor makes the same check itself, so an address that would fail is refused with a sentence rather than with a number nobody can act on.
 
+## Which models it offers, and the button that proves it
+
+**The list is asked for and never assumed.** `GET /models` on both formats, once the key is in, filling a menu. A four hundred and four there is an answer rather than a failure : several servers a reader may point Flong at route only the completion path, and *the service will not say* is a perfectly good state. What is worth reporting from that call is a refused key, because it means the key itself is wrong and nothing further will work. The field beside the menu is always there, and typing a name is the ordinary path for a self-hosted endpoint rather than an apology.
+
+**The two lists carry their moment differently.** OpenAI answers a number of seconds and Anthropic a date in words. Two readers, on purpose, so that nobody unifies them by mistake.
+
+**The test is two calls and it proves four things.** The list first, which is free and separates an address nothing answers from a key that is refused ; then the real endpoint, the real model and the whole shape machinery, asking for the smallest structured answer there is. Sixteen tokens, and it proves the key, the address, the model name and which rung of the ladder this server actually stands on. The rung is written back on the account so the first real call does not repeat the first test's failure.
+
+**It sends a fixed sentence and nothing of the reader's**, which is what makes it honest to offer before any consent has been given : somebody checking that their key works has not yet decided that their news may leave, and making them decide first would be asking them to agree to something they cannot yet check.
+
 ## What is never in an error
 
 **Nothing from the wire.** A service is free to put anything in the body of its own error and several put the prompt there ; one of them puts the key back. So the failures are a small closed set of five, the body is neither shown nor logged, and what a reader is told is one of five sentences written here. That is what makes `a key never reaches a message` a property a test can prove rather than a habit that decays.
