@@ -498,4 +498,33 @@ struct LocalizationTests {
         #expect(String(localized: "\(1) people", locale: french) == "1 personne")
         #expect(String(localized: "\(4) people", locale: french) == "4 personnes")
     }
+
+    /// What a reader is told when a model of their own will not answer.
+    ///
+    /// They read one of these exactly when something is wrong, which is the
+    /// worst moment to be reading a language they may not have. The service's
+    /// own words never reach the screen, so these five are the whole of what
+    /// there is to say.
+    @Test("A model service that will not answer says so in the reader's language")
+    func providerTrouble() {
+        #expect(inFrench(ProviderTrouble.keyRefused.line) == "La clé a été refusée.")
+        #expect(inFrench(ProviderTrouble.noSuchModel.line) == "Ce modèle n'existe pas.")
+        #expect(inFrench(ProviderTrouble.unreachable.line) == "Le service n'a pas pu être joint.")
+        #expect(inFrench(ProviderTrouble.busy.line) == "Le service est occupé. Réessayez plus tard.")
+        #expect(
+            inFrench(ProviderTrouble.unreadable.line) == "Le service a répondu quelque chose que Flong n'a pas su lire."
+        )
+    }
+
+    /// The four things a model does here, named in the pickers that point them
+    /// somewhere. Two of the four share a key with a panel row and with the tab
+    /// bar, which is deliberate : one thing, one name.
+    @Test("The four things a model does are named in the reader's language")
+    func modelTasks() {
+        #expect(inFrench(ModelTask.headlines.title) == "Titres")
+        #expect(inFrench(ModelTask.subjects.title) == "Thématiques")
+        #expect(inFrench(ModelTask.editions.title) == "Éditions")
+        #expect(inFrench(ModelTask.search.title) == "Recherche")
+    }
+
 }
