@@ -123,11 +123,19 @@ struct ErasureTests {
             for: "lemonde.fr"
         )
 
+        // The keys of the models the reader brought of their own, which are a
+        // third service and would otherwise be the one secret a reset left
+        // behind.
+        let providers = MemoryProviderSecrets()
+        try providers.setSecret(ProviderSecret(key: "not-a-real-key"), for: UUID.v7())
+
         try credentials.removeEverything()
         try sessions.removeEverything()
+        try providers.removeEverything()
 
         #expect(try credentials.identifiers().isEmpty)
         #expect(try sessions.hosts().isEmpty)
+        #expect(try providers.identifiers().isEmpty)
     }
 }
 
@@ -138,6 +146,7 @@ struct ErasedWindowTests {
     private let database: AppDatabase
     private let credentials = MemoryCredentials()
     private let sessions = MemorySessions()
+    private let providerSecrets = MemoryProviderSecrets()
     private let preferences: Preferences
     private let model: AppModel
     private let server = StubServer(host: "feeds.example.com")
@@ -160,6 +169,7 @@ struct ErasedWindowTests {
             ),
             credentials: credentials,
             sessions: sessions,
+            providerSecrets: providerSecrets,
             preferences: preferences,
             announcer: MemoryAnnouncer()
         )

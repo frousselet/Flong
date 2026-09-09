@@ -21,7 +21,7 @@ import Foundation
 /// different models : the sentence they type in the search field wants an
 /// answer while their finger is still on the key, and the headlines over a
 /// night's stories do not.
-nonisolated enum ModelTask: String, Hashable, Sendable, CaseIterable {
+nonisolated enum ModelTask: String, Codable, Hashable, Sendable, CaseIterable {
     /// What a story is called and what it says in one line.
     ///
     /// The heaviest of the four : up to four turns, and one conversation per

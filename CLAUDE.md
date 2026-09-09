@@ -85,6 +85,7 @@ The app target uses an Xcode synchronized file group, so a new file placed in `F
 | `Flong/Indexer/` | FTS5 for the stream, Core Spotlight for the library |
 | `Flong/Search/` | The query language : lexer, parser, and the compiler that turns a tree into SQL |
 | `Flong/Enricher/` | Vectors, classification, rule execution |
+| `Flong/Intelligence/` | Where a model is asked : the shape of an answer, the model on the device, and the providers a reader configured |
 | `Flong/Sync/` | `CKSyncEngine` on the private database |
 | `Flong/Notify/` | Local notifications : what is worth saying, and the rules for saying it |
 | `Flong/Place/` | Where the reader says they read from : MapKit suggestions, one fix from the device |
@@ -109,8 +110,8 @@ A module directory is created when its first real file lands, not before.
 - **Concurrency** : the target builds with `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` and approachable concurrency, so types are main-actor isolated unless marked `nonisolated`. Store types, records, parsers and networking types are `nonisolated` ; database access goes through GRDB's own `DatabaseQueue` / `DatabasePool` serialization rather than a hand-rolled actor.
 - **The query language is parsed into a tree**, never built by string concatenation, and the tree is what compiles to SQL or FTS5 with bound parameters.
 - **Every long task is resumable** : idempotent batches, a persisted resume point, automatic resumption at the next launch. `BGContinuedProcessingTask` is not reliable enough to assume a task that started will finish.
-- **Foundation Models is a feature flag** : the no-LLM path always exists, is always reachable, and is tested. Nothing in the nominal flow may depend on Apple Intelligence being available.
-- **Secrets never leave the keychain** : feed credentials and secret feed URLs are stored through the keychain with the appropriate protection class. Never write one to `UserDefaults`, a log line, an error message, a database column or a default export.
+- **A model is a feature flag, and there is more than one** : the no-LLM path always exists, is always reachable, and is tested. Nothing in the nominal flow may depend on Apple Intelligence being available, and nothing may depend on a provider the reader configured. A provider is never active by default and is never spoken to before the reader has been asked and has agreed.
+- **Secrets never leave the keychain** : feed credentials, secret feed URLs and the API key of a model provider are stored through the keychain with the appropriate protection class. Never write one to `UserDefaults`, a log line, an error message, a database column or a default export, and never read a provider's key back to the screen.
 - **Be polite to publishers** : conditional requests on every fetch, a token bucket per host, `Retry-After` honoured, an identifying user agent, and a per-device stagger. A change that increases outgoing traffic needs a reason.
 
 ## Development Guidelines

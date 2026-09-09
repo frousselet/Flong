@@ -219,6 +219,8 @@ final class AppModel {
     private let service: ServiceImport
     private let credentials: CredentialStoring
     private let sessions: SessionStoring
+    /// The keys of the models the reader brought of their own.
+    private let providerSecrets: ProviderSecretStoring
     private let preferences: Preferences
 
     /// Who answers each of the four things a model is asked here.
@@ -1181,6 +1183,7 @@ final class AppModel {
         fetcher: FeedFetcher = FeedFetcher(),
         credentials: CredentialStoring = KeychainCredentials(),
         sessions: SessionStoring = KeychainSessions(),
+        providerSecrets: ProviderSecretStoring = KeychainProviderSecrets(),
         preferences: Preferences = Preferences(),
         models: ModelDesk = .shared,
         announcer: Announcing = Notifier(),
@@ -1191,6 +1194,7 @@ final class AppModel {
         self.database = database
         self.credentials = credentials
         self.sessions = sessions
+        self.providerSecrets = providerSecrets
         self.preferences = preferences
         self.models = models
         self.announcer = announcer
@@ -2906,6 +2910,7 @@ final class AppModel {
         do {
             try credentials.removeEverything()
             try sessions.removeEverything()
+            try providerSecrets.removeEverything()
         } catch {
             failed = true
             Log.store.error("The keychain could not be emptied : \(error, privacy: .public)")
