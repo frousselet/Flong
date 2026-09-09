@@ -62,13 +62,6 @@ nonisolated struct EditionStore: Sendable {
     /// and nothing else, so a pass over a store where nothing has changed costs
     /// one read.
     ///
-    /// The boundary is the one **in press** where the reader already has a
-    /// paper on the table, and the one that has **gone** where they do not. A
-    /// fresh install pressing ahead would sit on the skeleton for twenty
-    /// minutes with a finished page in the store ; a device with something to
-    /// read loses nothing by being twenty minutes early, and it is what buys
-    /// the notice its hour.
-    ///
     /// **A boundary not later than the last page that came out mints nothing.**
     /// One guard, and it answers four things at once : a slot the reader moved
     /// backwards, a flight west, a schedule that now names an hour already
@@ -84,13 +77,10 @@ nonisolated struct EditionStore: Sendable {
         -> Edition?
     {
         try await database.writer.write { db in
-            let out = try Edition.out(by: now).fetchOne(db)
-
-            let moment: (slot: EditionSlot, opened: Date, pressed: Date)? =
-                out != nil
-                ? schedule.inPress(at: now, in: calendar)
-                : schedule.current(at: now, in: calendar).map { ($0.slot, $0.opened, $0.opened) }
-            guard let moment else { return nil }
+            // The boundary that has gone, and never one still to come. An
+            // edition is about the stretch of time that ends at its hour, so
+            // there is nothing to choose from until the hour has passed.
+            guard let moment = schedule.current(at: now, in: calendar) else { return nil }
 
             // The period of the last page that actually came out, which is
             // where this one picks up. A boundary the device slept through was
@@ -104,7 +94,7 @@ nonisolated struct EditionStore: Sendable {
                 try Date.fetchOne(
                     db,
                     sql: """
-                        SELECT COALESCE(pressed_at, opened_at) FROM edition
+                        SELECT opened_at FROM edition
                         WHERE published_at IS NOT NULL
                         ORDER BY opened_at DESC LIMIT 1
                         """
@@ -131,8 +121,7 @@ nonisolated struct EditionStore: Sendable {
             let edition = Edition(
                 slot: moment.slot,
                 openedAt: moment.opened,
-                coversFrom: max(moment.pressed.addingTimeInterval(-DigestStore.window), lastOut ?? .distantPast),
-                pressedAt: moment.pressed,
+                coversFrom: max(moment.opened.addingTimeInterval(-DigestStore.window), lastOut ?? .distantPast),
                 updatedAt: now
             )
             try edition.insert(db)
@@ -257,45 +246,6 @@ nonisolated struct EditionStore: Sendable {
         }
     }
 
-    /// Deletes the papers the reader has unmade, and says which hours went.
-    ///
-    /// **A page whose hour has not come has never been seen by anybody.** The
-    /// rule that a published edition is never written again protects a page a
-    /// reader has read ; this one has not come out, on this device or on any
-    /// other, an edition being the one thing here that does not travel.
-    /// Retracting the hour is retracting the paper, and leaving it would put a
-    /// page on the front that the reader deleted twenty minutes earlier, under
-    /// a notice the system delivers punctually for an hour that no longer
-    /// exists.
-    ///
-    /// Two reasons for a paper to be unmade : its hour is no longer one of the
-    /// reader's, and it was written in a language that is no longer theirs.
-    /// Both are one act, a choice that reached this device after the press, and
-    /// both are free to act on while nobody has seen the page.
-    @concurrent
-    func unmakeWhatIsNotWanted(
-        against schedule: EditionSchedule,
-        locale: Locale,
-        now: Date = Date(),
-        calendar: Calendar = .current
-    ) async throws -> [Date] {
-        try await database.writer.write { db in
-            let coming =
-                try Edition
-                .filter(Edition.Columns.openedAt > now)
-                .fetchAll(db)
-
-            let unwanted = coming.filter {
-                !schedule.names($0.openedAt, in: calendar)
-                    || ($0.briefLocale.map { $0 != locale.identifier } ?? false)
-            }
-            guard !unwanted.isEmpty else { return [] }
-
-            for edition in unwanted { try edition.delete(db) }
-            return unwanted.map(\.openedAt)
-        }
-    }
-
     /// The stories that may stand on this edition, best first.
     ///
     /// **Only stories the model has written about are eligible**, which is what
@@ -364,10 +314,10 @@ nonisolated struct EditionStore: Sendable {
                 sql: """
                     DELETE FROM edition WHERE opened_at < ?
                       AND id IS NOT (SELECT id FROM edition
-                                     WHERE published_at IS NOT NULL AND opened_at <= ?
+                                     WHERE published_at IS NOT NULL
                                      ORDER BY opened_at DESC LIMIT 1)
                     """,
-                arguments: [now.addingTimeInterval(-Self.archived), now]
+                arguments: [now.addingTimeInterval(-Self.archived)]
             )
             return db.changesCount
         }
@@ -377,13 +327,11 @@ nonisolated struct EditionStore: Sendable {
 
     /// The edition the front page shows.
     ///
-    /// **The newest one that has come out, and not the newest one written.**
-    /// Two things are being kept apart here. A page still being made has no
-    /// points yet, and a front page that emptied while the model worked would
-    /// go blank four times a day ; and a page written ahead of its hour is
-    /// tomorrow's paper, which must not arrive on the table twenty minutes
-    /// early under a dateline saying otherwise. ``Edition/out(by:)`` answers
-    /// both, and every reader goes through it.
+    /// **The newest published one, and not the newest one.** The edition of
+    /// the moment has no points for the first minutes of its life, and a front
+    /// page that emptied while the model worked would go blank four times a
+    /// day. Last night's page stands until this morning's is written, which is
+    /// what a paper on a table does.
     @concurrent
     func current(now: Date = Date()) async throws -> PublishedEdition? {
         try await database.writer.read { db in
@@ -397,22 +345,6 @@ nonisolated struct EditionStore: Sendable {
     func archive(now: Date = Date()) async throws -> [PublishedEdition] {
         try await database.writer.read { db in
             try Edition.out(by: now).fetchAll(db).map { try Self.published($0, in: db) }
-        }
-    }
-
-    /// The newest paper off the press, whether or not it has come out.
-    ///
-    /// Published, and that is the difference from ``current(now:)`` : a
-    /// finished page rather than a row still being filled. It exists for the
-    /// one thing that has to look past the hour, which is the notice : it is
-    /// lodged in the gap, for a page nobody may see yet.
-    @concurrent
-    func offThePress() async throws -> Edition? {
-        try await database.writer.read { db in
-            try Edition
-                .filter(Edition.Columns.publishedAt != nil)
-                .order(Edition.Columns.openedAt.desc)
-                .fetchOne(db)
         }
     }
 

@@ -276,7 +276,7 @@ struct AppShell: View {
             // And the next edition, at the hour the reader asked for it. Only
             // this side knows that hour : the handler is registered before
             // there is a store to read a schedule out of.
-            await model.scheduleTheNextEdition()
+            model.scheduleTheNextEdition()
 
             // A window that opens in the background has no phase change to
             // learn from, and `onChange` only fires on a change.

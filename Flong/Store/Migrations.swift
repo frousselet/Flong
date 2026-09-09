@@ -1191,37 +1191,6 @@ nonisolated extension AppDatabase {
             try db.execute(sql: "UPDATE story SET brief_asked_at = updated_at WHERE brief_locale IS NOT NULL")
         }
 
-        /// A paper goes to press before it comes out.
-        ///
-        /// The period ran to the hour, so the model could not be asked until
-        /// the hour had passed, so the notice could not be posted until some
-        /// background pass happened to run. `BGTaskRequest.earliestBeginDate`
-        /// promises only that the system will not begin sooner than the moment
-        /// it is given, which makes an hour a wish : a reader whose phone was in
-        /// a pocket got their morning paper when the system felt like it, and
-        /// sometimes not until they opened Flong themselves.
-        ///
-        /// Written before its hour, an edition's notice is lodged with the
-        /// system ahead of time and delivered on the hour with nothing of ours
-        /// running. What it costs is the last twenty minutes of every period,
-        /// which are not lost : they open the period of the paper that follows.
-        ///
-        /// `pressed_at` is stored rather than worked out again, for the reason
-        /// `covers_from` is : it is a record of something that happened, and the
-        /// next edition's period reads it. Everything already in the store ran
-        /// to its own hour, that being what the moment meant until now, so it is
-        /// backfilled to `opened_at` rather than to a press that never took
-        /// place. That also tiles, which is the point : the first pressed
-        /// edition clamps its period to this, and this is exactly where the
-        /// edition before it stopped.
-        migrator.registerMigration("v52.aPaperGoesToPressBeforeItComesOut") { db in
-            try db.alter(table: "edition") { table in
-                table.add(column: "pressed_at", .datetime)
-            }
-            try db.execute(sql: "UPDATE edition SET pressed_at = opened_at WHERE pressed_at IS NULL")
-            try db.create(index: "edition_on_pressed_at", on: "edition", columns: ["pressed_at"])
-        }
-
         return migrator
     }
 

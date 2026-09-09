@@ -1283,7 +1283,6 @@ final class AppModel {
     /// iCloud, a background refresh, an archive read in. The clock is what asks
     /// the publishers, which nothing else does while a window sits open.
     func keepUp() {
-        watchTheReadersChoices()
         guard watching == nil else { return }
 
         watching = Task { [weak self] in
@@ -1350,39 +1349,13 @@ final class AppModel {
         ticking?.cancel()
         ticking = Task { [weak self] in
             var reason = reason
-            var tick = Tick.feed
             while !Task.isCancelled {
                 guard let self else { return }
-                if isReading {
-                    // **The page before the publishers.** A window still open at
-                    // five past eleven has a paper waiting in the store and a
-                    // banner already in the centre ; a fetch ran first and took
-                    // as long as it took, and until it returned the reader
-                    // looked at last night's page under this morning's notice.
-                    // One store read, and the first frame is right.
-                    await loadDigest()
-                    // An hour is a moment the page changes with nothing having
-                    // arrived, so it asks nobody anything. A press is a moment
-                    // there is work to do, so it catches up like any other tick.
-                    if tick != .hour { await catchUp(reason) }
-                }
+                if isReading { await catchUp(reason) }
                 reason = .clock
-                let next = await untilSomethingIsDue()
-                tick = next.tick
-                try? await Task.sleep(for: .seconds(next.wait))
+                try? await Task.sleep(for: .seconds(await untilSomethingIsDue()))
             }
         }
-    }
-
-    /// What the clock is waiting for, which decides what it does on waking.
-    private enum Tick {
-        /// A feed has become due, which is a reason to ask a publisher.
-        case feed
-        /// An edition is going to press, which is a reason to write.
-        case press
-        /// An edition's hour has come, which is a reason to read the page back
-        /// and nothing more.
-        case hour
     }
 
     /// How long to wait before asking anybody anything, which is however long
@@ -1402,41 +1375,25 @@ final class AppModel {
     /// to be : a feed is not the only thing that puts articles in the store,
     /// and a device whose feeds are all daily still has to look at what iCloud
     /// and the archives brought while it was asleep.
-    private func untilSomethingIsDue(now: Date = Date()) async -> (wait: TimeInterval, tick: Tick) {
+    private func untilSomethingIsDue(now: Date = Date()) async -> TimeInterval {
         var soonest = now.addingTimeInterval(AppModel.foregroundInterval)
-        var tick = Tick.feed
 
-        if let feed = await refresher.nextDue(), feed < soonest {
-            soonest = feed
-            tick = .feed
-        }
+        if let feed = await refresher.nextDue(), feed < soonest { soonest = feed }
 
-        // **The hour, because the page turns with nothing arriving.** An
-        // edition written before its hour sits in the store until the hour, and
-        // the reader would otherwise meet last night's page until a feed
-        // happened to fall due. It can only ever shorten a wait already capped
-        // at five minutes.
-        if let boundary = heldSchedule.next(after: now) {
-            let press = heldSchedule.press(for: boundary)
-            if press > now, press < soonest {
-                soonest = press
-                tick = .press
-            }
-            if boundary < soonest {
-                soonest = boundary
-                tick = .hour
-            }
-        }
+        // **And the hour, because a page comes out with nothing having
+        // arrived.** An edition is about a period that ends at its hour, so the
+        // moment that hour passes there is a page to choose and a model to ask,
+        // and a window sitting open would otherwise wait for a feed to fall due
+        // before finding out. It can only ever shorten a wait already capped at
+        // five minutes.
+        if let boundary = heldSchedule.next(after: now), boundary < soonest { soonest = boundary }
 
-        let wait = min(
-            max(soonest.timeIntervalSince(now), AppModel.shortestWait), AppModel.foregroundInterval)
-        return (wait, tick)
+        return min(max(soonest.timeIntervalSince(now), AppModel.shortestWait), AppModel.foregroundInterval)
     }
 
     /// Stops following, when the window that was following is gone.
     deinit {
         watching?.cancel()
-        watchingChoices?.cancel()
         ticking?.cancel()
         enriching?.cancel()
         showingWork?.cancel()
@@ -1469,40 +1426,6 @@ final class AppModel {
     /// long enough that a first fetch of a thousand feeds is a sequence of
     /// passes rather than a spin.
     static let shortestWait: TimeInterval = 30
-
-    /// What is listening for a choice made on another device.
-    private var watchingChoices: Task<Void, Never>?
-
-    /// Follows the reader's own choices as they arrive from iCloud.
-    ///
-    /// **Nothing listened for this before, and one thing now has to.** The
-    /// key-value store answers a `synchronize()` through a notification, and
-    /// ``load()`` read the schedule directly on its own beat, which was enough
-    /// while an edition was made at its hour and never before it. It is written
-    /// twenty minutes early now : an hour retracted on the iPad at half past ten
-    /// would leave this device with a finished eleven o'clock page and a notice
-    /// the system will deliver punctually for an hour that no longer exists.
-    private func watchTheReadersChoices() {
-        guard watchingChoices == nil else { return }
-
-        watchingChoices = Task { [weak self] in
-            let arrivals = NotificationCenter.default.notifications(
-                named: NSUbiquitousKeyValueStore.didChangeExternallyNotification)
-
-            for await _ in arrivals {
-                guard let self else { return }
-                let arrived = preferences.editionSchedule
-                guard arrived != heldSchedule else { continue }
-
-                // Assigned rather than set : what has just come from the cloud
-                // is not written back to it, and the setter would.
-                heldSchedule = arrived
-                await reconcileEditions()
-                await rebuildDigest()
-                await scheduleTheNextEdition()
-            }
-        }
-    }
 
     /// Reads back what the window is showing, after something changed it.
     ///
@@ -1542,12 +1465,7 @@ final class AppModel {
         // Read here and held : another device may have moved an edition while
         // this one was away, and this is the one place the reader's own choices
         // are pulled back in.
-        let arrived = preferences.editionSchedule
-        let moved = arrived != heldSchedule
-        heldSchedule = arrived
-        // An hour retracted while this device was away may already have a
-        // finished page and a lodged notice waiting for it.
-        if moved { await reconcileEditions() }
+        heldSchedule = preferences.editionSchedule
         articleBody = preferences.articleBody
         theme = preferences.theme
         recentSearches = preferences.recentSearches
@@ -1606,13 +1524,8 @@ final class AppModel {
             heldSchedule = newValue
             preferences.editionSchedule = newValue
             Task {
-                // Before the rebuild : an hour the reader has just retracted
-                // may already have a finished page and a lodged notice waiting
-                // for it, and the rebuild would go on to open the next one over
-                // the top of them.
-                await reconcileEditions()
                 await rebuildDigest()
-                await scheduleTheNextEdition()
+                scheduleTheNextEdition()
             }
         }
     }
@@ -2438,13 +2351,6 @@ final class AppModel {
         guard wanted else {
             wantsNewEditionNotices = false
             preferences.wantsNewEditionNotices = false
-            // **A switch that leaves a banner to fire afterwards is not a
-            // switch.** Turning the notices off was instantaneous by accident
-            // while nothing was ever pending ; a notice lodged for an hour that
-            // has not come would otherwise arrive after the reader said no.
-            if let said = preferences.editionsAnnouncedAt, said > Date() {
-                await announcer.withdraw(Edition.notice(for: said))
-            }
             return
         }
         guard await authorizeNotifications() else {
@@ -2482,69 +2388,28 @@ final class AppModel {
     func announceNewEdition(now: Date = Date()) async {
         guard wantsNewEditionNotices else { return }
         guard !Task.isCancelled else { return }
-
-        // **The page off the press, and not the page on the table.** This is
-        // the one read that looks past the hour : the whole of the press is
-        // that a finished page exists before its hour, so that its notice can
-        // be lodged and the system deliver it on the hour with nothing of ours
-        // running. It keeps the `published` filter all the same, or a row still
-        // being filled would burn the watermark for a paper nobody has been
-        // told about.
-        guard let latest = try? await digestService.offThePress() else { return }
-        let boundary = latest.openedAt
+        guard let current = try? await digestService.currentEdition(now: now) else { return }
+        let boundary = current.edition.openedAt
 
         // Never said, so the clock starts here and this pass says nothing : the
-        // switch may have arrived from another device, and what was made before
+        // switch may have arrived from another device, and what came out before
         // this one heard about it is not news.
         guard let said = preferences.editionsAnnouncedAt else {
             preferences.editionsAnnouncedAt = boundary
             return
         }
-
-        // **Said, and its hour has gone.** The system has delivered it, and
-        // adding the same name again would hand it a moment in the past, which
-        // the delivery reads as `now` and the reader reads as a second banner
-        // for one paper. In the gap the same name is lodged as often as
-        // anything looks at it, and each lodging replaces the last, which is
-        // what heals a notice a restore or a reinstall cleared away.
-        guard boundary > said || now < boundary else { return }
+        guard boundary > said else { return }
         preferences.editionsAnnouncedAt = boundary
 
-        // **And no guard on the reader being here.** It was right while posting
-        // was delivering : nothing is said to somebody looking at the page it is
-        // about. The question is now put twenty minutes before the answer
-        // matters, and the watermark is stamped on the way past, so a reader
-        // with Flong open at twenty to eleven would have lost the eleven
-        // o'clock notice with no later pass able to put it back. Where the
-        // reader is is asked at delivery, by the one thing that runs then :
-        // ``NotificationRouter/presentation(thread:isReading:)``.
-        guard let announcement = Announcement.newEdition(latest) else { return }
+        // **And no guard here on the reader being present.** It was right, and
+        // it is now asked one step later : a page is published by whichever
+        // pass gets to it, and the answer to `is somebody looking at this` has
+        // to be the one that holds when the banner is actually offered. That is
+        // ``NotificationRouter/presentation(thread:isReading:)``, which files
+        // the notice without a banner or a sound rather than dropping it, since
+        // Flong being open is not the same as the front page being read.
+        guard let announcement = Announcement.newEdition(current.edition) else { return }
         await announcer.post(announcement)
-    }
-
-    /// Takes back the papers the reader has unmade, and the notices lodged for
-    /// them.
-    ///
-    /// **A schedule that moves unmakes a page rather than relabelling it.** An
-    /// hour retracted at half past ten, here or on another device, would
-    /// otherwise leave a finished eleven o'clock page to arrive on the front at
-    /// eleven under a banner the system delivers punctually for an hour that no
-    /// longer exists. A page whose hour has not come has been seen by nobody,
-    /// editions being the one thing here that does not travel, so deleting it
-    /// takes nothing away from anyone.
-    func reconcileEditions(now: Date = Date()) async {
-        let gone = (try? await digestService.unmakeEditions(against: heldSchedule, now: now)) ?? []
-        guard !gone.isEmpty else { return }
-
-        for boundary in gone { await announcer.withdraw(Edition.notice(for: boundary)) }
-
-        // The watermark named one of them, so it falls back to the newest paper
-        // that really is out : left where it was, the boundary that replaces
-        // the retracted one would be read as already said.
-        if let said = preferences.editionsAnnouncedAt, gone.contains(said) {
-            preferences.editionsAnnouncedAt =
-                (try? await digestService.currentEdition(now: now))?.edition.openedAt ?? .distantPast
-        }
     }
 
     /// Every subject there is, for the screen that manages them.
@@ -2863,51 +2728,24 @@ final class AppModel {
         // Asked for again from here, since only this side knows the reader's
         // schedule. The handler cannot : it is registered before there is a
         // store to read one out of.
-        await scheduleTheNextEdition()
+        scheduleTheNextEdition()
     }
 
     /// Asks the system to wake for the next edition.
-    /// Asks the system to wake for the next press.
+    /// Asks the system to wake for the hour the next edition comes out at.
     ///
-    /// **The press and not the hour.** `BGTaskRequest.earliestBeginDate`
-    /// promises only that the system will not begin sooner than the moment it
-    /// is given, so a task asked for eleven is a paper at eleven at the very
-    /// best and at midnight often enough, and there is no way to be early.
-    /// Asked for twenty to eleven, any grant that lands inside the run is a
-    /// paper written before its hour and a notice the system delivers on it.
-    ///
-    /// No second wake is asked for. `BGTaskScheduler` holds one pending request
-    /// per identifier, so a preparation grant would have to be replaced by the
-    /// hour's from inside its own handler, immediately after the application
-    /// has just spent a grant, which is how a system that has just served this
-    /// app defers the next one : eight requested wakes a day, on the least
-    /// favoured class, to make the paper arrive later.
-    func scheduleTheNextEdition(now: Date = Date()) async {
-        let schedule = heldSchedule
-        guard let boundary = schedule.next(after: now) else { return }
-        var moment = schedule.press(for: boundary)
-
-        if moment <= now, now < boundary {
-            // Inside the run already. Whether this run's work is done is a
-            // question about the edition, so it is asked of the store : read
-            // off the notice watermark, which is nil on every device whose
-            // reader never asked for edition notices, this would re-arm every
-            // ten minutes on every device for nothing.
-            let made = (try? await digestService.offThePress())?.openedAt
-            if made == boundary {
-                guard let after = schedule.next(after: boundary) else { return }
-                moment = schedule.press(for: after)
-            } else {
-                // A press that was tried and did not take : no grant, no model,
-                // no network, or a page with nothing on it yet. Worth another
-                // wake inside the same run rather than at the next one hours
-                // away, which is the difference between a paper a few minutes
-                // late and a paper that never came.
-                moment = now.addingTimeInterval(BriefEditionsJob.askAgainAfter)
-            }
-        }
-
-        BackgroundScheduler.scheduleEdition(at: moment)
+    /// **A moment, and the system reads it as a floor.**
+    /// `BGTaskRequest.earliestBeginDate` promises only that the task will not
+    /// begin sooner than the date given, never that it will begin then, so a
+    /// grant asked for at an hour is a page at that hour at best and an hour or
+    /// two later often enough. There is nothing to be done about that from
+    /// here : a page is about the period that ends at its hour, so it cannot be
+    /// written before the hour, so its notice cannot be handed to the system in
+    /// advance. What actually makes an edition arrive is section 25's rule that
+    /// the foreground is the mechanism and background time is a bonus : every
+    /// catch-up makes the page too.
+    func scheduleTheNextEdition(now: Date = Date()) {
+        BackgroundScheduler.scheduleEdition(at: heldSchedule.next(after: now))
     }
 
     /// The whole of the work, at rest and on the mains.
@@ -3255,8 +3093,6 @@ final class AppModel {
         watching?.cancel()
         await watching?.value
         watching = nil
-        watchingChoices?.cancel()
-        watchingChoices = nil
 
         // iCloud first, while what addresses it is still here. The offer in
         // the public database goes with it : a reader who deleted everything
