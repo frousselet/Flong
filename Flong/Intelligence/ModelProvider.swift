@@ -111,8 +111,8 @@ nonisolated extension ModelConversation {
 
 /// Why an ask did not produce an answer.
 ///
-/// **The three the callers already act on, given names.** `OnDeviceModel` drew
-/// the line between a model that will not write about one story and a model
+/// **The three the callers already act on, given names.** The one namespace every caller went
+/// through drew the line between a model that will not write about one story and a model
 /// that cannot be used, and three call sites drew the same conclusion from it
 /// by hand. Everything a provider can fail with lands in one of these, and the
 /// line is drawn once.

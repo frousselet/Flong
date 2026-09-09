@@ -168,7 +168,7 @@ struct DigestScreen: View {
             // telling the reader there is none would be untrue for the minute
             // it takes. That case draws the shape of the page instead, above.
             if model.digestTopic == .frontPage, model.edition == nil, !isWaitingForAnEdition {
-                NoEdition(hasSchedule: !model.editionSchedule.slots.isEmpty) {
+                NoEdition(hasSchedule: !model.editionSchedule.slots.isEmpty, absence: model.absence(of: .editions)) {
                     open(.view(.unread))
                 }
             } else if model.digest.isEmpty, model.currentWork == nil {
@@ -423,7 +423,7 @@ struct DigestScreen: View {
             && model.edition == nil
             && !model.isEmpty
             && !model.editionSchedule.slots.isEmpty
-            && OnDeviceModel.absence == nil
+            && model.writesEditions
     }
 
     /// Which edition the page is showing, and when it came out.
@@ -458,14 +458,15 @@ struct DigestScreen: View {
     ///
     /// So every term of this is known before anything is read : the hours come
     /// from the preferences, which are held rather than fetched, and whether
-    /// there is a model to write an edition at all is a question about the
-    /// device. Waiting on the store, as this did, is what made the line arrive
+    /// there is a model to write an edition at all is a question about what the
+    /// reader has chosen and what the device can do, both of which are held.
+    /// Waiting on the store, as this did, is what made the line arrive
     /// a beat late. Empty only where no edition is coming, ever : no hours set,
     /// or no model to write one.
     private var scheduled: (slot: EditionSlot, opened: Date)? {
         guard model.digestTopic == .frontPage,
             !model.editionSchedule.slots.isEmpty,
-            OnDeviceModel.absence == nil
+            model.writesEditions
         else { return nil }
 
         return model.editionSchedule.current()

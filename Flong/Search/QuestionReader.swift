@@ -195,17 +195,17 @@ nonisolated struct QuestionReader: Sendable {
 
     let locale: Locale
 
-    /// Where the question is put.
+    /// Who answers this question, and how patient to be with them.
     ///
     /// Injected rather than reached for, so a test can put a sentence to
     /// something that is not a model at all : the framework's own model is not
     /// injectable, and until this parameter existed only the path with no model
     /// could be exercised end to end.
-    let provider: any ModelProvider
+    let hand: ModelHand
 
-    init(locale: Locale = .current, provider: any ModelProvider = LocalProvider()) {
+    init(locale: Locale = .current, hand: ModelHand = ModelDesk.shared.hand(for: .search)) {
         self.locale = locale
-        self.provider = provider
+        self.hand = hand
     }
 
     private var instructions: String {
@@ -223,26 +223,21 @@ nonisolated struct QuestionReader: Sendable {
     /// What one sentence asks for, or nothing when the model has nothing to add.
     func read(_ sentence: String, in vocabulary: Vocabulary, now: Date = Date()) async -> QuestionReading? {
         let sentence = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard provider.isAvailable else { return nil }
+        guard hand.isAvailable else { return nil }
         guard sentence.split(separator: " ").count >= Self.fewestWords else { return nil }
 
-        let conversation = provider.conversation(saying: instructions)
+        let conversation = hand.conversation(saying: instructions)
         conversation.prewarm()
 
-        do {
-            let read = try await conversation.answer(
-                to: "The sentence : \(sentence)",
-                as: ReadQuestion.self,
-                keeping: Self.reservedTokens
-            )
-            OnDeviceModel.succeeded()
-
-            return Self.reading(of: read, said: sentence, in: vocabulary, now: now)
-        } catch {
-            OnDeviceModel.refused(error)
-            Log.enrich.notice("A sentence could not be read : \(LocalProvider.kind(of: error), privacy: .public)")
+        guard
+            case .wrote(let read) = await hand.asking(
+                conversation, "The sentence : \(sentence)", as: ReadQuestion.self, keeping: Self.reservedTokens)
+        else {
+            Log.enrich.notice("A sentence could not be read, so it is searched for as the words it is made of")
             return nil
         }
+
+        return Self.reading(of: read, said: sentence, in: vocabulary, now: now)
     }
 
     // MARK: - A sentence, with no model to read it

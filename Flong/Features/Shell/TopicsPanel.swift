@@ -149,7 +149,7 @@ struct TopicsPanel: View {
                     Label("No subjects yet", systemImage: "circle.grid.2x2")
                 } description: {
                     Text(
-                        OnDeviceModel.absence
+                        model.absence(of: .subjects)
                             ?? "Subjects appear once the model has read a page of stories. Yours can be added at any time."
                     )
                 }

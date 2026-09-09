@@ -1481,15 +1481,15 @@ struct DigestShapeTests {
 
     @Test("The model is asked to write in the reader's language, not the articles'")
     func briefLanguage() {
-        let instruction = OnDeviceModel.languageInstruction(for: Locale(identifier: "fr_FR")) { _ in true }
+        let instruction = ModelLanguage.languageInstruction(for: Locale(identifier: "fr_FR")) { _ in true }
 
         #expect(instruction == "Answer in French, whatever language the articles are written in.")
     }
 
     @Test("The region a reader is in is not the language they read in")
     func regionIsNotLanguage() {
-        let swiss = OnDeviceModel.languageInstruction(for: Locale(identifier: "de_CH")) { _ in true }
-        let brazilian = OnDeviceModel.languageInstruction(for: Locale(identifier: "pt_BR")) { _ in true }
+        let swiss = ModelLanguage.languageInstruction(for: Locale(identifier: "de_CH")) { _ in true }
+        let brazilian = ModelLanguage.languageInstruction(for: Locale(identifier: "pt_BR")) { _ in true }
 
         #expect(swiss.contains("German"))
         #expect(brazilian.contains("Portuguese"))
@@ -1497,7 +1497,7 @@ struct DigestShapeTests {
 
     @Test("A language the model does not speak leaves the articles in their own")
     func unsupportedLanguage() {
-        let instruction = OnDeviceModel.languageInstruction(for: Locale(identifier: "br_FR")) { _ in false }
+        let instruction = ModelLanguage.languageInstruction(for: Locale(identifier: "br_FR")) { _ in false }
 
         // Half Breton and half English would be worse than either.
         #expect(instruction == "Answer in the language the articles are written in.")
@@ -1900,16 +1900,18 @@ struct TopicKindTests {
 /// Intelligence is off, a backgrounded application has been rate-limited. What
 /// matters is that none of those is permanent, and that giving up on the model
 /// is therefore never permanent either.
-@Suite("Giving up on the model, and coming back to it", .serialized)
+@Suite("Giving up on the model, and coming back to it")
 struct ModelPatienceTests {
-    init() { OnDeviceModel.reconsider() }
+    /// One of its own, and that is the change worth noting : the count used to
+    /// be a static shared by the whole process, so this suite had to run alone.
+    private let patience = ModelPatience(with: "test")
 
     /// Through the framework's own error and the triage that reads it, so this
     /// suite covers both halves : what the framework said, and what it was
     /// taken to mean.
     private func refuse(_ error: LanguageModelSession.GenerationError, times: Int, at moment: Date) {
         let fault = LocalProvider.fault(of: error)
-        for _ in 0..<times { OnDeviceModel.refused(fault, now: moment) }
+        for _ in 0..<times { patience.refused(fault, now: moment) }
     }
 
     @Test("Three failures of the model itself are enough to leave it alone")
@@ -1917,7 +1919,7 @@ struct ModelPatienceTests {
         let now = Date()
         refuse(.assetsUnavailable(.init(debugDescription: "")), times: 3, at: now)
 
-        #expect(OnDeviceModel.hasGivenUp(now: now))
+        #expect(patience.hasGivenUp(now: now))
     }
 
     @Test("It is asked again once the pause is over")
@@ -1929,7 +1931,7 @@ struct ModelPatienceTests {
         // no success is possible while every caller asks whether the model is
         // available first. Three failures and the model was off for the life of
         // the process, which on a Mac is days.
-        #expect(!OnDeviceModel.hasGivenUp(now: now.addingTimeInterval(OnDeviceModel.refusalPause + 1)))
+        #expect(!patience.hasGivenUp(now: now.addingTimeInterval(ModelPatience.refusalPause + 1)))
     }
 
     @Test("A model that is merely busy is not a model to give up on")
@@ -1940,7 +1942,7 @@ struct ModelPatienceTests {
         // that is a night spent writing headlines and filing no subjects.
         refuse(.rateLimited(.init(debugDescription: "")), times: 10, at: now)
 
-        #expect(!OnDeviceModel.hasGivenUp(now: now))
+        #expect(!patience.hasGivenUp(now: now))
         // Still no answer about this story, so nothing is stamped as answered.
         #expect(
             LocalProvider.fault(of: LanguageModelSession.GenerationError.rateLimited(.init(debugDescription: "")))
@@ -1955,17 +1957,17 @@ struct ModelPatienceTests {
         // A page of security advisories trips the guardrail on some of its
         // stories and not others, and counting those would silence the model
         // for every story after them.
-        #expect(!OnDeviceModel.hasGivenUp(now: now))
+        #expect(!patience.hasGivenUp(now: now))
     }
 
     @Test("A success in between clears what came before it")
     func successForgives() {
         let now = Date()
         refuse(.assetsUnavailable(.init(debugDescription: "")), times: 2, at: now)
-        OnDeviceModel.succeeded()
+        patience.succeeded()
         let unavailable = LanguageModelSession.GenerationError.assetsUnavailable(.init(debugDescription: ""))
-        OnDeviceModel.refused(LocalProvider.fault(of: unavailable), now: now)
+        patience.refused(LocalProvider.fault(of: unavailable), now: now)
 
-        #expect(!OnDeviceModel.hasGivenUp(now: now))
+        #expect(!patience.hasGivenUp(now: now))
     }
 }

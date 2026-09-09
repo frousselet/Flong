@@ -294,6 +294,12 @@ struct EditionSinking: ViewModifier {
 /// looking exactly like a page that is broken.
 struct NoEdition: View {
     let hasSchedule: Bool
+    /// Why no edition will be written, or nothing where one will.
+    ///
+    /// Handed in rather than asked for here : it is a question about the model
+    /// the reader pointed the editions at, which is the window's to answer and
+    /// not a view's.
+    let absence: LocalizedStringResource?
     let openSettings: () -> Void
 
     var body: some View {
@@ -302,7 +308,7 @@ struct NoEdition: View {
         } description: {
             if !hasSchedule {
                 Text("You have switched every edition off. The wire still holds everything that arrives.")
-            } else if let absence = OnDeviceModel.absence {
+            } else if let absence {
                 Text(absence)
             } else {
                 Text("The next edition is being written. It appears once every headline on it is.")

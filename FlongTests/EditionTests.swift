@@ -326,7 +326,7 @@ struct EditionBriefWorkTests {
     /// would stop everything behind it for ever.
     @Test("Without a model there is nothing waiting to be named")
     func nothingToDoWithoutAModel() async throws {
-        guard !OnDeviceModel.isAvailable else { return }
+        guard !LocalProvider().isAvailable else { return }
         #expect(try await BriefEditionsJob(database, now: now).remaining() == 0)
     }
 }
@@ -449,7 +449,7 @@ struct EditionBriefChecksTests {
     /// fall back to : an edition exists only where the model wrote it.
     @Test("A list in the wrong language is not a page the reader can use")
     func language() {
-        guard OnDeviceModel.writes(french) else { return }
+        guard LocalProvider.writes(french) else { return }
         #expect(
             EditionSummarizer.languageFault(
                 ["Two workers were pulled alive from a tunnel in Nepal.", "Monfils is out of the US Open."],
