@@ -71,7 +71,7 @@ struct StoreChangesTests {
 
         var entry = Entry(feedID: feed.id, guid: "urn:1", title: "Un article")
         entry.hasMedia = false
-        try await database.writer.write { db in try entry.insert(db) }
+        try await database.writer.write { [entry] db in try entry.insert(db) }
         #expect(await ticks.next() != nil)
 
         // Not only insertions : a star or a read state set by another device is
@@ -82,7 +82,7 @@ struct StoreChangesTests {
 
     @Test("The machinery writing down where it got to does not tick")
     func machinery() async throws {
-        var ticks = StoreChanges.ticks(in: database).makeAsyncIterator()
+        let ticks = StoreChanges.ticks(in: database).makeAsyncIterator()
 
         // A change token moving says nothing a reader can see, and a window
         // that reloaded for it would reload constantly and show the same page.
@@ -112,7 +112,7 @@ struct StoreChangesTests {
         for index in 0..<40 {
             var entry = Entry(feedID: feed.id, guid: "urn:\(index)", title: "Article \(index)")
             entry.hasMedia = false
-            try await database.writer.write { db in try entry.insert(db) }
+            try await database.writer.write { [entry] db in try entry.insert(db) }
         }
 
         #expect(await ticks.next() != nil)

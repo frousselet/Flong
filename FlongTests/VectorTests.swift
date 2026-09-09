@@ -158,7 +158,7 @@ struct VectorStoreTests {
         )
         entry.hasMedia = false
 
-        try await database.writer.write { db in
+        try await database.writer.write { [entry] db in
             try entry.insert(db)
             try EntryBody(entryID: entry.id, sanitizedHTML: "<p>\(text)</p>", plainText: text).insert(db)
         }

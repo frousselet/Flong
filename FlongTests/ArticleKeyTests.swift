@@ -112,7 +112,7 @@ struct ArticleKeyTests {
             "https://liberation.example.com/2026/binet-patronat?utm_source=rss",
             "https://www.liberation.example.com/2026/binet-patronat/",
         ]
-        try await database.writer.write { db in
+        try await database.writer.write { [feeds] db in
             for (index, address) in addresses.enumerated() {
                 var entry = Entry(
                     feedID: feeds[index % feeds.count].id,

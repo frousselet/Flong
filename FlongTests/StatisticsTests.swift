@@ -55,7 +55,7 @@ struct StatisticsTests {
         ).feed
         if let site {
             feed.siteURL = URL(string: site)
-            try await database.writer.write { db in try feed.update(db) }
+            try await database.writer.write { [feed] db in try feed.update(db) }
         }
         return feed
     }
@@ -83,7 +83,7 @@ struct StatisticsTests {
         )
         entry.readAt = read
         let id = entry.id
-        try await database.writer.write { db in
+        try await database.writer.write { [entry] db in
             try entry.insert(db)
             if let body {
                 try EntryBody(entryID: id, sanitizedHTML: nil, extractedHTML: nil, plainText: body).insert(db)

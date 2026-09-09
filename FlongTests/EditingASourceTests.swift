@@ -186,7 +186,7 @@ struct EditingASourceTests {
             title: "One"
         )
         entry.hasMedia = false
-        try await database.writer.write { db in try entry.insert(db) }
+        try await database.writer.write { [entry] db in try entry.insert(db) }
 
         let found = await model.addressParameters(of: feed.id, feedURL: feed.url)
 
@@ -207,7 +207,7 @@ struct EditingASourceTests {
             title: "One"
         )
         entry.hasMedia = false
-        try await database.writer.write { db in try entry.insert(db) }
+        try await database.writer.write { [entry] db in try entry.insert(db) }
 
         await model.editSource(feed.id, to: SourceEdit(title: "Example"), address: .secret(address))
         let masked = try await stored(feed.id)

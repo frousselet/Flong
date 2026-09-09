@@ -632,7 +632,7 @@ struct ArrivedArticleTests {
         var feed = Feed(url: URL(string: "https://\(host)/atom.xml")!, title: name)
         feed.siteURL = URL(string: "https://\(host)")
         feed.notifiesNewArticles = announcing
-        try await database.writer.write { db in try feed.insert(db) }
+        try await database.writer.write { [feed] db in try feed.insert(db) }
         return feed
     }
 
@@ -653,7 +653,7 @@ struct ArrivedArticleTests {
         entry.isHidden = isHidden
         entry.duplicateOf = duplicateOf
         entry.imageURL = picture
-        try await database.writer.write { db in try entry.insert(db) }
+        try await database.writer.write { [entry] db in try entry.insert(db) }
         return entry.id
     }
 
@@ -766,6 +766,7 @@ struct ArrivedArticleTests {
     }
 
     /// A writer the reader asked about, and an article they signed.
+    @discardableResult
     private func signed(
         _ title: String,
         by writer: String,
@@ -780,7 +781,7 @@ struct ArrivedArticleTests {
             receivedAt: receivedAt
         )
         entry.hasMedia = false
-        try await database.writer.write { db in
+        try await database.writer.write { [entry] db in
             try entry.insert(db)
             try AuthorStore.index(entry.id, byline: writer, in: db)
         }
@@ -935,7 +936,7 @@ struct WindowlessModelTests {
         var feed = Feed(url: URL(string: "https://lemonde.example.com/atom.xml")!, title: "Le Monde")
         feed.siteURL = URL(string: "https://lemonde.example.com")
         feed.notifiesNewArticles = true
-        try await database.writer.write { db in try feed.insert(db) }
+        try await database.writer.write { [feed] db in try feed.insert(db) }
 
         await model.setNotifications(true, forSource: feed.id)
 
@@ -946,7 +947,7 @@ struct WindowlessModelTests {
             receivedAt: Date().addingTimeInterval(1)
         )
         entry.hasMedia = false
-        try await database.writer.write { db in try entry.insert(db) }
+        try await database.writer.write { [entry] db in try entry.insert(db) }
 
         await model.announceNewArticles()
 
@@ -977,14 +978,14 @@ struct AnnouncingSourceTests {
     private func source(_ name: String = "Le Monde", at host: String = "lemonde.example.com") async throws -> Feed {
         var feed = Feed(url: URL(string: "https://\(host)/atom.xml")!, title: name)
         feed.siteURL = URL(string: "https://\(host)")
-        try await database.writer.write { db in try feed.insert(db) }
+        try await database.writer.write { [feed] db in try feed.insert(db) }
         return feed
     }
 
     private func article(_ title: String, of feed: Feed, at moment: Date) async throws {
         var entry = Entry(feedID: feed.id, guid: "urn:\(title)", title: title, receivedAt: moment)
         entry.hasMedia = false
-        try await database.writer.write { db in try entry.insert(db) }
+        try await database.writer.write { [entry] db in try entry.insert(db) }
     }
 
     /// The reader has asked about the source, and the clock started then.
@@ -1123,7 +1124,7 @@ struct AnnouncingSourceTests {
             receivedAt: now.addingTimeInterval(60)
         )
         entry.hasMedia = false
-        try await database.writer.write { db in
+        try await database.writer.write { [entry] db in
             try entry.insert(db)
             try AuthorStore.index(entry.id, byline: "Claire Ancelin", in: db)
         }
@@ -1162,7 +1163,7 @@ struct AnnouncingSourceTests {
             receivedAt: now.addingTimeInterval(60)
         )
         entry.hasMedia = false
-        try await database.writer.write { db in
+        try await database.writer.write { [entry] db in
             try entry.insert(db)
             try AuthorStore.index(entry.id, byline: "Claire Ancelin", in: db)
         }

@@ -53,7 +53,7 @@ struct AuthorStoreTests {
             imageURL: image
         )
         entry.hasMedia = false
-        try await database.writer.write { db in
+        try await database.writer.write { [entry] db in
             try entry.insert(db)
             // What every path that stores an article does : see
             // ``AuthorStore/index(_:byline:in:)``.

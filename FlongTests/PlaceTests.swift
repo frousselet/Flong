@@ -98,14 +98,14 @@ struct PlaceTests {
 @MainActor
 struct ReaderPlaceTests {
     private func window(
-        _ locator: MemoryLocator = MemoryLocator()
+        _ locator: MemoryLocator? = nil
     ) throws -> (AppModel, Preferences) {
         let defaults = UserDefaults(suiteName: "com.rslt.Flong.tests.\(UUID().uuidString)")!
         let preferences = Preferences(cloud: nil, local: defaults)
         let model = AppModel(
             database: try AppDatabase.inMemory(),
             preferences: preferences,
-            locator: locator
+            locator: locator ?? MemoryLocator()
         )
         return (model, preferences)
     }

@@ -60,7 +60,7 @@ struct StreamArchiveTests {
                 receivedAt: date
             )
             entry.hasMedia = false
-            try await database.writer.write { db in
+            try await database.writer.write { [entry] db in
                 try entry.insert(db)
                 if let body {
                     try EntryBody(entryID: entry.id, sanitizedHTML: body, plainText: "Un corps.").insert(db)

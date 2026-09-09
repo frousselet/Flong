@@ -135,7 +135,7 @@ struct EditionStoreTests {
         // is still waiting on : the readiness of a period is its own suite.
         story.briefLocale = written ? Locale.current.identifier : nil
 
-        try await database.writer.write { db in
+        try await database.writer.write { [story] db in
             try story.insert(db)
             for index in 0..<count {
                 let host = "edition-\(abs(title.hashValue))-\(index).example.com"
@@ -847,8 +847,8 @@ struct EditionNoticeTests {
     /// line the model wrote over the whole page, and writing anything of our
     /// own on top would be a third opinion about a page that already has one.
     @Test("The notice names the edition and says its own points")
-    func wording() {
-        let announcement = try? #require(
+    func wording() throws {
+        let announcement = try #require(
             Announcement.newEdition(
                 edition(points: ["L'Assemblée a rejeté le texte.", "La CGT reconduit la grève."])
             )
@@ -856,14 +856,14 @@ struct EditionNoticeTests {
 
         // The edition names itself in the one bold line a banner gives a title,
         // which is where the dateline stands on the page for the same reason.
-        #expect(announcement?.title == String(localized: EditionSlot.morning.title))
+        #expect(announcement.title == String(localized: EditionSlot.morning.title))
         // A middle dot rather than commas, as the headlines are joined
         // everywhere else here : a point may hold commas of its own.
-        #expect(announcement?.body == "L'Assemblée a rejeté le texte. · La CGT reconduit la grève.")
+        #expect(announcement.body == "L'Assemblée a rejeté le texte. · La CGT reconduit la grève.")
         // A tap opens the digest, where the edition is. There is no deeper
         // place to go : the edition is the front page.
-        #expect(announcement?.story == nil)
-        #expect(announcement?.article == nil)
+        #expect(announcement.story == nil)
+        #expect(announcement.article == nil)
     }
 
     @Test("A page the model has not written says nothing at all")
@@ -934,7 +934,7 @@ struct IndexingLaneTests {
         )
         entry.hasMedia = false
 
-        try await database.writer.write { db in
+        try await database.writer.write { [entry, feed] db in
             try feed.insert(db)
             try entry.insert(db)
         }

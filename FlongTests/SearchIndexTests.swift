@@ -36,7 +36,7 @@ struct SearchIndexTests {
         var entry = Entry(feedID: feed.id, guid: "urn:example:\(title)", title: title, excerpt: excerpt, author: author)
         entry.hasMedia = false
 
-        try await database.writer.write { db in
+        try await database.writer.write { [entry] db in
             try entry.insert(db)
             if let body {
                 try EntryBody(entryID: entry.id, sanitizedHTML: "<p>\(body)</p>", plainText: body).insert(db)
@@ -96,7 +96,7 @@ struct SearchIndexTests {
         var entry = try await add(title: "Premier titre", body: "Premier corps")
 
         entry.title = "Titre corrigé"
-        try await database.writer.write { db in
+        try await database.writer.write { [entry] db in
             try entry.update(db)
             try EntryBody(entryID: entry.id, plainText: "Corps corrigé").upsert(db)
         }

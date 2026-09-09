@@ -55,7 +55,7 @@ struct BackgroundPassTests {
     func groupOfOne() async {
         var refreshed = false
 
-        await BackgroundScheduler.runFullPass {
+        let started = await BackgroundScheduler.runFullPass {
             await BackgroundScheduler.runRefresh { refreshed = true }
         }
 
@@ -63,6 +63,7 @@ struct BackgroundPassTests {
         // limit of one. Here the full pass fetches every feed a reader follows,
         // and a refresh running alongside it would double what the publishers
         // see.
+        #expect(started)
         #expect(!refreshed)
     }
 

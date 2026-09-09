@@ -11,7 +11,8 @@
             "value" : "Flong"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "CFBundleName" : {
       "comment" : "Bundle name",
@@ -23,7 +24,8 @@
             "value" : "Flong"
           }
         }
-      }
+      },
+      "shouldTranslate" : false
     },
     "NSContactsUsageDescription" : {
       "comment" : "Privacy - Contacts Usage Description",
@@ -33,6 +35,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Flong looks up the people you invite to a shared collection, so they show under the name and the face you have for them rather than as a phone number. It stays on this device and is never shared."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flong retrouve les personnes que vous invitez dans une collection partagée, pour qu'elles apparaissent sous le nom et le visage que vous leur connaissez plutôt que sous un numéro. Tout reste sur cet appareil et n'est jamais partagé."
           }
         }
       }
@@ -45,6 +53,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "Flong talks to the model server you run on your own network, at the address you gave it. Nothing goes anywhere else."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flong s'adresse au serveur de modèle que vous faites tourner sur votre réseau, à l'adresse que vous lui avez indiquée. Rien ne part ailleurs."
           }
         }
       }

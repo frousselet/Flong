@@ -37,7 +37,7 @@ struct CollectionStoreTests {
         ).feed
         var entry = Entry(feedID: feed.id, guid: "urn:\(title)", title: title, receivedAt: now)
         entry.hasMedia = false
-        try await database.writer.write { db in try entry.insert(db) }
+        try await database.writer.write { [entry] db in try entry.insert(db) }
         return entry
     }
 

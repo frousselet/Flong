@@ -145,7 +145,7 @@ struct DigestTests {
             )
             entry.hasMedia = false
 
-            try await database.writer.write { db in
+            try await database.writer.write { [entry] db in
                 try entry.insert(db)
                 try EntryBody(entryID: entry.id, plainText: article.excerpt).insert(db)
             }
@@ -204,7 +204,7 @@ struct DigestTests {
             receivedAt: now.addingTimeInterval(-600)
         )
         entry.hasMedia = false
-        try await database.writer.write { db in try entry.insert(db) }
+        try await database.writer.write { [entry] db in try entry.insert(db) }
 
         try await StoryBuilder(database).build(now: now)
 
@@ -891,7 +891,7 @@ struct DigestTests {
         }
 
         let phases = Locked<[WorkPhase]>([])
-        await service.enrich(now: now) { phase in phases.append(phase) }
+        await service.enrich(now: now, onPhase: { phase in phases.append(phase) })
 
         // The reader watching a repair wants to see the writing and the filing
         // happen, and both have to say so. They said nothing at all until the
@@ -974,7 +974,7 @@ struct DigestTests {
             receivedAt: now.addingTimeInterval(-600)
         )
         entry.hasMedia = false
-        try await database.writer.write { db in try entry.insert(db) }
+        try await database.writer.write { [entry] db in try entry.insert(db) }
         try await StoryBuilder(database).build(now: now)
 
         // The one whose articles moved, and only that one.
@@ -1302,7 +1302,7 @@ struct DigestTests {
                 receivedAt: now.addingTimeInterval(-600)
             )
             entry.hasMedia = false
-            try await database.writer.write { db in
+            try await database.writer.write { [entry] db in
                 try entry.insert(db)
                 try EntryBody(entryID: entry.id, plainText: entry.excerpt ?? "").insert(db)
             }
@@ -1405,17 +1405,17 @@ struct DigestShapeTests {
             firstAt: now,
             lastAt: now
         )
-        try await database.writer.write { db in try story.insert(db) }
+        try await database.writer.write { [story] db in try story.insert(db) }
 
-        let read = try await database.writer.read { db in try Story.fetchOne(db, key: story.id) }
+        let read = try await database.writer.read { [story] db in try Story.fetchOne(db, key: story.id) }
         #expect(read?.isGenerated == true)
         #expect(read?.isTranslated == true)
 
         // A brief written here is the other kind, and the column says so
         // rather than leaving the page to guess from the language.
         story.isTranslated = false
-        try await database.writer.write { db in try story.update(db) }
-        let written = try await database.writer.read { db in try Story.fetchOne(db, key: story.id) }
+        try await database.writer.write { [story] db in try story.update(db) }
+        let written = try await database.writer.read { [story] db in try Story.fetchOne(db, key: story.id) }
         #expect(written?.isGenerated == true)
         #expect(written?.isTranslated == false)
     }
@@ -1518,20 +1518,19 @@ struct DigestShapeTests {
     }
 
     @Test("A standfirst that ran long is cut back to the sentences that fit")
-    func aLongLineIsCut() {
+    func aLongLineIsCut() throws {
         let long = """
             Le président a annoncé la mesure lundi. Elle entrera en vigueur en janvier et concerne \
             les communes de plus de dix mille habitants. Les préfets disposeront de six mois pour \
             publier les arrêtés correspondants, et les recours devront être déposés avant la fin de \
             l'année suivante, faute de quoi ils seront jugés irrecevables par le tribunal.
             """
-        let kept = try? #require(StorySummarizer.shortened(long))
+        let kept = try #require(StorySummarizer.shortened(long))
 
-        #expect(kept != nil)
-        #expect(StorySummarizer.isBrief(kept ?? long))
+        #expect(StorySummarizer.isBrief(kept))
         // Whole sentences, and the model's own words in its own order.
-        #expect(kept?.hasPrefix("Le président a annoncé la mesure lundi.") == true)
-        #expect(long.hasPrefix(kept ?? ""))
+        #expect(kept.hasPrefix("Le président a annoncé la mesure lundi."))
+        #expect(long.hasPrefix(kept))
 
         // A single sentence that is itself a paragraph leaves nothing to keep.
         let oneBreath = String(repeating: "mot ", count: 60) + "."
