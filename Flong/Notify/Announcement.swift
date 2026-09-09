@@ -71,6 +71,42 @@ nonisolated struct Announcement: Hashable, Sendable {
     /// It is decided where the burst is known, which is the pass, and not here.
     var isQuiet = false
 
+    /// The moment the system is to deliver this, where that is not now.
+    ///
+    /// **The one field that separates a paper on time from a paper late.** An
+    /// edition is written before its hour, so its notice can be lodged with the
+    /// system and delivered on the hour with nothing of ours running :
+    /// `BGTaskRequest.earliestBeginDate` promises only that the system will not
+    /// begin sooner than the moment it is given, so a notice posted by code
+    /// that has to be running is a notice that arrives when the system feels
+    /// like it. A moment already gone is `now`, which is the late paper, and it
+    /// is the same field, the same builder and the same posting.
+    ///
+    /// `nil` for everything else : a story that has just opened is news at the
+    /// moment it is found, and a notice about it scheduled for later would be
+    /// stale on arrival.
+    var at: Date?
+
+    /// What this notice is known by, where it is about something with a name.
+    ///
+    /// **Only a named notice can be replaced or taken back.** Everything but an
+    /// article took a fresh identifier every time it was posted, which was
+    /// harmless while nothing was ever pending : a notice lodged for eleven and
+    /// then unwanted, because the reader moved the schedule at half past ten,
+    /// has to be findable by something that may no longer have the row it was
+    /// about. An edition's name is its boundary, which every device works out
+    /// the same way.
+    var name: String?
+
+    /// Whether a tap opens the front page, there being nothing deeper to open.
+    ///
+    /// An edition *is* the front page, so its notice carries neither a story
+    /// nor an article. Before the notice was lodged ahead of time it was almost
+    /// always posted while the reader had Flong open ; the ordinary case now is
+    /// a banner tapped from a cold start at eleven o'clock, which without this
+    /// lands them wherever they last were.
+    var opensTheDigest = false
+
     /// Stories that have just been opened.
     ///
     /// Nothing to say about none, which is the ordinary case : most passes have
@@ -139,15 +175,31 @@ nonisolated struct Announcement: Hashable, Sendable {
     static func newEdition(_ edition: Edition) -> Announcement? {
         guard !edition.points.isEmpty else { return nil }
 
+        // **Named in the language the page was written in, and not in this
+        // moment's.** The points are the model's own words, frozen when it was
+        // asked ; a reader who changes language between the press and the hour
+        // would otherwise be handed an English title over a French body. A page
+        // still waiting for its hour when that happens is unmade rather than
+        // relabelled, which is ``EditionStore/unmakeWhatIsNotWanted``'s work.
+        var named = edition.slot.title
+        if let written = edition.briefLocale { named.locale = Locale(identifier: written) }
+
         return Announcement(
-            title: String(localized: edition.slot.title),
+            title: String(localized: named),
             // The points joined by a middle dot rather than by commas, as the
             // headlines are joined everywhere else here : a point may hold
             // commas of its own, and a comma list of them reads as one broken
             // sentence. A banner gives the body two lines, so what does not fit
             // is what the reader opens the page for.
             body: edition.points.joined(separator: " · "),
-            thread: Thread.newEdition
+            thread: Thread.newEdition,
+            // **The hour, and not now.** Where the hour has already gone, which
+            // is a page the model could not be reached for in time, this names
+            // a moment in the past and the delivery says it at once. One field,
+            // one path, two papers.
+            at: edition.openedAt,
+            name: Edition.notice(for: edition.openedAt),
+            opensTheDigest: true
         )
     }
 

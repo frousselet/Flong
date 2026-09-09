@@ -12,6 +12,7 @@
 import Foundation
 import GRDB
 import Testing
+import UserNotifications
 
 @testable import Flong
 
@@ -865,13 +866,10 @@ struct EditionMarkTests {
 
 @Suite("Telling the reader an edition has come out")
 struct EditionNoticeTests {
-    private func edition(points: [String]) -> Edition {
-        Edition(
-            slot: .morning,
-            openedAt: Date(timeIntervalSince1970: 1_788_000_000),
-            points: points,
-            publishedAt: Date()
-        )
+    private func edition(points: [String], openedAt: Date = Date(timeIntervalSince1970: 1_788_000_000))
+        -> Edition
+    {
+        Edition(slot: .morning, openedAt: openedAt, points: points, publishedAt: Date())
     }
 
     /// **The one notice whose words are already written.** Everything else is a
@@ -901,6 +899,75 @@ struct EditionNoticeTests {
     @Test("A page the model has not written says nothing at all")
     func nothingToSay() {
         #expect(Announcement.newEdition(edition(points: [])) == nil)
+    }
+
+    /// **The one thing the press buys.** A page written before its hour lets
+    /// its notice be lodged with the system, which delivers it on the hour with
+    /// nothing of ours running. `earliestBeginDate` promises only that the
+    /// system will not begin sooner than the moment it is given.
+    @Test("A page written before its hour is announced for its hour")
+    func lodgedForTheHour() throws {
+        // An hour that has not come, since a full set of components naming a
+        // moment already gone matches nothing : that is the late paper, and it
+        // is the case below.
+        let boundary = Date(timeIntervalSince1970: (Date().timeIntervalSince1970 + 3600).rounded(.down))
+        let announcement = try #require(
+            Announcement.newEdition(edition(points: ["Une chose."], openedAt: boundary)))
+
+        #expect(announcement.at == boundary)
+        #expect(announcement.name == Edition.notice(for: boundary))
+        #expect(announcement.opensTheDigest)
+
+        let trigger = Notifier.trigger(for: announcement, now: boundary.addingTimeInterval(-20 * 60))
+        let calendar = try #require(trigger as? UNCalendarNotificationTrigger)
+        #expect(calendar.nextTriggerDate() == boundary)
+
+        // **The zone is pinned into the components**, so the moment is
+        // absolute : a reader who flies west between the press and the hour
+        // gets the banner when the page comes out and not at eleven o'clock
+        // wherever they have landed.
+        #expect(calendar.dateComponents.timeZone != nil)
+        #expect(calendar.repeats == false)
+    }
+
+    /// The late paper is not a second path : the same field, the same builder
+    /// and the same posting, on the other side of one comparison.
+    @Test("A page whose hour has gone is said at once")
+    func theLatePaper() throws {
+        let boundary = Date(timeIntervalSince1970: 1_788_000_000)
+        let announcement = try #require(Announcement.newEdition(edition(points: ["Une chose."])))
+
+        #expect(Notifier.trigger(for: announcement, now: boundary.addingTimeInterval(40 * 60)) == nil)
+    }
+
+    /// **Only a named notice can be replaced or taken back.** Everything but an
+    /// article took a fresh identifier every time it was posted, which was
+    /// harmless while nothing was ever pending.
+    @Test("An edition's notice is known by its hour, so it can be replaced")
+    func known() throws {
+        let announcement = try #require(Announcement.newEdition(edition(points: ["Une chose."])))
+        #expect(Notifier.identifier(of: announcement) == announcement.name)
+        #expect(
+            Edition.notice(for: Date(timeIntervalSince1970: 1_788_000_000))
+                != Edition.notice(for: Date(timeIntervalSince1970: 1_788_003_600)))
+    }
+
+    /// A banner and a sound over the page they are about is telling somebody
+    /// something they are looking at. Filed rather than dropped, since Flong
+    /// being open is not the same as the front page being read.
+    @Test("An edition arriving while the reader is in Flong is filed and not sounded")
+    func heldBackWhileReading() {
+        #expect(
+            NotificationRouter.presentation(thread: Announcement.Thread.newEdition, isReading: true) == [.list])
+        #expect(
+            NotificationRouter.presentation(thread: Announcement.Thread.newEdition, isReading: false)
+                == [.banner, .list, .sound])
+        // And only the edition : the others reach a foreground window because
+        // they were posted a moment before it opened, and they are worth
+        // showing.
+        #expect(
+            NotificationRouter.presentation(thread: Announcement.Thread.newStories, isReading: true)
+                == [.banner, .list, .sound])
     }
 }
 

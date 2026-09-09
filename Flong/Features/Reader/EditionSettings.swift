@@ -43,7 +43,7 @@ struct EditionSettings: View {
                     // read in English on a French device, and nothing would
                     // have said so.
                     Text(
-                        "The digest is made afresh at each of these hours, with the ten stories that matter most. What does not fit stays in the wire."
+                        "Each edition is closed shortly before its hour and comes out on the hour, with the ten stories that matter most. What arrives after that leads the next edition, and everything stays in the wire."
                     )
                 }
             }
