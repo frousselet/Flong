@@ -120,6 +120,7 @@ A single application, shared code, distinct interface layers per platform.
 | `Indexer` | FTS5 for every article, Core Spotlight for what the reader chose |
 | `Search` | The query language, and its compilation to SQL |
 | `Enricher` | vectors, classification, rule execution |
+| `Intelligence` | where a model is asked : the one on the device, and the providers a reader configured. `docs/technical/model-providers.md` |
 | `Sync` | `CKSyncEngine` on the private database |
 | `Notify` | Local notifications : what is worth saying, and the rules for saying it |
 | `Place` | Where the reader says they read from : suggestions from MapKit, one fix from the device. `docs/technical/place.md` |
@@ -817,7 +818,7 @@ The initial import runs in a resumable task with system progress : the resume po
 - No data leaves the device, apart from the private CloudKit database, a shared collection the reader created or accepted, the addresses they chose to offer the other readers under section 8, and the requests to the feeds themselves.
 - Nothing is offered to the other readers before the reader has been asked and has said yes, and turning it off takes their list back out. What is offered is an address and never a name, an article or anything they wrote.
 - No telemetry, no tracker, no third-party service active by default.
-- Secrets in the keychain exclusively.
+- Secrets in the keychain exclusively, feed credentials and the keys of a model the reader brought of their own alike, and a key is written once and never read back to the screen.
 - The local database under data protection, "after first unlock" class.
 - Whitelist HTML sanitization, a web view with no script and no third-party cookie.
 - Lazy and disableable image loading, tracking pixels neutralized.

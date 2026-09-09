@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- A model provider of your own : the key goes to the keychain, under a service of its own, and travels between your devices as a feed credential does. Nothing is configured and nothing is sent yet.
 - Each of the four things a model does here is asked of a model of its own, and a run of failures leaves that one alone rather than all of them.
 - The four questions put to the model go through one shape rather than through a generated type each, so an answer can come back from something that is not the framework. Nothing the model is told changes ; the one measurable difference is that the room left in the window is now counted with the instructions in it, which is slightly more prudent than before.
 - The indexing lane runs off the main thread at last : a background priority is not a background thread, and the named-entity passes and the sentence embeddings ran on it for twenty seconds after every catch-up.

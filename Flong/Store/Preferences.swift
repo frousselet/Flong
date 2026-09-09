@@ -64,6 +64,7 @@ nonisolated final class Preferences: @unchecked Sendable {
         static let poolContributes = "pool.contributes"
         static let poolIdentifier = "pool.identifier"
         static let editionSchedule = "edition.schedule"
+        static let providers = "model.providers"
         static let newEditionNotices = "notify.new-editions"
         static let editionsAnnouncedAt = "notify.editions-announced-at"
 
@@ -73,6 +74,7 @@ nonisolated final class Preferences: @unchecked Sendable {
             newStoryNotices, newArticleNotices, storiesAnnouncedAt, articlesAnnouncedAt, collaborationNotices,
             mutedCollections, collaborationsAnnouncedAt, recentSearches,
             poolContributes, poolIdentifier, editionSchedule, editionsAnnouncedAt, newEditionNotices,
+            providers,
         ]
     }
 
@@ -398,6 +400,28 @@ nonisolated final class Preferences: @unchecked Sendable {
             guard let data = try? JSONEncoder().encode(newValue) else { return }
             local.set(data, forKey: Key.editionSchedule)
             cloud?.set(data, forKey: Key.editionSchedule)
+            cloud?.synchronize()
+        }
+    }
+
+    /// The models the reader configured, and which of them answers what.
+    ///
+    /// **A preference and not a record.** It is a decision about themselves,
+    /// like the hours their editions come out, so it travels with their other
+    /// decisions rather than through a record budget spent on subscriptions and
+    /// kept articles. Nothing secret is in it : the keys are in the keychain,
+    /// under the same identifiers, and travel by iCloud Keychain instead.
+    var providers: ProviderSettings {
+        get {
+            guard let data = cloud?.data(forKey: Key.providers) ?? local.data(forKey: Key.providers),
+                let stored = try? JSONDecoder().decode(ProviderSettings.self, from: data)
+            else { return ProviderSettings() }
+            return stored
+        }
+        set {
+            guard let data = try? JSONEncoder().encode(newValue) else { return }
+            local.set(data, forKey: Key.providers)
+            cloud?.set(data, forKey: Key.providers)
             cloud?.synchronize()
         }
     }
