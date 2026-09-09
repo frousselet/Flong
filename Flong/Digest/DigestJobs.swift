@@ -45,6 +45,9 @@ nonisolated struct FileStoriesJob: ResumableJob {
     private let database: AppDatabase
     private let locale: Locale
     private let since: Date
+    /// Where the period being written for begins, which is what puts the coming
+    /// page's stories at the head of the queue. `nil` is the window's own head.
+    private let periodStart: Date?
     /// The one that will be asked, held rather than made twice : the guard on
     /// availability and the ask itself have to be about the same model.
     private let namer: TopicNamer
@@ -53,12 +56,14 @@ nonisolated struct FileStoriesJob: ResumableJob {
         _ database: AppDatabase,
         locale: Locale = .current,
         namer: TopicNamer? = nil,
-        now: Date = Date()
+        now: Date = Date(),
+        periodStart: Date? = nil
     ) {
         self.database = database
         self.locale = locale
         self.namer = namer ?? TopicNamer(locale: locale)
         self.since = now.addingTimeInterval(-DigestStore.window)
+        self.periodStart = periodStart
     }
 
     /// How many stories are waiting to be filed.
@@ -105,16 +110,23 @@ nonisolated struct FileStoriesJob: ResumableJob {
                             OR s.topics_asked_for IS NULL
                             OR s.topics_asked_for <> \(Self.question)
                           )
+                    -- **The coming page first, and the backlog behind it.**
+                    -- A pass off the mains is bounded to fifteen-second slices,
+                    -- so what is written is whatever the order reaches : the
+                    -- stories of the period about to be published are the ones
+                    -- a page is waiting on, and the rest drain after them
+                    -- rather than being shut out.
+                    --
                     -- **Briefed first.** A brief costs three model calls to a
                     -- filing's one, so the filing runs ahead and would decide
                     -- the one durable answer on the raw headline of whichever
                     -- article was nearest the middle of the group. Deferred and
                     -- never blocked : a story that never gets a standfirst is
                     -- still filed, behind the ones that have one.
-                    ORDER BY (s.summary IS NULL), s.last_at DESC
+                    ORDER BY (s.last_at >= ?) DESC, (s.summary IS NULL), s.last_at DESC
                     LIMIT \(Self.batchSize)
                     """,
-                arguments: [since]
+                arguments: [since, periodStart ?? since]
             )
             .map { (id: $0["id"] as UUID, title: $0["title"] as String, summary: $0["summary"] as String?) }
         }
@@ -208,11 +220,20 @@ nonisolated struct BriefStoriesJob: ResumableJob {
     private let database: AppDatabase
     private let summarizer: StorySummarizer
     private let since: Date
+    /// Where the period being written for begins, which is what holds the same
+    /// story back to one re-ask inside it. `nil` where there is no page coming.
+    private let periodStart: Date?
 
-    init(_ database: AppDatabase, summarizer: StorySummarizer = StorySummarizer(), now: Date = Date()) {
+    init(
+        _ database: AppDatabase,
+        summarizer: StorySummarizer = StorySummarizer(),
+        now: Date = Date(),
+        periodStart: Date? = nil
+    ) {
         self.database = database
         self.summarizer = summarizer
         self.since = now.addingTimeInterval(-DigestStore.window)
+        self.periodStart = periodStart
     }
 
     /// The articles the model is shown, named as one value the store can compare.
@@ -249,8 +270,15 @@ nonisolated struct BriefStoriesJob: ResumableJob {
         let stories = try await database.writer.read { db in
             try Story.fetchAll(
                 db,
-                sql: "SELECT * FROM story WHERE \(work.sql) ORDER BY last_at DESC LIMIT \(Self.batchSize)",
-                arguments: work.arguments
+                sql: """
+                    SELECT * FROM story WHERE \(work.sql)
+                    -- The coming page first, and the backlog behind it : a pass
+                    -- off the mains is bounded to slices, so the order is what
+                    -- decides which stories a page is not left waiting on.
+                    ORDER BY (last_at >= ?) DESC, last_at DESC
+                    LIMIT \(Self.batchSize)
+                    """,
+                arguments: work.arguments + [periodStart ?? since]
             )
         }
         guard !stories.isEmpty else { return 0 }
@@ -288,32 +316,70 @@ nonisolated struct BriefStoriesJob: ResumableJob {
     /// Without a model the summary is filled from the article's own standfirst,
     /// so the count reaches zero and the job stops rather than asking for ever.
     private var work: (sql: String, arguments: StatementArguments) {
-        Self.work(locale: summarizer.locale, hasModel: summarizer.hand.isAvailable, since: since)
+        Self.work(
+            locale: summarizer.locale,
+            hasModel: summarizer.hand.isAvailable,
+            since: since,
+            askedAgainSince: periodStart
+        )
     }
 
     static func work(locale: Locale, hasModel: Bool, since: Date) -> (
         sql: String, arguments: StatementArguments
     ) {
+        work(locale: locale, hasModel: hasModel, since: since, askedAgainSince: nil)
+    }
+
+    /// Which stories want a brief, and how often the same one may be re-asked.
+    ///
+    /// **And whether it is still about the same articles.** Held to the window
+    /// the page reads, so what is asked again is what the reader can actually
+    /// open ; a story nobody can reach is not worth a model call.
+    ///
+    /// **The language asked in, and not whether there is a summary.** A brief
+    /// may honestly have no standfirst : the model wrote a headline and its line
+    /// was a paragraph, or the story's articles carry no line a publisher wrote.
+    /// Asked on `summary IS NULL`, every one of those came back at every pass
+    /// for ever, and three of them in one batch stopped the whole phase.
+    ///
+    /// **The cadence goes inside the third arm and nowhere else.** A story that
+    /// has moved was asked again on every pass that reached it, so a story the
+    /// press is busy with cost a call an hour all day for a headline that
+    /// changed by a word ; held to once a period, it is asked again once per
+    /// page it could stand on.
+    ///
+    /// It is emphatically **not** put in front of the first two. A story nobody
+    /// has ever asked about has no headline of its own, and it is what the wire,
+    /// the story screens, the subject pages, search and Spotlight would show a
+    /// publisher's raw title for : confining that arm to a period would strand
+    /// such a story for good, since a period only ever moves forward. What is
+    /// metered is the refresh, and never the first ask.
+    static func work(locale: Locale, hasModel: Bool, since: Date, askedAgainSince: Date?) -> (
+        sql: String, arguments: StatementArguments
+    ) {
         guard hasModel else {
             return ("brief_locked = 0 AND summary IS NULL", [])
         }
-        // **And whether it is still about the same articles.** Held to the
-        // window the page reads, so what is asked again is what the reader can
-        // actually open ; a story nobody can reach is not worth a model call.
-        // **The language asked in, and not whether there is a summary.** A
-        // brief may honestly have no standfirst : the model wrote a headline
-        // and its line was a paragraph, or the story's articles carry no line
-        // a publisher wrote. Asked on `summary IS NULL`, every one of those
-        // came back at every pass for ever, and three of them in one batch
-        // stopped the whole phase.
+        guard let askedAgainSince else {
+            return (
+                """
+                brief_locked = 0 AND last_at >= ? AND (
+                    brief_locale IS NULL OR brief_locale <> ?
+                    OR brief_members IS NOT \(membersKey)
+                )
+                """,
+                [since, locale.identifier]
+            )
+        }
         return (
             """
             brief_locked = 0 AND last_at >= ? AND (
                 brief_locale IS NULL OR brief_locale <> ?
-                OR brief_members IS NOT \(membersKey)
+                OR (brief_members IS NOT \(membersKey)
+                    AND (brief_asked_at IS NULL OR brief_asked_at < ?))
             )
             """,
-            [since, locale.identifier]
+            [since, locale.identifier, askedAgainSince]
         )
     }
 
@@ -363,6 +429,18 @@ nonisolated struct BriefStoriesJob: ResumableJob {
                 sql: "UPDATE story SET brief_members = \(Self.membersKey) WHERE id = ?",
                 arguments: [storyID]
             )
+
+            // **Only where the model answered.** An unusable model has said
+            // nothing about this story, and stamping it would hold the next
+            // ask back for a whole period over a failure that was not the
+            // story's. It is the rule ``StorySummarizer`` already keeps : a
+            // brief with no language was never really asked.
+            if brief.askedIn != nil {
+                try db.execute(
+                    sql: "UPDATE story SET brief_asked_at = ? WHERE id = ?",
+                    arguments: [Date(), storyID]
+                )
+            }
         }
     }
 }
@@ -639,9 +717,11 @@ nonisolated struct DigestService: Sendable {
     func brief(
         until deadline: Date? = nil,
         now: Date = Date(),
+        periodStart: Date? = nil,
         onProgress: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
     ) async -> Int {
-        await JobRunner(BriefStoriesJob(database, now: now)).run(until: deadline, onProgress: onProgress).done
+        await JobRunner(BriefStoriesJob(database, now: now, periodStart: periodStart))
+            .run(until: deadline, onProgress: onProgress).done
     }
 
     /// How long one turn of the model's work is given when nobody named a
@@ -699,16 +779,18 @@ nonisolated struct DigestService: Sendable {
         // watcher follows, and the page went on moving under a reader for the
         // whole of its life. Once before and once after is the same ordering
         // said properly.
-        await openEdition(schedule, now: now)
+        let coming = await openEdition(schedule, now: now)
 
         while !Task.isCancelled, Date() < end {
             onPhase(.writing)
             let slice = min(Date().addingTimeInterval(Self.enrichmentSlice), end)
-            let written = await brief(until: slice, now: now, onProgress: onWriting)
+            let written = await brief(
+                until: slice, now: now, periodStart: coming?.periodStart, onProgress: onWriting)
 
             onPhase(.filing)
             let next = min(Date().addingTimeInterval(Self.enrichmentSlice), end)
-            let filed = await nameTopics(until: next, now: now, onProgress: onFiling)
+            let filed = await nameTopics(
+                until: next, now: now, periodStart: coming?.periodStart, onProgress: onFiling)
 
             guard written > 0 || filed > 0 else { break }
         }
@@ -756,9 +838,10 @@ nonisolated struct DigestService: Sendable {
     func nameTopics(
         until deadline: Date? = nil,
         now: Date = Date(),
+        periodStart: Date? = nil,
         onProgress: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
     ) async -> Int {
-        await JobRunner(FileStoriesJob(database, locale: locale, now: now))
+        await JobRunner(FileStoriesJob(database, locale: locale, now: now, periodStart: periodStart))
             .run(until: deadline, onProgress: onProgress).done
     }
 

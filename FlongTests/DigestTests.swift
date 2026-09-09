@@ -455,6 +455,74 @@ struct DigestTests {
         #expect(waiting == 0)
     }
 
+    // MARK: - Once a period, and never the first ask
+
+    /// How many stories the model would be asked about, under a given cadence.
+    private func waiting(_ askedAgainSince: Date?, locale: String = "fr_FR") async throws -> Int {
+        let work = BriefStoriesJob.work(
+            locale: Locale(identifier: locale),
+            hasModel: true,
+            since: .distantPast,
+            askedAgainSince: askedAgainSince
+        )
+        return try await database.writer.read { db in
+            try Int.fetchOne(
+                db, sql: "SELECT COUNT(*) FROM story WHERE \(work.sql)", arguments: work.arguments) ?? 0
+        }
+    }
+
+    /// Puts every story in the state a written, settled one is in : asked
+    /// about, in this language, over articles that have since moved.
+    private func writtenThenMoved(askedAt: Date) async throws {
+        try await database.writer.write { db in
+            for story in try Story.fetchAll(db) {
+                var story = story
+                story.summary = "Ce qui est arrivé."
+                story.isGenerated = true
+                story.briefLocale = "fr_FR"
+                story.briefMembers = "quelque chose d'autre"
+                story.briefAskedAt = askedAt
+                try story.update(db)
+            }
+        }
+    }
+
+    /// A story the press is busy with was asked about on every pass that
+    /// reached it, so it cost a call an hour all day for a headline that
+    /// changed by a word.
+    @Test("A story asked about in this period is not asked again in it")
+    func onceAPeriod() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await writtenThenMoved(askedAt: now)
+
+        #expect(try await waiting(now.addingTimeInterval(-3600)) == 0)
+    }
+
+    /// Once per period is once per page it could stand on, and the next page is
+    /// a new question.
+    @Test("The same story is asked again in the next period")
+    func thenAgainNextPeriod() async throws {
+        try await StoryBuilder(database).build(now: now)
+        try await writtenThenMoved(askedAt: now.addingTimeInterval(-7200))
+
+        let all = try await database.writer.read { db in try Story.fetchCount(db) }
+        #expect(try await waiting(now.addingTimeInterval(-3600)) == all)
+    }
+
+    /// **The cadence never meters the first ask.** A story nobody has ever
+    /// asked about has no headline of its own, and it is what the wire, the
+    /// story screens, search and Spotlight would show a publisher's raw title
+    /// for : held to a period it would be stranded for good, a period only ever
+    /// moving forward.
+    @Test("A story never asked about is offered whatever the period is")
+    func neverAskedIsNeverHeldBack() async throws {
+        try await StoryBuilder(database).build(now: now)
+
+        let all = try await database.writer.read { db in try Story.fetchCount(db) }
+        #expect(all > 0)
+        #expect(try await waiting(now.addingTimeInterval(3600)) == all)
+    }
+
     /// The excerpt is the top of the article body flattened and cut at three
     /// hundred characters on the nearest space. A release note went out as a
     /// standfirst, ticket numbers and `Tags:` footer included.

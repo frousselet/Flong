@@ -170,7 +170,14 @@ nonisolated struct EditionSummarizer: Sendable {
     func brief(over stories: [(title: String, summary: String?)], of slot: EditionSlot) async -> Outcome {
         guard hand.isAvailable, stories.count > 1 else { return .unusable }
 
-        for voice in [Self.instructions, Self.condensing] {
+        // **A second voice only where a second voice is worth anything.** The
+        // two exist because Apple's guardrails refuse a great deal of ordinary
+        // news and answer differently when the same page is put as the
+        // condensing of published headlines it is. A service the reader
+        // configured has read the page and said no, and putting it again is one
+        // more call on their account for the same answer :
+        // ``StorySummarizer`` settled that, and this had not.
+        for voice in hand.provider.triesASecondVoice ? [Self.instructions, Self.condensing] : [Self.instructions] {
             switch await attempt(stories, of: slot, saying: voice) {
             case .wrote(let brief): return .wrote(brief)
             case .unusable: return .unusable
@@ -235,7 +242,15 @@ nonisolated struct EditionSummarizer: Sendable {
         // reader does not read is not a page they can use, and there is no
         // floor under it to fall back to : an edition exists only where the
         // model wrote it.
-        guard Self.languageFault(list, in: locale, writes: hand.writes) == nil else { return .declined }
+        //
+        // **And a page in the wrong language is unusable rather than
+        // declined.** The two were one answer, which cost nothing while a page
+        // was re-asked on every article that arrived underneath it. A page is
+        // asked about once now, and a refusal is durable : an answer that came
+        // back in English on a French device would have taken the whole
+        // boundary with it, when what went wrong was the answer and not the
+        // page.
+        guard Self.languageFault(list, in: locale, writes: hand.writes) == nil else { return .unusable }
 
         return .wrote(EditionBrief(points: list, askedIn: locale))
     }
