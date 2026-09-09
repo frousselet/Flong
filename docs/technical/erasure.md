@@ -22,7 +22,7 @@ Deleting fewer than all seven is not a reset but a pause, since three of them wo
 
 | Where | What goes |
 | ----- | --------- |
-| The database | Every table, dropped and built again from the migrations : the feeds, the articles, the bodies, the stories, the subjects, the collections, the read states, and the tokens and record tags that told this device what iCloud already knew |
+| The database | Every table, dropped and built again from the migrations : the feeds, the articles, the bodies, the stories, the subjects, the collections, the read states, the log of what was sent to a model of the reader's own, and the tokens and record tags that told this device what iCloud already knew |
 | The keychain | Every feed credential, every site session and the key of every model the reader brought of their own, deleted by service rather than one by one, so a secret whose subscription or account is already gone goes with the rest |
 | The key-value store | Every preference, local and in iCloud : the name, the picture, which body an article opens on, the notices, the searches the reader ran, the models they configured and what they agreed to send, and the identifier this device writes its archive under |
 | Spotlight | The index of what the reader chose and of the front page's stories, emptied by the ordinary rebuild, which now writes nothing because there is nothing to write |

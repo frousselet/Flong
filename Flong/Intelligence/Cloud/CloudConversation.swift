@@ -35,6 +35,8 @@ nonisolated final class CloudConversation: ModelConversation {
 
     private let provider: CloudProvider
     private let instructions: String
+    /// Which of the four things a model does this exchange is, for the log.
+    private let task: ModelTask
 
     /// What has been said, in order, and the model's own words for its own
     /// turns.
@@ -55,9 +57,10 @@ nonisolated final class CloudConversation: ModelConversation {
     /// Which dialect this service turned out to understand.
     private var dialect: ProviderDialect
 
-    init(provider: CloudProvider, instructions: String) {
+    init(provider: CloudProvider, instructions: String, task: ModelTask) {
         self.provider = provider
         self.instructions = instructions
+        self.task = task
         self.dialect = provider.account.dialect
     }
 
@@ -106,22 +109,42 @@ nonisolated final class CloudConversation: ModelConversation {
             )
 
             let request = try provider.wire.request(for: exchange, cappingWith: tokenField)
-            let (status, body, retryAfter) = try await provider.transport.send(request)
+
+            let started = Date()
+            let status: Int
+            let body: Data
+            let retryAfter: TimeInterval?
+            do {
+                (status, body, retryAfter) = try await provider.transport.send(request)
+            } catch {
+                await record(.failed(error), status: nil, from: started)
+                throw error
+            }
 
             switch provider.wire.read(status: status, body: body, retryAfter: retryAfter, shaped: shaped) {
             case .success(let answered):
                 turns.append(.answered(answered.written))
                 spent = answered.promptTokens.map { $0 + (answered.answerTokens ?? 0) }
+                await record(
+                    .answered,
+                    status: status,
+                    from: started,
+                    prompt: answered.promptTokens,
+                    answer: answered.answerTokens
+                )
                 return Answer(answered.json)
 
             case .failure(.fault(let fault)):
+                await record(.failed(fault), status: status, from: started)
                 throw fault
 
             case .failure(.wrongTokenField):
+                await record(.refused, status: status, from: started)
                 Log.enrich.notice("A model service wants the answer cap named the other way, so it is")
                 tokenField = tokenField.other
 
             case .failure(.wrongDialect):
+                await record(.refused, status: status, from: started)
                 guard let next = Self.rung(under: dialect) else { throw ModelFault.unreadable }
                 Log.enrich.notice("A model service would not take a schema, so it is asked for one in words")
                 dialect = next
@@ -140,6 +163,37 @@ nonisolated final class CloudConversation: ModelConversation {
 
     /// What this service was found to want, so the account can remember it.
     var learnt: ProviderDialect { dialect }
+
+    /// Writes down that a call left, and nothing about what it carried.
+    ///
+    /// One row per request and not per question : a question that dropped a
+    /// rung of the ladder cost two calls, and a log that hid the first would be
+    /// a log the reader could not reconcile with their bill.
+    private func record(
+        _ outcome: ProviderCallOutcome,
+        status: Int?,
+        from started: Date,
+        prompt: Int? = nil,
+        answer: Int? = nil
+    ) async {
+        guard let log = provider.log else { return }
+
+        let call = ProviderCall(
+            startedAt: started,
+            providerID: provider.account.id,
+            providerName: provider.account.name,
+            kind: provider.account.kind,
+            host: provider.host ?? "",
+            task: task,
+            model: provider.account.model,
+            outcome: outcome,
+            promptTokens: prompt,
+            answerTokens: answer,
+            duration: Date().timeIntervalSince(started),
+            status: status
+        )
+        try? await log.write(call)
+    }
 }
 
 nonisolated extension CloudTurn {
