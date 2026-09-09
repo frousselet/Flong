@@ -138,13 +138,19 @@ nonisolated struct GeneratedLine: Sendable, ModelAnswer {
 ///
 /// A shape and the reading of it are two halves of one declaration, and a name
 /// spelled twice is a name that can be spelled two ways.
-private enum Called {
+///
+/// Nonisolated, like the four shapes that read it : the target isolates to the
+/// main actor by default, and a field name reached from a shape's own
+/// declaration is reached from nowhere in particular.
+private nonisolated enum Called {
     static let title = "title"
     static let summary = "summary"
 }
 
 /// What the model is told about each of the two fields, written once.
-private enum Guides {
+///
+/// Nonisolated for the reason ``Called`` is.
+private nonisolated enum Guides {
     static let title =
         "The headline : what happened, in at most ten words, every one of them carrying information"
     static let summary =

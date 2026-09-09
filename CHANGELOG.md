@@ -55,6 +55,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- The four shapes a model's answer is read into no longer warn at compilation : the two lists of names they share were isolated to the main actor by default and read from nowhere in particular.
 - Wherever several publishers' marks stand in a row, they overlap and each is cut out of the one behind it, so the gap between two is the page itself whatever colour the page is : the rooms running a story on the front page and on the story's own, and the papers beside an author or a personality. One drawing, where there were four.
 - Headlines are written as sentences of the reader's own language rather than in English titling : the model was dropping the determiners, stacking nouns in the English order and sometimes leaving out the verb, so a French page carried `Argentine restitue tableau volé par nazis`. And a headline that comes back with a full stop loses it, being a title rather than a sentence.
 - Nothing cuts a point at the head of an edition any more : it ran to an ellipsis for any reader above the default type size, because a cap in lines was standing in for a bound on the writing. The model is held to eighteen words a point instead, and it is told that a condition which already held is not news, after an edition led on `La Russie et l'Ukraine sont en guerre`.
