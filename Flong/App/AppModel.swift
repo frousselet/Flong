@@ -1436,6 +1436,7 @@ final class AppModel {
     /// Stops following, when the window that was following is gone.
     deinit {
         watching?.cancel()
+        watchingChoices?.cancel()
         ticking?.cancel()
         enriching?.cancel()
         showingWork?.cancel()
@@ -3254,6 +3255,8 @@ final class AppModel {
         watching?.cancel()
         await watching?.value
         watching = nil
+        watchingChoices?.cancel()
+        watchingChoices = nil
 
         // iCloud first, while what addresses it is still here. The offer in
         // the public database goes with it : a reader who deleted everything

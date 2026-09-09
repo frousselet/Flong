@@ -443,6 +443,25 @@ struct EditionStoreTests {
         #expect(try await rows(of: edition.id).first?.title == "Plus récente")
     }
 
+    /// The reading of a page and the writing of it are two transactions with a
+    /// model call's worth of time between them, and a page published in that
+    /// gap is a page frozen.
+    @Test("A page published while it was being chosen is not rewritten")
+    func composedAfterPublishing() async throws {
+        try await story("Une", endingHoursBeforeNoon: 3)
+        try await story("Deux", endingHoursBeforeNoon: 4)
+
+        let edition = try await make()
+        let held = try await rows(of: edition.id).map(\.title)
+
+        // The value in hand still says unpublished, as the other lane's would.
+        try await publish(edition.id)
+        try await story("Plus récente", endingHoursBeforeNoon: 1)
+        try await editions.compose(edition, now: now)
+
+        #expect(try await rows(of: edition.id).map(\.title) == held)
+    }
+
     /// The idle cost, asserted. A pass over a page nothing has changed writes
     /// nothing at all, on two tables the store watcher follows.
     @Test("A settled edition is read and never written")

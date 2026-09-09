@@ -163,6 +163,11 @@ nonisolated struct EditionStore: Sendable {
     func compose(_ edition: Edition, now: Date = Date()) async throws -> [EditionStory] {
         guard !edition.isPublished else { return try await rows(of: edition.id) }
 
+        // Read afresh below as well as here. The reading of the page and the
+        // writing of it are two transactions with a model call's worth of time
+        // between them for whoever holds the other lane, and a page published
+        // in that gap is a page frozen : rewriting its ten from a value read
+        // before it came out would undo the one guarantee this all exists for.
         let chosen = try await candidates(of: edition, now: now)
         let wanted = chosen.enumerated().map { position, story in
             EditionStory(
@@ -180,8 +185,13 @@ nonisolated struct EditionStore: Sendable {
 
         return try await database.writer.write { db in
             // Read back inside the write : two lanes may compose one page at
-            // once, and the cheap comparison has to be against what is there
-            // now rather than against what was there when this began.
+            // once, and both the freeze and the cheap comparison have to be
+            // against what is there now rather than against what was there when
+            // this began.
+            let standing = try Edition.fetchOne(db, key: edition.id)
+            guard let standing, !standing.isPublished else {
+                return try Self.stories(of: edition.id, in: db)
+            }
             guard try Self.stories(of: edition.id, in: db) != wanted else { return wanted }
 
             try db.execute(sql: "DELETE FROM edition_story WHERE edition_id = ?", arguments: [edition.id])
