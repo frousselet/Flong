@@ -52,3 +52,36 @@ The keychain, exclusively, under a service of its own, keyed by the provider's i
 ## What a reset takes
 
 The seven places of `docs/technical/erasure.md` are still seven. A provider's key is a keychain entry, so the keychain sweep has a second service to clear ; the accounts and the one consent are preferences, so they go when the key-value store is forgotten. No new step and no new ordering hazard.
+
+## Talking to a service
+
+**The reader gives the base and the path is ours.** `https://api.openai.com/v1`, `http://192.168.1.20:11434/v1`, `https://openrouter.ai/api/v1` and a private gateway all work with the same code, and whatever `/v1` a service wants is part of what the reader typed. What is appended is `chat/completions` for the OpenAI format and `messages` for Anthropic's.
+
+**Three rungs, and the one that answered is remembered.** A structured answer is a promise the OpenAI format makes and its imitators keep unevenly : some take a schema and hold the model to it, some take only `json_object` and want the shape said in words, and some four hundred on the parameter itself. There is no telling which without asking, so the question is put in the best way first, drops one rung on a refusal that names the parameter, and the rung that answered is written on the account so the next call starts where the last one ended. The cap on an answer is learnt the same way : OpenAI's reasoning models refuse `max_tokens` by name and want `max_completion_tokens`, and most of the services that copied the format have never heard of the second.
+
+**The answer is checked against the shape again when it comes back.** A schema is a promise about the form of an answer and never about its values, which is why `TopicNamer` has always filtered what came back against the reader's own subjects. That filter covers the remote path unchanged.
+
+**A conversation remembers, and remembers verbatim.** The turns are held here and sent again with every question, which is what makes `ask it again, it can see what it wrote` mean the same thing on both sides. What the model wrote is replayed word for word and never re-serialised : a re-serialisation with its keys in another order is not what it wrote, and asking it to correct a thing it did not say is asking it to correct somebody else.
+
+**Four turns and no more.** Every turn carries every turn before it, so a loop that asked one more time would cost more each time it did. Four is what the writing actually uses : the brief, one complaint, the headline alone and the line alone.
+
+## What the transport does that a feed's does not
+
+| | A feed | A model |
+| - | ------ | ------- |
+| Gap between bytes | 15 s | 120 s |
+| Whole request | 60 s | 180 s |
+| Body cap | 8 MB | 1 MB |
+| Politeness | one a second per host, burst of four | none, and the pause on `Retry-After` kept |
+
+**The fifteen seconds do not transpose.** A completion that does not stream sends nothing at all until the whole answer exists, so the gap between bytes *is* the generation ; for a feed it is a stall.
+
+**The bucket is a different bucket.** The fetcher's is sized for politeness towards publishers and would serialize a night's filing behind a gate no publisher benefits from. What is kept is the half that matters : a service that answered `Retry-After` is left alone until then, or one refusal during a pass of two hundred stories becomes two hundred of them.
+
+**A redirect that changes host is not followed**, and neither is one that steps down from `https` to `http`. `URLSession` strips `Authorization` across origins and leaves every other header alone : Anthropic's key travels in `x-api-key`, and a reader may add headers of their own, so a gateway answering a redirect to a host of its choosing would be handed the key by the system, silently, on the second request. A misconfiguration does it by accident and a hostile endpoint does it on purpose, and from here the two look the same.
+
+**Plain HTTP goes to the reader's own network and nowhere else.** A model server they run has no TLS and never will : it is a process on their own machine, and it is the one configuration of this feature that sends nothing to anybody. `NSAllowsLocalNetworking` carries it to the private ranges, to link-local addresses and to `.local`, and every public host keeps App Transport Security in full. The editor makes the same check itself, so an address that would fail is refused with a sentence rather than with a number nobody can act on.
+
+## What is never in an error
+
+**Nothing from the wire.** A service is free to put anything in the body of its own error and several put the prompt there ; one of them puts the key back. So the failures are a small closed set of five, the body is neither shown nor logged, and what a reader is told is one of five sentences written here. That is what makes `a key never reaches a message` a property a test can prove rather than a habit that decays.

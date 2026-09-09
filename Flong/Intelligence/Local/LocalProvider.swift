@@ -24,6 +24,8 @@ nonisolated struct LocalProvider: ModelProvider {
     /// of what wrote a headline, and the screen has its own words for it.
     let name = "Apple Intelligence"
 
+    let identity = "apple-intelligence"
+
     /// Nothing leaves the device, which is the whole of what this provider is
     /// for.
     let host: String? = nil

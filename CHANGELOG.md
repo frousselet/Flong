@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- A model of your own answers any of the four things a model does here : point a task at an OpenAI-compatible service with your own key, and headlines and the lines under them go to the host you named and nowhere else. Nothing is configured by default, nothing is sent before you have agreed, and a service that fails hands the work back to your device.
 - Every subject wears a mark and a colour : the fifty-two sections have one of each, and a subject you write takes the mark you pick and the colour that comes with it. The colours are eight, one per kind of news, so `Écologie` is green and `Cinéma` magenta ; they are worn by the mark, by the pill at the head of the page, which is tinted with them and deepens into them when it is the one chosen, and by the rubric over every headline. The name and the mark are asked for together, and the mark is changed afterwards from the glyph on its own row. Each line of an edition wears the mark of the subject it is about, in place of the rule it used to.
 
 - One notification per new article, and never a condensed one : a reader who singles out a source, a writer or somebody in the news is told about each piece rather than about how many there were. The first of a burst sounds and the rest arrive quietly, and the stack is per source rather than one pile for the lot.
@@ -17,9 +18,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - An `À propos` page at the foot of the reader's own panel : the icon, the version and the build, what Flong does without, and links to the source, the licence and its one dependency.
 - A `Nouveaux articles` switch in the notifications panel, covering every source at once, with the per-source, per-writer and per-person switches kept underneath it.
 
+### Security
+
+- A redirect that changes host, or that steps down from `https` to `http`, is not followed when talking to a model service : `URLSession` strips `Authorization` across origins and leaves every other header alone, so a gateway could otherwise be handed an `x-api-key` by the system.
+
 ### Changed
 
-- A model provider of your own : the key goes to the keychain, under a service of its own, and travels between your devices as a feed credential does. Nothing is configured and nothing is sent yet.
 - Each of the four things a model does here is asked of a model of its own, and a run of failures leaves that one alone rather than all of them.
 - The four questions put to the model go through one shape rather than through a generated type each, so an answer can come back from something that is not the framework. Nothing the model is told changes ; the one measurable difference is that the room left in the window is now counted with the instructions in it, which is slightly more prudent than before.
 - The indexing lane runs off the main thread at last : a background priority is not a background thread, and the named-entity passes and the sentence embeddings ran on it for twenty seconds after every catch-up.
