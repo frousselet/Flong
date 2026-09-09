@@ -149,7 +149,7 @@ struct StoryScreen: View {
             }
             .buttonStyle(.plain)
             .popover(isPresented: $isExplaining, arrowEdge: .bottom) {
-                explanation(carriedAcross: story.isTranslated)
+                explanation(carriedAcross: story.isTranslated, writtenBy: story.generatedBy)
             }
         } else {
             line
@@ -163,18 +163,30 @@ struct StoryScreen: View {
     /// written headline gets the article's own, in one tap, and the application
     /// does not argue. It is said here, where it was asked for, rather than
     /// printed on the page whether anybody wondered or not.
-    private func explanation(carriedAcross: Bool) -> some View {
+    /// - Parameter writtenBy: which model wrote it, or nothing where this
+    ///   device did. **The last clause of the two sentences below is a promise,
+    ///   and for a headline written elsewhere it is false.** So a story a
+    ///   provider wrote says who wrote it and does not make the promise, which
+    ///   is the one place in the application where that sentence appears at
+    ///   all.
+    private func explanation(carriedAcross: Bool, writtenBy: String?) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             // Two marks, two answers : a line written here out of the articles
             // below is not the same claim as an editor's own line said in
             // another language, and a reader pressing the mark is asking which
             // of the two this is.
-            Text(
-                carriedAcross
-                    ? "The headline and the line above are the publisher's own, translated on this device. Nothing was sent anywhere."
-                    : "The headline and the line above were written on this device, from the articles below. Nothing was sent anywhere."
-            )
-            .font(.callout)
+            if let writtenBy {
+                // Verbatim : the reader named this model themselves.
+                Text("The headline and the line above were written by \(writtenBy), from the articles below.")
+                    .font(.callout)
+            } else {
+                Text(
+                    carriedAcross
+                        ? "The headline and the line above are the publisher's own, translated on this device. Nothing was sent anywhere."
+                        : "The headline and the line above were written on this device, from the articles below. Nothing was sent anywhere."
+                )
+                .font(.callout)
+            }
 
             Button("Use the article's own headline") {
                 isExplaining = false

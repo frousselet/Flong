@@ -102,6 +102,7 @@ struct SpotlightIndexTests {
             summary: summary,
             isGenerated: true,
             isTranslated: false,
+            generatedBy: nil,
             articleCount: 6,
             feedMarks: [FeedMark(room: "lequotidien.example.com"), FeedMark(room: "lesoir.example.com")],
             feedCount: 2,

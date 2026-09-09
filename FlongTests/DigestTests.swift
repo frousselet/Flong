@@ -706,6 +706,7 @@ struct DigestTests {
             summary: nil,
             isGenerated: false,
             isTranslated: false,
+            generatedBy: nil,
             articleCount: 2,
             feedMarks: [],
             feedCount: 2,

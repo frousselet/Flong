@@ -77,6 +77,7 @@ struct StoreTests {
                 "v47.aPageHasNoNameOfItsOwn",
                 "v48.aMarkForEverySubject",
                 "v49.whatWasSentAway",
+                "v50.whoWroteTheHeadline",
             ]
         )
     }

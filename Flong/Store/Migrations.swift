@@ -1111,6 +1111,17 @@ nonisolated extension AppDatabase {
 
         migrator.registerMigration("v49.whatWasSentAway", migrate: createProviderCall)
 
+        // Which model wrote a headline, where one did. It was a boolean while
+        // there was one model to be, and the sentence behind the mark promised
+        // that nothing had been sent anywhere : for a headline written
+        // elsewhere that promise is false, and an export saying only `written
+        // by a model` says less than section 14 asks of it.
+        migrator.registerMigration("v50.whoWroteTheHeadline") { db in
+            try db.alter(table: "story") { table in
+                table.add(column: "generated_by", .text)
+            }
+        }
+
         return migrator
     }
 

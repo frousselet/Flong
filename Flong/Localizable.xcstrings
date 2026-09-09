@@ -5147,6 +5147,17 @@
         }
       }
     },
+    "The headline and the line above were written by %@, from the articles below.": {
+      "comment": "Behind the mark on a story a model of the reader's own wrote. The name is the one they gave that model.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le titre et la ligne au-dessus ont été écrits par %@, à partir des articles ci-dessous."
+          }
+        }
+      }
+    },
     "The headline and the line above were written on this device, from the articles below. Nothing was sent anywhere.": {
       "localizations": {
         "fr": {

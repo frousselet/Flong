@@ -114,6 +114,18 @@ Section 14 asks for one clause : *outgoing calls are logged locally*. What the c
 
 **Two thousand rows and ninety days, whichever comes first**, trimmed once in a hundred inserts rather than on every one : a delete that scanned the table would run two hundred times during one filing pass for a bound nothing crosses in a night. It is not synchronized, and that costs no work : a table is only carried into CloudKit when the sync layer is told about it, and it will not be. What one device sent is a fact about that device.
 
+## Who wrote it
+
+Section 14 asks that anything produced automatically be flagged in the interface and in exports. With more than one model that stopped being a boolean.
+
+**The mark stays one mark.** A glyph per provider would draw the application's own plumbing over the news, and there are as many of them as a reader configures. `StorySummary` already carries two, for two genuinely different claims : a line written here out of the articles below, and an editor's own line carried across into the reader's language. A third axis is one too many for a glyph inside a sentence.
+
+**What is behind it names the author, because the sentence there was a promise.** It read *written on this device, from the articles below. Nothing was sent anywhere*, and for a headline written elsewhere the last clause is false. A story a provider wrote says who wrote it and does not make the promise, which is the one place in the application that sentence appears at all.
+
+**The name is copied onto the story**, like the name of a provider on a call in the log : a record of who wrote something must not change when the account is renamed or deleted. Nothing on the column means this device, which is what it has always meant.
+
+There is no export of stories to carry the field into yet ; the column is where it will come from when there is one.
+
 ## What is never in an error
 
 **Nothing from the wire.** A service is free to put anything in the body of its own error and several put the prompt there ; one of them puts the key back. So the failures are a small closed set of five, the body is neither shown nor logged, and what a reader is told is one of five sentences written here. That is what makes `a key never reaches a message` a property a test can prove rather than a habit that decays.
