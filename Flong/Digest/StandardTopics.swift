@@ -39,12 +39,13 @@ import Foundation
 /// every section a French word hard-coded in Swift.
 ///
 /// **Eight colours across the fifty-two, and never one apiece.** A section
-/// belongs to a family and the family is what is printed : blue for the news of
-/// the state, teal for money, green for the land, red for the body, orange for
-/// ordinary life, violet for science, magenta for culture, and nothing at all
-/// for the two that sort nothing. Fifty-two hues cannot be told apart, and the
-/// colour is there to be recognized at a glance or ignored. See
-/// ``TopicFamily``.
+/// belongs to a family and the family is what is printed : violet for the news
+/// of the state, teal for money, leaf green for the land, red for the body,
+/// orange for ordinary life, a deeper green for science, magenta for culture,
+/// and nothing at all for the two that sort nothing. Fifty-two hues cannot be
+/// told apart, and the colour is there to be recognized at a glance or
+/// ignored. No blue among them, that being the colour of what can be pressed.
+/// See ``TopicFamily``.
 ///
 /// **They are seeded and then ordinary.** Nothing keeps them apart afterwards
 /// except that the reader may not delete them : a story is filed under one the

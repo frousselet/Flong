@@ -245,7 +245,7 @@ struct TopicsPanel: View {
     /// **A column of colour down a list of fifty-two, which is where the colour
     /// is learnt.** A page shows one subject's colour at a time ; this shows
     /// them all at once, and a reader scrolling it finds out that green is the
-    /// land and blue the news of the state without being told.
+    /// land and violet the news of the state without being told.
     private func mark(_ symbol: String) -> some View {
         Image(systemName: symbol)
             .font(.system(.body, weight: .regular))

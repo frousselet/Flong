@@ -39,6 +39,41 @@ struct TopicColourTests {
         }
     }
 
+    /// **Blue is what can be pressed, and no subject wears it.** The standard
+    /// theme takes the accent the system hands it, which is Apple's blue, and
+    /// Solarized states a violet-blue of its own in the same band ; a rubric
+    /// printed in either is a line the reader tries to tap. So the band from
+    /// cyan to indigo belongs to the controls, and the eight are picked around
+    /// it.
+    @Test("No subject is printed in a blue")
+    func nothingIsBlue() {
+        // What the band is for, stated where it is enforced : the two themes
+        // that name an accent rather than a warmth both name one in it.
+        for theme in [Theme.standard, .solarized] {
+            for scheme in [ColorScheme.light, .dark] {
+                let hue = Self.hue(theme.palette(in: scheme).accent)
+                #expect(hue > Self.blue.lowerBound && hue < Self.blue.upperBound)
+            }
+        }
+
+        for family in TopicFamily.allCases {
+            for scheme in [ColorScheme.light, .dark] {
+                let ink = family.ink(in: scheme)
+
+                // A grey has no hue worth the name. The plain colour is four
+                // parts in a hundred off neutral, and reading the last bit of
+                // its blue channel as a colour would fail it for nothing.
+                guard Self.saturation(ink) > 0.15 else { continue }
+
+                let hue = Self.hue(ink)
+                #expect(
+                    !Self.blue.contains(hue),
+                    "\(family) in \(scheme == .dark ? "dark" : "light") is at \(Int(hue)) degrees, which is a blue"
+                )
+            }
+        }
+    }
+
     /// **The colour is reached through the mark, so every mark has to answer.**
     /// A section whose glyph is in no family would be printed in the plain
     /// colour, which is what the two sections that sort nothing wear : the page
@@ -74,6 +109,34 @@ struct TopicColourTests {
     func theTagIsPlain() {
         #expect(StandardTopics.family(of: Topic.defaultSymbol) == .plain)
         #expect(StandardTopics.family(of: "not.a.symbol.anybody.has") == .plain)
+    }
+
+    /// Where a colour stops being a green or a violet and starts being
+    /// something to press, in degrees around the wheel : cyan at one end,
+    /// indigo at the other.
+    private static let blue: ClosedRange<Double> = 190...265
+
+    /// The hue, in degrees, as a colour wheel states it.
+    private static func hue(_ ink: Ink) -> Double {
+        let high = max(ink.red, ink.green, ink.blue)
+        let span = high - min(ink.red, ink.green, ink.blue)
+        guard span > 0 else { return 0 }
+
+        let degrees =
+            switch high {
+            case ink.red: ((ink.green - ink.blue) / span).truncatingRemainder(dividingBy: 6)
+            case ink.green: (ink.blue - ink.red) / span + 2
+            default: (ink.red - ink.green) / span + 4
+            }
+        return (degrees * 60 + 360).truncatingRemainder(dividingBy: 360)
+    }
+
+    /// How much colour there is in it at all, which is what tells a hue from a
+    /// grey that happens to lean.
+    private static func saturation(_ ink: Ink) -> Double {
+        let high = max(ink.red, ink.green, ink.blue)
+        guard high > 0 else { return 0 }
+        return (high - min(ink.red, ink.green, ink.blue)) / high
     }
 
     /// The ratio between two colours, as the accessibility guidelines state it.

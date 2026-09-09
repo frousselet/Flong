@@ -16,10 +16,21 @@ import SwiftUI
 /// **Eight colours for fifty-two sections, because a colour per section is not
 /// a code.** Fifty-two hues cannot be told apart, and a reader who has to
 /// learn which of four blues is `Immigration` is reading a legend rather than a
-/// page. Eight can be learnt without trying : the news of the state is blue,
-/// money is teal, the living world green, the body red, ordinary life orange,
-/// science violet, culture magenta, and the two sections that sort nothing wear
-/// no colour at all.
+/// page. Eight can be learnt without trying : the news of the state is violet,
+/// money teal, the living world the green of a leaf, the body red, ordinary
+/// life orange, science a deeper green, culture magenta, and the two sections
+/// that sort nothing wear no colour at all.
+///
+/// **None of the eight is a blue, and that is a rule rather than an
+/// accident.** Blue is what can be pressed : it is the accent the system hands
+/// the standard theme, and Solarized's own accent sits in the same band. A
+/// subject printed in it would be a word the reader tries to tap, which is the
+/// one confusion a colour code cannot afford, so the band from cyan to indigo
+/// is left to the controls. It costs the eight two of their hues : the news of
+/// the state was a blue and science an indigo, and they are a violet and a
+/// green now, which is why two of the eight are greens and told apart by how
+/// far each leans towards the yellow. ``TopicColourTests`` is what holds the
+/// band closed.
 ///
 /// **The colour is a second way of saying the mark, never the only way.** A
 /// pill says its subject in words, and the glyph in front of the words says it
@@ -80,12 +91,12 @@ nonisolated enum TopicFamily: String, Hashable, Sendable, CaseIterable {
     /// is a page nobody can look away from.
     private var light: Ink {
         switch self {
-        case .publicLife: Ink(0x1D6CA8)
+        case .publicLife: Ink(0x9140AE)
         case .money: Ink(0x0C736C)
         case .land: Ink(0x477219)
         case .body: Ink(0xC22F2C)
         case .everyday: Ink(0x9E5512)
-        case .science: Ink(0x5B54C0)
+        case .science: Ink(0x137527)
         case .culture: Ink(0xAC3A7A)
         case .plain: Ink(0x6C6C70)
         }
@@ -96,12 +107,12 @@ nonisolated enum TopicFamily: String, Hashable, Sendable, CaseIterable {
     /// colour picked twice is two colours the day one of them is changed.
     private var dark: Ink {
         switch self {
-        case .publicLife: Ink(0x6FB2FF)
+        case .publicLife: Ink(0xD293E8)
         case .money: Ink(0x4FC7BA)
         case .land: Ink(0xA3C558)
         case .body: Ink(0xFF7A72)
         case .everyday: Ink(0xE8973F)
-        case .science: Ink(0xA79FFF)
+        case .science: Ink(0x5CC66F)
         case .culture: Ink(0xEC85BC)
         case .plain: Ink(0x9C9CA1)
         }

@@ -56,6 +56,29 @@ struct ThemeTests {
         #expect(Theme.solarized.paints)
     }
 
+    @Test("What can be pressed is the system's own, unless the theme paints")
+    func accents() {
+        // The standard theme is the system's appearance and the accent is part
+        // of it : Apple's blue, or whatever the reader has put in its place.
+        for scheme in [ColorScheme.light, .dark] {
+            #expect(Theme.standard.accent(in: scheme) == .accentColor)
+        }
+
+        // The two that paint state their own, a page in its own warmth having
+        // no room for a colour from outside it.
+        for theme in [Theme.paper, .solarized] {
+            for scheme in [ColorScheme.light, .dark] {
+                #expect(theme.accent(in: scheme) == theme.palette(in: scheme).accent.color)
+            }
+        }
+
+        // And the standard theme states a blue all the same, for the rendered
+        // article : a web page is handed a stylesheet and cannot be handed the
+        // accent the system hands a screen.
+        #expect(Theme.standard.palette(in: .light).accent == Ink(0x0B_6B_CB))
+        #expect(Theme.standard.palette(in: .dark).accent == Ink(0x6F_B2_FF))
+    }
+
     @Test("No theme leaves an appearance half stated")
     func bothAppearances() {
         for theme in Theme.allCases {
