@@ -71,28 +71,6 @@ nonisolated struct EditionSchedule: Codable, Hashable, Sendable {
 
     var slots: [EditionSlot] { EditionSlot.allCases.filter { hours[$0] != nil } }
 
-    /// How long before its hour an edition goes to press.
-    ///
-    /// **A paper goes to press before it comes out, and that is the whole of
-    /// this.** The period used to run to the hour, so the model could not be
-    /// asked until the hour had passed, so the notice could not be posted until
-    /// some background pass happened to run. `BGTaskRequest.earliestBeginDate`
-    /// promises only that the system will not begin sooner than the moment it
-    /// is given, which makes an hour a wish. Written before its hour, an
-    /// edition's notice is lodged with the system ahead of time and delivered
-    /// on the hour with nothing of ours running at all.
-    ///
-    /// **Twenty minutes, and the reader pays for every one of them.** It is the
-    /// shortest run that holds the whole of the writing : the wait for a
-    /// straggling headline, and one further ask after it. Longer buys a wider
-    /// window for a background grant to land in and costs the reader news
-    /// minute for minute, and no width is a promise, so buying probability
-    /// against a scheduler that promises nothing is a bad trade paid for in
-    /// news. What the run guarantees is not the paper : it is the notice, which
-    /// is exact once lodged. The run only gives the writing somewhere to
-    /// happen.
-    static let pressRun: TimeInterval = 20 * 60
-
     /// The moment of the boundary a given slot falls on, on a given day.
     private func moment(of slot: EditionSlot, on day: Date, in calendar: Calendar) -> Date? {
         guard let minutes = hours[slot] else { return nil }
@@ -133,53 +111,6 @@ nonisolated struct EditionSchedule: Codable, Hashable, Sendable {
             .filter { $0 > now }
             .min()
     }
-
-    /// The moment the edition of a boundary is closed and written.
-    ///
-    /// **Never before the paper in front of it.** A reader who sets two
-    /// editions twenty minutes apart would otherwise have the second written
-    /// before the first came out, over hours the first already covered.
-    /// Clamped, a packed schedule degrades to what this all used to be : the
-    /// paper is made at the boundary in front of it, comes out at its own, and
-    /// has no run to be early in.
-    func press(for boundary: Date, in calendar: Calendar = .current) -> Date {
-        let previous = current(at: boundary.addingTimeInterval(-1), in: calendar)?.opened ?? .distantPast
-        return max(boundary.addingTimeInterval(-Self.pressRun), previous)
-    }
-
-    /// The edition in the press : the newest boundary whose press has come.
-    ///
-    /// **Not the same question as ``current(at:in:)``.** That one asks which
-    /// paper is on the table, and is answered by the newest boundary that has
-    /// gone. This asks which one is being made, and in the twenty minutes
-    /// before an hour the answer is a boundary that has not come yet.
-    ///
-    /// It is also what makes a late paper need no path of its own. A pass at
-    /// twenty to eleven and a pass at twenty past midnight are given the same
-    /// answer, eleven o'clock, its press having come and no later boundary's
-    /// having come : the first publishes on time and the second publishes late,
-    /// out of one call and one comparison.
-    func inPress(at now: Date = Date(), in calendar: Calendar = .current)
-        -> (slot: EditionSlot, opened: Date, pressed: Date)?
-    {
-        let days = [-1, 0, 1].map { calendar.date(byAdding: .day, value: $0, to: now) ?? now }
-
-        return
-            days
-            .flatMap { day in slots.compactMap { slot in moment(of: slot, on: day, in: calendar).map { (slot, $0) } } }
-            .map { (slot: $0.0, opened: $0.1, pressed: press(for: $0.1, in: calendar)) }
-            .filter { $0.pressed <= now }
-            .max { $0.opened < $1.opened }
-    }
-
-    /// Whether this schedule still produces a given boundary.
-    ///
-    /// The one question the reconciliation asks : a paper whose hour the reader
-    /// has retracted is a paper to unmake, and a notice to take back.
-    func names(_ boundary: Date, in calendar: Calendar = .current) -> Bool {
-        let days = [-1, 0, 1].map { calendar.date(byAdding: .day, value: $0, to: boundary) ?? boundary }
-        return days.contains { day in slots.contains { moment(of: $0, on: day, in: calendar) == boundary } }
-    }
 }
 
 /// A page made at a moment, and the ten stories on it.
@@ -196,7 +127,6 @@ nonisolated struct Edition: Identifiable, Hashable, StoredRecord {
         case slot
         case openedAt = "opened_at"
         case coversFrom = "covers_from"
-        case pressedAt = "pressed_at"
         case closedAt = "closed_at"
         case points
         case pointTopics = "point_topics"
@@ -212,11 +142,19 @@ nonisolated struct Edition: Identifiable, Hashable, StoredRecord {
     /// The boundary this edition closes and comes out at.
     ///
     /// **Three things at once, and it was already two of them.** It is the
-    /// dateline, so a page that arrives at ten past seven still reads
-    /// `Édition du matin · 07:00` ; it is the identity two devices working from
-    /// one schedule agree on without speaking, which is what the unique index
-    /// on it says ; and it is now the deadline, the hour the page is written
-    /// for rather than the hour it starts being filled at.
+    /// dateline, so a page that arrives at ten past eleven still reads
+    /// `Édition de la nuit · 23:00` ; it is the identity two devices working
+    /// from one schedule agree on without speaking, which is what the unique
+    /// index on it says ; and it is now the end of the period, the hour the
+    /// page is *about* rather than the hour it starts being filled at.
+    ///
+    /// **Eleven o'clock means eleven o'clock.** An earlier version closed the
+    /// period twenty minutes before the hour, so that the page was finished in
+    /// time for its notice to be lodged with the system and delivered
+    /// punctually. It cost the reader the last twenty minutes of every period,
+    /// always the most recent twenty, and that is not a trade a paper should
+    /// make : what the edition of eleven says is what had happened by eleven.
+    /// What it costs instead is written under ``isOut(at:)``.
     ///
     /// The name is left as it was on purpose. The unique index keys on it, the
     /// order of the archive keys on it, and so does the watermark that says
@@ -235,18 +173,6 @@ nonisolated struct Edition: Identifiable, Hashable, StoredRecord {
     ///
     /// `nil` is a page made before the periods existed.
     var coversFrom: Date?
-
-    /// When the period closed and the page was made, which is before it comes
-    /// out.
-    ///
-    /// The upper bound of the period, and the moment the reader pays for : what
-    /// arrives between this and ``openedAt`` opens the period of the paper that
-    /// follows. See ``EditionSchedule/pressRun``.
-    ///
-    /// `nil` is a page made before the press existed, and every predicate reads
-    /// `COALESCE(pressed_at, opened_at)` so such a row falls back to the hour
-    /// rather than out of the work set.
-    var pressedAt: Date?
 
     /// What the row is once it is no longer the one being made.
     ///
@@ -311,12 +237,13 @@ nonisolated struct Edition: Identifiable, Hashable, StoredRecord {
     /// asking again inside the page's own window, and not on every pass.
     var askedAt: Date?
 
-    /// When the page was finished, which is before it comes out.
+    /// When the page was written, which is at its hour or after it.
     ///
-    /// **Written is not out.** A paper goes to press before its hour : this is
-    /// the press, and ``openedAt`` is the hour. Between the two the edition is
-    /// whole, sitting in the store, and no reader sees it. What decides whether
-    /// it may be shown is ``isOut(at:)``, and never this on its own.
+    /// A page cannot be written before the hour its period ends at, so the
+    /// model is asked once that hour has passed and the page comes out when it
+    /// answers. On a device the system did not wake it is later than the hour,
+    /// and the dateline still says the hour : a paper that arrives at ten past
+    /// eleven is still the eleven o'clock edition.
     ///
     /// `nil` is an edition still being made. Set once and never cleared, and
     /// there is nothing left that could clear it : a published page is not
@@ -329,18 +256,24 @@ nonisolated struct Edition: Identifiable, Hashable, StoredRecord {
     /// Whether the model has written it. A question about a page being made.
     var isPublished: Bool { publishedAt != nil }
 
-    /// Whether it has come out : written, and its hour has gone.
+    /// Whether it has come out.
     ///
-    /// The question to ask about a page being shown. See ``Edition/out(by:)``,
-    /// which is the only place a query should ask it.
-    func isOut(at now: Date = Date()) -> Bool { isPublished && openedAt <= now }
+    /// **Written and out are the same thing, and that is a decision.** A page
+    /// finished before its hour could have its notice lodged with the system
+    /// and delivered on the hour with nothing of ours running, which is what
+    /// `UNCalendarNotificationTrigger` is for and what
+    /// `BGTaskRequest.earliestBeginDate` explicitly does not promise. It would
+    /// cost the period its last minutes, and the period is what the reader
+    /// asked for : the edition of eleven says what had happened by eleven. So
+    /// the notice arrives when the page comes into being, which on a device the
+    /// system chose not to wake is after the hour.
+    func isOut(at now: Date = Date()) -> Bool { isPublished }
 
     init(
         id: UUID = .v7(),
         slot: EditionSlot,
         openedAt: Date,
         coversFrom: Date? = nil,
-        pressedAt: Date? = nil,
         closedAt: Date? = nil,
         points: [String] = [],
         pointTopics: [String] = [],
@@ -353,7 +286,6 @@ nonisolated struct Edition: Identifiable, Hashable, StoredRecord {
         self.slot = slot
         self.openedAt = openedAt
         self.coversFrom = coversFrom
-        self.pressedAt = pressedAt
         self.closedAt = closedAt
         self.points = points
         self.pointTopics = pointTopics
@@ -369,8 +301,8 @@ nonisolated struct Edition: Identifiable, Hashable, StoredRecord {
     /// nothing before its own dateline.
     var periodStart: Date { coversFrom ?? openedAt }
 
-    /// The moment the period of this page ends, however old the row is.
-    var periodEnd: Date { pressedAt ?? openedAt }
+    /// The moment the period of this page ends, which is its own hour.
+    var periodEnd: Date { openedAt }
 }
 
 nonisolated extension Edition {
@@ -379,25 +311,20 @@ nonisolated extension Edition {
         static let slot = Column(CodingKeys.slot)
         static let openedAt = Column(CodingKeys.openedAt)
         static let coversFrom = Column(CodingKeys.coversFrom)
-        static let pressedAt = Column(CodingKeys.pressedAt)
         static let closedAt = Column(CodingKeys.closedAt)
         static let askedAt = Column(CodingKeys.askedAt)
         static let publishedAt = Column(CodingKeys.publishedAt)
     }
 
-    /// The editions that have come out by a moment, newest first.
+    /// The editions that have come out, newest first.
     ///
-    /// **One place, and every reader goes through it.** An edition written at
-    /// twenty to eleven for eleven o'clock is in the store, complete, and is
-    /// nobody's paper yet : a query asking only whether it had been written
-    /// would hand the reader their eleven o'clock page at twenty to eleven and
-    /// take back the six o'clock one they were reading.
-    ///
-    /// There are two readers and they must not come to disagree, which is why
-    /// this exists rather than a filter written twice.
-    static func out(by now: Date) -> QueryInterfaceRequest<Edition> {
+    /// **One place, and every reader goes through it.** There are two of them,
+    /// the front page and the archive, and a page shown by one and not the
+    /// other would be a back number the reader cannot reach or a front page
+    /// with no history.
+    static func out(by now: Date = Date()) -> QueryInterfaceRequest<Edition> {
         Edition
-            .filter(Columns.publishedAt != nil && Columns.openedAt <= now)
+            .filter(Columns.publishedAt != nil)
             .order(Columns.openedAt.desc)
     }
 

@@ -477,14 +477,11 @@ nonisolated struct BriefEditionsJob: ResumableJob {
     /// written ones sat underneath it. The page is asked about when its period
     /// has been written, or when this has gone by.
     ///
-    /// **Capped by the run, and it has to be.** Twenty minutes was right for a
-    /// page with no deadline ; a page that goes to press cannot wait longer
-    /// than half the time it has, or the wait eats the ask it exists to
-    /// improve. What makes a short one safe is the other half of the same test :
-    /// it is skipped outright the moment nothing is outstanding, so it only
-    /// bites when the model is failing, and a failing model is not made to
-    /// answer by being waited on.
-    static var grace: TimeInterval { min(20 * 60, EditionSchedule.pressRun / 2) }
+    /// What makes it safe is the other half of the same test : it is skipped
+    /// outright the moment nothing is outstanding, so it only bites when the
+    /// model is failing, and a failing model is not made to answer by being
+    /// waited on.
+    static let grace: TimeInterval = 20 * 60
 
     /// How long a page whose model was unusable waits before being put again.
     ///
@@ -511,9 +508,9 @@ nonisolated struct BriefEditionsJob: ResumableJob {
     /// - `published_at IS NULL` is the rule itself. A page that has come off
     ///   the press is not in the work set and can never be asked about again.
     /// - `closed_at IS NULL` is the bound on a late paper : a page whose
-    ///   successor has gone to press has missed its hour for good.
-    /// - the press has come, so a page is asked about when it is finished
-    ///   rather than when it is opened.
+    ///   successor's hour has come has missed its own for good.
+    /// - the hour has passed, so a page is about a period that has ended rather
+    ///   than one still filling.
     /// - a language is a durable answer : asked and refused about ten stories
     ///   that can no longer move is the same answer next time, and only a
     ///   reader changing language is a different question.
@@ -529,7 +526,7 @@ nonisolated struct BriefEditionsJob: ResumableJob {
         (
             """
             closed_at IS NULL AND published_at IS NULL
-            AND COALESCE(pressed_at, opened_at) <= ?
+            AND opened_at <= ?
             AND (brief_locale IS NULL OR brief_locale <> ?)
             AND (asked_at IS NULL OR asked_at <= ?)
             AND (SELECT COUNT(*) FROM edition_story WHERE edition_id = edition.id) >= \(EditionStore.leastStories)
@@ -884,23 +881,6 @@ nonisolated struct DigestService: Sendable {
     @concurrent
     func editionArchive(now: Date = Date()) async throws -> [PublishedEdition] {
         try await EditionStore(database).archive(now: now)
-    }
-
-    /// The newest page off the press, whether or not its hour has come.
-    ///
-    /// The one read that looks past the hour, and it is the notice's.
-    @concurrent
-    func offThePress() async throws -> Edition? {
-        try await EditionStore(database).offThePress()
-    }
-
-    /// Takes back the pages whose hour the reader has retracted.
-    @concurrent
-    func unmakeEditions(
-        against schedule: EditionSchedule,
-        now: Date = Date()
-    ) async throws -> [Date] {
-        try await EditionStore(database).unmakeWhatIsNotWanted(against: schedule, locale: locale, now: now)
     }
 
     /// The figures of a named handful of stories, for a page that is frozen.

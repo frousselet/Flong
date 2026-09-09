@@ -79,7 +79,6 @@ struct StoreTests {
                 "v49.whatWasSentAway",
                 "v50.whoWroteTheHeadline",
                 "v51.theNewsOfThePeriodBefore",
-                "v52.aPaperGoesToPressBeforeItComesOut",
             ]
         )
     }

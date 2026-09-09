@@ -37,13 +37,6 @@ protocol Announcing {
     func status() async -> UNAuthorizationStatus
     func authorize() async -> Bool
     func post(_ announcement: Announcement) async
-    /// Takes back one thing, said or not yet said.
-    ///
-    /// **Pending and delivered both.** A notice lodged for eleven whose edition
-    /// stopped existing at half past ten and a banner still sitting in the
-    /// centre for a page that was unmade are the same mistake : one leads
-    /// nowhere in a minute, the other leads nowhere now.
-    func withdraw(_ name: String) async
     /// Takes back everything already said, for a reset.
     func withdrawEverything() async
 }
@@ -126,10 +119,16 @@ struct Notifier: Announcing {
             content.userInfo = [Key.article: article.uuidString]
         }
 
+        // No trigger : a trigger of nil is delivered immediately, and nothing
+        // here can be written before the moment it is about. An edition could
+        // be, by closing its period early, and then its notice would be lodged
+        // for its hour and delivered on it with nothing of ours running ; what
+        // that costs is the last minutes of every period, and the period is
+        // what the reader asked for.
         let request = UNNotificationRequest(
             identifier: Self.identifier(of: announcement),
             content: content,
-            trigger: Self.trigger(for: announcement)
+            trigger: nil
         )
 
         do {
@@ -146,58 +145,11 @@ struct Notifier: Announcing {
     /// ever, so posting it twice should replace it rather than stack a second
     /// copy : the system keys on this, and a fresh `UUID` every time meant
     /// nothing could ever be corrected or de-duplicated. An edition's name is
-    /// its boundary, which is what lets one lodged ahead of its hour be
-    /// replaced, or taken back by a path that no longer has the row. Everything
-    /// else keeps a new one, having nothing stable to be known by.
+    /// its boundary, so two passes that both notice one page has come out
+    /// replace one banner rather than stacking two. Everything else keeps a new
+    /// one, having nothing stable to be known by.
     static func identifier(of announcement: Announcement) -> String {
         announcement.name ?? announcement.article?.uuidString ?? UUID().uuidString
-    }
-
-    /// How close to its moment a notice is simply said.
-    ///
-    /// A second either side of an hour is a race between a trigger and a clock,
-    /// and losing it means the notice waits for ever : a full set of components
-    /// naming a moment already gone matches nothing, and the request sits
-    /// pending until something takes it back.
-    static let soonest: TimeInterval = 5
-
-    /// When the system is to deliver it, or `nil` for now.
-    ///
-    /// `UNCalendarNotificationTrigger` is the only kind that names a moment : a
-    /// trigger the system delivers at a specific date and time, with nothing of
-    /// ours running. `BGTaskRequest.earliestBeginDate` promises only that the
-    /// system will not begin sooner than the moment it is given, so a notice
-    /// posted by code that has to be running is a notice that arrives when the
-    /// system feels like it.
-    ///
-    /// **The zone is pinned into the components.** A trigger matches wall-clock
-    /// components in whatever calendar holds when it fires : a reader who flew
-    /// west between the press and the hour would have had eleven o'clock fire
-    /// hours after the page it announces came out, and the page is decided on
-    /// the instant. With the zone in the components the moment is absolute, and
-    /// the banner and the page agree wherever the reader is. The year is in
-    /// them and `repeats` is false, so it matches exactly once ; a set without
-    /// a year repeats for ever.
-    ///
-    /// **A moment already gone is now.** That is the late paper, and which of
-    /// the two a paper is comes down to this comparison.
-    static func trigger(
-        for announcement: Announcement,
-        now: Date = Date(),
-        in calendar: Calendar = .current
-    ) -> UNNotificationTrigger? {
-        guard let at = announcement.at, at > now.addingTimeInterval(soonest) else { return nil }
-
-        var parts = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: at)
-        parts.timeZone = calendar.timeZone
-        return UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
-    }
-
-    /// Takes back one notice, whether it has been said or is still waiting.
-    func withdraw(_ name: String) async {
-        let centre = UNUserNotificationCenter.current()
-        centre.removePendingNotificationRequests(withIdentifiers: [name])
-        centre.removeDeliveredNotifications(withIdentifiers: [name])
     }
 
     /// Takes back every notice this device has posted.
@@ -238,9 +190,6 @@ struct Notifier: Announcing {
 /// that is exactly what this records.
 final class MemoryAnnouncer: Announcing {
     private(set) var posted: [Announcement] = []
-    /// The names taken back, so a test can read a withdrawal as well as a
-    /// posting.
-    private(set) var withdrawn: [String] = []
     var granted = true
     var stated = UNAuthorizationStatus.authorized
 
@@ -265,15 +214,7 @@ final class MemoryAnnouncer: Announcing {
         posted.append(announcement)
     }
 
-    func withdraw(_ name: String) async {
-        withdrawn.append(name)
-        posted.removeAll { $0.name == name }
-    }
-
-    func withdrawEverything() async {
-        posted.removeAll()
-        withdrawn.removeAll()
-    }
+    func withdrawEverything() async { posted.removeAll() }
 }
 
 /// Holds what a tapped notification asked for, until there is a window to show
@@ -326,12 +267,10 @@ final class NotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     /// worth showing, and the reader is the one who decides whether a banner
     /// interrupts them, not this.
     ///
-    /// **The edition is the one that is held back, and only the edition.** Its
-    /// notice is lodged twenty minutes before it fires, so nothing at lodging
-    /// time can know where the reader will be, and this is the only place that
-    /// runs at the moment the system offers the banner. A banner and a sound
-    /// over the page they are about is telling somebody something they are
-    /// looking at.
+    /// **The edition is the one that is held back, and only the edition.** A
+    /// banner and a sound over the page they are about is telling somebody
+    /// something they are looking at, and a pass may publish a page while the
+    /// reader has the front page open in front of them.
     ///
     /// **Filed rather than dropped.** It said nothing at all before, because
     /// posting was itself the interruption ; the notice exists now whichever

@@ -91,11 +91,10 @@ struct EditionStoreTests {
 
     /// A Saturday, twenty to one in the afternoon, in Paris.
     ///
-    /// The boundary that has gone is noon and the one in press is still the
-    /// evening's, so a page made here is the midday edition and its period ends
-    /// at midday. Everything below is said in hours before that hour rather
-    /// than before this moment, since what a page holds is a question about its
-    /// period.
+    /// The boundary that has gone is noon, so a page made here is the midday
+    /// edition and its period ends at midday. Everything below is said in hours
+    /// before that hour rather than before this moment, since what a page holds
+    /// is a question about its period and never about the moment it is made.
     private let now = Date(timeIntervalSince1970: 1_788_000_000)
     private var noon: Date { now.addingTimeInterval(-40 * 60) }
 
@@ -498,30 +497,6 @@ struct EditionStoreTests {
         #expect(current.edition.points.count == 2)
     }
 
-    /// A page written ahead of its hour is tomorrow's paper : it must not
-    /// arrive on the table twenty minutes early under a dateline saying
-    /// otherwise.
-    @Test("A page written before its hour is not on the table until its hour")
-    func writtenIsNotOut() async throws {
-        try await story("Ce matin", endingHoursBeforeNoon: 1)
-        try await story("Aussi ce matin", endingHoursBeforeNoon: 2)
-
-        let midday = try await make()
-        try await publish(midday.id)
-
-        // Ten to six, so the evening edition is in press and its hour has not
-        // come.
-        let inPress = noon.addingTimeInterval(6 * 3600 - 10 * 60)
-        try await story("Cet après-midi", endingHoursBeforeNoon: -3)
-        try await story("Aussi cet après-midi", endingHoursBeforeNoon: -4)
-        let evening = try await make(at: inPress)
-        try await publish(evening.id)
-
-        #expect(try await editions.current(now: inPress)?.edition.id == midday.id)
-        #expect(try await editions.offThePress()?.id == evening.id)
-        #expect(try await editions.current(now: evening.openedAt)?.edition.id == evening.id)
-    }
-
     @Test("The archive holds what has come out and nothing else")
     func archiveIsPublishedOnly() async throws {
         try await story("Une", endingHoursBeforeNoon: 1)
@@ -597,30 +572,6 @@ struct EditionStoreTests {
         )
         #expect(written == false)
         #expect(try await editions.current(now: now) == nil)
-    }
-
-    /// A page whose hour has not come has never been seen by anybody, so
-    /// retracting the hour is retracting the paper.
-    @Test("An hour the reader retracts unmakes the page waiting for it")
-    func unmade() async throws {
-        try await story("Ce matin", endingHoursBeforeNoon: 1)
-        try await story("Aussi ce matin", endingHoursBeforeNoon: 2)
-        let midday = try await make()
-        try await publish(midday.id)
-
-        let inPress = noon.addingTimeInterval(6 * 3600 - 10 * 60)
-        try await story("Cet après-midi", endingHoursBeforeNoon: -3)
-        try await story("Aussi cet après-midi", endingHoursBeforeNoon: -4)
-        let evening = try await make(at: inPress)
-        try await publish(evening.id)
-
-        var without = EditionSchedule.standard
-        without.hours[.evening] = nil
-        let gone = try await editions.unmakeWhatIsNotWanted(
-            against: without, locale: Locale(identifier: "fr_FR"), now: inPress, calendar: calendar)
-
-        #expect(gone == [evening.openedAt])
-        #expect(try await editions.current(now: evening.openedAt)?.edition.id == midday.id)
     }
 
     private func publish(_ id: UUID, at moment: Date? = nil) async throws {
@@ -920,48 +871,9 @@ struct EditionNoticeTests {
         #expect(Announcement.newEdition(edition(points: [])) == nil)
     }
 
-    /// **The one thing the press buys.** A page written before its hour lets
-    /// its notice be lodged with the system, which delivers it on the hour with
-    /// nothing of ours running. `earliestBeginDate` promises only that the
-    /// system will not begin sooner than the moment it is given.
-    @Test("A page written before its hour is announced for its hour")
-    func lodgedForTheHour() throws {
-        // An hour that has not come, since a full set of components naming a
-        // moment already gone matches nothing : that is the late paper, and it
-        // is the case below.
-        let boundary = Date(timeIntervalSince1970: (Date().timeIntervalSince1970 + 3600).rounded(.down))
-        let announcement = try #require(
-            Announcement.newEdition(edition(points: ["Une chose."], openedAt: boundary)))
-
-        #expect(announcement.at == boundary)
-        #expect(announcement.name == Edition.notice(for: boundary))
-        #expect(announcement.opensTheDigest)
-
-        let trigger = Notifier.trigger(for: announcement, now: boundary.addingTimeInterval(-20 * 60))
-        let calendar = try #require(trigger as? UNCalendarNotificationTrigger)
-        #expect(calendar.nextTriggerDate() == boundary)
-
-        // **The zone is pinned into the components**, so the moment is
-        // absolute : a reader who flies west between the press and the hour
-        // gets the banner when the page comes out and not at eleven o'clock
-        // wherever they have landed.
-        #expect(calendar.dateComponents.timeZone != nil)
-        #expect(calendar.repeats == false)
-    }
-
-    /// The late paper is not a second path : the same field, the same builder
-    /// and the same posting, on the other side of one comparison.
-    @Test("A page whose hour has gone is said at once")
-    func theLatePaper() throws {
-        let boundary = Date(timeIntervalSince1970: 1_788_000_000)
-        let announcement = try #require(Announcement.newEdition(edition(points: ["Une chose."])))
-
-        #expect(Notifier.trigger(for: announcement, now: boundary.addingTimeInterval(40 * 60)) == nil)
-    }
-
-    /// **Only a named notice can be replaced or taken back.** Everything but an
-    /// article took a fresh identifier every time it was posted, which was
-    /// harmless while nothing was ever pending.
+    /// **Only a named notice can be replaced.** Everything but an article took
+    /// a fresh identifier every time, so two passes that both noticed one page
+    /// had come out stacked two banners for one paper.
     @Test("An edition's notice is known by its hour, so it can be replaced")
     func known() throws {
         let announcement = try #require(Announcement.newEdition(edition(points: ["Une chose."])))

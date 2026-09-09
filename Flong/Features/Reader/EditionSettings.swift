@@ -43,7 +43,7 @@ struct EditionSettings: View {
                     // read in English on a French device, and nothing would
                     // have said so.
                     Text(
-                        "Each edition is closed shortly before its hour and comes out on the hour, with the ten stories that matter most. What arrives after that leads the next edition, and everything stays in the wire."
+                        "Each edition holds what happened since the one before it, with the ten stories that matter most. It does not change until the next one comes out, and what did not fit stays in the wire."
                     )
                 }
             }
