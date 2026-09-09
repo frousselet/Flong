@@ -350,6 +350,7 @@ nonisolated struct BriefStoriesJob: ResumableJob {
             story.summary = brief.summary
             story.isGenerated = brief.isGenerated
             story.isTranslated = brief.isTranslated
+            story.generatedBy = brief.writtenBy
             story.briefLocale = brief.askedIn?.identifier
             story.updatedAt = Date()
             try story.update(db)

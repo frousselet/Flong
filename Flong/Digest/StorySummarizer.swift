@@ -24,6 +24,9 @@ nonisolated struct StoryBrief: Hashable, Sendable {
     /// publisher wrote it in, rather than write it. Never true on its own.
     let isTranslated: Bool
 
+    /// Which model wrote it, or nothing where this device did.
+    var writtenBy: String?
+
     /// The language the model was asked in, when it was asked at all.
     ///
     /// It is what stops a story being asked about for ever. A model that was
@@ -38,12 +41,14 @@ nonisolated struct StoryBrief: Hashable, Sendable {
         summary: String?,
         isGenerated: Bool,
         isTranslated: Bool = false,
+        writtenBy: String? = nil,
         askedIn: Locale? = nil
     ) {
         self.title = title
         self.summary = summary
         self.isGenerated = isGenerated
         self.isTranslated = isTranslated
+        self.writtenBy = writtenBy
         self.askedIn = askedIn
     }
 
@@ -202,6 +207,15 @@ nonisolated struct StorySummarizer: Sendable {
     init(locale: Locale = .current, hand: ModelHand = ModelDesk.shared.hand(for: .headlines)) {
         self.locale = locale
         self.hand = hand
+    }
+
+    /// What goes on a story to say who wrote its head.
+    ///
+    /// Nothing for the model on this device, which is what `nil` has always
+    /// meant on the column : a story written here is the ordinary case, and the
+    /// sentence behind the mark says so without naming anything.
+    private var writtenBy: String? {
+        hand.provider.host == nil ? nil : hand.provider.name
     }
 
     /// What a headline is for, put to a model that has never worked on a desk.
@@ -503,7 +517,8 @@ nonisolated struct StorySummarizer: Sendable {
         // and not the brief again.
         let line = summary.isEmpty ? await self.line(under: title, in: conversation) : summary
 
-        return .wrote(StoryBrief(title: title, summary: line, isGenerated: true, askedIn: locale))
+        return .wrote(
+            StoryBrief(title: title, summary: line, isGenerated: true, writtenBy: writtenBy, askedIn: locale))
     }
 
     /// What a story is called when no model is available.
@@ -650,7 +665,8 @@ nonisolated struct StorySummarizer: Sendable {
         let usable = !summary.isEmpty && !Self.repeats(title, in: summary) && Self.isBrief(summary)
         let line = usable ? summary : await self.line(under: title, in: conversation)
 
-        return .wrote(StoryBrief(title: title, summary: line, isGenerated: true, askedIn: locale))
+        return .wrote(
+            StoryBrief(title: title, summary: line, isGenerated: true, writtenBy: writtenBy, askedIn: locale))
     }
 
     /// The publisher's own head, carried across into the reader's language.
@@ -717,7 +733,14 @@ nonisolated struct StorySummarizer: Sendable {
             return nil
         }
 
-        return StoryBrief(title: title, summary: carried, isGenerated: true, isTranslated: true, askedIn: locale)
+        return StoryBrief(
+            title: title,
+            summary: carried,
+            isGenerated: true,
+            isTranslated: true,
+            writtenBy: writtenBy,
+            askedIn: locale
+        )
     }
 
     /// Asks for the headline alone, once, where the story is settled and the

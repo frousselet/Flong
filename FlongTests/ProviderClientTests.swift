@@ -288,6 +288,45 @@ struct ProviderClientTests {
         #expect(!sent.lowercased().contains("feed"))
     }
 
+    /// Section 14 asks that anything produced automatically be flagged in the
+    /// interface and in exports. With more than one model that stopped being a
+    /// boolean : the sentence behind the mark used to promise that nothing was
+    /// sent anywhere, and for a headline written elsewhere that is false.
+    @Test("A story says which model wrote its head")
+    func aStorySaysWhoWroteIt() async throws {
+        let stub = StubServer(host: Self.host)
+        defer { stub.reset() }
+        stub.install { _ in Self.completion(#"{"title":"Un titre","summary":"Une ligne assez longue pour tenir."}"#) }
+
+        let summarizer = StorySummarizer(
+            locale: Locale(identifier: "fr_FR"),
+            hand: ModelHand(task: .headlines, provider: provider(stub), patience: ModelPatience(with: "test"))
+        )
+
+        let brief = await summarizer.brief(forArticles: [
+            (title: "Un titre publié", excerpt: "Le chapeau publié."),
+            (title: "Un autre titre", excerpt: nil),
+        ])
+
+        #expect(brief.isGenerated)
+        #expect(brief.writtenBy == "Mine")
+    }
+
+    /// Nothing, and not the name of the framework : a story written here is the
+    /// ordinary case, and the sentence behind the mark says so without naming
+    /// anything.
+    @Test("A story written on this device names nobody")
+    func theDeviceNamesNobody() async {
+        let summarizer = StorySummarizer(
+            locale: Locale(identifier: "fr_FR"),
+            hand: ModelHand(task: .headlines, provider: LocalProvider(), patience: ModelPatience(with: "test"))
+        )
+
+        let brief = await summarizer.brief(forArticles: [])
+
+        #expect(brief.writtenBy == nil)
+    }
+
     @Test("A key never reaches a log line or an error a reader could see")
     func theKeyStaysInTheRequest() async throws {
         let stub = StubServer(host: Self.host)

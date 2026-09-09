@@ -66,6 +66,9 @@ nonisolated struct DigestStory: Identifiable, Hashable, Sendable {
     /// And whether what it did was carry them across from the language their
     /// publisher wrote them in, which the card says differently.
     let isTranslated: Bool
+    /// Which model wrote them, or nothing where this device did. The card says
+    /// nothing about it ; the page behind it does.
+    let generatedBy: String?
 
     let articleCount: Int
     /// The rooms talking about it, a few of them shown.
@@ -509,6 +512,7 @@ nonisolated struct DigestStore: Sendable {
             summary: story.summary,
             isGenerated: story.isGenerated,
             isTranslated: story.isTranslated,
+            generatedBy: story.generatedBy,
             articleCount: members.count,
             feedMarks: Array(marks.prefix(namedFeeds)),
             feedCount: marks.count,

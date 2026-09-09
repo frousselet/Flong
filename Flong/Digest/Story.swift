@@ -27,6 +27,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         case summary
         case isGenerated = "is_generated"
         case isTranslated = "is_translated"
+        case generatedBy = "generated_by"
         case briefLocked = "brief_locked"
         case briefLocale = "brief_locale"
         case topicsAskedAt = "topics_asked_at"
@@ -56,6 +57,22 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
     /// line written here and another for a line an editor wrote elsewhere, and
     /// everything that clears what the model did clears both.
     var isTranslated: Bool
+
+    /// Which model wrote it, or nothing where this device did.
+    ///
+    /// **Section 14 asks that anything produced automatically be flagged in the
+    /// interface and in exports, and with more than one model that stopped
+    /// being a boolean.** The mark on the page stays one mark : a glyph per
+    /// provider would draw the application's own plumbing over the news, and
+    /// there are as many of them as a reader configures. What is behind it says
+    /// which, because the sentence there used to promise that nothing was sent
+    /// anywhere, and for a headline written elsewhere that promise is false.
+    ///
+    /// Copied rather than pointed at, like the name on a call in the log : a
+    /// record of who wrote something must not change when the account is
+    /// renamed or deleted.
+    var generatedBy: String?
+
     /// Whether the reader has settled the matter themselves.
     var briefLocked: Bool
 
@@ -113,6 +130,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         summary: String? = nil,
         isGenerated: Bool = false,
         isTranslated: Bool = false,
+        generatedBy: String? = nil,
         briefLocked: Bool = false,
         briefLocale: String? = nil,
         topicsAskedAt: Date? = nil,
@@ -130,6 +148,7 @@ nonisolated struct Story: Identifiable, Hashable, StoredRecord {
         self.summary = summary
         self.isGenerated = isGenerated
         self.isTranslated = isTranslated
+        self.generatedBy = generatedBy
         self.briefLocked = briefLocked
         self.briefLocale = briefLocale
         self.topicsAskedAt = topicsAskedAt
