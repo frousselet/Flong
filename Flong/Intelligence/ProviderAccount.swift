@@ -115,6 +115,23 @@ nonisolated struct ProviderAccount: Identifiable, Hashable, Sendable, Codable {
     var host: String { origin?.host() ?? "" }
 }
 
+/// Where one of the four things a model does is pointed.
+///
+/// **Three answers and not two.** An identifier or nothing would fold *the
+/// device does this* into *nobody does this*, and they are different : the
+/// first is the ordinary state and the second is a reader saying they would
+/// rather have no headline than a written one.
+nonisolated enum ModelChoice: Hashable, Sendable, Codable {
+    case onDevice
+    case provider(UUID)
+    case nothing
+
+    var account: UUID? {
+        guard case .provider(let id) = self else { return nil }
+        return id
+    }
+}
+
 /// What the reader has chosen about models.
 ///
 /// A preference and not a record : it is a decision about themselves, like the
@@ -128,9 +145,10 @@ nonisolated struct ProviderSettings: Hashable, Sendable, Codable {
     /// Which model answers which task.
     ///
     /// A task with no entry, or one naming an account that has been removed,
-    /// falls back to the model on the device, and from there to the path with
-    /// no model at all. There is no state in which a task points at nothing.
-    var assignment: [ModelTask: UUID] = [:]
+    /// falls back to the model on the device. There is no state in which a task
+    /// points at an account that is gone : removing one takes back everything
+    /// aimed at it, so nothing has to have words for that.
+    var assignment: [ModelTask: ModelChoice] = [:]
 
     /// Whether the reader has been asked, and said yes.
     ///
@@ -148,16 +166,22 @@ nonisolated struct ProviderSettings: Hashable, Sendable, Codable {
         return accounts.first { $0.id == id }
     }
 
+    /// Where one task is pointed, the device being the answer for anything
+    /// that has never been said.
+    func choice(for task: ModelTask) -> ModelChoice {
+        assignment[task] ?? .onDevice
+    }
+
     /// The account answering one task, or nothing where the device answers it.
     func account(for task: ModelTask) -> ProviderAccount? {
         guard sendsToProviders else { return nil }
-        return account(assignment[task])
+        return account(choice(for: task).account)
     }
 
     /// The same settings with one task pointed somewhere else.
-    func pointing(_ task: ModelTask, at id: UUID?) -> ProviderSettings {
+    func pointing(_ task: ModelTask, at choice: ModelChoice) -> ProviderSettings {
         var settings = self
-        settings.assignment[task] = id
+        settings.assignment[task] = choice
         return settings
     }
 
@@ -170,15 +194,30 @@ nonisolated struct ProviderSettings: Hashable, Sendable, Codable {
     func without(_ id: UUID) -> ProviderSettings {
         var settings = self
         settings.accounts.removeAll { $0.id == id }
-        settings.assignment = settings.assignment.filter { $0.value != id }
+        settings.assignment = settings.assignment.filter { $0.value.account != id }
         return settings
     }
 
-    /// The same settings with every task back on the device.
+    /// The same settings with every task that was sent away back on the
+    /// device.
+    ///
+    /// A task the reader switched off stays off : stopping is about what leaves
+    /// the device and not about undoing every choice they made.
     func withNothingSent() -> ProviderSettings {
         var settings = self
-        settings.assignment = [:]
+        settings.assignment = settings.assignment.filter { $0.value == .nothing }
         settings.sendsToProviders = false
+        return settings
+    }
+
+    /// The same settings with one account added or replaced.
+    func keeping(_ account: ProviderAccount) -> ProviderSettings {
+        var settings = self
+        if let index = settings.accounts.firstIndex(where: { $0.id == account.id }) {
+            settings.accounts[index] = account
+        } else {
+            settings.accounts.append(account)
+        }
         return settings
     }
 }
