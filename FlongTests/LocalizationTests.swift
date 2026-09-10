@@ -40,6 +40,10 @@ struct LocalizationTests {
         #expect(String(localized: "Add to favourites", locale: french) == "Mettre en favori")
         #expect(String(localized: "Choose a picture", locale: french) == "Choisir une photo")
         #expect(String(localized: "Subscribed sites", locale: french) == "Sites abonnés")
+        #expect(String(localized: "Length", locale: french) == "Longueur")
+        #expect(String(localized: "Short", locale: french) == "Courte")
+        #expect(String(localized: "Medium", locale: french) == "Moyenne")
+        #expect(String(localized: "Long", locale: french) == "Longue")
     }
 
     /// The sections of the catalogue, which are English keys in the code and

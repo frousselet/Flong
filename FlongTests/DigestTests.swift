@@ -2061,3 +2061,232 @@ struct ModelPatienceTests {
         #expect(!patience.hasGivenUp(now: now))
     }
 }
+
+/// The rule that a story belongs to one edition's period and never to two.
+///
+/// The corpus is four pieces about one thing, two on each side of a boundary,
+/// and a handful of unrelated ones so that a word's rarity means something.
+/// A reader would call the four one story and would still expect this morning's
+/// paper to carry the morning's two : that is the whole of what is tested here.
+@Suite("A story and its period")
+struct StoryPeriodTests {
+    /// Thursday 10 September 2026, one o'clock in the afternoon.
+    private let now = Date(timeIntervalSince1970: 1_789_045_200)
+    /// Fixed, so the boundaries of the standard schedule fall where this file
+    /// says they do rather than where the machine happens to be.
+    private let zone: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }()
+
+    private let database: AppDatabase
+    private var feeds: [String: Feed] = [:]
+
+    /// One article, placed so many minutes before one o'clock.
+    private struct Piece {
+        let feed: String
+        let title: String
+        let excerpt: String
+        let minutes: Double
+    }
+
+    /// The boundary of the standard schedule that these straddle is midday, an
+    /// hour before `now`.
+    private static let pieces = [
+        Piece(
+            feed: "Le Quotidien",
+            title: "Le pont de la Roquette rouvre à la circulation",
+            excerpt: "La circulation reprendra dans les deux sens sur le pont de la Roquette.",
+            minutes: 120
+        ),
+        Piece(
+            feed: "L'Agence",
+            title: "Le pont de la Roquette rouvre après dix-huit mois",
+            excerpt: "La circulation reprend dans les deux sens sur le pont de la Roquette.",
+            minutes: 105
+        ),
+        Piece(
+            feed: "Le Soir",
+            title: "Réouverture du pont de la Roquette à la circulation",
+            excerpt: "Le pont de la Roquette rouvre à la circulation dans les deux sens.",
+            minutes: 30
+        ),
+        Piece(
+            feed: "La Gazette",
+            title: "Le pont de la Roquette est rouvert à la circulation",
+            excerpt: "La circulation a repris dans les deux sens sur le pont de la Roquette.",
+            minutes: 15
+        ),
+        Piece(
+            feed: "Le Quotidien",
+            title: "Une fondeuse de caractères raconte son métier",
+            excerpt: "Elle dessine des empattements depuis vingt ans et n'a jamais vendu une police.",
+            minutes: 200
+        ),
+        Piece(
+            feed: "L'Agence",
+            title: "Les macros Swift, deux ans après",
+            excerpt: "Ce que les macros ont changé au code que nous écrivons, et ce qu'elles n'ont pas résolu.",
+            minutes: 45
+        ),
+        Piece(
+            feed: "Le Soir",
+            title: "La saison des cèpes s'annonce tardive",
+            excerpt: "Les ramasseurs attendent la pluie pour que les bois donnent enfin quelque chose.",
+            minutes: 90
+        ),
+    ]
+
+    init() async throws {
+        database = try AppDatabase.inMemory()
+
+        let subscriptions = SubscriptionStore(database)
+        for name in Set(Self.pieces.map(\.feed)) {
+            let address = "https://\(abs(name.hashValue)).example.com/f.xml"
+            feeds[name] = try await subscriptions.subscribe(to: Subscription(address: address, title: name)).feed
+        }
+
+        for (index, piece) in Self.pieces.enumerated() {
+            try await insert(piece, numbered: index)
+        }
+    }
+
+    private func insert(_ piece: Piece, numbered index: Int) async throws {
+        let date = now.addingTimeInterval(-piece.minutes * 60)
+        var entry = Entry(
+            feedID: feeds[piece.feed]!.id,
+            guid: "urn:example:period:\(index)",
+            url: URL(string: "https://example.com/period/\(index)"),
+            title: piece.title,
+            excerpt: piece.excerpt,
+            language: "fr",
+            publishedAt: date,
+            receivedAt: date
+        )
+        entry.hasMedia = false
+
+        try await database.writer.write { [entry] db in
+            try entry.insert(db)
+            try EntryBody(entryID: entry.id, plainText: piece.excerpt).insert(db)
+        }
+    }
+
+    /// The stories in the store, oldest first, with the articles of each.
+    private func stories() async throws -> [(story: Story, dates: [Date])] {
+        try await database.writer.read { db in
+            try Story.order(Story.Columns.lastAt).fetchAll(db).map { story in
+                let dates = try Date.fetchAll(
+                    db,
+                    sql: """
+                        SELECT COALESCE(e.published_at, e.received_at) FROM story_member m
+                        JOIN entry e ON e.id = m.entry_id WHERE m.story_id = ?
+                        ORDER BY 1
+                        """,
+                    arguments: [story.id]
+                )
+                return (story, dates)
+            }
+        }
+    }
+
+    /// Four pieces a reader would call one story, and the edition of midday
+    /// carries the two that happened before midday.
+    @Test("An article on the far side of a boundary starts a story of its own")
+    func aBoundaryCutsAStory() async throws {
+        try await StoryBuilder(database).build(within: .standard, now: now, calendar: zone)
+
+        let stories = try await stories()
+        #expect(stories.count == 2)
+        #expect(stories.map(\.story.articleCount) == [2, 2])
+
+        let midday = now.addingTimeInterval(-3600)
+        #expect(stories.first?.dates.allSatisfy { $0 < midday } == true)
+        #expect(stories.last?.dates.allSatisfy { $0 >= midday } == true)
+    }
+
+    /// Every story is about one paper's stretch of time, which is the property
+    /// the story page rests on : what it lists cannot fall outside the edition
+    /// the reader opened it from.
+    @Test("No story holds two periods")
+    func onePeriodEach() async throws {
+        try await StoryBuilder(database).build(within: .standard, now: now, calendar: zone)
+
+        for (story, _) in try await stories() {
+            let opened = EditionSchedule.standard.period(of: story.firstAt, in: zone)
+            #expect(opened == EditionSchedule.standard.period(of: story.lastAt, in: zone))
+        }
+    }
+
+    /// The period the story opened in and no other : an article that lands
+    /// after the boundary is a new development and belongs to the next paper,
+    /// however much it shares with what came before.
+    @Test("The period that has closed takes nothing more")
+    func aClosedPeriodTakesNothingMore() async throws {
+        let midday = now.addingTimeInterval(-3600)
+
+        // The store as it stood at midday : the afternoon has not happened yet.
+        let afternoon = Self.pieces.enumerated().filter { now.addingTimeInterval(-$0.element.minutes * 60) >= midday }
+        try await database.writer.write { db in
+            try db.execute(
+                sql: "DELETE FROM entry WHERE COALESCE(published_at, received_at) >= ?", arguments: [midday])
+        }
+
+        try await StoryBuilder(database).build(within: .standard, now: midday, calendar: zone)
+
+        let morning = try await stories()
+        #expect(morning.count == 1)
+        #expect(morning.first?.story.articleCount == 2)
+        let opened = try #require(morning.first?.story.id)
+
+        // And then the afternoon arrives, saying the same thing in other words.
+        for (index, piece) in afternoon { try await insert(piece, numbered: index) }
+        try await StoryBuilder(database).build(within: .standard, now: now, calendar: zone)
+
+        let both = try await stories()
+        #expect(both.count == 2)
+        #expect(both.first?.story.id == opened)
+        #expect(both.first?.story.articleCount == 2)
+    }
+
+    /// The rule holds over what is already in the store and not only over what
+    /// arrives next. A reader who moves an edition's hour turns every story
+    /// that was whole under the old schedule into one that straddles a boundary
+    /// under the new one, and a rule kept only where stories are built would be
+    /// true of tomorrow's news and false of this morning's.
+    @Test("A story already spanning a boundary is cut at the next pass")
+    func aStraddlerIsCut() async throws {
+        // Grouped with no boundary at all, which is what a store looked like
+        // before there were periods.
+        try await StoryBuilder(database).build(within: EditionSchedule(hours: [:]), now: now, calendar: zone)
+
+        let whole = try await stories()
+        #expect(whole.count == 1)
+        #expect(whole.first?.story.articleCount == 4)
+        let opened = try #require(whole.first?.story.id)
+
+        try await StoryBuilder(database).build(within: .standard, now: now, calendar: zone)
+
+        // Two stories of two, and the row keeps its name where it is still
+        // running : it is the older half that is let go and grouped again.
+        let cut = try await stories()
+        #expect(cut.count == 2)
+        #expect(cut.map(\.story.articleCount) == [2, 2])
+        #expect(cut.last?.story.id == opened)
+
+        let midday = now.addingTimeInterval(-3600)
+        #expect(cut.first?.dates.allSatisfy { $0 < midday } == true)
+        #expect(cut.last?.dates.allSatisfy { $0 >= midday } == true)
+    }
+
+    /// A reader who switched every edition off has no boundaries, so nothing
+    /// cuts anything : the grouping is what it was before periods existed.
+    @Test("With no edition at all there is no boundary to cut at")
+    func withoutASchedule() async throws {
+        try await StoryBuilder(database).build(within: EditionSchedule(hours: [:]), now: now, calendar: zone)
+
+        let stories = try await stories()
+        #expect(stories.count == 1)
+        #expect(stories.first?.story.articleCount == 4)
+    }
+}

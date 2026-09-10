@@ -189,8 +189,16 @@ struct TopicNamerLiveTests {
         // under a vocabulary nobody has written yet.
         try await TopicPreferences(database).seedStandards(at: now)
 
+        // One edition a day, coming out just before the oldest of these, so
+        // that the seven are one period's news. A story belongs to one
+        // edition, and a fixture spread over six hours of the standard four
+        // would be cut wherever the hour of the run happens to fall.
+        let opened = Calendar.current.dateComponents(
+            [.hour, .minute], from: now.addingTimeInterval(-Double(headlines.count) * 3600))
+        let schedule = EditionSchedule(hours: [.morning: opened.hour! * 60 + opened.minute!])
+
         let service = DigestService(database, locale: Locale(identifier: "fr_FR"))
-        _ = await service.rebuild(now: now)
+        _ = await service.rebuild(now: now, schedule: schedule)
 
         let page = try await service.digest(now: now)
         let stories = try await database.writer.read { db in try Story.fetchAll(db) }

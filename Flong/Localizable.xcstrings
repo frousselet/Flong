@@ -1223,6 +1223,17 @@
         }
       }
     },
+    "A longer edition carries more stories. It takes nothing out of the wire, which holds everything either way.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Une édition plus longue porte plus d'actualités. Elle n'enlève rien au fil, qui garde tout dans les deux cas."
+          }
+        }
+      }
+    },
     "A source is suggested once ten readers follow it, or once a trusted reader does.": {
       "localizations": {
         "fr": {
@@ -2368,13 +2379,13 @@
         }
       }
     },
-    "Each edition holds what happened since the one before it, with the ten stories that matter most. It does not change until the next one comes out, and what did not fit stays in the wire.": {
+    "Each edition holds what happened since the one before it, with the stories that matter most. It does not change until the next one comes out, and what did not fit stays in the wire.": {
       "extractionState": "manual",
       "localizations": {
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Chaque édition rassemble ce qui s'est passé depuis la précédente, avec les dix sujets qui comptent le plus. Elle ne change plus jusqu'à la parution de la suivante, et ce qui n'a pas tenu reste dans le fil."
+            "value": "Chaque édition rassemble ce qui s'est passé depuis la précédente, avec les sujets qui comptent le plus. Elle ne change plus jusqu'à la parution de la suivante, et ce qui n'a pas tenu reste dans le fil."
           }
         }
       }
@@ -3536,6 +3547,17 @@
         }
       }
     },
+    "Length": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Longueur"
+          }
+        }
+      }
+    },
     "License": {
       "localizations": {
         "fr": {
@@ -3573,6 +3595,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Régions"
+          }
+        }
+      }
+    },
+    "Long": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Longue"
           }
         }
       }
@@ -3645,6 +3678,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Médias"
+          }
+        }
+      }
+    },
+    "Medium": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moyenne"
           }
         }
       }
@@ -4996,6 +5040,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Partagées avec moi"
+          }
+        }
+      }
+    },
+    "Short": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Courte"
           }
         }
       }

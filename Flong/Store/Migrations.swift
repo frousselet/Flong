@@ -1191,6 +1191,97 @@ nonisolated extension AppDatabase {
             try db.execute(sql: "UPDATE story SET brief_asked_at = updated_at WHERE brief_locale IS NOT NULL")
         }
 
+        /// A story belongs to one period, and the ones already grouped did not.
+        ///
+        /// **The rule arrived after the rows.** The grouping had no notion of
+        /// time : an article joined whatever it shared enough vocabulary with,
+        /// however old, so a story spanned as far as its members reached. The
+        /// store this shipped to held stories running over ten days, and pages
+        /// made at noon leading on groups whose articles were almost all from
+        /// the day before, which is what the reader saw and reported.
+        ///
+        /// So the rows are cut where the new rule would have cut them. The
+        /// boundaries are read from the editions themselves rather than from
+        /// the reader's schedule : the schedule travels through the key-value
+        /// store and a migration has no business reading it, while every
+        /// `opened_at` in the table is a boundary that really went, on this
+        /// device, at the hour this reader had then. Each story keeps the
+        /// newest period it reaches into and loses what falls before it.
+        ///
+        /// **What is lost is the grouping and never the news.** An article cut
+        /// loose here is unassigned again, and the next pass groups it with the
+        /// articles of its own period, so the days behind regroup themselves
+        /// rather than being thrown away. A story left with one article stops
+        /// being a story, by the one rule that says what a story is. A page
+        /// already published keeps the headline it printed, that being frozen
+        /// beside it, and loses only the figures of a story that should never
+        /// have stood on it.
+        migrator.registerMigration("v52.aStoryBelongsToOnePeriod") { db in
+            try db.execute(
+                sql: """
+                    DELETE FROM story_member
+                    WHERE EXISTS (
+                        SELECT 1 FROM entry e JOIN story s ON s.id = story_member.story_id
+                        WHERE e.id = story_member.entry_id
+                          AND COALESCE(e.published_at, e.received_at) < (
+                              SELECT MAX(ed.opened_at) FROM edition ed WHERE ed.opened_at <= s.last_at
+                          )
+                    )
+                    """
+            )
+
+            // What the cut left with one article is no longer a story, by the
+            // one rule that says what a story is. The join is what holds this
+            // to the rows this migration touched : the sweep in
+            // ``StoryBuilder/removeEmptyStories(in:)`` also takes a row with no
+            // members at all, which is a thing a repair has no business
+            // deciding about.
+            try db.execute(
+                sql: """
+                    DELETE FROM story WHERE id IN (
+                        SELECT s.id FROM story s JOIN story_member m ON m.story_id = s.id
+                        GROUP BY s.id HAVING COUNT(m.entry_id) < 2
+                    )
+                    """
+            )
+
+            // **And what hung off those stories goes by hand, because nothing
+            // else will take it.** A migration runs with the foreign keys
+            // switched off, so the `ON DELETE CASCADE` that empties a story
+            // everywhere else does not fire here : the delete above leaves the
+            // members and the filings pointing at a story that is gone, and the
+            // check GRDB runs at the end of a migration fails on them. The
+            // upgrade stops there, and the reader's store cannot be opened at
+            // all : it was found that way, on a real one, and both tables have
+            // to be named because naming one of them is the same fault again.
+            for table in ["story_member", "story_topic"] {
+                try db.execute(
+                    sql: """
+                        DELETE FROM \(table)
+                        WHERE NOT EXISTS (SELECT 1 FROM story WHERE story.id = \(table).story_id)
+                        """
+                )
+            }
+
+            // And the figures follow the members, every one of them being a
+            // roll-up of a set that has just changed under it.
+            try db.execute(
+                sql: """
+                    UPDATE story SET
+                        article_count = (SELECT COUNT(*) FROM story_member m WHERE m.story_id = story.id),
+                        feed_count = (SELECT COUNT(DISTINCT e.feed_id) FROM story_member m
+                                      JOIN entry e ON e.id = m.entry_id WHERE m.story_id = story.id),
+                        first_at = (SELECT MIN(COALESCE(e.published_at, e.received_at))
+                                    FROM story_member m JOIN entry e ON e.id = m.entry_id
+                                    WHERE m.story_id = story.id),
+                        last_at = (SELECT MAX(COALESCE(e.published_at, e.received_at))
+                                   FROM story_member m JOIN entry e ON e.id = m.entry_id
+                                   WHERE m.story_id = story.id)
+                    WHERE EXISTS (SELECT 1 FROM story_member m WHERE m.story_id = story.id)
+                    """
+            )
+        }
+
         return migrator
     }
 
