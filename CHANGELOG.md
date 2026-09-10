@@ -55,6 +55,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- An edition comes out on the pass its hour falls in : the headlines and the subjects ran to the end of the model's turn and the naming was left whatever remained, which on a morning was nothing, so a phone woken at seven spent five minutes writing headlines and the reader still had last night's paper at ten. The naming takes a slice of the turn instead of hoping for one.
 - The permission prompts for the contacts and for the local network are asked in French : they were shown in English whatever language the reader had.
 - The four shapes a model's answer is read into no longer warn at compilation : the two lists of names they share were isolated to the main actor by default and read from nowhere in particular.
 - Wherever several publishers' marks stand in a row, they overlap and each is cut out of the one behind it, so the gap between two is the page itself whatever colour the page is : the rooms running a story on the front page and on the story's own, and the papers beside an author or a personality. One drawing, where there were four.
