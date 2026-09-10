@@ -744,10 +744,14 @@ nonisolated struct DigestService: Sendable {
     /// The order matters and is not negotiable : a story with no articles has
     /// nothing to be named after.
     /// Groups what has arrived. Fast, and what the screen waits for.
+    ///
+    /// The schedule is not a courtesy : it is what cuts the stream into periods,
+    /// and a story is grouped inside one of them or it is not grouped at all.
+    /// See ``StoryBuilder``.
     @discardableResult
     @concurrent
-    func buildStories(now: Date = Date()) async -> StoryBuilder.Summary {
-        (try? await StoryBuilder(database).build(now: now)) ?? StoryBuilder.Summary()
+    func buildStories(_ schedule: EditionSchedule, now: Date = Date()) async -> StoryBuilder.Summary {
+        (try? await StoryBuilder(database).build(within: schedule, now: now)) ?? StoryBuilder.Summary()
     }
 
     /// Opens the edition being made, and closes whatever it supersedes.
@@ -973,7 +977,7 @@ nonisolated struct DigestService: Sendable {
         onFiling: @escaping @Sendable (Int, Int) -> Void = { _, _ in },
         onPhase: @Sendable (WorkPhase) -> Void = { _ in }
     ) async -> StoryBuilder.Summary {
-        let summary = await buildStories(now: now)
+        let summary = await buildStories(schedule, now: now)
         await enrich(
             until: deadline, now: now, schedule: schedule,
             onWriting: onWriting, onFiling: onFiling, onPhase: onPhase)

@@ -54,6 +54,22 @@ struct EditionScheduleTests {
         #expect(early?.opened == moment(3, 23))
     }
 
+    /// Which period an article belongs to, and therefore which story it may
+    /// join. A period is open at the bottom and closed at the top, exactly as
+    /// `DigestStore.withinThePeriod` reads it, so a piece stamped on the hour
+    /// belongs to the paper that hour closes and to no other.
+    @Test("A moment on the boundary belongs to the period that boundary closes")
+    func period() {
+        let schedule = EditionSchedule.standard
+
+        #expect(schedule.period(of: moment(4, 12), in: calendar) == moment(4, 12))
+        #expect(schedule.period(of: moment(4, 11, 59), in: calendar) == moment(4, 12))
+        #expect(schedule.period(of: moment(4, 12, 1), in: calendar) == moment(4, 18))
+
+        // A reader who wants no edition at all has no boundary to be cut at.
+        #expect(EditionSchedule(hours: [:]).period(of: moment(4, 12), in: calendar) == nil)
+    }
+
     @Test("The next boundary is what the system is asked to wake for")
     func next() {
         let schedule = EditionSchedule.standard

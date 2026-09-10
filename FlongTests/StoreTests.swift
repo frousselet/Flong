@@ -79,6 +79,7 @@ struct StoreTests {
                 "v49.whatWasSentAway",
                 "v50.whoWroteTheHeadline",
                 "v51.theNewsOfThePeriodBefore",
+                "v52.aStoryBelongsToOnePeriod",
             ]
         )
     }
@@ -119,6 +120,105 @@ struct StoreTests {
         // writes the language back down. A story that has its line is left
         // alone.
         #expect(asked == [nil, "fr_FR"])
+    }
+
+    /// The grouping had no notion of time, so the stories already in a store
+    /// span as many periods as their articles reach. The upgrade cuts them
+    /// where the rule would have.
+    @Test("A story that spans two editions is cut back to the newer one")
+    func aStoredStoryIsCutAtTheBoundary() throws {
+        let queue = try DatabaseQueue()
+        // The schema as it stood while a story could grow across a boundary.
+        try AppDatabase.migrator.migrate(queue, upTo: "v51.theNewsOfThePeriodBefore")
+
+        /// Midday, which is where the page that came out at midday closes.
+        let midday = Date(timeIntervalSince1970: 1_789_041_600)
+        let dates = [-3600.0, -1800, 1800, 3600].map { midday.addingTimeInterval($0) }
+
+        let feed = makeFeed()
+        let running = UUID.v7()
+        let thin = UUID.v7()
+
+        try queue.write { db in
+            try feed.insert(db)
+            try Edition(
+                slot: .noon,
+                openedAt: midday,
+                coversFrom: midday.addingTimeInterval(-5 * 3600),
+                publishedAt: midday
+            ).insert(db)
+
+            // Six articles : four for a story that straddles midday, two for
+            // one the cut will leave with a single article.
+            var entries: [Entry] = []
+            for (index, date) in (dates + [dates[0], dates[2]]).enumerated() {
+                var entry = Entry(
+                    feedID: feed.id,
+                    guid: "urn:example:cut:\(index)",
+                    title: "Le pont rouvre",
+                    publishedAt: date,
+                    receivedAt: date
+                )
+                entry.hasMedia = false
+                try entry.insert(db)
+                entries.append(entry)
+            }
+
+            for (id, members) in [(running, Array(entries.prefix(4))), (thin, Array(entries.suffix(2)))] {
+                try db.execute(
+                    sql: """
+                        INSERT INTO story
+                        (id, title, is_generated, is_translated, brief_locked, article_count, feed_count,
+                         first_at, last_at, updated_at)
+                        VALUES (?, 'Le pont rouvre', 1, 0, 0, ?, 1, ?, ?, ?)
+                        """,
+                    arguments: [id, members.count, dates[0], members.map(\.publishedAt!).max()!, midday]
+                )
+                for member in members {
+                    try StoryMember(storyID: id, entryID: member.id, similarity: 1).insert(db)
+                }
+                // Filed, like every story the model has read. It hangs off the
+                // story by a foreign key of its own, and a migration runs with
+                // those switched off.
+                try StoryTopic(storyID: id, name: "Régions").insert(db)
+            }
+        }
+
+        try AppDatabase.migrator.migrate(queue)
+
+        let (kept, held, dropped, orphans) = try queue.read { db in
+            (
+                try Story.fetchOne(db, key: running),
+                try Date.fetchAll(
+                    db,
+                    sql: """
+                        SELECT e.published_at FROM story_member m JOIN entry e ON e.id = m.entry_id
+                        WHERE m.story_id = ? ORDER BY 1
+                        """,
+                    arguments: [running]
+                ),
+                try Story.fetchOne(db, key: thin),
+                try Int.fetchOne(
+                    db,
+                    sql: "SELECT (SELECT COUNT(*) FROM story_member WHERE story_id = ?)"
+                        + " + (SELECT COUNT(*) FROM story_topic WHERE story_id = ?)",
+                    arguments: [thin, thin]
+                )
+            )
+        }
+
+        // What happened before midday belongs to the paper that came out then,
+        // and the figures follow the members rather than outliving them.
+        #expect(held == [dates[2], dates[3]])
+        #expect(kept?.articleCount == 2)
+        #expect(kept?.firstAt == dates[2])
+
+        // And a story the cut leaves with one article is no longer a story.
+        // Its members and its filings go with it, by hand : a migration runs
+        // with the foreign keys off, so nothing cascades and an orphan left
+        // here is a store that cannot be opened at all.
+        #expect(dropped == nil)
+        #expect(orphans == 0)
     }
 
     @Test("The folders go, and what a source is now is worked out rather than filed")

@@ -2002,7 +2002,7 @@ final class AppModel {
         let pass = await beginWork([.grouping, .writing, .filing, .naming])
 
         moveWork(to: .grouping)
-        await digestService.buildStories()
+        await digestService.buildStories(preferences.editionSchedule)
         await digestService.openEdition(preferences.editionSchedule)
         await loadDigest()
 
@@ -2869,7 +2869,7 @@ final class AppModel {
             defer { self.endWork(pass) }
 
             self.moveWork(to: .grouping)
-            await self.digestService.buildStories()
+            await self.digestService.buildStories(self.preferences.editionSchedule)
 
             // **The whole of the model's work, and not the naming alone.**
             // This is the one grant a phone gets that can both reach the
@@ -3061,7 +3061,7 @@ final class AppModel {
         await doOutstandingWork(until: Date().addingTimeInterval(BackgroundScheduler.fullPassBudget))
 
         moveWork(to: .grouping)
-        await digestService.buildStories()
+        await digestService.buildStories(preferences.editionSchedule)
         await digestService.openEdition(preferences.editionSchedule)
 
         // Generous, and bounded all the same. The pass has minutes rather than
@@ -4965,7 +4965,7 @@ final class AppModel {
         // when something happens to be written. The control lets go on the beat
         // now, so there is nothing to lay out against and nothing to except.
         moveWork(to: .grouping)
-        await digestService.buildStories()
+        await digestService.buildStories(preferences.editionSchedule)
         await digestService.openEdition(preferences.editionSchedule)
         await load()
 

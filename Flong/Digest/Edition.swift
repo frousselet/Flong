@@ -100,16 +100,42 @@ nonisolated struct EditionSchedule: Codable, Hashable, Sendable {
             .map { (slot: $0.0, opened: $0.1) }
     }
 
+    /// The period a moment falls in, named by the boundary that closes it.
+    ///
+    /// **What keeps a story inside one paper.** The grouping used to have no
+    /// notion of time at all : an article joined whatever it shared enough
+    /// vocabulary with, however old, so a story spanned as far as its members
+    /// reached and a page made at noon could lead on a group whose articles
+    /// were mostly yesterday's. The reader saw it before the code did, and what
+    /// they said is the rule : at each new period one starts again from
+    /// nothing.
+    ///
+    /// **By its end, and not by its beginning**, so that what comes back is the
+    /// `opened_at` of the edition the moment belongs on and the two ways of
+    /// asking cannot disagree. `DigestStore.withinThePeriod` holds a period open
+    /// at the bottom and closed at the top, so an article landing exactly on a
+    /// boundary belongs to the page that boundary closes ; named by its opening
+    /// boundary instead, such an article would be grouped with the period after
+    /// it and admitted to the page before it, which is the very leak this rule
+    /// exists to stop.
+    ///
+    /// `nil` where the reader has switched every edition off, there being no
+    /// boundaries left to cut anything at.
+    func period(of moment: Date, in calendar: Calendar = .current) -> Date? {
+        boundaries(from: moment, in: calendar).filter { $0 >= moment }.min()
+    }
+
     /// The next boundary after this moment, which is what the background task
     /// asks the system to wake it for.
     func next(after now: Date = Date(), in calendar: Calendar = .current) -> Date? {
-        let days = [now, calendar.date(byAdding: .day, value: 1, to: now) ?? now]
+        boundaries(from: now, in: calendar).filter { $0 > now }.min()
+    }
 
-        return
-            days
-            .flatMap { day in slots.compactMap { moment(of: $0, on: day, in: calendar) } }
-            .filter { $0 > now }
-            .min()
+    /// Every boundary of this day and the next, which is enough to hold the
+    /// first one at or after any moment of it.
+    private func boundaries(from moment: Date, in calendar: Calendar) -> [Date] {
+        let days = [moment, calendar.date(byAdding: .day, value: 1, to: moment) ?? moment]
+        return days.flatMap { day in slots.compactMap { self.moment(of: $0, on: day, in: calendar) } }
     }
 }
 
