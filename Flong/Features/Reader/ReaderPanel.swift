@@ -375,6 +375,21 @@ private struct ActivityLine: View {
     /// every time a word or a rule moved.
     @ScaledMetric(relativeTo: .caption) private var capsule: CGFloat = 48
 
+    /// The room the stage's mark stands in.
+    ///
+    /// **A frame rather than the glyph's own size, and it is what keeps the
+    /// line still.** The marks are nothing like one width : `tag` is narrow,
+    /// `arrow.up.arrow.down` is half as wide again, and the replace transition
+    /// scales the one going out and the one coming in on top of that. Drawn at
+    /// their own size, every stage change resized the mark and shoved the words
+    /// beside it along, in a band that is centred and therefore moves at both
+    /// ends. Given one box, the glyph changes inside it and nothing around it
+    /// knows.
+    ///
+    /// It is the same answer ``EditionHead/markWidth`` gives for the marks
+    /// beside an edition's points, at the size this band is set in.
+    @ScaledMetric(relativeTo: .caption) private var mark: CGFloat = WorkPhase.markRoom
+
     /// How tall the band is while there is something in it.
     ///
     /// Nought the rest of the time : a place kept permanently is a strip of
@@ -463,11 +478,18 @@ private struct ActivityLine: View {
                 // where the words and the rule already say it.
                 Image(systemName: work.phase.glyph)
                     .symbolEffect(.pulse, isActive: !reduceMotion)
-                    // The same Magic Replace the ring had : the stages follow
-                    // one another several times a pass, and a mark that cut
-                    // from one glyph to the next is a jump where the rule
-                    // beneath it is running smoothly.
-                    .contentTransition(.symbolEffect(.replace))
+                    // **A fade, where the ring had Magic Replace.** That
+                    // transition holds still whatever two symbols share, and
+                    // what these two shared was the ring : the circle stayed
+                    // put and only the thing inside it was replaced. Without
+                    // it they share nothing, so the system falls back to one
+                    // going down and the next coming up, and the mark visibly
+                    // shrank and grew again at every stage. A crossfade changes
+                    // the glyph and nothing else about it.
+                    .contentTransition(.opacity)
+                    // And it happens inside a box that does not move : the
+                    // marks are nothing like one width.
+                    .frame(width: mark, height: mark)
 
                 Text(work.phase.title)
                     .lineLimit(1)

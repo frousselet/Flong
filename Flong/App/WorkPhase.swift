@@ -107,6 +107,18 @@ nonisolated enum WorkPhase: String, Hashable, Sendable, CaseIterable {
         }
     }
 
+    /// How much room a stage's mark is given, at the size a caption is set in.
+    ///
+    /// **The marks are nothing like one width**, and a mark drawn at its own is
+    /// a mark that moves whatever stands beside it every time the stage
+    /// changes. This is the box they all stand in, held to being wide enough
+    /// for the widest of them by `WorkRingSymbolTests`.
+    ///
+    /// Stated against the caption size, so a view scaling it with
+    /// `@ScaledMetric(relativeTo: .caption)` keeps the proportion at every type
+    /// size the reader can ask for.
+    static let markRoom: CGFloat = 22
+
     /// Whether the stage can say how much of itself it has done.
     ///
     /// Six can, and they are the six that matter : each is a queue the store
