@@ -104,9 +104,9 @@ struct DigestScreen: View {
         // for the whole of the fetching, which is what dragged the page down,
         // sometimes left it there, and made every question about this page a
         // question about an inset. It reports the pull was heard and retracts
-        // on the beat now ; ``WorkRing``, up in the corner, is what says the
-        // work is running, and it says it on every page rather than on this one
-        // alone.
+        // on the beat now ; the band at the head of ``ReaderPanel`` is what
+        // says the work is running, which is where a reader goes to ask rather
+        // than on the page they are reading.
         //
         // A Mac has no pull and no command either, since the command came out
         // of the reader's menu : it keeps up through the clock, the full pass

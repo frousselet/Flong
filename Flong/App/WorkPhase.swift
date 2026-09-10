@@ -79,6 +79,34 @@ nonisolated enum WorkPhase: String, Hashable, Sendable, CaseIterable {
         }
     }
 
+    /// The same thing, without the ring round it.
+    ///
+    /// **The measure and the subject of the measure, told apart.** ``mark`` is
+    /// one glyph doing both : the circle is inked round as the pass goes and
+    /// what stands inside it says which work. That is what a corner has room
+    /// for. A band the width of a column has room for two things, so the rule
+    /// under the words is the measure and this is only ever the subject : the
+    /// enclosure would be a second, emptier measure beside a real one.
+    ///
+    /// Written out rather than derived by dropping `.circle` from the name
+    /// above. A string operation would be right for as long as every mark
+    /// happens to be an enclosed form, and silently wrong the day one of them
+    /// is not.
+    var glyph: String {
+        switch self {
+        case .fetching: "arrow.down"
+        case .grouping: "newspaper"
+        case .indexing: "magnifyingglass"
+        case .reading: "person"
+        case .writing: "pencil"
+        case .filing: "tag"
+        case .naming: "list.bullet"
+        case .tidying: "trash"
+        case .synchronizing: "icloud"
+        case .exchanging: "arrow.up.arrow.down"
+        }
+    }
+
     /// Whether the stage can say how much of itself it has done.
     ///
     /// Six can, and they are the six that matter : each is a queue the store

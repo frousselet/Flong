@@ -94,9 +94,23 @@ struct ReaderPanel: View {
     /// What the panel opens on, which is the reader and no control at all.
     private var root: some View {
         ScrollView {
-            VStack(spacing: 24) {
-                portrait
-                cards
+            // **What the machinery is doing, at the head and nowhere else.** It
+            // was a ring in the corner of every section, which put a measure
+            // that runs a few seconds an hour in the bar of every page all day.
+            // This is where a reader comes to ask what Flong is up to, so it is
+            // where the answer is : a line of words over a rule that fills, in
+            // the room it opens for itself and gives straight back.
+            //
+            // Outside the stack below rather than in it : a stack's spacing is
+            // paid whether or not its first child has any height, and this one
+            // has none most of the time.
+            VStack(spacing: 0) {
+                ActivityLine(work: model.currentWork)
+
+                VStack(spacing: 24) {
+                    portrait
+                    cards
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
@@ -321,6 +335,159 @@ struct ReaderPanel: View {
 
     private func close() {
         dismiss()
+    }
+}
+
+/// What the machinery is doing, as a line of words over a rule that fills.
+///
+/// **The shape the reader asked for, back where they can find it.** The pass
+/// was drawn as a ring in the toolbar for a while : one small round thing in
+/// the corner of every section, which says how far along something is and
+/// cannot say what. A bar has room for both, and the reader's own panel is the
+/// place a person goes to ask what the application is doing, so a measure that
+/// runs a few seconds an hour belongs there rather than in the bar of every
+/// page all day.
+///
+/// It reads ``AppModel/currentWork`` through whoever hands it in : the panel is
+/// already subscribed to the model, and a pass moves on every feed fetched and
+/// every headline written.
+private struct ActivityLine: View {
+    let work: WorkPlan?
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.theme) private var theme
+
+    /// How tall the band is while there is something in it.
+    ///
+    /// The line of type over its rule, and the air under it that keeps it off
+    /// the reader's own portrait. It follows the type size, since what sits in
+    /// it is one line of type over a rule inside a capsule.
+    ///
+    /// Nought the rest of the time : a place kept permanently is a strip of
+    /// nothing at the head of a panel opened many times a day, for a measure
+    /// that runs a few seconds an hour.
+    @ScaledMetric(relativeTo: .caption) private var open: CGFloat = 56
+
+    /// What the band is worth right now.
+    private var height: CGFloat { work == nil ? 0 : open }
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            if let work {
+                content(work)
+                    // Glass of its own rather than a slab of the panel's ground
+                    // running the full width : a band of opaque paper reads as a
+                    // shelf bolted to the top of the sheet, and this is a
+                    // control floating over it, which is the layer the material
+                    // is for.
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 7)
+                    .glassEffect(.regular, in: .capsule)
+                    // **It grows out of the top rather than materializing.** A
+                    // fade on its own put the capsule on screen at full size in
+                    // a band that was still opening, which reads as a thing
+                    // arriving from nowhere over a panel that has not made room
+                    // for it yet. Anchored at the top, it comes up out of the
+                    // edge the room is opening from, which is the same motion
+                    // the band is making.
+                    .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .top)))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        // **It takes the room it needs and gives it back.** The height is what
+        // is animated rather than the row's presence, since a stack measuring a
+        // child that has just been inserted lands on the answer a frame late
+        // and that frame is the jolt.
+        //
+        // **And it is not clipped to that height.** Glass casts a soft shadow,
+        // and a rectangular clip cuts it off where it is still dark : what that
+        // leaves is a grey oblong with hard edges behind a capsule with round
+        // ones. Unclipped, the capsule spills a little during the third of a
+        // second it is growing or shrinking, which the fade over exactly the
+        // same third of a second covers.
+        .frame(height: height, alignment: .top)
+        .animation(reduceMotion ? nil : .snappy(duration: 0.32), value: height)
+        // The same curve and the same third of a second for the capsule's own
+        // coming and going, so the room and the thing in it move together : two
+        // animations of different lengths on one event is a capsule that lands
+        // before the space exists or hangs about after it has gone.
+        .animation(reduceMotion ? nil : .snappy(duration: 0.32), value: work == nil)
+        .animation(.snappy(duration: 0.28), value: work?.phase)
+        // Nothing here answers to a finger : it reports and does not act.
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(work.map { Text($0.phase.title) } ?? Text(""))
+        .accessibilityValue(value)
+        .accessibilityHidden(work == nil)
+        // So VoiceOver does not read every batch out as it lands.
+        .accessibilityAddTraits(.updatesFrequently)
+    }
+
+    private func content(_ work: WorkPlan) -> some View {
+        VStack(spacing: 6) {
+            // **The words and the rule, and no figures.** A count beside them is
+            // a second measure of the same thing, disagreeing with the first :
+            // the rule is the whole pass and a figure can only ever be the step,
+            // so `9 of 112` sat under a bar four fifths of the way along and the
+            // reader had to work out which of the two to believe. The bar says
+            // how far ; the mark and the words say what.
+            //
+            // **Centred over the rule**, because the rule runs the whole width
+            // and a label set against its left end reads as a caption for the
+            // first fifth of it rather than for the measure.
+            HStack(spacing: 6) {
+                // **The stage's own glyph, without the ring round it.** The
+                // ring was one symbol doing both jobs, the circle inked round
+                // as the measure and the thing inside it saying which work ;
+                // here the rule underneath is the measure, so an enclosure
+                // would be a second and emptier one beside it.
+                //
+                // It pulses because a mark that only changed at each stage
+                // would sit perfectly still through the minute the model takes,
+                // which is the one moment a reader is looking to see whether
+                // anything is happening at all. Still under Reduce Motion,
+                // where the words and the rule already say it.
+                Image(systemName: work.phase.glyph)
+                    .symbolEffect(.pulse, isActive: !reduceMotion)
+                    // The same Magic Replace the ring had : the stages follow
+                    // one another several times a pass, and a mark that cut
+                    // from one glyph to the next is a jump where the rule
+                    // beneath it is running smoothly.
+                    .contentTransition(.symbolEffect(.replace))
+
+                Text(work.phase.title)
+                    .lineLimit(1)
+            }
+            .font(theme.metadata)
+            .foregroundStyle(.secondary)
+
+            bar(work)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// A rule that fills, which is the application's own idiom : the stories on
+    /// the front page are separated by rules, and this is one of them saying how
+    /// far along the pass is by how much of it is inked.
+    @ViewBuilder
+    private func bar(_ work: WorkPlan) -> some View {
+        if let fraction = work.fraction {
+            ProgressView(value: fraction)
+                .progressViewStyle(.linear)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: fraction)
+        } else if reduceMotion {
+            // A bar that runs for ever is motion for its own sake, and the line
+            // above has already said what is happening.
+            Capsule().fill(.tint.opacity(0.35)).frame(height: 3)
+        } else {
+            ProgressView().progressViewStyle(.linear)
+        }
+    }
+
+    private var value: Text {
+        guard let work else { return Text("") }
+        guard let fraction = work.fraction else { return Text("In progress") }
+        return Text(fraction.formatted(.percent.precision(.fractionLength(0))))
     }
 }
 

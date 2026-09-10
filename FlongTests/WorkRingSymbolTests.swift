@@ -107,6 +107,27 @@ struct WorkRingSymbolTests {
         #expect(rendering(WorkRing.chase, value: WorkRing.resting) != rendering(WorkRing.chase, value: 1))
     }
 
+    /// **The band draws the same stages without their enclosure**, and a name
+    /// written out by hand is a name that can be wrong. `Image(systemName:)`
+    /// takes any string at all and draws nothing where the system has no such
+    /// symbol, so a slip here is a gap at the head of the reader's own panel
+    /// every time a pass runs, and the compiler is perfectly happy about it.
+    @Test("Every stage has a plain glyph the system has")
+    func theGlyphsExist() {
+        for phase in WorkPhase.allCases {
+            #expect(exists(phase.glyph), "\(phase.glyph) is not a symbol the system knows")
+        }
+    }
+
+    /// One stage under two marks would be a band saying one thing and a ring
+    /// saying another about the same piece of work.
+    @Test("Each stage's glyph is its own mark without the ring")
+    func theGlyphsMatchTheirMarks() {
+        for phase in WorkPhase.allCases {
+            #expect(phase.mark == "\(phase.glyph).circle", "\(phase) draws two different things")
+        }
+    }
+
     private func exists(_ symbol: String) -> Bool {
         #if os(iOS)
             UIImage(systemName: symbol) != nil

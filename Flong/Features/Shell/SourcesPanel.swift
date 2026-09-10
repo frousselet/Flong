@@ -302,10 +302,11 @@ struct SourcesPanel: View {
     /// application is up to, and a permanent bar under the reading would be one
     /// more thing between them and the article.
     ///
-    /// **The bar says it too now, and that is not the bar this refuses.**
-    /// What is refused here is something permanent, under the reading, saying
-    /// nothing most of the time. ``WorkRing`` stands beside the reader's own
-    /// button while a phase is actually running and goes the moment it is over.
+    /// **The reader's own panel says it too now, and that is not the bar this
+    /// refuses.** What is refused here is something permanent, under the
+    /// reading, saying nothing most of the time. The band at the head of
+    /// ``ReaderPanel`` opens while a phase is actually running and closes the
+    /// moment it is over, in a sheet nobody is reading in.
     /// A reader reported not knowing whether the page in front of them was
     /// current, which is a question this screen could only answer if they
     /// thought to come and ask it.
