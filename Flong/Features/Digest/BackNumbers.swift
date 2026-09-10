@@ -264,7 +264,7 @@ struct BackNumber: View {
     /// what says so.
     private var dateline: some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(verbatim: Self.day(published.edition.openedAt))
+            Text(verbatim: Datelines.day(published.edition.openedAt))
                 .font(theme.headline(.title2))
                 .foregroundStyle(.primary)
 
@@ -282,13 +282,6 @@ struct BackNumber: View {
         .accessibilityAddTraits(.isHeader)
     }
 
-    /// The day spelled as the front page spells it in its own title.
-    private static func day(_ date: Date) -> String {
-        let spelled = date.formatted(.dateTime.weekday(.wide).day().month(.wide))
-        // Only the first letter : French writes `samedi 29 août`, and
-        // capitalizing every word would give `Samedi 29 Août`.
-        return spelled.prefix(1).localizedUppercase + spelled.dropFirst()
-    }
 }
 
 /// The row that asks for the next handful, by being reached.
@@ -305,5 +298,87 @@ struct MoreBackNumbers: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, Editorial.rhythm)
             .accessibilityLabel(Text("Loading earlier editions"))
+    }
+}
+
+/// Which paper the bar is naming, and where each of them begins.
+///
+/// **The bar is the dateline, and a page that scrolls through a year of papers
+/// has to say which one is under the reader's eye.** It said today's date and
+/// today's edition whatever they were looking at, so a reader four papers down
+/// was being told the wrong day by the one line on the screen whose whole job
+/// is to say the day.
+///
+/// An object, for the reason the scroll offset is one : each paper reports
+/// where it begins as it is realized, and a dictionary written from a lazy
+/// stack's layout would rebuild the page it is a part of. The screen reads it
+/// from the scroll and never from its body. See ``PageOffset``.
+@Observable
+final class Datelines {
+    /// What the bar says over one paper, and where that paper starts.
+    struct Mark: Hashable {
+        /// Down the page's own content, which does not move when it scrolls.
+        var top: CGFloat
+        /// The day, spelled as the front page spells its own title.
+        var day: String
+        /// The edition and its hour, which is the subtitle under it.
+        var line: String
+    }
+
+    var marks: [UUID: Mark] = [:]
+
+    /// The paper whose own top is the last one at or above the top of the page.
+    ///
+    /// A plain sweep. There is one entry per paper the reader has scrolled
+    /// through, so a year of them is fifteen hundred comparisons, which is
+    /// nothing beside the frame it happens in ; a sorted structure would be
+    /// bookkeeping bought with nothing.
+    func naming(at position: CGFloat) -> Mark? {
+        marks.values.filter { $0.top <= position + Self.reach }.max { $0.top < $1.top }
+    }
+
+    /// The day, spelled as a masthead spells it.
+    ///
+    /// One spelling, read from here by the bar, by today's paper and by every
+    /// back number : three copies of a date format is three chances to print
+    /// two different dates on one screen.
+    static func day(_ date: Date) -> String {
+        let spelled = date.formatted(.dateTime.weekday(.wide).day().month(.wide))
+        // Only the first letter : French writes `samedi 29 août`, and
+        // capitalizing every word would give `Samedi 29 Août`.
+        return spelled.prefix(1).localizedUppercase + spelled.dropFirst()
+    }
+
+    /// Which edition it is and the hour it came out at, which is the line under
+    /// the day.
+    static func line(of edition: Edition) -> String {
+        "\(String(localized: edition.slot.title)) · \(edition.openedAt.formatted(.dateTime.hour().minute()))"
+    }
+
+    /// How far below the top of the page a paper's own head has to have come
+    /// before the bar takes its name.
+    ///
+    /// A hair, so the bar changes as the dateline meets it rather than a moment
+    /// before or after. The pinned subjects sit over the same edge, and a
+    /// larger reach would name the paper under them while the one above is
+    /// still on the screen.
+    private static let reach: CGFloat = 8
+}
+
+nonisolated extension View {
+    /// Reports where this paper begins and what the bar should say over it.
+    ///
+    /// Measured down the page's own content, which does not move when the page
+    /// is scrolled : what is written here changes when the layout changes and
+    /// never per frame.
+    func dateline(
+        _ datelines: Datelines, of published: PublishedEdition, day: String, in space: String
+    ) -> some View {
+        onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.frame(in: .named(space)).minY
+        } action: { top in
+            let mark = Datelines.Mark(top: top, day: day, line: Datelines.line(of: published.edition))
+            if datelines.marks[published.id] != mark { datelines.marks[published.id] = mark }
+        }
     }
 }

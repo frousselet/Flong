@@ -54,6 +54,19 @@ struct DigestScreen: View {
     /// felt rather than what is drawn.
     @State private var isReadingBackNumbers = false
 
+    /// Where each paper on the page begins, and what the bar should say over
+    /// it.
+    ///
+    /// An object, written from the layout of a lazy stack and read from the
+    /// scroll, so neither of those rebuilds the page. See ``Datelines``.
+    @State private var datelines = Datelines()
+
+    /// What the bar is saying, or nothing where it is saying today's.
+    ///
+    /// State, and it can afford to be : it is assigned when the reader crosses
+    /// from one paper into the next and not on every frame of getting there.
+    @State private var naming: Datelines.Mark?
+
     /// How far past the foot of today's paper the reader is pulling.
     ///
     /// An object rather than a number, so a gesture moves the seam without
@@ -139,8 +152,15 @@ struct DigestScreen: View {
             // The wash follows through the object, which costs no rebuild.
             offset.scrolled = position
             crossed(at: position)
+            name(at: position)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
+        // Narrowing to a subject replaces the page, so where the papers began
+        // is a question about a page that is no longer there.
+        .onChange(of: model.digestTopic) {
+            datelines.marks.removeAll()
+            naming = nil
+        }
         // **The pull, on the front page and nowhere else.** The page does keep
         // itself up to date : it follows the store, so anything that arrives
         // reaches it, and a clock asks the publishers what politeness allows.
@@ -177,7 +197,12 @@ struct DigestScreen: View {
         //
         // A large title like every other section's, so it shrinks into the bar
         // as the reader scrolls into the page.
-        .navigationTitle(Text(verbatim: Self.today()))
+        // **Whichever paper is under the reader's eye.** The bar is the
+        // dateline, and a page that scrolls through a year of papers has to say
+        // which one this is : it said today's whatever they were looking at, so
+        // a reader four papers down was being told the wrong day by the one
+        // line on the screen whose whole job is to say the day.
+        .navigationTitle(Text(verbatim: naming?.day ?? Self.today()))
         // **Which edition, under the date the page is titled with.** It stood
         // over the list, which put a second heading under the date : two lines
         // saying when, one above the other, and the reader had read the day
@@ -186,7 +211,7 @@ struct DigestScreen: View {
         //
         // Empty where there is no edition, since a subtitle about a page that
         // does not exist is a line saying nothing.
-        .navigationSubtitle(Text(verbatim: dateline))
+        .navigationSubtitle(Text(verbatim: naming?.line ?? dateline))
         // The sources in one corner, the reader's own menu in the other, the
         // same way round in every section.
         .toolbar {
@@ -251,6 +276,10 @@ struct DigestScreen: View {
         // and a pill still reads the whole of the three days.
         if model.digestTopic == .frontPage, let published = model.edition {
             EditionHead(published: published)
+                // Today's paper says where it begins too, or the bar would have
+                // nothing to go back to once the reader comes up out of the
+                // archive.
+                .dateline(datelines, of: published, day: Self.today(), in: Self.page)
                 // **The animation is here and nowhere above.** It was three
                 // `.animation(_:value:)` on the `LazyVStack` itself, which is
                 // where it does the most harm : an animation attribute on a
@@ -343,6 +372,25 @@ struct DigestScreen: View {
         if inside != isReadingBackNumbers { isReadingBackNumbers = inside }
     }
 
+    /// Says which paper the bar is naming, and only when the answer moves.
+    ///
+    /// Written from the scroll, so it has to be cheap : a sweep of a dictionary
+    /// with one entry per paper, and the state behind it assigned once per
+    /// crossing rather than once per frame.
+    private func name(at position: CGFloat) {
+        // **Today's, on a page narrowed to a subject.** A pill reads the whole
+        // of the three days and has no papers under it, so nothing there
+        // reports a dateline ; left to the marks a previous scroll wrote, the
+        // bar would name a back number over a page that is not one.
+        guard model.digestTopic == .frontPage else {
+            if naming != nil { naming = nil }
+            return
+        }
+
+        let named = datelines.naming(at: position)
+        if named != naming { naming = named }
+    }
+
     // MARK: - The back numbers
 
     /// Every edition before this one, under it, as far as the reader goes.
@@ -378,6 +426,12 @@ struct DigestScreen: View {
                     BackNumber(published: published, marks: model.digest.symbols, zoom: zoom) {
                         open(.story($0))
                     }
+                    .dateline(
+                        datelines,
+                        of: published,
+                        day: Datelines.day(published.edition.openedAt),
+                        in: Self.page
+                    )
                 }
 
                 // **Reached rather than pressed.** The row is realized a little
@@ -593,12 +647,7 @@ struct DigestScreen: View {
     /// Read at each render rather than held : the page is rebuilt on returning
     /// to the foreground, which is when a date left open overnight would
     /// otherwise be yesterday's.
-    private static func today(_ date: Date = .now) -> String {
-        let spelled = date.formatted(.dateTime.weekday(.wide).day().month(.wide))
-        // Only the first letter : French writes `samedi 29 août`, and
-        // capitalizing every word would give `Samedi 29 Août`.
-        return spelled.prefix(1).localizedUppercase + spelled.dropFirst()
-    }
+    private static func today(_ date: Date = .now) -> String { Datelines.day(date) }
 
     /// The subjects the model found, as pills that scroll.
     ///

@@ -99,5 +99,17 @@ final class EditionArchiveUITests: XCTestCase {
         }
 
         XCTAssertTrue(headline.exists, "Pulling past the foot of the page opens the back numbers")
+
+        // **The bar is the dateline.** Once the reader is in the archive it is
+        // the one line on the screen that says which paper this is, so it has
+        // to stop saying today's. Compared rather than read for a date, since
+        // every word of it is translated.
+        let bar = app.navigationBars.firstMatch
+        let onThePage = bar.staticTexts.allElementsBoundByIndex.map(\.label)
+
+        for _ in 0..<6 { page.swipeUp() }
+
+        let inTheArchive = bar.staticTexts.allElementsBoundByIndex.map(\.label)
+        XCTAssertNotEqual(onThePage, inTheArchive, "The bar names the paper the reader is in")
     }
 }
