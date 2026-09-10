@@ -128,6 +128,41 @@ struct WorkRingSymbolTests {
         }
     }
 
+    /// **A box the widest mark does not fit in is a mark that overlaps the
+    /// words beside it.** The band gives every stage the same room so that a
+    /// change of stage moves nothing ; that only holds while the room is
+    /// actually enough, and the marks are nothing like one width. Rendered at
+    /// the size a caption is set in, since that is what ``WorkPhase/markRoom``
+    /// is stated against.
+    @Test("Every stage's mark fits the room the band gives it")
+    func theGlyphsFitTheirRoom() {
+        for phase in WorkPhase.allCases {
+            let width = drawnWidth(phase.glyph, pointSize: Self.captionPoints)
+            #expect(width != nil, "\(phase.glyph) draws nothing")
+            #expect(
+                (width ?? .infinity) <= WorkPhase.markRoom,
+                "\(phase.glyph) is \(width ?? 0) wide, and the room is \(WorkPhase.markRoom)")
+        }
+    }
+
+    /// What `.caption` comes to at the default type size, which is what
+    /// ``WorkPhase/markRoom`` is measured against.
+    private static let captionPoints: CGFloat = 12
+
+    /// How wide a symbol actually draws at a stated point size.
+    private func drawnWidth(_ symbol: String, pointSize: CGFloat) -> CGFloat? {
+        #if os(iOS)
+            let configuration = UIImage.SymbolConfiguration(pointSize: pointSize)
+            return UIImage(systemName: symbol, withConfiguration: configuration)?.size.width
+        #else
+            guard
+                let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil),
+                let sized = image.withSymbolConfiguration(.init(pointSize: pointSize, weight: .regular))
+            else { return nil }
+            return sized.size.width
+        #endif
+    }
+
     private func exists(_ symbol: String) -> Bool {
         #if os(iOS)
             UIImage(systemName: symbol) != nil
