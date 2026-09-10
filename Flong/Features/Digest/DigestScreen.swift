@@ -599,13 +599,11 @@ struct DigestScreen: View {
             // with a glyph in front of each is four shapes they recognize. It
             // is hidden from VoiceOver, the name beside it saying the same
             // thing and saying it better.
-            // **In its subject's own colour, and only when the pill is not the
-            // one chosen.** A chosen pill is a pane of the accent with white
-            // type on it, and a coloured glyph on that is a third colour in a
-            // capsule the width of a word.
+            // It says nothing about its colour : the whole pill is set in the
+            // subject's own now, and a mark stating the same thing again is a
+            // second place to change it.
             Image(systemName: mark(of: topic))
                 .font(.system(.caption, weight: .medium))
-                .foregroundStyle(isCurrent ? theme.onAccent(in: scheme) : colour(of: topic))
                 .accessibilityHidden(true)
 
             // Only when there is something to say : a row of arrows on every
@@ -622,7 +620,18 @@ struct DigestScreen: View {
                 .font(.system(.footnote, weight: .medium))
                 .lineLimit(1)
         }
-        .foregroundStyle(isCurrent ? AnyShapeStyle(theme.onAccent(in: scheme)) : AnyShapeStyle(.primary))
+        // **The colour is in the ink, and it was in the ground.** Every pill
+        // carried a wash of its own subject, which is fifteen tinted capsules
+        // across the head of the page and the type on all of them the page's
+        // own ink. It is the other way about : the ground is the plain material
+        // and the subject's colour is what the words and the mark are set in,
+        // so the row is the page's own paper with fifteen colours of type on
+        // it. Chosen, the pill is a pane of that colour and the type turns to
+        // the paper, which is the one thing always on the far side of whatever
+        // is printed on it.
+        .foregroundStyle(
+            isCurrent ? AnyShapeStyle(theme.onAccent(in: scheme)) : AnyShapeStyle(colour(of: topic))
+        )
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
     }
@@ -989,25 +998,24 @@ struct ArticleRow: View {
 /// that what changes when a pill is chosen is its colour and nothing about its
 /// size.
 ///
-/// **Every pill is tinted with its own subject's colour.** It was clear glass
-/// for all of them and the accent for whichever was chosen, which made the row
-/// one colour and a highlight ; a reader coming back to a page they know finds
-/// `Sport` by its orange before they have read a word. Chosen, the same colour
-/// at full strength, so choosing a subject deepens what was already there
-/// rather than swapping it for a colour that says nothing about the subject.
+/// **The plain material until it is chosen, and the colour is in the ink.**
+/// Every pill carried a wash of its own subject and the type on all of them was
+/// the page's own ink, which is fifteen tinted capsules across the head of the
+/// page : the row read as the coloured thing and the words as what was written
+/// on it. Turned about, the ground is the material the rest of the page's
+/// controls are made of and the colour is what the words and the mark are set
+/// in, so a reader still finds `Sport` by its orange before they have read a
+/// word and the row is quiet behind them.
+///
+/// Chosen, the pill is a pane of that colour at full strength, which is the one
+/// state that has to be legible across a whole row at a glance : the subject's
+/// own colour rather than an accent that would say nothing about it.
 private struct PillShape: ViewModifier {
     let isCurrent: Bool
     let topic: DigestTopic
     /// The subject's own colour : see ``DigestScreen/colour(of:)``.
     let colour: Color
     let namespace: Namespace.ID
-
-    /// How much of the colour an unchosen pill keeps.
-    ///
-    /// A wash rather than the colour : fifteen capsules at full strength is a
-    /// paint chart, and the type on them has to stay the page's own ink, which
-    /// wants the ground behind it to stay near the paper.
-    private static let wash = 0.22
 
     func body(content: Content) -> some View {
         content
@@ -1016,10 +1024,7 @@ private struct PillShape: ViewModifier {
             // row is pinned : it is on screen for the whole of every scroll. A
             // pill answers a tap ; it does not need to answer a finger passing
             // over it.
-            .glassEffect(
-                .regular.tint(isCurrent ? colour : colour.opacity(Self.wash)),
-                in: .capsule
-            )
+            .glassEffect(isCurrent ? .regular.tint(colour) : .regular, in: .capsule)
             .glassEffectID(topic, in: namespace)
             .accessibilityAddTraits(isCurrent ? [.isSelected] : [])
     }
