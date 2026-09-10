@@ -357,19 +357,30 @@ private struct ActivityLine: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.theme) private var theme
 
-    /// How tall the band is while there is something in it.
+    /// The air over the capsule.
     ///
-    /// The line of type over its rule, and the air under it that keeps it off
-    /// the reader's own portrait. It follows the type size, since what sits in
-    /// it is one line of type over a rule inside a capsule.
+    /// **The panel's own, and not a number of its own.** ``ReaderPanel/portrait``
+    /// opens with exactly this much above it, so the head of the panel begins
+    /// in the same place whether the band is there or not, and the capsule
+    /// clears the sheet's grabber rather than sitting under it. Set against the
+    /// panel's own eight points of top padding it was the whole of the air the
+    /// words had, and the head read as jammed against the top edge.
+    @ScaledMetric(relativeTo: .caption) private var air: CGFloat = 18
+
+    /// What the capsule itself comes to : a line of type, the space under it
+    /// and the rule, inside its own padding.
+    ///
+    /// A little generous. Short, the capsule spills into the portrait's own top
+    /// padding, which is air either way ; exact, it would have to be recomputed
+    /// every time a word or a rule moved.
+    @ScaledMetric(relativeTo: .caption) private var capsule: CGFloat = 48
+
+    /// How tall the band is while there is something in it.
     ///
     /// Nought the rest of the time : a place kept permanently is a strip of
     /// nothing at the head of a panel opened many times a day, for a measure
     /// that runs a few seconds an hour.
-    @ScaledMetric(relativeTo: .caption) private var open: CGFloat = 56
-
-    /// What the band is worth right now.
-    private var height: CGFloat { work == nil ? 0 : open }
+    private var height: CGFloat { work == nil ? 0 : air + capsule }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -383,6 +394,9 @@ private struct ActivityLine: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 7)
                     .glassEffect(.regular, in: .capsule)
+                    // Inside the band rather than above it, so the room comes
+                    // and goes with the thing that needs it.
+                    .padding(.top, air)
                     // **It grows out of the top rather than materializing.** A
                     // fade on its own put the capsule on screen at full size in
                     // a band that was still opening, which reads as a thing
@@ -424,7 +438,7 @@ private struct ActivityLine: View {
     }
 
     private func content(_ work: WorkPlan) -> some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             // **The words and the rule, and no figures.** A count beside them is
             // a second measure of the same thing, disagreeing with the first :
             // the rule is the whole pass and a figure can only ever be the step,
