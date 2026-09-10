@@ -77,10 +77,33 @@ nonisolated struct EditionStore: Sendable {
         -> Edition?
     {
         try await database.writer.write { db in
+            // **What the reader cancelled is abandoned, and it never was.** A
+            // slot switched off, or moved back across a boundary that has gone,
+            // leaves a row open that nothing downstream can tell from the page
+            // being made : the work set is `closed_at IS NULL AND published_at
+            // IS NULL`, so a model call was spent on it, the page came out, and
+            // it announced itself under an hour the reader had just abolished.
+            // Never a published row : a back number is what the archive is made
+            // of.
+            func abandonEverythingAfter(_ boundary: Date?) throws {
+                let bound = boundary == nil ? "" : "AND opened_at > ?"
+                let after = boundary.map { StatementArguments([$0]) } ?? StatementArguments()
+                try db.execute(
+                    sql: """
+                        UPDATE edition SET closed_at = ?, updated_at = ?
+                        WHERE closed_at IS NULL AND published_at IS NULL \(bound)
+                        """,
+                    arguments: StatementArguments([now, now]) + after
+                )
+            }
+
             // The boundary that has gone, and never one still to come. An
             // edition is about the stretch of time that ends at its hour, so
             // there is nothing to choose from until the hour has passed.
-            guard let moment = schedule.current(at: now, in: calendar) else { return nil }
+            guard let moment = schedule.current(at: now, in: calendar) else {
+                try abandonEverythingAfter(nil)
+                return nil
+            }
 
             // The period of the last page that actually came out, which is
             // where this one picks up. A boundary the device slept through was
@@ -100,22 +123,37 @@ nonisolated struct EditionStore: Sendable {
                         """
                 )
 
-            if let lastOut, moment.opened <= lastOut { return nil }
+            if let lastOut, moment.opened <= lastOut {
+                try abandonEverythingAfter(lastOut)
+                return nil
+            }
 
-            // Everything that opened before this one is over. Closed rather
+            // Everything that opened at another hour is over. Closed rather
             // than deleted : an edition that came out is what the archive is
             // made of, and one that never did is abandoned, which is a thing
             // the store may be asked about, and which the purge takes.
+            //
+            // `<>` and not `<`, so a row standing at an hour *later* than this
+            // one goes with the rest : that is a slot the reader moved back,
+            // and a page for an hour that no longer exists would otherwise
+            // outlive the page that supersedes it and be written beside it. No
+            // published row can share this boundary, one having made `lastOut`
+            // not less than it a few lines above.
             try db.execute(
-                sql: "UPDATE edition SET closed_at = ?, updated_at = ? WHERE closed_at IS NULL AND opened_at < ?",
+                sql: "UPDATE edition SET closed_at = ?, updated_at = ? WHERE closed_at IS NULL AND opened_at <> ?",
                 arguments: [now, now, moment.opened]
             )
 
             if let standing = try Edition.filter(Edition.Columns.openedAt == moment.opened).fetchOne(db) {
-                // A closed edition is finished with. It can happen : a device
-                // asleep across two boundaries opens the later one, and the
-                // earlier one is history the moment it is read.
-                return standing
+                // **And a closed one is finished with.** It happens where the
+                // reader shuffles the hours : a boundary abandoned by a later
+                // one can become the current boundary again. Its period folded
+                // forward when it was closed, so re-opening it would claim a
+                // stretch of time the page that follows already holds. Nothing
+                // is made for this boundary, and the next one covers from the
+                // last page that actually came out : what is lost is the page
+                // and never the news.
+                return standing.closedAt == nil ? standing : nil
             }
 
             let edition = Edition(
@@ -213,7 +251,15 @@ nonisolated struct EditionStore: Sendable {
         now: Date = Date()
     ) async throws -> Bool {
         try await database.writer.write { db in
-            guard var edition = try Edition.fetchOne(db, key: editionID), !edition.isPublished else { return false }
+            // **Closed as well as unpublished, and read inside the write.**
+            // The work set tests `closed_at IS NULL`, but it tested it in
+            // ``BriefEditionsJob/due()``, before the model call ; a boundary
+            // that goes to press while the answer is being written would
+            // otherwise publish a page whose successor is already out, and the
+            // archive would show two pages for one period.
+            guard var edition = try Edition.fetchOne(db, key: editionID),
+                !edition.isPublished, edition.closedAt == nil
+            else { return false }
             guard try Self.stories(of: editionID, in: db).map(\.storyID) == ids else { return false }
 
             edition.points = points
@@ -291,6 +337,33 @@ nonisolated struct EditionStore: Sendable {
     @concurrent
     func rows(of editionID: UUID) async throws -> [EditionStory] {
         try await database.writer.read { db in try Self.stories(of: editionID, in: db) }
+    }
+
+    /// The boundary of a page that is composed and still waiting to be written,
+    /// if there is one.
+    ///
+    /// **What a background grant is worth asking for a second time.** A page
+    /// with rows on it is a page a model is working on, and one still unwritten
+    /// at the end of a grant is almost always a page held by the wait for its
+    /// own stories rather than one nothing can be done about. A row the model
+    /// has read and declined carries a language and is not worth a grant, and a
+    /// row with fewer than ``leastStories`` on it means no model is filling it
+    /// at all, which on a device without one is every row for ever.
+    @concurrent
+    func inThePress(now: Date = Date()) async throws -> Date? {
+        try await database.writer.read { db in
+            try Date.fetchOne(
+                db,
+                sql: """
+                    SELECT opened_at FROM edition
+                    WHERE closed_at IS NULL AND published_at IS NULL AND brief_locale IS NULL
+                      AND opened_at <= ?
+                      AND (SELECT COUNT(*) FROM edition_story WHERE edition_id = edition.id) >= \(Self.leastStories)
+                    ORDER BY opened_at DESC LIMIT 1
+                    """,
+                arguments: [now]
+            )
+        }
     }
 
     /// Throws away the editions nobody will ever see.

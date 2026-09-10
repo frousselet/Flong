@@ -62,6 +62,16 @@ nonisolated enum StoreChanges {
     /// trying to read it.
     static let exchanging = Duration.seconds(2)
 
+    /// How often the window is read back while the model is writing.
+    ///
+    /// A model answers about one story per transaction, so a turn ticks the
+    /// store once per call, seconds apart : too slow for ``settling`` to
+    /// coalesce anything and far too fast to rebuild a page under a reader
+    /// thirty or forty times. Three seconds is quick enough that a headline
+    /// still appears as it is written and slow enough to be a page rather than
+    /// a flicker.
+    static let writing = Duration.seconds(3)
+
     /// Ticks while anything the interface is drawn from is written to.
     static func ticks(in database: AppDatabase) -> AsyncStream<Void> {
         AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in

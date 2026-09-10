@@ -389,8 +389,10 @@ nonisolated struct TopicPreferences: Sendable {
 
     /// The mark each subject wears, by name.
     ///
-    /// What the pills are drawn from. One read of a table of fifty-odd rows,
-    /// beside the scores the page already reads.
+    /// One read of a table of fifty-odd rows, on its own. The front page reads
+    /// the same rows inside ``DigestStore/digest(_:now:limit:during:)``'s own
+    /// transaction, so that a page is assembled from one snapshot of the store
+    /// rather than four.
     func symbols() async throws -> [String: String] {
         try await database.writer.read { db in
             try Row.fetchAll(db, sql: "SELECT name, symbol FROM topic")

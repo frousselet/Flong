@@ -454,6 +454,17 @@ final class AppModel {
     /// The model's own work, which no gesture waits for.
     private var enriching: Task<Void, Never>?
 
+    /// Whether the model is being asked anything at all, whoever is asking.
+    private var isEnriching: Bool { enriching != nil }
+
+    /// Which turn the lane is on.
+    ///
+    /// **Released by generation and not by identity.** A turn cannot compare
+    /// itself to the handle it is held by, so a superseded one clearing the
+    /// slot on its way out would hand away a lane its successor had already
+    /// claimed. The counter is what says whose slot it is.
+    private var laneGeneration = 0
+
     /// Whether the reader is looking at Flong right now.
     ///
     /// Nothing is announced while they are : a story appears on the page they
@@ -469,6 +480,18 @@ final class AppModel {
     /// never be announced by any later pass either. A model with no window is
     /// interrupting nobody's reading.
     var isReading = false
+
+    /// Whether the window is there at all, frontmost or not.
+    ///
+    /// **Not the same question as ``isReading``, and it was answered with it.**
+    /// `.active` means key window, so a Mac window sitting open behind a text
+    /// editor was treated exactly like a backgrounded iPhone : the clock did
+    /// nothing, and on the machine most likely to be left open across a
+    /// boundary the hourly activity was the only thing that could publish a
+    /// page. What ``isReading`` decides is whether Flong may interrupt the
+    /// reader about the page they are looking at, which is a question about
+    /// attention ; this one is about the window existing.
+    var isAwake = true
 
     // MARK: - Who is reading
 
@@ -520,6 +543,7 @@ final class AppModel {
     func setPicture(_ data: Data?) -> Bool {
         guard let data else {
             preferences.picture = nil
+            pictureData = nil
             picture = nil
             // The face the other people in a shared collection see is this
             // one, so taking it away has to reach them too.
@@ -531,6 +555,10 @@ final class AppModel {
             return false
         }
         preferences.picture = scaled
+        // Stamped wherever the picture is set, or the bytes the held image was
+        // decoded from stop naming it and the read-back skips a correction it
+        // owed.
+        pictureData = scaled
         picture = ProfilePicture.image(scaled)
         Task { await publishMemberCards() }
         return true
@@ -587,11 +615,25 @@ final class AppModel {
     }
 
     /// Reads the name and the face back from what has been kept.
+    /// The bytes the held picture was decoded from.
+    ///
+    /// **Held so the decode happens once.** `preferences.picture` reads up to a
+    /// hundred and twenty kilobytes out of the iCloud key-value store and
+    /// `ProfilePicture.image` runs a full `CGImageSource` decode over it, on the
+    /// main actor, and this is the tail of every catch-up. A fresh `CGImage`
+    /// assigned every tick also re-renders the reader's own mark in every
+    /// section's toolbar, for a picture nobody has touched since they chose it.
+    private var pictureData: Data?
+
     private func loadProfile() {
-        firstName = preferences.firstName
-        lastName = preferences.lastName
-        picture = preferences.picture.flatMap(ProfilePicture.image)
-        place = preferences.place
+        if preferences.firstName != firstName { firstName = preferences.firstName }
+        if preferences.lastName != lastName { lastName = preferences.lastName }
+        if preferences.place != place { place = preferences.place }
+
+        let data = preferences.picture
+        guard data != pictureData else { return }
+        pictureData = data
+        picture = data.flatMap(ProfilePicture.image)
     }
 
     private(set) var isRefreshing = false
@@ -1209,7 +1251,9 @@ final class AppModel {
         self.mutedSharedCollections = preferences.mutedSharedCollections
         self.firstName = preferences.firstName
         self.lastName = preferences.lastName
-        self.picture = preferences.picture.flatMap(ProfilePicture.image)
+        let heldPicture = preferences.picture
+        self.pictureData = heldPicture
+        self.picture = heldPicture.flatMap(ProfilePicture.image)
         self.place = preferences.place
         self.recentSearches = preferences.recentSearches
         self.contributesToPool = preferences.contributesToPool
@@ -1240,6 +1284,11 @@ final class AppModel {
         self.finder = FeedFinder(fetcher: fetcher)
         self.opml = OPMLImport(subscriptions)
         self.service = ServiceImport(database)
+
+        // Asked once here so the first frame is drawn against the truth : a
+        // device that will never write an edition would otherwise show the
+        // shape of a page on its way for as long as the first read takes.
+        holdWhoWritesEditions()
     }
 
     /// The fixed views, which every reader has whatever they follow.
@@ -1287,6 +1336,7 @@ final class AppModel {
 
         watching = Task { [weak self] in
             guard let database = self?.database else { return }
+            var lastRead = ContinuousClock.now - StoreChanges.writing
 
             for await _ in StoreChanges.ticks(in: database) {
                 // Let a burst settle. Everything that arrives during the wait
@@ -1313,6 +1363,21 @@ final class AppModel {
                     try? await Task.sleep(for: StoreChanges.settling)
                 }
                 if waited { try? await Task.sleep(for: StoreChanges.settling) }
+
+                // **And held to a pace while the model is writing.** Each story
+                // the model answers about is its own transaction, so each is
+                // its own tick, and four hundred milliseconds coalesces nothing
+                // at that spacing : a turn read the whole window back thirty or
+                // forty times under a reader who was scrolling, and reading the
+                // window back is the digest query, a named-entity pass over
+                // every headline on the page and the sidebar. The stream keeps
+                // only the newest tick, so waiting here is what makes several
+                // of them one.
+                if self?.isEnriching == true {
+                    let since = ContinuousClock.now - lastRead
+                    if since < StoreChanges.writing { try? await Task.sleep(for: StoreChanges.writing - since) }
+                }
+                lastRead = ContinuousClock.now
 
                 await self?.reloadWhatIsShown()
             }
@@ -1351,7 +1416,7 @@ final class AppModel {
             var reason = reason
             while !Task.isCancelled {
                 guard let self else { return }
-                if isReading { await catchUp(reason) }
+                if isAwake { await catchUp(reason) }
                 reason = .clock
                 try? await Task.sleep(for: .seconds(await untilSomethingIsDue()))
             }
@@ -1450,6 +1515,11 @@ final class AppModel {
 
     func load() async {
         await loadSidebar()
+        // **Every time, and it is the one read-back that must be.** The
+        // tick-driven ``reloadWhatIsShown()`` above is right to ask whether the
+        // reader is in the wire ; this one is the answer to `read the whole of
+        // what the window holds`, and it is what every path that changes the
+        // selection ends with, before any view has said what it is showing.
         await loadArticles()
         // The front page is part of what the window shows, and this is the
         // read-back every path that writes ends with. Leaving it out is how a
@@ -1462,13 +1532,26 @@ final class AppModel {
         await loadCollections()
         // Another device may have changed them while this one was away.
         preferences.synchronize()
-        // Read here and held : another device may have moved an edition while
-        // this one was away, and this is the one place the reader's own choices
-        // are pulled back in.
-        heldSchedule = preferences.editionSchedule
-        articleBody = preferences.articleBody
-        theme = preferences.theme
-        recentSearches = preferences.recentSearches
+
+        // **Assigned only where they moved.** `@Observable` notifies on the
+        // assignment and never on the value, so writing the theme back
+        // unchanged on every clock tick invalidated every view that reads it,
+        // which through the environment is the whole window.
+        //
+        // The schedule is the one that also has to be acted on : another device
+        // may have moved an edition while this one was away, and the setter
+        // below is the only thing that asks the system to wake for the new
+        // hour. Coming through here, the old hour stayed lodged and the new one
+        // was never asked for.
+        let carried = preferences.editionSchedule
+        if !scheduleIsSettling, carried != heldSchedule {
+            heldSchedule = carried
+            scheduleTheNextEdition()
+        }
+        if preferences.articleBody != articleBody { articleBody = preferences.articleBody }
+        if preferences.theme != theme { theme = preferences.theme }
+        if preferences.recentSearches != recentSearches { recentSearches = preferences.recentSearches }
+        holdWhoWritesEditions()
         loadProfile()
         await countOutstandingWork()
         // An import somebody started and did not finish. Found rather than
@@ -1521,14 +1604,51 @@ final class AppModel {
         get { heldSchedule }
         set {
             guard newValue != heldSchedule else { return }
+            // Immediately, so the picker under the reader's thumb is answered
+            // by the value they are dragging and nothing else waits on it.
             heldSchedule = newValue
-            preferences.editionSchedule = newValue
-            Task {
+
+            // **And everything else once they stop.** A wheel dragged from
+            // seven to nine passes through a hundred and twenty minutes, and
+            // each of them wrote the preference, pushed it to iCloud, opened an
+            // edition, grouped the whole three-day window and read the page
+            // back. None of those hundred and nineteen values is a schedule the
+            // reader ever meant.
+            scheduleIsSettling = true
+            rescheduling?.cancel()
+            rescheduling = Task { [weak self] in
+                try? await Task.sleep(for: Self.settlingOfAChoice)
+                guard let self, !Task.isCancelled else { return }
+                preferences.editionSchedule = heldSchedule
+                // Cleared the moment the preference agrees again, and before
+                // the rebuild : from here a read-back finds the reader's own
+                // value and there is nothing to protect it from.
+                scheduleIsSettling = false
                 await rebuildDigest()
                 scheduleTheNextEdition()
             }
         }
     }
+
+    /// How long a choice the reader is still making is left to settle.
+    ///
+    /// Long enough that a wheel being dragged writes nothing, short enough that
+    /// letting go and looking up is answered by the page having changed.
+    private static let settlingOfAChoice: Duration = .milliseconds(500)
+
+    /// The one pass a changed schedule owes, held so that the next change
+    /// takes it back rather than starting a second one beside it.
+    private var rescheduling: Task<Void, Never>?
+
+    /// Whether the reader is still choosing, which is the one window in which
+    /// the held schedule and the stored one are allowed to disagree.
+    ///
+    /// **And in which the stored one is not the truth.** ``load()`` reads the
+    /// preference back over the held value, and it is the tail of every
+    /// refresh, every pull and every mark-all-read : landing inside the settle
+    /// it would undo the hour the reader had just chosen, and the pending task
+    /// would then write the undone value back for good.
+    private var scheduleIsSettling = false
 
     private var heldSchedule = EditionSchedule.standard
 
@@ -1549,7 +1669,26 @@ final class AppModel {
     /// Two places on the front page ask it, one to decide whether a page is on
     /// its way and one to decide whether the bar carries a dateline at the
     /// first frame. Written twice they drifted ; written here they cannot.
-    var writesEditions: Bool { absence(of: .editions) == nil }
+    var writesEditions: Bool { editionsAbsence == nil }
+
+    /// Why an edition will never be written, or nothing where it will.
+    ///
+    /// **Held, exactly as the schedule is, and for the same reason.**
+    /// ``absence(of:)`` decodes the provider settings out of the iCloud
+    /// key-value store twice and, where the reader has configured a service,
+    /// asks the keychain for its key. The front page reached it up to four
+    /// times per body evaluation, on the main actor, and a body is evaluated
+    /// whenever anything on the page moves.
+    ///
+    /// Asked again at the three moments the answer can change : the whole
+    /// window being read, the reader coming back, and the reader pointing a
+    /// task somewhere else.
+    private(set) var editionsAbsence: LocalizedStringResource?
+
+    private func holdWhoWritesEditions() {
+        let held = models.absence(of: .editions)
+        if held != editionsAbsence { editionsAbsence = held }
+    }
 
     /// Forgets every run of failures, everywhere.
     ///
@@ -1558,6 +1697,7 @@ final class AppModel {
     /// switched on, a rate limit lifted, an account put right.
     func reconsiderTheModels() {
         models.reconsiderEverything()
+        holdWhoWritesEditions()
     }
 
     // MARK: - The models the reader brought of their own
@@ -1595,6 +1735,7 @@ final class AppModel {
         let settings = preferences.providers
         providers = settings.accounts
         sendsToProviders = settings.sendsToProviders
+        holdWhoWritesEditions()
     }
 
     /// Points one task somewhere else.
@@ -1704,15 +1845,15 @@ final class AppModel {
     /// have no window and no cap.
     private(set) var frozenFigures: [UUID: DigestStory] = [:]
 
-    /// Reads them again, where the page the reader is looking at has changed.
-    private func loadFrozenFigures() async {
-        guard let published = edition else {
-            if !frozenFigures.isEmpty { frozenFigures = [:] }
-            return
-        }
-        let wanted = published.stories.map(\.storyID)
-        let figures = (try? await digestService.figures(of: wanted)) ?? [:]
-        if figures != frozenFigures { frozenFigures = figures }
+    /// What the world has since done to the stories a page holds.
+    ///
+    /// Pure, and static, so the page can be read whole before any of it is
+    /// published : see ``loadDigest()``.
+    private static func figures(
+        of published: PublishedEdition?, from service: DigestService
+    ) async -> [UUID: DigestStory] {
+        guard let published, !published.stories.isEmpty else { return [:] }
+        return (try? await service.figures(of: published.stories.map(\.storyID))) ?? [:]
     }
 
     /// Works the join out again, from whatever the page and the edition are now.
@@ -1724,15 +1865,18 @@ final class AppModel {
     /// reader's back the first time a purge takes one of its stories, which is
     /// the exact thing the frozen rows exist to prevent.
     private func resolveFrontPage() {
-        guard let published = edition else {
-            if !frontPageStories.isEmpty { frontPageStories = [] }
-            return
-        }
-
-        let resolved = published.stories.map {
-            $0.printed(over: frozenFigures[$0.storyID], on: published.edition.openedAt)
-        }
+        let resolved = Self.frontPage(of: edition, over: frozenFigures)
         if resolved != frontPageStories { frontPageStories = resolved }
+    }
+
+    /// The same join, as a pure function of a page and its figures.
+    private static func frontPage(
+        of published: PublishedEdition?, over figures: [UUID: DigestStory]
+    ) -> [DigestStory] {
+        guard let published else { return [] }
+        return published.stories.map {
+            $0.printed(over: figures[$0.storyID], on: published.edition.openedAt)
+        }
     }
 
     func loadDigest() async {
@@ -1784,10 +1928,21 @@ final class AppModel {
             // of the subject table and a term-set match per point, in order to
             // take the first of them. The back numbers are read where they are
             // shown.
+            //
+            // **Read whole, then published in one movement.** It was three
+            // assignments with a hop off the main actor between each, so
+            // between the second and the third the head of the page already
+            // carried this morning's points while the ten rows under it were
+            // still last night's headlines and the lead picture was still last
+            // night's photograph. The main actor is free to draw in that gap,
+            // and it did.
             let current = try await digestService.currentEdition()
+            let figures = await Self.figures(of: current, from: digestService)
+            let rows = Self.frontPage(of: current, over: figures)
+
             if current != edition { edition = current }
-            await loadFrozenFigures()
-            resolveFrontPage()
+            if figures != frozenFigures { frozenFigures = figures }
+            if rows != frontPageStories { frontPageStories = rows }
         } catch {
             Log.enrich.error("The digest could not be read : \(error, privacy: .public)")
         }
@@ -2368,10 +2523,16 @@ final class AppModel {
         // at twenty to eleven for eleven o'clock has been read by nobody, so
         // stamping it here would swallow the very next edition : the reader
         // would turn the notices on and hear nothing until the one after.
-        if preferences.editionsAnnouncedAt == nil {
-            let current = try? await digestService.currentEdition()
-            preferences.editionsAnnouncedAt = current?.edition.openedAt ?? Date()
-        }
+        //
+        // **A boundary and never a clock, and on every turn of the switch.** It
+        // was seeded with `Date()` where nothing had ever come out, and a wall
+        // clock is by construction ahead of the boundary of the page being
+        // written, so the first edition a reader ever gets was the one this
+        // swallowed. And it was seeded once, so a reader who turned the notices
+        // off for a day and on again was told about a page they had been
+        // reading all afternoon.
+        let current = try? await digestService.currentEdition()
+        preferences.editionsAnnouncedAt = current?.edition.openedAt ?? .distantPast
     }
 
     /// Tells the reader that an edition has come out.
@@ -2696,7 +2857,14 @@ final class AppModel {
         // write at seven is one worth asking about at five past.
         models.reconsiderEverything()
 
-        await exclusively("The edition") {
+        // **No fetch gate.** This asks no publisher anything, so taking the one
+        // flag that guards outgoing requests was trading the single wake a
+        // sleeping phone gets for the hour that has just gone against a
+        // conflict that does not exist : a grant that came down while a refresh
+        // happened to be running was dropped whole. What it really contends for
+        // is the model, and that is what it takes.
+        await takeTheModelLane { [weak self] in
+            guard let self else { return }
             let pass = await self.beginWork([.grouping, .writing, .filing, .naming])
             defer { self.endWork(pass) }
 
@@ -2728,7 +2896,7 @@ final class AppModel {
         // Asked for again from here, since only this side knows the reader's
         // schedule. The handler cannot : it is registered before there is a
         // store to read one out of.
-        scheduleTheNextEdition()
+        await scheduleTheEditionInThePress()
     }
 
     /// Asks the system to wake for the next edition.
@@ -2746,6 +2914,93 @@ final class AppModel {
     /// catch-up makes the page too.
     func scheduleTheNextEdition(now: Date = Date()) {
         BackgroundScheduler.scheduleEdition(at: heldSchedule.next(after: now))
+    }
+
+    /// The shortest a grant is ever asked for, so a request submitted at the
+    /// end of a pass is not one the system reads as already due.
+    private static let shortestGrant: TimeInterval = 60
+
+    /// Asks the system to wake for the next edition, or sooner where the page
+    /// of the hour that has just gone is still in the press.
+    ///
+    /// **A grant is one grant, and it was being spent and then given away.**
+    /// `BGProcessingTaskRequest` keeps one pending request per identifier, so
+    /// asking for the next boundary is the whole of what a sleeping phone gets
+    /// for the hour that has just passed. A morning grant that came down at two
+    /// minutes past seven, inside the twenty minutes a page waits for its own
+    /// stories to be written, found nothing ready, asked for noon, and the
+    /// morning edition was never written at all : the reader opened Flong at
+    /// ten to last night's paper.
+    ///
+    /// Once per boundary, and by construction rather than by a flag. What is
+    /// asked for is the moment the page stops being held ; a page still
+    /// unwritten after that was not being held by the wait, so the next call
+    /// finds nothing to ask for and falls through to the boundary.
+    private func scheduleTheEditionInThePress(now: Date = Date()) async {
+        let boundary = heldSchedule.next(after: now)
+
+        guard let held = try? await digestService.editionInThePress(now: now) else {
+            BackgroundScheduler.scheduleEdition(at: boundary)
+            return
+        }
+
+        let freed = held.addingTimeInterval(BriefEditionsJob.grace)
+        guard freed > now else {
+            BackgroundScheduler.scheduleEdition(at: boundary)
+            return
+        }
+
+        let wanted = max(freed, now.addingTimeInterval(Self.shortestGrant))
+        BackgroundScheduler.scheduleEdition(at: boundary.map { min(wanted, $0) } ?? wanted)
+    }
+
+    /// Runs the model's turn, taking the lane from whatever had it.
+    ///
+    /// **One lane, and there were two guards over different halves of it.** The
+    /// foreground turn was serialized on its own handle ; the two passes the
+    /// system grants time for took the fetch gate instead, which a catch-up
+    /// gives up the moment it hands the model's work on. So a grant and a
+    /// window could ask the model about the same stories and the same page at
+    /// the same second, against a budget of four editions and under two hundred
+    /// calls a day.
+    ///
+    /// Cancelling rather than waiting is the right way round : every job is
+    /// resumable and stops between two batches, the grant has minutes where the
+    /// foreground has two, and a grant spent waiting for a turn to finish is a
+    /// grant spent. The foreground stands aside instead, which is what it
+    /// already did.
+    /// **And the wait for the turn before it happens inside the new one.**
+    /// Claiming the lane after awaiting its predecessor leaves it unowned for
+    /// as long as that predecessor takes to unwind, which is exactly the window
+    /// the foreground guard exists to close.
+    ///
+    /// **Cancellation has to reach the turn.** A grant is stopped by its
+    /// expiration handler cancelling the task that waits here, and an
+    /// unstructured task inherits none of that : the model went on being asked
+    /// past the expiry, the system killed the process for not answering, and
+    /// the line below that asks for the next wake was never reached. The phone
+    /// then had no pending edition request at all until the reader next opened
+    /// Flong.
+    private func takeTheModelLane(_ work: @escaping @MainActor () async -> Void) async {
+        let previous = enriching
+        previous?.cancel()
+
+        laneGeneration += 1
+        let mine = laneGeneration
+
+        let turn = Task { @MainActor in
+            await previous?.value
+            await work()
+        }
+        enriching = turn
+
+        await withTaskCancellationHandler {
+            await turn.value
+        } onCancel: {
+            turn.cancel()
+        }
+
+        if laneGeneration == mine { enriching = nil }
     }
 
     /// The whole of the work, at rest and on the mains.
@@ -2813,16 +3068,26 @@ final class AppModel {
         // seconds, and the model's two halves share whatever it turns out to
         // have : unbounded, the headlines took the lot and the subjects were
         // never asked for.
-        await digestService.enrich(
-            until: Date().addingTimeInterval(BackgroundScheduler.fullPassBudget),
-            schedule: preferences.editionSchedule,
-            onWriting: progress(of: .writing),
-            onFiling: progress(of: .filing),
-            onNaming: progress(of: .naming),
-            onPhase: { [weak self] phase in
-                Task { @MainActor [weak self] in self?.moveWork(to: phase) }
-            }
-        )
+        await takeTheModelLane { [weak self] in
+            guard let self else { return }
+            await self.digestService.enrich(
+                until: Date().addingTimeInterval(BackgroundScheduler.fullPassBudget),
+                schedule: self.preferences.editionSchedule,
+                onWriting: self.progress(of: .writing),
+                onFiling: self.progress(of: .filing),
+                onNaming: self.progress(of: .naming),
+                onPhase: { [weak self] phase in
+                    Task { @MainActor [weak self] in self?.moveWork(to: phase) }
+                }
+            )
+        }
+
+        // **And the page it may just have published is said.** This was the one
+        // path that published an edition silently. The watermark is a
+        // high-water mark and not a ledger, so a boundary this pass skipped was
+        // skipped for good : a full pass that ran across seven in the morning
+        // took the morning edition's notice with it.
+        await announceNewEdition()
         await announceNewArticles()
         await announceNewStories()
         await announceCollaborations()
@@ -4815,16 +5080,25 @@ final class AppModel {
     ///   for one already going used to end nothing at all, and the pass that
     ///   had handed itself over was left with nothing to close it.
     private func enrich(until deadline: Date? = nil, pass: Work? = nil) {
-        guard enriching?.isCancelled ?? true else {
+        // **Nil and not merely cancelled.** A turn that has been cancelled and
+        // has not finished unwinding still holds the lane, and the two of them
+        // ask the model about the same stories.
+        guard enriching == nil else {
             endWork(pass)
             return
         }
+
+        laneGeneration += 1
+        let mine = laneGeneration
 
         enriching = Task { [weak self] in
             guard let self else { return }
             defer {
                 endWork(pass)
-                enriching = nil
+                // Only where the lane is still this turn's : a grant that came
+                // down mid-turn has taken it, and clearing it here would let a
+                // third turn start beside the one now running.
+                if laneGeneration == mine { enriching = nil }
             }
 
             await digestService.enrich(

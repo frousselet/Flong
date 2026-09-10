@@ -43,6 +43,9 @@ struct EditionHead: View {
 
     @Environment(\.colorScheme) private var scheme
 
+    /// The room the mark stands in, at the reader's own type size.
+    @ScaledMetric(relativeTo: .body) private var markWidth = EditionHead.markWidth
+
     private var edition: Edition { published.edition }
 
     var body: some View {
@@ -69,6 +72,11 @@ struct EditionHead: View {
     /// A frame rather than the glyph's own width, so every line of type starts
     /// at the same place whatever its mark is, and so the skeleton can hold the
     /// same room before there is a mark at all.
+    ///
+    /// The base value : what the column is actually drawn at follows the
+    /// reader's type size, the glyph inside it being set in `footnote`. Fixed
+    /// at twenty, the mark overran its own column at the accessibility sizes
+    /// and ran into the sentence beside it.
     static let markWidth: CGFloat = 20
 
     /// What this edition says, and never more than the bound.
@@ -99,13 +107,15 @@ struct EditionHead: View {
     /// coming to the page met a wall of grey and had to work out where the
     /// edition stopped and the news began. The pane says it in one move.
     ///
-    /// **A fill and not glass.** It was the material first, and the material is
-    /// resolved against whatever is behind it on every frame the pane moves :
-    /// this one moves on every frame of every scroll, and it is blurred on the
-    /// way out, which is a second pass off screen over the first. A fill is a
-    /// colour. It reads as the same object, it holds the words apart from the
-    /// news exactly as well, and it costs one composite. See
-    /// `docs/technical/interface.md`.
+    /// **Glass, and what it costs is paid for by not blurring it.** It was
+    /// tried as a flat fill, on the argument that a material is resolved
+    /// against whatever is behind it on every frame the pane moves and that
+    /// this one moves on every frame of every scroll. The fill reads as a
+    /// weaker object at the head of a page whose every other surface is glass,
+    /// so the material is back and what went instead is the blur on the way
+    /// out : that was an offscreen pass over a surface being resolved again
+    /// under it, and the offset, the scale and the opacity carry the pane out
+    /// on their own. See `docs/technical/interface.md` and ``EditionSinking``.
     ///
     /// **One pane and not three.** A card per point was the other way, and
     /// three panes of glass with three shadows at the head of a page is three
@@ -122,7 +132,7 @@ struct EditionHead: View {
                         // across the whole pane cuts it into boxes, and this
                         // is one pane with three things on it.
                         Divider()
-                            .padding(.leading, Self.markWidth + Self.columnGap)
+                            .padding(.leading, markWidth + Self.columnGap)
                     }
 
                     HStack(alignment: .firstTextBaseline, spacing: Self.columnGap) {
@@ -143,7 +153,7 @@ struct EditionHead: View {
                         Image(systemName: mark(at: index))
                             .font(.system(.footnote, weight: .semibold))
                             .foregroundStyle(StandardTopics.family(of: mark(at: index)).color(in: scheme))
-                            .frame(width: Self.markWidth)
+                            .frame(width: markWidth)
                             .accessibilityHidden(true)
 
                         // **Never a cut one, and no cap on the lines.** The
@@ -187,8 +197,13 @@ struct EditionHead: View {
 
     /// How far the page scrolls before the pane has gone entirely.
     ///
-    /// About the height of the pane itself : it is finished by the time the
-    /// first headline has reached where it stood.
+    /// The height of the pane itself, measured, with this as the value to draw
+    /// the first frame with. It was this number and nothing else, and the pane
+    /// is three points of up to eighteen words : three hundred points at the
+    /// default type size and over a thousand at the accessibility sizes. The
+    /// summary vanished two hundred points into the scroll and left its own
+    /// height of blank page standing between the subjects and the first
+    /// headline.
     static let sinking: CGFloat = 200
 
     /// What share of the scroll the pane is held back by.
@@ -199,13 +214,6 @@ struct EditionHead: View {
 
     /// How far the pane shrinks on its way out.
     static let shrink: CGFloat = 0.14
-
-    /// How far out of focus the pane goes on its way out.
-    ///
-    /// Affordable now that the pane is a fill : a blur is one pass off screen
-    /// over a bitmap rasterized once, rather than a pass over a material being
-    /// resolved again on every frame.
-    static let softening: CGFloat = 6
 
     /// The gap between a mark and the words it stands in front of.
     static let columnGap: CGFloat = 12
@@ -246,12 +254,17 @@ struct EditionHead: View {
 struct EditionSinking: ViewModifier {
     let offset: PageOffset
 
-    @ViewBuilder
+    /// The pane's own height, which is what it sinks through.
+    ///
+    /// Written only when the layout actually changes, so it costs nothing per
+    /// frame ; the constant it starts at is what draws the first one.
+    @State private var paneHeight = EditionHead.sinking
+
     func body(content: Content) -> some View {
         // Never below nought : a page pulled past its own top is a page being
         // refreshed, and the head has no business moving for that.
         let travelled = max(offset.scrolled, 0)
-        let gone = min(travelled / EditionHead.sinking, 1)
+        let gone = min(travelled / max(paneHeight, 1), 1)
 
         // **Drawn only while it is there.** Once it has gone entirely the pane
         // was still a pane : a shape of glass, faded to nothing, sampling what
@@ -263,23 +276,34 @@ struct EditionSinking: ViewModifier {
         //
         // A simulator draws glass cheaply and shows none of this ; a device
         // draws the real thing.
-        if gone >= 1 {
-            content.hidden()
-        } else {
-
-            // **And nothing rasterized over it.** Drawing the pane once and
-            // moving the picture of it is the right answer for something
-            // painted and the wrong one for the material : a bitmap is a
-            // snapshot, and what the material draws is whatever is behind it at
-            // this moment. It was rasterized while the pane was a fill, and the
-            // fill is gone.
-            content
-                // Held back against the scroll, so it falls behind the page
-                // rather than travelling with it.
-                .offset(y: travelled * EditionHead.lag)
-                .scaleEffect(1 - gone * EditionHead.shrink, anchor: .top)
-                .blur(radius: gone * EditionHead.softening)
-                .opacity(1 - gone)
+        Group {
+            if gone >= 1 {
+                content.hidden()
+            } else {
+                // **Nothing rasterized over it, and nothing blurred either.**
+                // Drawing the pane once and moving the picture of it is the
+                // right answer for something painted and the wrong one for the
+                // material : a bitmap is a snapshot, and what the material
+                // draws is whatever is behind it at this moment. The blur was
+                // the same mistake said the other way about : it is one pass
+                // off screen over a bitmap when the pane is a fill, and the
+                // pane is not a fill, so it was an offscreen render of a
+                // surface being resolved again against a moving page, on every
+                // frame of every scroll. The offset, the scale and the opacity
+                // are transforms the compositor does without one, and they
+                // carry the pane out on their own.
+                content
+                    // Held back against the scroll, so it falls behind the page
+                    // rather than travelling with it.
+                    .offset(y: travelled * EditionHead.lag)
+                    .scaleEffect(1 - gone * EditionHead.shrink, anchor: .top)
+                    .opacity(1 - gone)
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) {
+            $0.size.height
+        } action: {
+            paneHeight = max($0, 1)
         }
     }
 }
@@ -385,6 +409,14 @@ struct TextPlaceholder: View {
 /// exactly as far as one that settled from nothing. Three is the fewest a list
 /// ever has, so the page only ever grows into it.
 struct EditionPlaceholder: View {
+    /// The same three measurements the real thing is drawn at, so the skeleton
+    /// holds the room the words will take rather than the room they take at the
+    /// default type size and nowhere else.
+    @ScaledMetric(relativeTo: .body) private var markWidth = EditionHead.markWidth
+    @ScaledMetric(relativeTo: .body) private var markSquare: CGFloat = 14
+    @ScaledMetric(relativeTo: .body) private var barHeight: CGFloat = 9
+    @ScaledMetric(relativeTo: .body) private var barSpacing: CGFloat = EditionHead.leading + 11
+
     var body: some View {
         GlassEffectContainer {
             VStack(alignment: .leading, spacing: 0) {
@@ -397,7 +429,7 @@ struct EditionPlaceholder: View {
                 ForEach(Array(Self.points.enumerated()), id: \.offset) { index, lines in
                     if index > 0 {
                         Divider()
-                            .padding(.leading, EditionHead.markWidth + EditionHead.columnGap)
+                            .padding(.leading, markWidth + EditionHead.columnGap)
                     }
 
                     HStack(alignment: .top, spacing: EditionHead.columnGap) {
@@ -407,8 +439,8 @@ struct EditionPlaceholder: View {
                         // change shape twice.
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
                             .fill(.quaternary)
-                            .frame(width: 14, height: 14)
-                            .frame(width: EditionHead.markWidth)
+                            .frame(width: markSquare, height: markSquare)
+                            .frame(width: markWidth)
                             .padding(.top, 3)
 
                         // The same room a line of the real thing takes : a bar
@@ -416,8 +448,8 @@ struct EditionPlaceholder: View {
                         // type plus its leading, or the page moves when the
                         // words land.
                         TextPlaceholder(
-                            lines: lines, last: lines > 1 ? 0.5 : 0.8, height: 9,
-                            spacing: EditionHead.leading + 11
+                            lines: lines, last: lines > 1 ? 0.5 : 0.8, height: barHeight,
+                            spacing: barSpacing
                         )
                     }
                     .padding(.vertical, EditionHead.rowAir)
@@ -431,11 +463,16 @@ struct EditionPlaceholder: View {
             .padding(.horizontal, EditionHead.paneInset)
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
+            // **Under the pane, and it was over it.** What tells a page filling
+            // in from a page that is broken is the band travelling across the
+            // bars. Applied outside the pane it masked the pane as well, so the
+            // material was resolved twice a frame - once to draw it and once to
+            // mask the band with it - at the display's refresh rate, for ever,
+            // on the one page a reader is looking at while they wait.
+            .shimmering()
             .glassEffect(.regular, in: .rect(cornerRadius: EditionHead.paneCorner))
         }
         .padding(.bottom, Editorial.rhythm)
-        // What tells a page that is filling in from a page that is broken.
-        .shimmering()
         // One thing said once, rather than a set of bars read out as sentences
         // of nonsense.
         .accessibilityElement(children: .ignore)

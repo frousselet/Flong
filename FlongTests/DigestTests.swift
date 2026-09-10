@@ -317,7 +317,8 @@ struct DigestTests {
             try db.execute(sql: "UPDATE story SET brief_members = \(BriefStoriesJob.membersKey)")
         }
 
-        let work = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true, since: .distantPast)
+        let work = BriefStoriesJob.work(
+            locale: Locale(identifier: "fr_FR"), hasModel: true, since: .distantPast, askedAgainSince: nil)
         let waiting = try await database.writer.read { db in
             try Int.fetchOne(
                 db,
@@ -350,7 +351,8 @@ struct DigestTests {
             try db.execute(sql: "UPDATE story SET brief_members = \(BriefStoriesJob.membersKey)")
         }
 
-        let work = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true, since: .distantPast)
+        let work = BriefStoriesJob.work(
+            locale: Locale(identifier: "fr_FR"), hasModel: true, since: .distantPast, askedAgainSince: nil)
         let waiting = try await database.writer.read { db in
             try Int.fetchOne(
                 db,
@@ -382,8 +384,10 @@ struct DigestTests {
             try db.execute(sql: "UPDATE story SET brief_members = \(BriefStoriesJob.membersKey)")
         }
 
-        let withModel = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true, since: .distantPast)
-        let without = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: false, since: .distantPast)
+        let withModel = BriefStoriesJob.work(
+            locale: Locale(identifier: "fr_FR"), hasModel: true, since: .distantPast, askedAgainSince: nil)
+        let without = BriefStoriesJob.work(
+            locale: Locale(identifier: "fr_FR"), hasModel: false, since: .distantPast, askedAgainSince: nil)
 
         let counts = try await database.writer.read { db in
             (
@@ -399,6 +403,23 @@ struct DigestTests {
         #expect(counts.asked == 3)
         // And without a model it asks for nothing, so the count reaches zero.
         #expect(counts.quiet == 0)
+    }
+
+    /// **A set the fallback cannot empty is a busy loop.** Without a model the
+    /// work set was `summary IS NULL`, which is a scan of every story ever
+    /// grouped and a set a group whose articles carry no standfirst can never
+    /// leave : the same three rows were offered at every batch, written again
+    /// each time, and the runner never saw a batch that did nothing. It is the
+    /// same key as everywhere else now, which the save writes whatever the
+    /// answer was.
+    @Test("Without a model a story is looked at once, not for ever")
+    func withoutAModelAStoryLeavesTheSet() {
+        let work = BriefStoriesJob.work(
+            locale: Locale(identifier: "fr_FR"), hasModel: false, since: .distantPast, askedAgainSince: nil)
+
+        #expect(work.sql.contains("brief_members"))
+        #expect(work.sql.contains("last_at >= ?"))
+        #expect(!work.sql.contains("summary IS NULL"))
     }
 
     @Test("A brief in the wrong language is refused before it is stored")
@@ -443,7 +464,8 @@ struct DigestTests {
             try db.execute(sql: "UPDATE story SET brief_members = \(BriefStoriesJob.membersKey)")
         }
 
-        let work = BriefStoriesJob.work(locale: Locale(identifier: "fr_FR"), hasModel: true, since: .distantPast)
+        let work = BriefStoriesJob.work(
+            locale: Locale(identifier: "fr_FR"), hasModel: true, since: .distantPast, askedAgainSince: nil)
         let waiting = try await database.writer.read { db in
             try Int.fetchOne(
                 db,
@@ -959,7 +981,7 @@ struct DigestTests {
         }
 
         let settled = BriefStoriesJob.work(
-            locale: Locale(identifier: "fr_FR"), hasModel: true, since: .distantPast)
+            locale: Locale(identifier: "fr_FR"), hasModel: true, since: .distantPast, askedAgainSince: nil)
         #expect(try await waiting(under: settled) == 0)
 
         // Another newsroom picks one of them up.
