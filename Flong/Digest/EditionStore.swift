@@ -15,14 +15,31 @@ import OSLog
 
 /// Makes the editions, and reads them back.
 ///
-/// **Ten stories, and the rest is the wire.** A front page that grew with the
+/// **A capped page, and the rest is the wire.** A front page that grew with the
 /// day was a page nobody could finish, and one that reordered itself under the
-/// reader on every fetch was a page nobody could return to. Ten is what a
-/// person reads over a coffee ; what did not fit is not hidden, it is in the
-/// section next door, and the next edition may well lead on it.
+/// reader on every fetch was a page nobody could return to. Ten is what a person
+/// reads over a coffee, and it is what a reader gets until they say otherwise ;
+/// somebody who follows three hundred feeds and looks in once a day may ask for
+/// fifteen or twenty. See ``EditionSize``. What did not fit is not hidden, it is
+/// in the section next door, and the next edition may well lead on it.
 nonisolated struct EditionStore: Sendable {
-    /// How many stories an edition carries.
-    static let mostStories = 10
+    /// How many rooms have to be covering a story before it may lead a page.
+    ///
+    /// **Two, and it was written down long before it was true.** The comment
+    /// over ``StoryBuilder/removeEmptyStories(in:)`` asserted that what a story
+    /// needs in order to be a story is two rooms covering one event ; the SQL
+    /// under it counts articles, and the rule existed nowhere else. So a
+    /// newsroom having a busy afternoon led a front page : the edition of the
+    /// tenth of September carried, in eighth place, eleven pieces from one
+    /// broadcaster in one morning.
+    ///
+    /// It is kept here and not in the grouping, because it is a question of
+    /// what a paper leads on rather than of what a story is. One room saying a
+    /// thing several times is a perfectly good group : it belongs on the page
+    /// of its subject, where a reader asking what there is about one thing
+    /// wants everything there is about it. It does not belong on a front page,
+    /// where ten slots are the whole of what the reader gets.
+    static let leastRooms = 2
 
     /// How far back the archive goes.
     ///
@@ -37,11 +54,13 @@ nonisolated struct EditionStore: Sendable {
         self.database = database
     }
 
-    /// How many stories are looked at before the ten are taken.
+    /// How many stories are looked at before the page's own are taken.
     ///
-    /// Wider than the front page's sixty, and it can afford to be : this read
-    /// happens four times a day rather than behind every render, and the order
-    /// it comes back in is not the order the page wants.
+    /// Wider than the front page's sixty, and wider again than the longest page
+    /// a reader may ask for : this read happens four times a day rather than
+    /// behind every render, the order it comes back in is not the order the page
+    /// wants, and what a room test and a written-about test take out of it has
+    /// to come from somewhere.
     static let considered = 120
 
     /// The fewest stories that still make a page.
@@ -185,9 +204,16 @@ nonisolated struct EditionStore: Sendable {
     /// words, this is one read and no write at all.
     ///
     /// - Returns: the rows the page now holds, in the order it shows them.
+    /// - Parameter size: how long the reader wants their paper. It is read
+    ///   afresh on every pass rather than frozen with the row, so a reader who
+    ///   asks for a longer one while a page is being made gets it on that page
+    ///   rather than on the one after. A page that has come out is finished
+    ///   with, here as everywhere.
     @discardableResult
     @concurrent
-    func compose(_ edition: Edition, now: Date = Date()) async throws -> [EditionStory] {
+    func compose(
+        _ edition: Edition, holding size: EditionSize = .standard, now: Date = Date()
+    ) async throws -> [EditionStory] {
         guard !edition.isPublished else { return try await rows(of: edition.id) }
 
         // Read afresh below as well as here. The reading of the page and the
@@ -195,7 +221,7 @@ nonisolated struct EditionStore: Sendable {
         // between them for whoever holds the other lane, and a page published
         // in that gap is a page frozen : rewriting its ten from a value read
         // before it came out would undo the one guarantee this all exists for.
-        let chosen = try await candidates(of: edition, now: now)
+        let chosen = try await candidates(of: edition, holding: size, now: now)
         let wanted = chosen.enumerated().map { position, story in
             EditionStory(
                 editionID: edition.id,
@@ -313,7 +339,9 @@ nonisolated struct EditionStore: Sendable {
     /// it. And the weight is the story's weight *in the period*, not over its
     /// whole life, or a story that ran all week would lead every edition of the
     /// week on its own history.
-    private func candidates(of edition: Edition, now: Date) async throws -> [DigestStory] {
+    private func candidates(
+        of edition: Edition, holding size: EditionSize, now: Date
+    ) async throws -> [DigestStory] {
         let period = edition.periodStart..<edition.periodEnd
         guard period.lowerBound < period.upperBound else { return [] }
 
@@ -324,12 +352,19 @@ nonisolated struct EditionStore: Sendable {
             digest
             .all
             .filter(\.isGenerated)
+            // **And several rooms have to be saying it.** A group of one room
+            // repeating itself is a newsroom having a busy afternoon, not an
+            // event, and it took a slot on a page that has ten of them. The
+            // count is the one the row draws, which folds a paper's desks into
+            // one room, so a title running a story in three of its sections
+            // still counts once. See ``leastRooms``.
+            .filter { $0.feedCount >= Self.leastRooms }
             .sorted {
                 let left = ($0.score(digest.scores), $0.articleCount, $0.feedCount, $0.lastAt)
                 let right = ($1.score(digest.scores), $1.articleCount, $1.feedCount, $1.lastAt)
                 return left > right
             }
-            .prefix(Self.mostStories)
+            .prefix(size.stories)
             .map { $0 }
     }
 

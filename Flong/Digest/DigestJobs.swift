@@ -779,6 +779,7 @@ nonisolated struct DigestService: Sendable {
     @concurrent
     func makeTheEdition(
         _ schedule: EditionSchedule,
+        holding size: EditionSize = .standard,
         now: Date = Date(),
         until deadline: Date? = nil,
         onNaming: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
@@ -795,7 +796,7 @@ nonisolated struct DigestService: Sendable {
                 edition.closedAt == nil,
                 edition.briefLocale != locale.identifier
             {
-                try await store.compose(edition, now: now)
+                try await store.compose(edition, holding: size, now: now)
             }
             try await store.purge(now: now)
         } catch {
@@ -897,6 +898,7 @@ nonisolated struct DigestService: Sendable {
         until deadline: Date? = nil,
         now: Date = Date(),
         schedule: EditionSchedule = .standard,
+        holding size: EditionSize = .standard,
         onWriting: @escaping @Sendable (Int, Int) -> Void = { _, _ in },
         onFiling: @escaping @Sendable (Int, Int) -> Void = { _, _ in },
         onNaming: @escaping @Sendable (Int, Int) -> Void = { _, _ in },
@@ -962,6 +964,7 @@ nonisolated struct DigestService: Sendable {
         onPhase(.naming)
         await makeTheEdition(
             schedule,
+            holding: size,
             until: Self.namingEnds(by: end),
             onNaming: onNaming
         )
@@ -973,13 +976,14 @@ nonisolated struct DigestService: Sendable {
         until deadline: Date? = nil,
         now: Date = Date(),
         schedule: EditionSchedule = .standard,
+        holding size: EditionSize = .standard,
         onWriting: @escaping @Sendable (Int, Int) -> Void = { _, _ in },
         onFiling: @escaping @Sendable (Int, Int) -> Void = { _, _ in },
         onPhase: @Sendable (WorkPhase) -> Void = { _ in }
     ) async -> StoryBuilder.Summary {
         let summary = await buildStories(schedule, now: now)
         await enrich(
-            until: deadline, now: now, schedule: schedule,
+            until: deadline, now: now, schedule: schedule, holding: size,
             onWriting: onWriting, onFiling: onFiling, onPhase: onPhase)
         return summary
     }

@@ -143,6 +143,22 @@ nonisolated struct EditionSummarizer: Sendable {
     /// enough to spend the window on one of the ten.
     static let lineShown = 160
 
+    /// How many of the page's stories the model is shown.
+    ///
+    /// **The lead ten, however long the page is.** The window holds the prompt
+    /// and the answer together, and a prompt that leaves no room for an answer
+    /// is not sent at all : see ``attempt(_:of:saying:)``, where an edition too
+    /// long to write is left unwritten, which on a device with only the model
+    /// on it means no front page. A reader who asks for twenty stories would
+    /// have doubled the prompt to buy three lines of type.
+    ///
+    /// It costs nothing that was ever promised. The points are what the page
+    /// adds up to, and what a page adds up to is what leads it : the model is
+    /// shown the stories in the order the page shows them, so the ten it reads
+    /// are the ten the reader reads first. For a short page it is the whole
+    /// page, which is what it always was.
+    static let storiesShown = 10
+
     let locale: Locale
 
     /// Who answers this question, and how patient to be with them.
@@ -167,7 +183,13 @@ nonisolated struct EditionSummarizer: Sendable {
     /// or a court report, and the writing voice refuses those outright. A page
     /// of ten published headlines said in five lines is a transformation of
     /// published text, and saying so is what gets it written.
-    func brief(over stories: [(title: String, summary: String?)], of slot: EditionSlot) async -> Outcome {
+    func brief(over page: [(title: String, summary: String?)], of slot: EditionSlot) async -> Outcome {
+        // **The stories that lead the page, and not the whole of it.** Bounded
+        // here rather than in the prompt, so that what the model is shown and
+        // what its answer is checked against are one list : a point naming a
+        // year found only in the twentieth story would otherwise pass for
+        // something it read. See ``storiesShown``.
+        let stories = Array(page.prefix(Self.storiesShown))
         guard hand.isAvailable, stories.count > 1 else { return .unusable }
 
         // **A second voice only where a second voice is worth anything.** The
@@ -388,8 +410,9 @@ nonisolated struct EditionSummarizer: Sendable {
             .withinTheBound()
     }
 
-    /// What the model is shown : the ten heads, in the order the page shows
-    /// them, and nothing else.
+    /// What the model is shown : the heads it was handed, in the order the page
+    /// shows them, and nothing else. What is handed to it is bounded in
+    /// ``brief(over:of:)``.
     static func prompt(for stories: [(title: String, summary: String?)], language: String) -> String {
         let lines = stories.map { story in
             guard let line = story.summary.map({ String($0.prefix(lineShown)) }), !line.isEmpty else {

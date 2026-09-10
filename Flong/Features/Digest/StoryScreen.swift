@@ -37,8 +37,26 @@ struct StoryScreen: View {
     /// third array of every story on the page, built to be looked through once
     /// and thrown away, and the body asked for it once for the picture and once
     /// more for every article under it.
+    ///
+    /// **What the page printed answers first.** The two halves below are the
+    /// sixty newest stories of three days, narrowed to whichever subject is
+    /// chosen, and an edition's rows are neither : a story printed at noon and
+    /// pushed out of those sixty by the afternoon was found nowhere at all, so
+    /// the header was skipped and the reader who tapped a headline landed on a
+    /// bare list of articles with nothing over it. The printed rows are read by
+    /// identifier, with no window and no cap.
+    ///
+    /// First and not last, and that is the same argument the freezing rests on.
+    /// The row the reader pressed on the front page carries the head the
+    /// edition froze, and the page grows out of that very row : found in the
+    /// live page instead, a headline the model rewrote after the edition came
+    /// out changed under the reader in the middle of the transition. What the
+    /// page said is what it said. There are ten rows here, or fifteen, or
+    /// twenty, so everything else on three days of news is answered below
+    /// exactly as it was.
     private var story: DigestStory? {
-        model.digest.live.first { $0.id == storyID }
+        model.frontPageStories.first { $0.id == storyID }
+            ?? model.digest.live.first { $0.id == storyID }
             ?? model.digest.stories.first { $0.id == storyID }
     }
 
@@ -141,7 +159,13 @@ struct StoryScreen: View {
             style: .body
         )
 
-        if story.isGenerated {
+        // **And not pressable where the story has gone.** A row drawn from its
+        // frozen half alone knows nothing about who wrote the line : the model
+        // that did is read from the live story, so the popover would fall
+        // through to the sentence promising that nothing was sent anywhere,
+        // which for a headline a provider wrote is false. The mark stays and
+        // says the model wrote it ; what cannot be answered is not offered.
+        if story.isGenerated, story.hasFigures {
             Button {
                 isExplaining = true
             } label: {
@@ -198,7 +222,24 @@ struct StoryScreen: View {
         .presentationCompactAdaptation(.popover)
     }
 
+    /// Who is saying it, how many of them, and how long ago the last one came.
+    ///
+    /// **Nothing at all where there is nothing to say.** A page keeps its rows
+    /// however a purge has thinned the stream underneath it, so a row can
+    /// outlive the story it was printed from. Drawn anyway it claims nought
+    /// rooms, which VoiceOver reads out as a fact, an empty sparkline, and a
+    /// moment computed off the edition's own dateline standing in for a date
+    /// nobody knows. A headline with no figures is a headline. The row on the
+    /// front page has always said so ; this page could not, because it never
+    /// found such a story at all.
+    @ViewBuilder
     private func facts(_ story: DigestStory) -> some View {
+        if story.hasFigures {
+            factsLine(story)
+        }
+    }
+
+    private func factsLine(_ story: DigestStory) -> some View {
         HStack(spacing: 10) {
             if story.isLive {
                 LiveDot()

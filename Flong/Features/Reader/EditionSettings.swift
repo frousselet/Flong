@@ -23,7 +23,7 @@ import SwiftUI
 /// page at all, so the screen says so rather than letting the reader find out
 /// on the page next door.
 struct EditionSettings: View {
-    let model: AppModel
+    @Bindable var model: AppModel
 
     var body: some View {
         List {
@@ -43,12 +43,50 @@ struct EditionSettings: View {
                     // read in English on a French device, and nothing would
                     // have said so.
                     Text(
-                        "Each edition holds what happened since the one before it, with the ten stories that matter most. It does not change until the next one comes out, and what did not fit stays in the wire."
+                        "Each edition holds what happened since the one before it, with the stories that matter most. It does not change until the next one comes out, and what did not fit stays in the wire."
                     )
                 }
             }
+
+            length
         }
         .navigationTitle(Text("Editions"))
+    }
+
+    /// How long the reader wants their paper.
+    ///
+    /// **Three lengths in words, with the count under each.** A stepper on a
+    /// number would ask the reader to have an opinion about a figure, and the
+    /// figure is not what they have an opinion about : they want a short paper
+    /// or a long one. The count is said all the same, since it is the only
+    /// thing that separates the three and a reader picking blind would have to
+    /// pick twice to find out.
+    private var length: some View {
+        Section {
+            Picker(selection: $model.editionSize) {
+                ForEach(EditionSize.allCases) { size in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(size.title)
+                        Text("\(size.stories) stories")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
+                    .tag(size)
+                }
+            } label: {
+                Text("Length")
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+            .accessibilityIdentifier("edition-length")
+        } header: {
+            Text("Length")
+        } footer: {
+            Text(
+                "A longer edition carries more stories. It takes nothing out of the wire, which holds everything either way."
+            )
+        }
     }
 
     private func row(_ slot: EditionSlot) -> some View {

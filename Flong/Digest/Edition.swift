@@ -52,6 +52,48 @@ nonisolated enum EditionSlot: String, Codable, Hashable, Sendable, CaseIterable 
     }
 }
 
+/// How much of a paper the reader wants.
+///
+/// **Ten was a good number and it was everybody's.** Ten is what a person reads
+/// over a coffee, which is the right cap for somebody who follows forty feeds
+/// and looks in four times a day. It is not the right cap for somebody who
+/// follows three hundred and looks in once, and there is no number that is
+/// right for both : what did not fit is in the wire, which is true and is no
+/// answer to a reader who wanted a longer paper.
+///
+/// Three lengths and never a number typed in. A field would ask the reader to
+/// have an opinion about a figure, and the figure is not what they have an
+/// opinion about : they want a short paper, or a long one.
+nonisolated enum EditionSize: String, Codable, Hashable, Sendable, CaseIterable, Identifiable {
+    case short
+    case medium
+    case long
+
+    var id: Self { self }
+
+    /// What the reader picks, in the settings.
+    var title: LocalizedStringResource {
+        switch self {
+        case .short: "Short"
+        case .medium: "Medium"
+        case .long: "Long"
+        }
+    }
+
+    /// How many stories a page of this length carries at most.
+    var stories: Int {
+        switch self {
+        case .short: 10
+        case .medium: 15
+        case .long: 20
+        }
+    }
+
+    /// What a reader has before they have said anything, which is the paper
+    /// every reader had until they could choose.
+    static let standard = EditionSize.short
+}
+
 /// When each of the four comes out, as the reader has it.
 ///
 /// **A choice, so it travels.** Everything the reader decides about themselves

@@ -91,6 +91,7 @@ struct ErasureTests {
         store.place = Place(city: "Paris", country: "France", countryCode: "FR")
         store.articleBody = .page
         store.theme = .solarized
+        store.editionSize = .long
         store.wantsNewStoryNotices = true
         store.storiesAnnouncedAt = Date()
         let device = store.device
@@ -103,6 +104,7 @@ struct ErasureTests {
         #expect(store.place == nil)
         #expect(store.articleBody == .feed)
         #expect(store.theme == .standard)
+        #expect(store.editionSize == .short)
         #expect(!store.wantsNewStoryNotices)
         #expect(store.storiesAnnouncedAt == nil)
         // The identifier goes too, and the next one asked for is a new one.

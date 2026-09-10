@@ -131,11 +131,16 @@ struct EditionStoreTests {
     /// Written straight into the store : what these tests pin is which stories
     /// reach a page and in what order, and grouping a corpus to get there would
     /// be testing the grouping.
+    /// - Parameter rooms: how many newsrooms the articles are spread over, one
+    ///   apiece by default. Fewer than there are articles puts several feeds
+    ///   under one host, which is a paper running a story in several of its
+    ///   sections and counts once.
     @discardableResult
     private func story(
         _ title: String,
         endingHoursBeforeNoon hours: Double,
         articles count: Int = 2,
+        rooms: Int? = nil,
         written: Bool = true,
         groupedHoursBeforeNoon grouped: Double? = nil
     ) async throws -> UUID {
@@ -153,9 +158,10 @@ struct EditionStoreTests {
 
         try await database.writer.write { [story] db in
             try story.insert(db)
+            let spread = max(1, min(rooms ?? count, count))
             for index in 0..<count {
-                let host = "edition-\(abs(title.hashValue))-\(index).example.com"
-                var feed = Feed(url: URL(string: "https://\(host)/f.xml")!, title: host)
+                let host = "edition-\(abs(title.hashValue))-\(index % spread).example.com"
+                var feed = Feed(url: URL(string: "https://\(host)/f\(index).xml")!, title: host)
                 feed.siteURL = URL(string: "https://\(host)")
                 try feed.insert(db)
 
@@ -189,26 +195,103 @@ struct EditionStoreTests {
     /// Opens the page being made and chooses what stands on it, which is what
     /// every pass does.
     @discardableResult
-    private func make(at moment: Date? = nil) async throws -> Edition {
+    private func make(at moment: Date? = nil, holding size: EditionSize = .standard) async throws -> Edition {
         let moment = moment ?? now
         let edition = try #require(await editions.open(.standard, now: moment, calendar: calendar))
-        try await editions.compose(edition, now: moment)
+        try await editions.compose(edition, holding: size, now: moment)
         return edition
     }
 
-    @Test("An edition holds ten stories, and the rest is the wire")
-    func tenAndNoMore() async throws {
-        for index in 0..<14 {
+    @Test("An edition holds what the reader asked for, and the rest is the wire")
+    func cappedAtWhatWasAskedFor() async throws {
+        for index in 0..<24 {
             try await story("Actualité \(index)", endingHoursBeforeNoon: Double(index) + 1)
         }
 
         let edition = try await make()
         let held = try await rows(of: edition.id)
 
-        #expect(held.count == EditionStore.mostStories)
+        #expect(held.count == EditionSize.short.stories)
         // The page's own order : the most recent first, since nothing here has
         // a subject the reader has spoken about and every story weighs the same.
         #expect(held.first?.title == "Actualité 0")
+    }
+
+    /// Ten is what a person reads over a coffee, and it is not everybody. A
+    /// reader who follows three hundred feeds and looks in once a day may ask
+    /// for a longer paper, and what did not fit was never hidden anyway.
+    @Test("A reader who asks for a longer paper gets one")
+    func aLongerPaper() async throws {
+        for index in 0..<24 {
+            try await story("Actualité \(index)", endingHoursBeforeNoon: Double(index) + 1)
+        }
+
+        let edition = try await make(holding: .long)
+        let held = try await rows(of: edition.id)
+
+        #expect(held.count == EditionSize.long.stories)
+        #expect(held.count == 20)
+        #expect(held.first?.title == "Actualité 0")
+    }
+
+    /// A cap and never a quota : a quiet period gives what it has.
+    @Test("A long paper does not invent stories to fill itself")
+    func aLongPaperIsStillACap() async throws {
+        for index in 0..<3 {
+            try await story("Actualité \(index)", endingHoursBeforeNoon: Double(index) + 1)
+        }
+
+        let edition = try await make(holding: .long)
+
+        #expect(try await rows(of: edition.id).count == 3)
+    }
+
+    /// The three lengths are three lengths, and the shortest is what a reader
+    /// has before they have said anything : a default that drifted would give
+    /// every reader who never opened the setting a different paper.
+    @Test("The lengths are ten, fifteen and twenty, and the short one is the default")
+    func theThreeLengths() {
+        #expect(EditionSize.short.stories == 10)
+        #expect(EditionSize.medium.stories == 15)
+        #expect(EditionSize.long.stories == 20)
+        #expect(EditionSize.standard == .short)
+    }
+
+    /// **Several rooms have to be saying it.** One room repeating itself is a
+    /// newsroom having a busy afternoon rather than an event, and it took one of
+    /// the ten slots a reader gets. The group is still a story and still reaches
+    /// the page of its subject : what it does not do is lead the paper.
+    @Test("A story only one room is covering does not reach the page")
+    func oneRoomDoesNotLead() async throws {
+        try await story("Deux salles", endingHoursBeforeNoon: 2)
+        try await story("Trois salles", endingHoursBeforeNoon: 3, articles: 3)
+        try await story("Une salle, dix fois", endingHoursBeforeNoon: 1, articles: 10, rooms: 1)
+
+        let edition = try await make()
+        let held = try await rows(of: edition.id).map(\.title)
+
+        // A set, since what is under test is which stories reach the page and
+        // not the order they stand in, which the weight decides and which the
+        // suite pins elsewhere.
+        #expect(Set(held) == ["Deux salles", "Trois salles"])
+
+        // And it is still a story, in the store and in the wire and on the page
+        // of its subject. The rule is the edition's taste and not the
+        // definition of a story.
+        #expect(try await database.writer.read { db in try Story.fetchCount(db) } == 3)
+    }
+
+    /// Weight is the second key of the edition's own sort, so eleven articles
+    /// beat two. The room test runs before the sort and is not a tie-break :
+    /// otherwise the busiest newsroom of the morning leads the paper.
+    @Test("Eleven pieces from one room do not outrank two from two")
+    func weightDoesNotBuyASlot() async throws {
+        try await story("Une chaîne toute la matinée", endingHoursBeforeNoon: 1, articles: 11, rooms: 1)
+        try await story("Deux rédactions", endingHoursBeforeNoon: 2)
+
+        let edition = try await make()
+
+        #expect(try await rows(of: edition.id).map(\.title) == ["Deux rédactions"])
     }
 
     /// **Only stories the model has written about.** It is what makes `every
@@ -848,6 +931,46 @@ struct EditionScheduleSettleTests {
         await model.load()
 
         #expect(model.editionSchedule == wanted)
+    }
+}
+
+/// How long a paper the reader asked for.
+///
+/// It travels like the hours and unlike them it is written straight through :
+/// three rows in a list, so the value the reader touches is the value they
+/// meant and there is nothing to wait for. What has to hold all the same is
+/// that a read-back does not undo it, ``AppModel/load()`` being the tail of
+/// every refresh, every pull and every mark-all-read.
+@Suite("How long a paper the reader wants", .serialized)
+@MainActor
+struct EditionSizeTests {
+    private let defaults: UserDefaults
+    private let model: AppModel
+
+    init() throws {
+        defaults = UserDefaults(suiteName: "flong.size.\(UUID())") ?? .standard
+        model = AppModel(
+            database: try AppDatabase.inMemory(),
+            preferences: Preferences(cloud: nil, local: defaults)
+        )
+    }
+
+    @Test("A reader who has said nothing has the short paper")
+    func theDefault() {
+        #expect(model.editionSize == .short)
+        #expect(Preferences(cloud: nil, local: defaults).editionSize == .short)
+    }
+
+    @Test("The length the reader chose is written down and survives a refresh")
+    func aChoiceIsKept() async throws {
+        model.editionSize = .long
+
+        #expect(Preferences(cloud: nil, local: defaults).editionSize == .long)
+
+        // What every refresh ends with.
+        await model.load()
+
+        #expect(model.editionSize == .long)
     }
 }
 

@@ -1246,6 +1246,7 @@ final class AppModel {
         self.wantsNewStoryNotices = preferences.wantsNewStoryNotices
         self.wantsNewEditionNotices = preferences.wantsNewEditionNotices
         self.heldSchedule = preferences.editionSchedule
+        self.editionSize = preferences.editionSize
         self.wantsNewArticleNotices = preferences.wantsNewArticleNotices
         self.wantsCollaborationNotices = preferences.wantsCollaborationNotices
         self.mutedSharedCollections = preferences.mutedSharedCollections
@@ -1548,6 +1549,7 @@ final class AppModel {
             heldSchedule = carried
             scheduleTheNextEdition()
         }
+        if preferences.editionSize != editionSize { editionSize = preferences.editionSize }
         if preferences.articleBody != articleBody { articleBody = preferences.articleBody }
         if preferences.theme != theme { theme = preferences.theme }
         if preferences.recentSearches != recentSearches { recentSearches = preferences.recentSearches }
@@ -1662,6 +1664,25 @@ final class AppModel {
     /// once, which was right while there was one model to answer for.
     func absence(of task: ModelTask) -> LocalizedStringResource? {
         models.absence(of: task)
+    }
+
+    /// How long the reader wants their paper, which caps the stories the next
+    /// edition carries.
+    ///
+    /// **Held like the hours, and written straight through unlike them.** The
+    /// hours are dragged on a wheel, so a hundred and twenty values the reader
+    /// never meant pass under their thumb and the write has to wait for them to
+    /// stop. This is three rows in a list : the value they touch is the value
+    /// they meant.
+    ///
+    /// Nothing is rebuilt from here either. A page that has come out is frozen,
+    /// and the one being made is composed again on every pass, so the next pass
+    /// takes the new length without being asked.
+    var editionSize = EditionSize.standard {
+        didSet {
+            guard editionSize != oldValue else { return }
+            preferences.editionSize = editionSize
+        }
     }
 
     /// Whether an edition will ever be written.
@@ -2881,6 +2902,7 @@ final class AppModel {
             await self.digestService.enrich(
                 until: Date().addingTimeInterval(BackgroundScheduler.fullPassBudget),
                 schedule: self.preferences.editionSchedule,
+                holding: self.preferences.editionSize,
                 onWriting: self.progress(of: .writing),
                 onFiling: self.progress(of: .filing),
                 onNaming: self.progress(of: .naming),
@@ -3073,6 +3095,7 @@ final class AppModel {
             await self.digestService.enrich(
                 until: Date().addingTimeInterval(BackgroundScheduler.fullPassBudget),
                 schedule: self.preferences.editionSchedule,
+                holding: self.preferences.editionSize,
                 onWriting: self.progress(of: .writing),
                 onFiling: self.progress(of: .filing),
                 onNaming: self.progress(of: .naming),
@@ -3408,6 +3431,7 @@ final class AppModel {
         setPlace(nil)
         articleBody = .feed
         theme = .standard
+        editionSize = .standard
         wantsNewStoryNotices = false
         wantsNewEditionNotices = false
         edition = nil
@@ -5104,6 +5128,7 @@ final class AppModel {
             await digestService.enrich(
                 until: deadline,
                 schedule: preferences.editionSchedule,
+                holding: preferences.editionSize,
                 onWriting: progress(of: .writing),
                 onFiling: progress(of: .filing),
                 onNaming: progress(of: .naming),

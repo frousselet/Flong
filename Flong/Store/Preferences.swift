@@ -64,6 +64,7 @@ nonisolated final class Preferences: @unchecked Sendable {
         static let poolContributes = "pool.contributes"
         static let poolIdentifier = "pool.identifier"
         static let editionSchedule = "edition.schedule"
+        static let editionSize = "edition.size"
         static let providers = "model.providers"
         static let newEditionNotices = "notify.new-editions"
         static let editionsAnnouncedAt = "notify.editions-announced-at"
@@ -73,8 +74,8 @@ nonisolated final class Preferences: @unchecked Sendable {
             articleBody, theme, firstName, lastName, picture, city, country, countryCode, device,
             newStoryNotices, newArticleNotices, storiesAnnouncedAt, articlesAnnouncedAt, collaborationNotices,
             mutedCollections, collaborationsAnnouncedAt, recentSearches,
-            poolContributes, poolIdentifier, editionSchedule, editionsAnnouncedAt, newEditionNotices,
-            providers,
+            poolContributes, poolIdentifier, editionSchedule, editionSize, editionsAnnouncedAt,
+            newEditionNotices, providers,
         ]
     }
 
@@ -402,6 +403,23 @@ nonisolated final class Preferences: @unchecked Sendable {
             cloud?.set(data, forKey: Key.editionSchedule)
             cloud?.synchronize()
         }
+    }
+
+    /// How many stories the reader wants their paper to carry.
+    ///
+    /// Beside the hours and for the same reason : it is a decision about
+    /// themselves rather than about a device, and a reader who asked for a long
+    /// paper on the phone did not mean only on the phone. Unlike the hours it
+    /// changes nothing that two devices have to agree on : an edition is known
+    /// by its boundary, so two devices reading one schedule build one page, and
+    /// one of them making it longer than the other costs a few rows and not an
+    /// identity.
+    ///
+    /// The short one until they say otherwise, which is the paper every reader
+    /// had before the setting existed.
+    var editionSize: EditionSize {
+        get { value(for: Key.editionSize).flatMap(EditionSize.init(rawValue:)) ?? .standard }
+        set { set(newValue.rawValue, for: Key.editionSize) }
     }
 
     /// The models the reader configured, and which of them answers what.
