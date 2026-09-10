@@ -732,6 +732,32 @@ nonisolated struct DigestService: Sendable {
     /// How long either half gets before the other has a go.
     static let enrichmentSlice: TimeInterval = 15
 
+    /// When the writing and the filing have to stop, which is a slice short of
+    /// the end of the turn.
+    ///
+    /// **The naming's slice is taken, and it was left over.** The two halves
+    /// above ran to the end of the turn and the naming was given whatever
+    /// remained, which on the one morning it matters is nothing at all : a
+    /// night's stories all want a headline, every story that gained an article
+    /// wants its own again, and a hundred and twenty seconds of that leaves a
+    /// deadline already gone. The page was never asked about, and the reader
+    /// woke at ten to last night's paper. It is one call for a whole page, so
+    /// what it costs the other two is one call apiece.
+    static func writingEnds(by end: Date) -> Date { end.addingTimeInterval(-enrichmentSlice) }
+
+    /// When the naming has to stop, which is the end of the turn or a slice
+    /// from here, whichever is later.
+    ///
+    /// **A floor, because a slice reserved is not a slice kept.** A deadline is
+    /// read before a call rather than during it, so a headline begun a moment
+    /// before the writing was due to stop runs on past it and can carry the
+    /// whole reservation away with it. The page is the one thing in the turn a
+    /// reader is waiting for and it is a single call, so it is worth the
+    /// seconds it overruns by.
+    static func namingEnds(by end: Date, at now: Date = Date()) -> Date {
+        max(end, now.addingTimeInterval(enrichmentSlice))
+    }
+
     /// Writes the headlines and files the subjects, turn about.
     ///
     /// **Turn about, and not one after the other.** A written headline says
@@ -744,7 +770,9 @@ nonisolated struct DigestService: Sendable {
     ///
     /// A slice each, in turn, until there is nothing left to do or no time left
     /// to do it in. Neither half can starve the other, and both stop cleanly on
-    /// a batch that changed nothing.
+    /// a batch that changed nothing. **And neither may starve the third**, the
+    /// two of them working to a slice short of the end so the naming has one :
+    /// see ``writingEnds(by:)``.
     /// - Parameter schedule: when the reader's editions come out. The page is
     ///   filled again between the briefs and the naming, and it has to be : a
     ///   story is only eligible for an edition once the model has written about
@@ -778,14 +806,17 @@ nonisolated struct DigestService: Sendable {
         // said properly.
         let coming = await openEdition(schedule, now: now)
 
-        while !Task.isCancelled, Date() < end {
+        // A slice short of the end, and the last one belongs to the naming.
+        let writing = Self.writingEnds(by: end)
+
+        while !Task.isCancelled, Date() < writing {
             onPhase(.writing)
-            let slice = min(Date().addingTimeInterval(Self.enrichmentSlice), end)
+            let slice = min(Date().addingTimeInterval(Self.enrichmentSlice), writing)
             let written = await brief(
                 until: slice, now: now, periodStart: coming?.periodStart, onProgress: onWriting)
 
             onPhase(.filing)
-            let next = min(Date().addingTimeInterval(Self.enrichmentSlice), end)
+            let next = min(Date().addingTimeInterval(Self.enrichmentSlice), writing)
             let filed = await nameTopics(
                 until: next, now: now, periodStart: coming?.periodStart, onProgress: onFiling)
 
@@ -796,13 +827,14 @@ nonisolated struct DigestService: Sendable {
         // the stories on it, so a page named before they were written would be
         // named over the titles of whichever articles happened to be nearest
         // the middle of each group. It is also the cheapest of the three, being
-        // one call for a whole page, so going last costs it nothing : what the
-        // other two leave it is always enough for one ask.
+        // one call for a whole page, so going last costs the other two one call
+        // apiece : what it works to is a slice of its own rather than whatever
+        // they happened to leave, which on a morning was nothing.
         onPhase(.naming)
         await makeTheEdition(
             schedule,
             now: now,
-            until: min(Date().addingTimeInterval(Self.enrichmentSlice), end),
+            until: Self.namingEnds(by: end),
             onNaming: onNaming
         )
     }

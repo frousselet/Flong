@@ -624,6 +624,50 @@ struct EditionBriefWorkTests {
     }
 }
 
+/// How the model's turn is shared between the three things it does in one.
+///
+/// **The page is what the turn is for, and it was the one thing that could get
+/// none of it.** The headlines and the subjects took a slice each in turn until
+/// the turn was over, and the naming was given whatever was left on the grounds
+/// that one call for a whole page costs nothing to put last. What was left on a
+/// morning was nothing : the night's stories all wanted a headline, every story
+/// that had gained an article wanted its own written again, and the naming was
+/// reached with its deadline already behind it. No call was made, no page came
+/// out, and the reader had last night's paper at ten.
+@Suite("How the model's turn is shared")
+struct EnrichmentTurnTests {
+    private let start = Date(timeIntervalSince1970: 1_788_000_000)
+    private var end: Date { start.addingTimeInterval(DigestService.enrichmentTurn) }
+
+    @Test("The writing and the filing stop a slice short of the end")
+    func writingLeavesTheLastSlice() {
+        #expect(
+            DigestService.writingEnds(by: end)
+                == end.addingTimeInterval(-DigestService.enrichmentSlice))
+        #expect(DigestService.writingEnds(by: end) > start)
+    }
+
+    @Test("The naming works to the end of the turn when the writing stopped in time")
+    func namingTakesWhatWasReserved() {
+        let stopped = DigestService.writingEnds(by: end)
+        #expect(DigestService.namingEnds(by: end, at: stopped) == end)
+        #expect(DigestService.namingEnds(by: end, at: stopped) > stopped)
+    }
+
+    /// A deadline is read before a call and not during one, so a headline begun
+    /// a moment before the writing was due to stop runs on past it. Without a
+    /// floor that one call carries the whole reservation away and the page is
+    /// asked about on no pass at all.
+    @Test("A page is still asked about when the writing overran the whole turn")
+    func namingHasAFloor() {
+        let overran = end.addingTimeInterval(5)
+        #expect(DigestService.namingEnds(by: end, at: overran) > overran)
+        #expect(
+            DigestService.namingEnds(by: end, at: overran)
+                == overran.addingTimeInterval(DigestService.enrichmentSlice))
+    }
+}
+
 /// The checks an edition's list is held to.
 ///
 /// **There are three left, and there were seven.** An edition carried a name of
