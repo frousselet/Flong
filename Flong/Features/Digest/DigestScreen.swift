@@ -359,6 +359,13 @@ struct DigestScreen: View {
             // contact and not a thing on the page.
             PullForBackNumbers(pull: pull) { model.openBackNumbers() }
 
+            // The foot of the page saying it has one. It goes with the pull
+            // it explains : once the archive is open there is nothing left to
+            // ask for.
+            if !model.backNumbersAreOpen {
+                PullMark(drawn: min(pull.pulled / PullForBackNumbers.threshold, 1))
+            }
+
             BackNumbersMasthead(pull: pull, isOpen: model.backNumbersAreOpen)
                 .onGeometryChange(for: CGFloat.self) { proxy in
                     proxy.frame(in: .named(Self.page)).minY

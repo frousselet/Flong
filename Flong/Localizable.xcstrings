@@ -4542,6 +4542,17 @@
         }
       }
     },
+    "Pull to see the earlier editions": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tirez pour voir les numéros précédents"
+          }
+        }
+      }
+    },
     "Puts every task back on this device.": {
       "comment": "Footer under the button that stops sending.",
       "localizations": {

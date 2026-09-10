@@ -81,6 +81,13 @@ final class EditionArchiveUITests: XCTestCase {
         let headline = app.buttons["back-number-headline"]
         XCTAssertFalse(headline.exists, "The archive is not simply under the page, it is pulled for")
 
+        // And the page says it has a bottom worth reaching : a gesture nobody
+        // knows about is a feature nobody has.
+        XCTAssertTrue(
+            app.descendants(matching: .any)["pull-mark"].exists,
+            "The foot of the page carries the mark that says to pull"
+        )
+
         // A slow drag with a hold at the end, which is a pull past the foot of
         // the page rather than a flick. More than one, because a gesture that
         // has to reach past the end of the content is the one kind of gesture a

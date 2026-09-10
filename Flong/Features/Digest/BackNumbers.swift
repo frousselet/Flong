@@ -120,6 +120,88 @@ struct BackNumbersMasthead: View {
     }
 }
 
+/// The mark at the foot of the page that says there is more under it.
+///
+/// **A page has to say that it has a bottom worth reaching.** The archive is
+/// opened by pulling past the end, and a gesture nobody knows about is a
+/// feature nobody has. So the foot of today's paper carries one small mark, and
+/// the mark is the instruction : it is a pill at rest, it bends as the reader
+/// pulls, and it is an arrow pointing down by the moment the pull takes.
+///
+/// Nothing is written under it. A line of type saying `pull for the earlier
+/// editions` would be the application explaining its own controls at the foot
+/// of the news, and a shape that turns into an arrow under the reader's own
+/// thumb explains itself.
+struct PullMark: View {
+    /// How far the pull has come, from nothing to done.
+    let drawn: CGFloat
+
+    var body: some View {
+        PullArrow(drawn: drawn)
+            .stroke(style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+            .foregroundStyle(.tertiary)
+            .frame(width: PullArrow.side, height: PullArrow.side)
+            .frame(maxWidth: .infinity)
+            .padding(.top, Editorial.rhythm)
+            // A pill is not a control, and this one is worked by a gesture a
+            // reader with VoiceOver cannot make. The words say what the shape
+            // says, and the action is the way through without them.
+            .accessibilityElement()
+            .accessibilityLabel(Text("Pull to see the earlier editions"))
+            .accessibilityIdentifier("pull-mark")
+    }
+}
+
+/// A pill that bends into an arrow.
+///
+/// **One stroke, bent.** Two shapes cross-fading is two shapes, and the reader
+/// sees a swap ; this is the same line throughout, and what moves is where its
+/// middle is. At rest the ends are level and the stroke is straight, which
+/// with a round cap at each end is a pill. As it is drawn the middle drops, the
+/// span narrows a little so the head does not read as flat, and a stem grows up
+/// out of the middle : pill, chevron, arrow, without ever being two things.
+nonisolated struct PullArrow: Shape {
+    var drawn: CGFloat
+
+    /// The room it is drawn in, square so the stem has somewhere to grow.
+    static let side: CGFloat = 26
+
+    /// Half the pill's width at rest.
+    private static let span: CGFloat = 15
+    /// How far the middle drops by the end.
+    private static let dip: CGFloat = 8
+    /// How far the stem grows by the end.
+    private static let stem: CGFloat = 10
+    /// How much the span closes as the head bends, so a wide chevron does not
+    /// read as a line that merely sagged.
+    private static let close: CGFloat = 0.34
+
+    /// Interpolated by the framework where anything animates it, and driven
+    /// straight off the gesture where the reader is doing the moving.
+    var animatableData: CGFloat {
+        get { drawn }
+        set { drawn = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let drawn = min(max(self.drawn, 0), 1)
+        let middle = CGPoint(x: rect.midX, y: rect.midY + Self.dip * drawn / 2)
+        let span = Self.span * (1 - Self.close * drawn)
+
+        var path = Path()
+        path.move(to: CGPoint(x: middle.x - span, y: middle.y - Self.dip * drawn))
+        path.addLine(to: middle)
+        path.addLine(to: CGPoint(x: middle.x + span, y: middle.y - Self.dip * drawn))
+
+        // The stem, which is nothing at all until the head has begun to bend :
+        // a stem on a straight bar is a cross.
+        guard drawn > 0 else { return path }
+        path.move(to: middle)
+        path.addLine(to: CGPoint(x: middle.x, y: middle.y - Self.stem * drawn))
+        return path
+    }
+}
+
 /// One back number, as it was.
 ///
 /// The rows are the edition's own frozen heads rather than a read of the story
