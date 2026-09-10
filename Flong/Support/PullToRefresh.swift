@@ -42,8 +42,8 @@ import SwiftUI
 /// returned, which is what pushed the page down for the whole of a fetch, what
 /// sometimes left it pushed down afterwards, and what stopped the page being
 /// read back under it. It is an acknowledgement and not a measure : it says the
-/// pull was heard and retracts on the beat, and ``WorkRing`` in the reader's
-/// corner is what says the work is running.
+/// pull was heard and retracts on the beat, and the band at the head of the
+/// reader's own panel is what says the work is running.
 ///
 /// iOS only. A Mac has no pull and, since the command came out of the reader's
 /// menu, nothing there asks by hand at all : it keeps up through the clock
