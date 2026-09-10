@@ -608,10 +608,13 @@ struct EditionStoreTests {
         #expect(try await editions.archive(now: now).map(\.edition.id) == [edition.id])
     }
 
-    /// An edition older than the window its stories are held to is a page of
-    /// headlines whose articles have gone.
-    @Test("The purge takes what has fallen out of the window")
-    func purge() async throws {
+    /// A newspaper is kept. What a back number loses with age is its figures
+    /// and the way into its stories, and neither is a reason to burn the paper :
+    /// the headline, the line under it, the picture and the order are frozen
+    /// beside the page, and a reader scrolling back through their own year is
+    /// asking for exactly what is left.
+    @Test("A page that came out is kept, however old it gets")
+    func publishedPagesAreKept() async throws {
         try await story("Une", endingHoursBeforeNoon: 1)
         try await story("Deux", endingHoursBeforeNoon: 2)
 
@@ -619,22 +622,42 @@ struct EditionStoreTests {
         try await publish(edition.id)
 
         // A newer page, so the one under test is no longer the paper on the
-        // table and the purge may take it.
+        // table and nothing is sparing it for that reason.
         let later = now.addingTimeInterval(6 * 3600)
         try await story("Ce soir", endingHoursBeforeNoon: -5)
         try await story("Ce soir encore", endingHoursBeforeNoon: -5.5)
         let evening = try await make(at: later)
         try await publish(evening.id, at: later)
 
-        let muchLater = later.addingTimeInterval(EditionStore.archived + 24 * 3600)
-        _ = try await editions.purge(now: muchLater)
+        let aYearOn = later.addingTimeInterval(365 * 24 * 3600)
+        #expect(try await editions.purge(now: aYearOn) == 0)
+        #expect(try await editions.archive(now: aYearOn).map(\.edition.id) == [evening.id, edition.id])
+    }
 
+    /// A boundary a sleeping device missed, or a slot the reader abolished : its
+    /// hour has gone and it will never be written, so nothing is lost with it
+    /// and the period folds into the page that follows.
+    @Test("The purge takes a page that was abandoned")
+    func purgeTakesTheAbandoned() async throws {
+        try await story("Une", endingHoursBeforeNoon: 1)
+        try await story("Deux", endingHoursBeforeNoon: 2)
+
+        // Opened and never published, then superseded by the next boundary,
+        // which closes it.
+        _ = try await make()
+        let later = now.addingTimeInterval(6 * 3600)
+        try await story("Ce soir", endingHoursBeforeNoon: -5)
+        try await story("Ce soir encore", endingHoursBeforeNoon: -5.5)
+        let evening = try await make(at: later)
+        try await publish(evening.id, at: later)
+
+        let muchLater = later.addingTimeInterval(EditionStore.abandoned + 24 * 3600)
+        #expect(try await editions.purge(now: muchLater) == 1)
         #expect(try await editions.archive(now: muchLater).map(\.edition.id) == [evening.id])
     }
 
     /// A quiet reader whose periods keep failing to fill two stories keeps one
-    /// page for days, and the age would eventually take it and leave the front
-    /// page blank.
+    /// page for days, and an age that took it would leave the front page blank.
     @Test("The purge never takes the page on the table")
     func purgeSparesTheCurrent() async throws {
         try await story("Une", endingHoursBeforeNoon: 1)
@@ -643,10 +666,49 @@ struct EditionStoreTests {
         let edition = try await make()
         try await publish(edition.id)
 
-        let muchLater = now.addingTimeInterval(EditionStore.archived + 24 * 3600)
+        let muchLater = now.addingTimeInterval(EditionStore.abandoned + 24 * 3600)
         _ = try await editions.purge(now: muchLater)
 
         #expect(try await editions.current(now: muchLater)?.edition.id == edition.id)
+    }
+
+    /// The archive is scrolled into rather than opened, so it is read a handful
+    /// at a time, from the hour of the oldest one already on the page.
+    @Test("The back numbers come a handful at a time, oldest cursor first")
+    func archiveIsPaged() async throws {
+        // Five pages that came out, written straight into the store : what this
+        // pins is the cursor and not the composing, which the rest of the suite
+        // covers at length.
+        let hours = (0..<5).map { noon.addingTimeInterval(Double($0) * 3600) }
+        try await database.writer.write { db in
+            for (index, hour) in hours.enumerated() {
+                try Edition(
+                    slot: .noon,
+                    openedAt: hour,
+                    coversFrom: hour.addingTimeInterval(-3600),
+                    points: ["Un point \(index)"],
+                    publishedAt: hour
+                ).insert(db)
+            }
+        }
+
+        // Newest first, which is the order a reader scrolls them in.
+        let newest = hours.reversed().map { $0 }
+
+        let first = try await editions.archive(limit: 2, now: now)
+        #expect(first.map(\.edition.openedAt) == Array(newest.prefix(2)))
+
+        let next = try await editions.archive(before: newest[1], limit: 2, now: now)
+        #expect(next.map(\.edition.openedAt) == Array(newest.dropFirst(2).prefix(2)))
+
+        // Short of what it asked for is the end of the archive, which is how
+        // the page knows to stop asking.
+        let last = try await editions.archive(before: newest[3], limit: 2, now: now)
+        #expect(last.map(\.edition.openedAt) == [newest[4]])
+
+        // Open at the top : the hour handed in is the one already shown, and it
+        // is never shown twice.
+        #expect(try await editions.archive(before: newest[4], limit: 2, now: now).isEmpty)
     }
 
     /// The model call sits between the choosing and the stamping, and a page

@@ -1,0 +1,384 @@
+//
+//  BackNumbers.swift
+//  Flong
+//
+//  Created by François Rousselet on 10/09/2026.
+//
+//  This Source Code Form is subject to the terms of the Mozilla Public
+//  License, v. 2.0. If a copy of the MPL was not distributed with this
+//  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//
+
+import SwiftUI
+
+/// Where today's paper ends and the ones before it begin.
+///
+/// **A reader does not open a drawer to find yesterday's paper : it is under
+/// today's.** The back numbers stood behind a calendar in the corner of the
+/// digest, which is a control that has to be found, opened, chosen from and
+/// closed to get at a page that was already written. They are under the page
+/// now, and the way to them is the way a reader already knows.
+///
+/// What this draws is the seam. It is the one place on the page where the
+/// reader leaves the present, so it says so in words, holds the scroll for a
+/// moment, and is felt as well as seen.
+struct BackNumbersMasthead: View {
+    /// How far past the foot of the page the reader is pulling, which is what
+    /// draws the seam.
+    ///
+    /// **This one view is rebuilt on every frame of that pull, and that is the
+    /// bargain.** The same one ``EditionSinking`` makes at the other end of the
+    /// page : a value that moves per frame invalidates the body it is read in,
+    /// so it is read in a body that is two rules and three words rather than in
+    /// the page they sit on.
+    let pull: FootPull
+
+    /// Whether the archive is open under it.
+    let isOpen: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// A name the scroll can be told to catch on.
+    static let anchor = "back-numbers"
+
+    /// How far the seam is dragged behind the page while it is being pulled at.
+    ///
+    /// **In the spirit of the head of the page, which drifts up at half the
+    /// speed of the news going past it.** Here it is the seam that holds its
+    /// ground while the reader pulls the page out from under it, and catches up
+    /// exactly as the pull completes : what reads as depth is the seam and the
+    /// paper moving at two speeds, and what reads as resistance is the seam
+    /// arriving last. A line of type is the whole of it. See ``EditionHead/lag``.
+    private static let cling: CGFloat = 22
+
+    /// How far the seam has come, from nothing to done.
+    ///
+    /// It is the reader's own thumb that moves it : nothing here is on a clock.
+    /// A page that played an animation at the seam would be the application
+    /// performing ; this is the page answering the hand, and it completes at
+    /// the moment the pull takes and the tap is felt.
+    ///
+    /// One once the archive is open. What is under the page is no longer being
+    /// revealed, so a seam that went on drawing and undrawing itself as the
+    /// reader passed it would be an effect for its own sake, and it would drift
+    /// over the dateline of the paper underneath.
+    private var drawn: CGFloat {
+        guard !reduceMotion, !isOpen else { return 1 }
+        return min(pull.pulled / PullForBackNumbers.threshold, 1)
+    }
+
+    var body: some View {
+        // Read once. It is three views deep and it moves per frame.
+        let drawn = self.drawn
+
+        VStack(spacing: 10) {
+            // Two rules with the words between them, which is what a masthead
+            // does : the page above is over, and the page below is a different
+            // day. One rule would read as another story's separator.
+            //
+            // They open from the middle as the reader pulls, which is the one
+            // gesture that says *a boundary is closing behind you* without a
+            // word : a rule that faded in evenly would be a rule appearing, and
+            // this is a rule being drawn.
+            rule(drawn)
+
+            Text("Earlier editions")
+                .font(.system(.footnote, weight: .semibold))
+                .textCase(.uppercase)
+                .kerning(0.8)
+                .foregroundStyle(.secondary)
+                // Up from under the rule and out to its own size, so the words
+                // arrive rather than switch on. Transforms and opacity only :
+                // the compositor does those without a pass of its own, and a
+                // blur here would be an offscreen render on every frame of the
+                // gesture. See ``EditionSinking``.
+                .opacity(Double(drawn * drawn))
+                .scaleEffect(0.9 + 0.1 * drawn)
+                .offset(y: (1 - drawn) * 12)
+
+            rule(drawn)
+        }
+        .padding(.top, Editorial.rhythm * 2)
+        .padding(.bottom, Editorial.rhythm)
+        .frame(maxWidth: .infinity)
+        // Held back against the pull, and caught up by the end of it.
+        .offset(y: (1 - drawn) * Self.cling)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+        // An identifier beside the words, because the words are translated and
+        // a test that looked for the English would pass here and fail on a
+        // device set to the reader's own language.
+        .accessibilityIdentifier(Self.anchor)
+    }
+
+    private func rule(_ drawn: CGFloat) -> some View {
+        Rectangle()
+            .fill(.quaternary)
+            .frame(height: 1)
+            .scaleEffect(x: 0.12 + 0.88 * drawn, anchor: .center)
+            .opacity(Double(0.35 + 0.65 * drawn))
+    }
+}
+
+/// The mark at the foot of the page that says there is more under it.
+///
+/// **A page has to say that it has a bottom worth reaching.** The archive is
+/// opened by pulling past the end, and a gesture nobody knows about is a
+/// feature nobody has. So the foot of today's paper carries one small mark, and
+/// the mark is the instruction : it is a pill at rest, it bends as the reader
+/// pulls, and it is an arrow pointing down by the moment the pull takes.
+///
+/// Nothing is written under it. A line of type saying `pull for the earlier
+/// editions` would be the application explaining its own controls at the foot
+/// of the news, and a shape that turns into an arrow under the reader's own
+/// thumb explains itself.
+struct PullMark: View {
+    /// How far the pull has come, from nothing to done.
+    let drawn: CGFloat
+
+    var body: some View {
+        PullArrow(drawn: drawn)
+            .stroke(style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+            .foregroundStyle(.tertiary)
+            .frame(width: PullArrow.side, height: PullArrow.side)
+            .frame(maxWidth: .infinity)
+            .padding(.top, Editorial.rhythm)
+            // A pill is not a control, and this one is worked by a gesture a
+            // reader with VoiceOver cannot make. The words say what the shape
+            // says, and the action is the way through without them.
+            .accessibilityElement()
+            .accessibilityLabel(Text("Pull to see the earlier editions"))
+            .accessibilityIdentifier("pull-mark")
+    }
+}
+
+/// A pill that bends into an arrow.
+///
+/// **One stroke, bent.** Two shapes cross-fading is two shapes, and the reader
+/// sees a swap ; this is the same line throughout, and what moves is where its
+/// middle is. At rest the ends are level and the stroke is straight, which
+/// with a round cap at each end is a pill. As it is drawn the middle drops, the
+/// span narrows a little so the head does not read as flat, and a stem grows up
+/// out of the middle : pill, chevron, arrow, without ever being two things.
+nonisolated struct PullArrow: Shape {
+    var drawn: CGFloat
+
+    /// The room it is drawn in, square so the stem has somewhere to grow.
+    static let side: CGFloat = 26
+
+    /// Half the pill's width at rest.
+    private static let span: CGFloat = 15
+    /// How far the middle drops by the end.
+    private static let dip: CGFloat = 8
+    /// How far the stem grows by the end.
+    private static let stem: CGFloat = 10
+    /// How much the span closes as the head bends, so a wide chevron does not
+    /// read as a line that merely sagged.
+    private static let close: CGFloat = 0.34
+
+    /// Interpolated by the framework where anything animates it, and driven
+    /// straight off the gesture where the reader is doing the moving.
+    var animatableData: CGFloat {
+        get { drawn }
+        set { drawn = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let drawn = min(max(self.drawn, 0), 1)
+        let middle = CGPoint(x: rect.midX, y: rect.midY + Self.dip * drawn / 2)
+        let span = Self.span * (1 - Self.close * drawn)
+
+        var path = Path()
+        path.move(to: CGPoint(x: middle.x - span, y: middle.y - Self.dip * drawn))
+        path.addLine(to: middle)
+        path.addLine(to: CGPoint(x: middle.x + span, y: middle.y - Self.dip * drawn))
+
+        // The stem, which is nothing at all until the head has begun to bend :
+        // a stem on a straight bar is a cross.
+        guard drawn > 0 else { return path }
+        path.move(to: middle)
+        path.addLine(to: CGPoint(x: middle.x, y: middle.y - Self.stem * drawn))
+        return path
+    }
+}
+
+/// One back number, as it was.
+///
+/// **Set exactly as today's paper is set.** The dateline over the head, the
+/// head on its own pane of glass, the lead running its picture across the
+/// column and the rest keeping theirs to a square at the side : an archive set
+/// in plainer type than the page above it would read as a summary of itself
+/// rather than as the paper it was. What it does not do is sink, which is the
+/// one thing on the front page that is about being at the top of a scroll : see
+/// ``EditionSinking``.
+///
+/// The rows are the edition's own frozen heads rather than a read of the story
+/// table : a purge that took an article shrinks a story and can tidy it away
+/// altogether, and a page from last Tuesday that lost a row would be an archive
+/// nobody could trust. What the world has since done to a story is not drawn
+/// here at all, so nothing on a back number moves again, and ``StoryRow`` draws
+/// no figures where there are none to give.
+struct BackNumber: View {
+    let published: PublishedEdition
+    /// The mark each subject wears, which a rubric is printed from. Handed down
+    /// so the rows here are set exactly as the rows above them.
+    let marks: [String: String]
+    let zoom: Namespace.ID
+    let open: (UUID) -> Void
+
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            dateline
+
+            if !published.edition.points.isEmpty {
+                EditionHead(published: published)
+            }
+
+            ForEach(Array(published.stories.enumerated()), id: \.element.position) { position, story in
+                StoryRow(
+                    story: story.printed(over: nil, on: published.edition.openedAt),
+                    isLead: position == 0,
+                    isFirst: position == 0,
+                    marks: marks,
+                    zoom: zoom
+                ) {
+                    open(story.storyID)
+                }
+                .accessibilityIdentifier("back-number-headline")
+            }
+        }
+        .padding(.bottom, Editorial.rhythm)
+    }
+
+    /// Which paper this is, set the way the front page sets its own.
+    ///
+    /// The day over the edition and its hour, which is the navigation title and
+    /// the subtitle under it said inline : a back number has no bar of its own
+    /// to put them in, and they are the two things that say which paper this
+    /// is.
+    ///
+    /// The hour and not the moment it was written : a page that arrived at ten
+    /// past eleven is still the eleven o'clock edition, and the dateline is
+    /// what says so.
+    private var dateline: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(verbatim: Datelines.day(published.edition.openedAt))
+                .font(theme.headline(.title2))
+                .foregroundStyle(.primary)
+
+            HStack(spacing: 5) {
+                Text(published.edition.slot.title)
+                Text(verbatim: "·")
+                Text(published.edition.openedAt, format: .dateTime.hour().minute())
+            }
+            .font(theme.metadata)
+            .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, Editorial.rhythm)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+}
+
+/// The row that asks for the next handful, by being reached.
+///
+/// **The reader asks by scrolling, and nothing else asks at all.** A lazy stack
+/// realizes a view a little before it comes into sight, so this one is built
+/// while there is still paper above it and the next pages are in hand by the
+/// time the thumb gets there. Keyed on how many are already held, so each batch
+/// that lands makes a new identity and the row asks once more ; without the key
+/// the task would run once and the archive would stop at eight.
+struct MoreBackNumbers: View {
+    var body: some View {
+        WaitingRing(side: 16)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Editorial.rhythm)
+            .accessibilityLabel(Text("Loading earlier editions"))
+    }
+}
+
+/// Which paper the bar is naming, and where each of them begins.
+///
+/// **The bar is the dateline, and a page that scrolls through a year of papers
+/// has to say which one is under the reader's eye.** It said today's date and
+/// today's edition whatever they were looking at, so a reader four papers down
+/// was being told the wrong day by the one line on the screen whose whole job
+/// is to say the day.
+///
+/// An object, for the reason the scroll offset is one : each paper reports
+/// where it begins as it is realized, and a dictionary written from a lazy
+/// stack's layout would rebuild the page it is a part of. The screen reads it
+/// from the scroll and never from its body. See ``PageOffset``.
+@Observable
+final class Datelines {
+    /// What the bar says over one paper, and where that paper starts.
+    struct Mark: Hashable {
+        /// Down the page's own content, which does not move when it scrolls.
+        var top: CGFloat
+        /// The day, spelled as the front page spells its own title.
+        var day: String
+        /// The edition and its hour, which is the subtitle under it.
+        var line: String
+    }
+
+    var marks: [UUID: Mark] = [:]
+
+    /// The paper whose own top is the last one at or above the top of the page.
+    ///
+    /// A plain sweep. There is one entry per paper the reader has scrolled
+    /// through, so a year of them is fifteen hundred comparisons, which is
+    /// nothing beside the frame it happens in ; a sorted structure would be
+    /// bookkeeping bought with nothing.
+    func naming(at position: CGFloat) -> Mark? {
+        marks.values.filter { $0.top <= position + Self.reach }.max { $0.top < $1.top }
+    }
+
+    /// The day, spelled as a masthead spells it.
+    ///
+    /// One spelling, read from here by the bar, by today's paper and by every
+    /// back number : three copies of a date format is three chances to print
+    /// two different dates on one screen.
+    static func day(_ date: Date) -> String {
+        let spelled = date.formatted(.dateTime.weekday(.wide).day().month(.wide))
+        // Only the first letter : French writes `samedi 29 août`, and
+        // capitalizing every word would give `Samedi 29 Août`.
+        return spelled.prefix(1).localizedUppercase + spelled.dropFirst()
+    }
+
+    /// Which edition it is and the hour it came out at, which is the line under
+    /// the day.
+    static func line(of edition: Edition) -> String {
+        "\(String(localized: edition.slot.title)) · \(edition.openedAt.formatted(.dateTime.hour().minute()))"
+    }
+
+    /// How far below the top of the page a paper's own head has to have come
+    /// before the bar takes its name.
+    ///
+    /// A hair, so the bar changes as the dateline meets it rather than a moment
+    /// before or after. The pinned subjects sit over the same edge, and a
+    /// larger reach would name the paper under them while the one above is
+    /// still on the screen.
+    private static let reach: CGFloat = 8
+}
+
+nonisolated extension View {
+    /// Reports where this paper begins and what the bar should say over it.
+    ///
+    /// Measured down the page's own content, which does not move when the page
+    /// is scrolled : what is written here changes when the layout changes and
+    /// never per frame.
+    func dateline(
+        _ datelines: Datelines, of published: PublishedEdition, day: String, in space: String
+    ) -> some View {
+        onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.frame(in: .named(space)).minY
+        } action: { top in
+            let mark = Datelines.Mark(top: top, day: day, line: Datelines.line(of: published.edition))
+            if datelines.marks[published.id] != mark { datelines.marks[published.id] = mark }
+        }
+    }
+}

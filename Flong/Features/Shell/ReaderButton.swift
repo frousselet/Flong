@@ -113,40 +113,6 @@ struct ReaderMark: View {
     }
 }
 
-/// The way to the back numbers, in the corner of the digest.
-///
-/// **It was a line under the edition's own list**, `Éditions précédentes`,
-/// which put a way *out* of the page in the middle of the page : the reader met
-/// it between what this edition says and the first story it leads on, on the
-/// way down to the news. A masthead does not carry its own archive.
-///
-/// It stands in the digest and nowhere else, which is the whole argument for
-/// its being in a toolbar rather than in the reader's menu : that menu holds
-/// what a reader tends everywhere, and a back number is about this page alone.
-///
-/// It carries the panel itself rather than a route : the reader picks an
-/// edition, reads it, and comes back to the one they were on.
-struct EditionsButton: View {
-    let model: AppModel
-
-    @State private var isOpen = false
-
-    var body: some View {
-        Button {
-            isOpen = true
-        } label: {
-            Label("Editions", systemImage: "calendar")
-        }
-        // An identifier beside the name, because the name is translated and a
-        // test that looked for the English would pass here and fail on a device
-        // set to the reader's own language.
-        .accessibilityIdentifier("edition-archive")
-        .sheet(isPresented: $isOpen) {
-            EditionsPanel(model: model)
-        }
-    }
-}
-
 nonisolated extension ToolbarItemPlacement {
     /// The corner opposite the reader's own menu.
     ///

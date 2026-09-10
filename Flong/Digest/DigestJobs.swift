@@ -1040,10 +1040,14 @@ nonisolated struct DigestService: Sendable {
         try await EditionStore(database).current(now: now)
     }
 
-    /// Every edition that has come out, newest first, for the back numbers.
+    /// The back numbers, newest first, a handful at a time.
+    ///
+    /// - Parameter before: the hour of the oldest one already on the page.
     @concurrent
-    func editionArchive(now: Date = Date()) async throws -> [PublishedEdition] {
-        try await EditionStore(database).archive(now: now)
+    func editionArchive(
+        before boundary: Date? = nil, limit: Int = EditionStore.archivePage, now: Date = Date()
+    ) async throws -> [PublishedEdition] {
+        try await EditionStore(database).archive(before: boundary, limit: limit, now: now)
     }
 
     /// The hour of a page that is composed and still waiting to be written,

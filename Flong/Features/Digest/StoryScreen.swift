@@ -46,6 +46,11 @@ struct StoryScreen: View {
     /// bare list of articles with nothing over it. The printed rows are read by
     /// identifier, with no window and no cap.
     ///
+    /// **And a back number answers last of all.** A headline pressed in the
+    /// archive is often a story the window no longer holds, and what is left of
+    /// it is what its own page froze : see ``AppModel/printedStory(_:)``. It is
+    /// last because it is the thinnest answer and not the wrong one.
+    ///
     /// First and not last, and that is the same argument the freezing rests on.
     /// The row the reader pressed on the front page carries the head the
     /// edition froze, and the page grows out of that very row : found in the
@@ -58,6 +63,7 @@ struct StoryScreen: View {
         model.frontPageStories.first { $0.id == storyID }
             ?? model.digest.live.first { $0.id == storyID }
             ?? model.digest.stories.first { $0.id == storyID }
+            ?? model.printedStory(storyID)
     }
 
     var body: some View {
@@ -71,6 +77,10 @@ struct StoryScreen: View {
             VStack(alignment: .leading, spacing: 0) {
                 if let story {
                     header(story)
+                }
+
+                if let story, !story.hasFigures, model.storyArticles[storyID]?.isEmpty != false {
+                    gone
                 }
 
                 ForEach(model.storyArticles[storyID] ?? []) { article in
@@ -108,6 +118,20 @@ struct StoryScreen: View {
             .navigationBarTitleDisplayMode(.inline)
         #endif
         .task { await model.openStoryPage(storyID) }
+    }
+
+    /// Said where a headline is the whole of what is left.
+    ///
+    /// A back number keeps its page however a purge has thinned the stream
+    /// underneath it, so an old headline opens onto nothing at all. A page that
+    /// simply ended under the title would read as a fault ; one line says what
+    /// it is, which is an archive being honest about what an archive holds.
+    private var gone: some View {
+        Text("The articles are no longer kept : this is the headline the edition printed.")
+            .font(theme.metadata)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, Editorial.rhythm)
     }
 
     private func header(_ story: DigestStory) -> some View {

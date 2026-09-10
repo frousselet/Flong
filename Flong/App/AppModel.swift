@@ -1582,13 +1582,107 @@ final class AppModel {
     /// look identical without a line to tell them apart.
     private(set) var edition: PublishedEdition?
 
-    /// Every published edition, newest first. What the archive shows.
+    /// The back numbers under the page, newest first, as far as the reader has
+    /// scrolled.
+    ///
+    /// It holds what has been asked for and never the whole archive : a reader
+    /// who has been here a year has fifteen hundred of them, and the front page
+    /// is not the place to read fifteen hundred rows to draw one screen.
+    /// Everything published strictly before the edition on the table, so the
+    /// paper is never printed twice on one scroll.
     private(set) var editionArchive: [PublishedEdition] = []
 
-    /// Reads the back numbers, for the calendar that shows them.
-    func loadEditionArchive() async {
-        let archive = (try? await digestService.editionArchive()) ?? []
-        if archive != editionArchive { editionArchive = archive }
+    /// Whether the reader has pulled the archive open.
+    ///
+    /// **Asked for and not merely reached.** A year of back numbers under
+    /// today's paper is a page whose bottom nobody could trust : a flick that
+    /// carried too far would land the reader in last November. So the paper
+    /// ends where it ends, and what is under it is opened by pulling past that
+    /// end against the scroll view's own resistance. See ``PullForBackNumbers``.
+    ///
+    /// Once, and for the rest of the session : a reader who has asked is not
+    /// asked to ask again on the way back down. It is not written down, because
+    /// what it says is `this reader has looked at their archive today` and that
+    /// is not a preference.
+    ///
+    /// A Mac has no rubber band worth pulling and no thumb to feel the tap
+    /// with, so there is nothing there to gate it with and the archive is
+    /// simply under the page.
+    private(set) var backNumbersAreOpen = AppModel.backNumbersOpenAtRest
+
+    /// A Mac has nothing to pull, so there is nothing to open there.
+    static let backNumbersOpenAtRest: Bool = {
+        #if os(macOS)
+            true
+        #else
+            false
+        #endif
+    }()
+
+    /// Says the reader has pulled far enough, and asks for the first handful.
+    func openBackNumbers() {
+        guard !backNumbersAreOpen else { return }
+        backNumbersAreOpen = true
+    }
+
+    /// Whether there is more history to ask for.
+    ///
+    /// A batch that came back short of what it asked for is the end of the
+    /// archive, which is one read fewer than asking again and being answered
+    /// with nothing.
+    private(set) var hasOlderEditions = true
+
+    /// Whether a batch is on its way, so the page does not ask twice for it.
+    ///
+    /// A scroll fires its geometry change on every frame, and the row that asks
+    /// for more stays on screen for the whole of the read : without this, one
+    /// flick asks for the same eight pages a dozen times.
+    private(set) var isReadingOlderEditions = false
+
+    /// Reads the next handful of back numbers, and stops at the end of them.
+    func readOlderEditions() async {
+        guard hasOlderEditions, !isReadingOlderEditions else { return }
+        // The oldest one already on the page, or the paper on the table : the
+        // archive begins under the edition the reader is looking at.
+        guard let boundary = editionArchive.last?.edition.openedAt ?? edition?.edition.openedAt else { return }
+
+        isReadingOlderEditions = true
+        defer { isReadingOlderEditions = false }
+
+        let older = (try? await digestService.editionArchive(before: boundary)) ?? []
+        if older.count < EditionStore.archivePage { hasOlderEditions = false }
+        guard !older.isEmpty else { return }
+        editionArchive.append(contentsOf: older)
+    }
+
+    /// A story as one of the back numbers printed it.
+    ///
+    /// **The frozen half alone, and that is the answer rather than a
+    /// shortcoming.** A story still on the live page is found before this is
+    /// reached, so what gets here is one the window no longer holds : an
+    /// article of it was purged, or the page it stood on is from last month.
+    /// What survives is what the edition froze beside it, which is the headline,
+    /// the line, the picture and the room the picture came from. The figures are
+    /// the world's and the world has moved on, so ``DigestStory/hasFigures``
+    /// says nothing is known and the page draws none.
+    func printedStory(_ id: UUID) -> DigestStory? {
+        for published in editionArchive {
+            guard let row = published.stories.first(where: { $0.storyID == id }) else { continue }
+            return row.printed(over: nil, on: published.edition.openedAt)
+        }
+        return nil
+    }
+
+    /// Puts the paper that was on the table at the head of the back numbers.
+    ///
+    /// **Put there rather than read again.** A new edition means everything
+    /// under it has moved down by one, and re-reading the archive from the top
+    /// would take the ground out from under a reader who is a year down the
+    /// scroll. Only where they have already asked for some : where they have
+    /// not, the first batch finds it on its own.
+    private func fileTheEditionOnTheTable(_ previous: PublishedEdition?) {
+        guard let previous, !editionArchive.isEmpty, editionArchive.first?.id != previous.id else { return }
+        editionArchive.insert(previous, at: 0)
     }
 
     /// When each of the four editions comes out, as the reader has it.
@@ -1961,7 +2055,10 @@ final class AppModel {
             let figures = await Self.figures(of: current, from: digestService)
             let rows = Self.frontPage(of: current, over: figures)
 
-            if current != edition { edition = current }
+            if current != edition {
+                fileTheEditionOnTheTable(edition)
+                edition = current
+            }
             if figures != frozenFigures { frozenFigures = figures }
             if rows != frontPageStories { frontPageStories = rows }
         } catch {
@@ -3437,6 +3534,8 @@ final class AppModel {
         edition = nil
         resolveFrontPage()
         editionArchive = []
+        hasOlderEditions = true
+        backNumbersAreOpen = AppModel.backNumbersOpenAtRest
         forgetSearches()
         contributesToPool = nil
         popularFeeds = []

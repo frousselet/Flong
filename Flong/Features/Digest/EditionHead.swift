@@ -34,7 +34,7 @@ import SwiftUI
 /// list, which put a way *out* of the page in the middle of the page : the
 /// reader met it between what this edition says and the first story it leads
 /// on. It stands in the corner now, beside the notices, and only in this
-/// section. See ``EditionsButton``.
+/// section. The back numbers are under it : see ``BackNumbersMasthead``.
 ///
 /// The points are the model's own, in the reader's own language. An edition
 /// with none is not shown at all.
@@ -58,6 +58,10 @@ struct EditionHead: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, Editorial.rhythm)
         .padding(.bottom, Editorial.tightRhythm)
+        // What a test presses on to know there is a paper at all : everything
+        // here is either translated or whatever the model wrote that morning,
+        // and a device with no model legitimately has no head to find.
+        .accessibilityIdentifier("edition-head")
     }
 
     /// How much air a point carries between its own lines.

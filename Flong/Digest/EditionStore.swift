@@ -41,12 +41,31 @@ nonisolated struct EditionStore: Sendable {
     /// where ten slots are the whole of what the reader gets.
     static let leastRooms = 2
 
-    /// How far back the archive goes.
+    /// How long an abandoned page is kept before it is thrown away.
     ///
-    /// The same three days the front page reads, and for the same reason : the
-    /// stories underneath are held to that window, so an edition older than it
-    /// would be a page of headlines whose articles have gone.
-    static let archived: TimeInterval = DigestStore.window
+    /// **Only the ones nobody will ever see.** It was every edition, published
+    /// or not, held to the same three days the stories are, on the argument
+    /// that a page older than that is a page of headlines whose articles have
+    /// gone. That argument was about the articles and it decided the wrong
+    /// thing : what a back number holds is frozen beside it, so an old page
+    /// still reads as the page it was and loses only its figures and the way
+    /// into its stories. A newspaper is kept ; a page that never came out is
+    /// not a newspaper.
+    ///
+    /// So a published edition is never taken, and what this bounds is the other
+    /// kind : a boundary a sleeping device missed, or a slot the reader
+    /// abolished, which was closed and will never be written. Three days is
+    /// long enough for anything still interested in one to have looked.
+    static let abandoned: TimeInterval = DigestStore.window
+
+    /// How many back numbers are read at a time.
+    ///
+    /// The reader scrolls into them, so what this decides is how often the page
+    /// asks for more rather than how much history there is. Eight is a little
+    /// over a screenful on a phone and two days of paper, so a reader running a
+    /// thumb down the page stays ahead of it without the store being asked on
+    /// every frame.
+    static let archivePage = 8
 
     private let database: AppDatabase
 
@@ -403,29 +422,35 @@ nonisolated struct EditionStore: Sendable {
 
     /// Throws away the editions nobody will ever see.
     ///
-    /// Two kinds. One that fell out of the window the stories underneath are
-    /// held to, and one that was abandoned : a later boundary went to press
-    /// while it had still not come out, so its hour has gone and it will never
-    /// be written. Neither is a loss, the stories themselves being untouched by
-    /// any of this and an abandoned period folding into the page that follows.
+    /// **One kind now, and it was two.** A page that was abandoned is one a
+    /// later boundary went to press over while it had still not come out : its
+    /// hour has gone and it will never be written. Nothing is lost with it, the
+    /// stories being untouched and an abandoned period folding into the page
+    /// that follows.
     ///
-    /// **Never the paper on the table.** The rule is an age, and a quiet reader
-    /// whose periods keep failing to fill two stories legitimately keeps one
-    /// page for days : the age would eventually take it and leave the front
-    /// page blank, which is the one thing a paper made at an hour exists to
-    /// stop.
+    /// **A published page is never taken, at any age.** It used to be, on the
+    /// three days the stories are held to, because an edition older than that
+    /// was said to be a page of headlines whose articles have gone. That is
+    /// true of the articles and it is not a reason to burn the paper : the
+    /// headline, the line under it, the picture and the order are frozen beside
+    /// the page, so a back number from last month still reads as the page it
+    /// was. What it loses is its figures and the way into its stories, and a
+    /// reader scrolling back through their own year is asking for exactly what
+    /// is left.
+    ///
+    /// **And never the page being made.** `closed_at IS NOT NULL` says the row
+    /// is finished with ; the one still open is the page the next pass is
+    /// filling, whatever its hour.
     @discardableResult
     @concurrent
     func purge(now: Date = Date()) async throws -> Int {
         try await database.writer.write { db in
             try db.execute(
                 sql: """
-                    DELETE FROM edition WHERE opened_at < ?
-                      AND id IS NOT (SELECT id FROM edition
-                                     WHERE published_at IS NOT NULL
-                                     ORDER BY opened_at DESC LIMIT 1)
+                    DELETE FROM edition
+                    WHERE published_at IS NULL AND closed_at IS NOT NULL AND opened_at < ?
                     """,
-                arguments: [now.addingTimeInterval(-Self.archived)]
+                arguments: [now.addingTimeInterval(-Self.abandoned)]
             )
             return db.changesCount
         }
@@ -448,11 +473,38 @@ nonisolated struct EditionStore: Sendable {
         }
     }
 
-    /// Every edition that has come out, newest first, for the archive.
+    /// The editions that have come out, newest first, a handful at a time.
+    ///
+    /// **A handful, because there is no end to them now.** It read every
+    /// published edition there had ever been and built the whole archive in
+    /// memory, which was fair enough while the archive was three days and
+    /// twelve pages. A reader now scrolls back through their own year, so what
+    /// is asked for is the next few and never the lot.
+    ///
+    /// **Keyed on the boundary rather than counted from the start.** A cursor
+    /// is answered by the unique index on `opened_at` and reads exactly the rows
+    /// it returns, where an offset walks and throws away everything above it,
+    /// which gets slower the further back the reader goes. And a page published
+    /// while the reader is a year down does not shift the ones under their
+    /// thumb, which is what a count would do.
+    ///
+    /// - Parameter before: the hour of the oldest back number already shown.
+    ///   Nothing asks for the newest.
     @concurrent
-    func archive(now: Date = Date()) async throws -> [PublishedEdition] {
+    func archive(
+        before boundary: Date? = nil, limit: Int = Self.archivePage, now: Date = Date()
+    ) async throws -> [PublishedEdition] {
         try await database.writer.read { db in
-            try Edition.out(by: now).fetchAll(db).map { try Self.published($0, in: db) }
+            var wanted = Edition.out(by: now)
+            if let boundary { wanted = wanted.filter(Edition.Columns.openedAt < boundary) }
+
+            let editions = try wanted.limit(limit).fetchAll(db)
+            guard !editions.isEmpty else { return [] }
+
+            // Once for the batch. It is the whole subject table, and it was
+            // read again for every page in it.
+            let symbols = try Self.symbols(in: db)
+            return try editions.map { try Self.published($0, in: db, wearing: symbols) }
         }
     }
 
@@ -468,12 +520,11 @@ nonisolated struct EditionStore: Sendable {
     ///
     /// A page written before the subjects were frozen carries none, and has its
     /// match worked out here, exactly as every page used to.
-    private static func published(_ edition: Edition, in db: Database) throws -> PublishedEdition {
+    private static func published(
+        _ edition: Edition, in db: Database, wearing symbols: [String: String]? = nil
+    ) throws -> PublishedEdition {
         let stories = try Self.stories(of: edition.id, in: db)
-        let symbols = try Row.fetchAll(db, sql: "SELECT name, symbol FROM topic")
-            .reduce(into: [String: String]()) { found, row in
-                found[row["name"]] = (row["symbol"] as String?) ?? Topic.defaultSymbol
-            }
+        let symbols = try symbols ?? Self.symbols(in: db)
 
         let named: [String]
         if edition.pointTopics.count == edition.points.count {
@@ -488,6 +539,18 @@ nonisolated struct EditionStore: Sendable {
             stories: stories,
             marks: named.map { $0.isEmpty ? Topic.defaultSymbol : (symbols[$0] ?? Topic.defaultSymbol) }
         )
+    }
+
+    /// The mark every subject wears, by name.
+    ///
+    /// Read once for a batch of pages rather than once per page : it is the
+    /// whole subject table, and an archive read it fifty-two rows at a time for
+    /// every back number it built.
+    private static func symbols(in db: Database) throws -> [String: String] {
+        try Row.fetchAll(db, sql: "SELECT name, symbol FROM topic")
+            .reduce(into: [String: String]()) { found, row in
+                found[row["name"]] = (row["symbol"] as String?) ?? Topic.defaultSymbol
+            }
     }
 
     /// The subjects the points of a page are about, one per point.
