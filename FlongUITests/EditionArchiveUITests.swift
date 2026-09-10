@@ -13,11 +13,12 @@ import XCTest
 
 /// The back numbers, reached the way a reader reaches them.
 ///
-/// XCUITest and not a unit test, because the question is about the window : the
-/// line under the edition's own headline pushes a screen onto the digest's
-/// stack, that screen draws a row per published edition, and a row opens the
-/// page as it was. None of that is answerable by a function taking names and
-/// giving back a sentence.
+/// **Under the page, and not behind a calendar.** They stood behind a button in
+/// the corner, which is a control that has to be found, opened, chosen from and
+/// closed to get at a page that was already written. A reader does not open a
+/// drawer to find yesterday's paper : it is under today's. So the question this
+/// asks is a scrolling question, and XCUITest is the only thing that can ask
+/// it.
 ///
 /// **It is written to pass on a device with no editions too**, which is every
 /// device the first time it is launched and every device with no Apple
@@ -31,6 +32,14 @@ import XCTest
 /// on a device set to the reader's own language.
 final class EditionArchiveUITests: XCTestCase {
 
+    /// How many flicks it is worth spending to reach the seam.
+    ///
+    /// A long paper is twenty stories with their pictures, and a flick moves
+    /// about half a screen, so the seam can be a good way down. Bounded all the
+    /// same : a loop that scrolled until it found something would hang rather
+    /// than fail on a page that has no seam at all.
+    private static let flicks = 60
+
     override func setUpWithError() throws {
         continueAfterFailure = false
         #if os(iOS)
@@ -39,34 +48,49 @@ final class EditionArchiveUITests: XCTestCase {
     }
 
     @MainActor
-    func testTheEditionLeadsToItsBackNumbers() throws {
+    func testTheBackNumbersAreUnderThePage() throws {
         let app = XCUIApplication()
         app.launch()
 
-        // In the digest and no other section : the three buttons beside it are
-        // everywhere, and a back number is about this page alone.
-        let archive = app.buttons["edition-archive"].firstMatch
-        guard archive.waitForExistence(timeout: 20) else {
-            // No edition on this device, which is a legitimate state and one
-            // the page has to say out loud rather than render blank.
-            XCTAssertTrue(
-                app.staticTexts.count > 0,
-                "A page with no edition still says something"
-            )
+        let page = app.scrollViews.firstMatch
+        XCTAssertTrue(page.waitForExistence(timeout: 30), "The digest is the section the application opens on")
+
+        // No edition on this device, which is a legitimate state and one the
+        // page has to say out loud rather than render blank. There is no
+        // history under a page that does not exist.
+        guard app.otherElements["edition-head"].waitForExistence(timeout: 20) else {
+            XCTAssertTrue(app.staticTexts.count > 0, "A page with no edition still says something")
             return
         }
 
-        archive.tap()
+        // Any kind of element : the masthead combines its children for
+        // VoiceOver, so what carries the identifier is a text rather than the
+        // container it was written on.
+        let seam = app.descendants(matching: .any)["back-numbers"]
+        var flicks = 0
+        while !seam.exists, flicks < Self.flicks {
+            page.swipeUp()
+            flicks += 1
+        }
 
-        // The panel the calendar opens. Its being there at all is what says it
-        // opened : what is on it depends on how many editions this device has
-        // had, and a first launch has exactly the one it is looking at.
-        //
-        // A panel and not a page, so there is no back button to look for : it
-        // is a sheet over the page, flicked away like the other three in that
-        // corner, and the identifier is on the list it holds.
-        let back = app.buttons["edition-row"].firstMatch
-        XCTAssertTrue(back.waitForExistence(timeout: 10), "The back numbers open in a panel over the page")
-        XCTAssertTrue(back.isHittable, "And one of them can be opened")
+        XCTAssertTrue(seam.exists, "Today's paper ends at a seam, and the back numbers are under it")
+
+        // **Closed until it is asked for.** A year of back numbers that a flick
+        // could carry the reader into would be a page whose bottom nobody
+        // trusts, so the paper ends where it ends.
+        let headline = app.buttons["back-number-headline"]
+        XCTAssertFalse(headline.exists, "The archive is not simply under the page, it is pulled for")
+
+        // A slow drag with a hold at the end, which is a pull past the foot of
+        // the page rather than a flick. More than one, because a gesture that
+        // has to reach past the end of the content is the one kind of gesture a
+        // simulator does not always land the first time.
+        for _ in 0..<4 where !headline.exists {
+            let from = page.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8))
+            let to = page.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+            from.press(forDuration: 0.15, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 1.0)
+        }
+
+        XCTAssertTrue(headline.exists, "Pulling past the foot of the page opens the back numbers")
     }
 }

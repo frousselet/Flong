@@ -1609,16 +1609,6 @@
         }
       }
     },
-    "An edition appears here once it has come out and been written.": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Une édition apparaît ici une fois parue et rédigée."
-          }
-        }
-      }
-    },
     "An import is waiting to be finished": {
       "localizations": {
         "fr": {
@@ -2401,6 +2391,17 @@
         }
       }
     },
+    "Earlier editions": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Numéros précédents"
+          }
+        }
+      }
+    },
     "Ecology": {
       "localizations": {
         "fr": {
@@ -2448,16 +2449,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Modifier la source"
-          }
-        }
-      }
-    },
-    "Edition": {
-      "localizations": {
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Édition"
           }
         }
       }
@@ -3585,6 +3576,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Chargement"
+          }
+        }
+      }
+    },
+    "Loading earlier editions": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chargement des numéros précédents"
           }
         }
       }
@@ -5687,6 +5689,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "L'adresse d'un site auquel vous êtes abonné, par exemple lemonde.fr."
+          }
+        }
+      }
+    },
+    "The articles are no longer kept : this is the headline the edition printed.": {
+      "extractionState": "manual",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les articles ne sont plus conservés : voici le titre publié par l'édition."
           }
         }
       }

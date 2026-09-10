@@ -41,6 +41,36 @@ struct DigestScreen: View {
     /// rebuilding the page it is behind. See ``PageOffset``.
     @State private var offset = PageOffset()
 
+    /// Where the seam between today's paper and the back numbers sits, measured
+    /// down the page's own content.
+    ///
+    /// State, and it can afford to be : it is measured in a coordinate space
+    /// that does not move with the scroll, so it is written when the layout
+    /// changes and not on every frame. `nil` until there is an archive under
+    /// the page, and the catch does nothing then.
+    @State private var seam: CGFloat?
+
+    /// Whether the reader has crossed into the back numbers, which is what is
+    /// felt rather than what is drawn.
+    @State private var isReadingBackNumbers = false
+
+    /// How far past the foot of today's paper the reader is pulling.
+    ///
+    /// An object rather than a number, so a gesture moves the seam without
+    /// rebuilding the page it is at the foot of. See ``FootPull``.
+    @State private var pull = FootPull()
+
+    /// The page's own content, which the seam is measured down.
+    private static let page = "digest-page"
+
+    /// How far back above the seam the reader has to come before they have left
+    /// the archive again.
+    ///
+    /// A dead band, and it is not decoration : a scroll settling on the seam
+    /// jitters by a point or two, and a boundary tested exactly would fire the
+    /// tap half a dozen times for one crossing.
+    private static let seamHysteresis: CGFloat = 44
+
     var body: some View {
         ScrollView {
             // The gesture, from UIKit. It draws nothing and takes no room here ;
@@ -67,10 +97,30 @@ struct DigestScreen: View {
                         // reason.
                         .zIndex(1)
                 }
+
+                // **A section of its own, and the pills do not follow into
+                // it.** The subjects narrow today's stories ; a back number is
+                // a page that was already narrowed by nothing and cannot be
+                // narrowed now. Held in the section above, the pinned row of
+                // pills would ride over last Tuesday's paper offering to filter
+                // it, which is a control that would answer nothing.
+                Section { backNumbers }
             }
             .editorialColumn()
             .padding(.horizontal, 22)
             .padding(.bottom, 90)
+            // The seam measures itself down this, which is the page's own
+            // content and does not move when the page is scrolled : the head
+            // sinks by a transform and takes no room away as it goes, so what
+            // is measured here changes when the layout changes and never per
+            // frame.
+            .coordinateSpace(.named(Self.page))
+        }
+        // Felt on the way back up as well as down : the tap that opens the
+        // archive is the pull's own, and this is the boundary being crossed
+        // afterwards, which a reader who felt it once expects to feel again.
+        .sensoryFeedback(trigger: isReadingBackNumbers) { was, now in
+            was == now || !model.backNumbersAreOpen ? nil : .impact(flexibility: .soft, intensity: 0.6)
         }
         // **Behind the scroll view, and the width of the page.** It was the
         // background of the column of type, which is held to a measure and
@@ -86,7 +136,9 @@ struct DigestScreen: View {
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top
         } action: { _, position in
+            // The wash follows through the object, which costs no rebuild.
             offset.scrolled = position
+            crossed(at: position)
         }
         .scrollEdgeEffectStyle(.soft, for: .top)
         // **The pull, on the front page and nowhere else.** The page does keep
@@ -146,9 +198,6 @@ struct DigestScreen: View {
             // named in words. A back number is the one control left that is
             // about this page rather than about the whole of what a reader
             // reads, which is the whole argument for its being here.
-            ToolbarItem(placement: .sectionLeading) {
-                EditionsButton(model: model)
-            }
             ReaderCorner(model: model) { open(.view($0)) }
         }
         // Not while something is being brought in. `Nothing has come in yet`
@@ -272,6 +321,64 @@ struct DigestScreen: View {
                 }
                 ForEach(rest) { story in
                     row(story, isLead: story.id == lead, isFirst: story.id == lead)
+                }
+            }
+        }
+    }
+
+    /// Says whether the reader is in the archive, and only when the answer
+    /// moves.
+    ///
+    /// Written from the scroll, so it has to be cheap : the comparison is two
+    /// numbers, and the state behind it is assigned once per crossing rather
+    /// than once per frame.
+    private func crossed(at position: CGFloat) {
+        guard let seam else {
+            if isReadingBackNumbers { isReadingBackNumbers = false }
+            return
+        }
+
+        let bound = isReadingBackNumbers ? seam - Self.seamHysteresis : seam
+        let inside = position >= bound
+        if inside != isReadingBackNumbers { isReadingBackNumbers = inside }
+    }
+
+    // MARK: - The back numbers
+
+    /// Every edition before this one, under it, as far as the reader goes.
+    ///
+    /// **Only under the front page.** A subject is a question about the whole
+    /// of the three days and never about one paper, so a narrowed page has no
+    /// archive to put under it ; and a device that has never published an
+    /// edition has no history to show for a page it does not have.
+    @ViewBuilder
+    private var backNumbers: some View {
+        if model.digestTopic == .frontPage, model.edition != nil {
+            // The foot of today's paper, and the gesture that opens what is
+            // under it. It draws nothing and takes no room : it is a point of
+            // contact and not a thing on the page.
+            PullForBackNumbers(pull: pull) { model.openBackNumbers() }
+
+            BackNumbersMasthead(pull: pull, isOpen: model.backNumbersAreOpen)
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.frame(in: .named(Self.page)).minY
+                } action: { measured in
+                    if seam != measured { seam = measured }
+                }
+
+            if model.backNumbersAreOpen {
+                ForEach(model.editionArchive) { published in
+                    BackNumber(published: published) { open(.story($0)) }
+                }
+
+                // **Reached rather than pressed.** The row is realized a little
+                // before it comes into sight, so the next few pages are in hand
+                // by the time the thumb arrives. Keyed on what is already held,
+                // or the task would run once and the archive would stop at the
+                // first batch.
+                if model.hasOlderEditions {
+                    MoreBackNumbers()
+                        .task(id: model.editionArchive.count) { await model.readOlderEditions() }
                 }
             }
         }
