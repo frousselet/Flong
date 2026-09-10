@@ -45,9 +45,12 @@ nonisolated struct FileStoriesJob: ResumableJob {
     private let database: AppDatabase
     private let locale: Locale
     private let since: Date
-    /// Where the period being written for begins, which is what puts the coming
-    /// page's stories at the head of the queue. `nil` is the window's own head.
-    private let periodStart: Date?
+    /// Where the period running now begins, which is what puts the stories of
+    /// that period at the head of the queue. `nil` is the window's own head.
+    ///
+    /// The period running now and not the page being made : a page stops being
+    /// made the moment it comes out, and the filing goes on all the same.
+    private let runningFrom: Date?
     /// The one that will be asked, held rather than made twice : the guard on
     /// availability and the ask itself have to be about the same model.
     private let namer: TopicNamer
@@ -57,13 +60,13 @@ nonisolated struct FileStoriesJob: ResumableJob {
         locale: Locale = .current,
         namer: TopicNamer? = nil,
         now: Date = Date(),
-        periodStart: Date? = nil
+        runningFrom: Date? = nil
     ) {
         self.database = database
         self.locale = locale
         self.namer = namer ?? TopicNamer(locale: locale)
         self.since = now.addingTimeInterval(-DigestStore.window)
-        self.periodStart = periodStart
+        self.runningFrom = runningFrom
     }
 
     /// How many stories are waiting to be filed.
@@ -110,12 +113,11 @@ nonisolated struct FileStoriesJob: ResumableJob {
                             OR s.topics_asked_for IS NULL
                             OR s.topics_asked_for <> \(Self.question)
                           )
-                    -- **The coming page first, and the backlog behind it.**
-                    -- A pass off the mains is bounded to fifteen-second slices,
-                    -- so what is written is whatever the order reaches : the
-                    -- stories of the period about to be published are the ones
-                    -- a page is waiting on, and the rest drain after them
-                    -- rather than being shut out.
+                    -- **The period running now first, and the backlog behind
+                    -- it.** A pass off the mains is bounded to fifteen-second
+                    -- slices, so what is written is whatever the order reaches :
+                    -- the stories of the period running now come first, and the
+                    -- rest drain after them rather than being shut out.
                     --
                     -- **Briefed first.** A brief costs three model calls to a
                     -- filing's one, so the filing runs ahead and would decide
@@ -126,7 +128,7 @@ nonisolated struct FileStoriesJob: ResumableJob {
                     ORDER BY (s.last_at >= ?) DESC, (s.summary IS NULL), s.last_at DESC
                     LIMIT \(Self.batchSize)
                     """,
-                arguments: [since, periodStart ?? since]
+                arguments: [since, runningFrom ?? since]
             )
             .map { (id: $0["id"] as UUID, title: $0["title"] as String, summary: $0["summary"] as String?) }
         }
@@ -220,20 +222,41 @@ nonisolated struct BriefStoriesJob: ResumableJob {
     private let database: AppDatabase
     private let summarizer: StorySummarizer
     private let since: Date
-    /// Where the period being written for begins, which is what holds the same
-    /// story back to one re-ask inside it. `nil` where there is no page coming.
-    private let periodStart: Date?
+
+    /// The stretch of time the page being made is about, when one is being made.
+    ///
+    /// **What the page needs before what merely arrived.** The order was
+    /// `last_at DESC` inside a bucket that opened at the period's start and
+    /// never closed, so everything that had come in *since* the boundary sorted
+    /// above the period's own stories. On a morning that means the writer works
+    /// through the day's news first and the night's last, and the page it is
+    /// working for cannot reach the two stories it needs for several passes.
+    /// The batch is taken from the period first now, by the same predicate the
+    /// composition chooses with, and from the backlog in the same call, so
+    /// nothing behind it is shut out.
+    private let period: Range<Date>?
+
+    /// Where the period running now begins, which is what holds the same story
+    /// back to one re-ask inside it.
+    ///
+    /// It is not the same thing as ``period``, and reading it as one was
+    /// costing the whole meter : the page being made stops existing the moment
+    /// it comes out, and the period goes on running for hours after that.
+    /// `nil` only where the reader has switched every edition off.
+    private let meteredFrom: Date?
 
     init(
         _ database: AppDatabase,
         summarizer: StorySummarizer = StorySummarizer(),
         now: Date = Date(),
-        periodStart: Date? = nil
+        period: Range<Date>? = nil,
+        meteredFrom: Date? = nil
     ) {
         self.database = database
         self.summarizer = summarizer
         self.since = now.addingTimeInterval(-DigestStore.window)
-        self.periodStart = periodStart
+        self.period = period
+        self.meteredFrom = meteredFrom ?? period?.lowerBound
     }
 
     /// The articles the model is shown, named as one value the store can compare.
@@ -267,18 +290,42 @@ nonisolated struct BriefStoriesJob: ResumableJob {
 
     func step() async throws -> Int {
         let work = self.work
+        let period = self.period
+
         let stories = try await database.writer.read { db in
-            try Story.fetchAll(
+            // **The coming page first, by the predicate it is composed with.**
+            // The bucket was `last_at >= periodStart`, which is open at the top
+            // and therefore admits the whole stretch since the boundary as
+            // well : within it `last_at DESC` sorts the page's own stories,
+            // which are by construction the older half, strictly last.
+            if let period {
+                let wanted = try Story.fetchAll(
+                    db,
+                    sql: """
+                        SELECT * FROM story
+                        WHERE \(work.sql) AND \(DigestStore.withinThePeriod)
+                        ORDER BY last_at DESC
+                        LIMIT \(Self.batchSize)
+                        """,
+                    arguments: work.arguments + DigestStore.periodArguments(period)
+                )
+                if !wanted.isEmpty { return wanted }
+            }
+
+            // And the backlog behind it, in the same call, so a period already
+            // written cannot shut the rest of the window out. Ordered on the
+            // column alone : `(last_at >= ?) DESC, last_at DESC` says exactly
+            // what `last_at DESC` says, since any row above the bound already
+            // sorts above any row below it, and the expression key cost a temp
+            // b-tree over every story of the window on every batch.
+            return try Story.fetchAll(
                 db,
                 sql: """
                     SELECT * FROM story WHERE \(work.sql)
-                    -- The coming page first, and the backlog behind it : a pass
-                    -- off the mains is bounded to slices, so the order is what
-                    -- decides which stories a page is not left waiting on.
-                    ORDER BY (last_at >= ?) DESC, last_at DESC
+                    ORDER BY last_at DESC
                     LIMIT \(Self.batchSize)
                     """,
-                arguments: work.arguments + [periodStart ?? since]
+                arguments: work.arguments
             )
         }
         guard !stories.isEmpty else { return 0 }
@@ -320,14 +367,8 @@ nonisolated struct BriefStoriesJob: ResumableJob {
             locale: summarizer.locale,
             hasModel: summarizer.hand.isAvailable,
             since: since,
-            askedAgainSince: periodStart
+            askedAgainSince: meteredFrom
         )
-    }
-
-    static func work(locale: Locale, hasModel: Bool, since: Date) -> (
-        sql: String, arguments: StatementArguments
-    ) {
-        work(locale: locale, hasModel: hasModel, since: since, askedAgainSince: nil)
     }
 
     /// Which stories want a brief, and how often the same one may be re-asked.
@@ -358,7 +399,15 @@ nonisolated struct BriefStoriesJob: ResumableJob {
         sql: String, arguments: StatementArguments
     ) {
         guard hasModel else {
-            return ("brief_locked = 0 AND summary IS NULL", [])
+            // **Held to the window, and to one look apiece.** It was
+            // `summary IS NULL`, which is a scan of every story ever grouped
+            // and, worse, a set the fallback cannot empty : a group whose
+            // articles carry no standfirst comes back without one, so the row
+            // still matches, the same three are offered at every batch, each is
+            // written again, and the runner never sees a batch that did
+            // nothing. The key the save writes whatever the answer was is what
+            // takes a story out of the set, here as everywhere else.
+            return ("brief_locked = 0 AND last_at >= ? AND brief_members IS NOT \(membersKey)", [since])
         }
         guard let askedAgainSince else {
             return (
@@ -375,10 +424,13 @@ nonisolated struct BriefStoriesJob: ResumableJob {
             """
             brief_locked = 0 AND last_at >= ? AND (
                 brief_locale IS NULL OR brief_locale <> ?
-                OR (brief_members IS NOT \(membersKey)
-                    AND (brief_asked_at IS NULL OR brief_asked_at < ?))
+                OR ((brief_asked_at IS NULL OR brief_asked_at < ?)
+                    AND brief_members IS NOT \(membersKey))
             )
             """,
+            // The date test first : SQLite reads a conjunction left to right,
+            // so a story already asked about inside this period is spared the
+            // correlated roll-up over its own members.
             [since, locale.identifier, askedAgainSince]
         )
     }
@@ -412,14 +464,32 @@ nonisolated struct BriefStoriesJob: ResumableJob {
         try await database.writer.write { db in
             guard var story = try Story.fetchOne(db, key: storyID) else { return }
 
-            story.title = brief.title.isEmpty ? story.title : brief.title
-            story.summary = brief.summary
-            story.isGenerated = brief.isGenerated
-            story.isTranslated = brief.isTranslated
-            story.generatedBy = brief.writtenBy
-            story.briefLocale = brief.askedIn?.identifier
-            story.updatedAt = Date()
-            try story.update(db)
+            // **The row is written only where the answer moved it.** A model
+            // asked again about a story it had already written about answers
+            // word for word the same most of the time, and rewriting six
+            // columns and a timestamp to say so is work nobody asked for.
+            //
+            // It does not spare the store a tick, and it is not meant to : the
+            // key below is written in this same transaction whatever happened,
+            // since that is what says the story has been asked about *these*
+            // articles. What holds the window steady under a turn is the pace
+            // the watcher reads at.
+            let title = brief.title.isEmpty ? story.title : brief.title
+            let moved =
+                story.title != title || story.summary != brief.summary
+                || story.isGenerated != brief.isGenerated || story.isTranslated != brief.isTranslated
+                || story.generatedBy != brief.writtenBy || story.briefLocale != brief.askedIn?.identifier
+
+            if moved {
+                story.title = title
+                story.summary = brief.summary
+                story.isGenerated = brief.isGenerated
+                story.isTranslated = brief.isTranslated
+                story.generatedBy = brief.writtenBy
+                story.briefLocale = brief.askedIn?.identifier
+                story.updatedAt = Date()
+                try story.update(db)
+            }
 
             // Written in the same transaction as the brief it belongs to, and
             // written whatever the answer was : it is what says this story has
@@ -546,8 +616,19 @@ nonisolated struct BriefEditionsJob: ResumableJob {
     static func isReady(_ edition: Edition, in db: Database, locale: Locale, now: Date = Date()) throws -> Bool {
         guard edition.periodEnd > now.addingTimeInterval(-grace) else { return true }
 
+        // **The writer's own question, about this page's own period.** It was
+        // the unmetered one : every story of the period whose articles had
+        // moved counted as still waiting, while the writer, held to one re-ask
+        // a period, had already decided never to touch it again. The count
+        // could not reach nought, so no page was ever ready before its grace
+        // ran out and every edition came out twenty minutes after its hour,
+        // four times a day.
         let stories = BriefStoriesJob.work(
-            locale: locale, hasModel: true, since: now.addingTimeInterval(-DigestStore.window))
+            locale: locale,
+            hasModel: true,
+            since: now.addingTimeInterval(-DigestStore.window),
+            askedAgainSince: edition.periodStart
+        )
 
         let waiting =
             try Int.fetchOne(
@@ -562,9 +643,26 @@ nonisolated struct BriefEditionsJob: ResumableJob {
         return waiting == 0
     }
 
+    /// Whether a page is waiting, without asking whether it is ready.
+    ///
+    /// **The cheap half, because this is asked for a number and not for work.**
+    /// It ran the whole of ``due()``, and readiness is a correlated roll-up
+    /// over every story of the window ; `JobRunner` asks for the count once
+    /// before its loop and once after, so one turn paid for that answer three
+    /// and four times over to draw a fraction. What it over-reports is a page
+    /// that is waiting on its own stories, which is what the ring should be
+    /// saying anyway.
     func remaining() async throws -> Int {
         guard summarizer.hand.isAvailable else { return 0 }
-        return try await due() == nil ? 0 : 1
+        let work = Self.work(locale: summarizer.locale, now: now)
+
+        return try await database.writer.read { db in
+            try Int.fetchOne(
+                db,
+                sql: "SELECT EXISTS(SELECT 1 FROM edition WHERE \(work.sql))",
+                arguments: work.arguments
+            ) ?? 0
+        }
     }
 
     func step() async throws -> Int {
@@ -683,7 +781,16 @@ nonisolated struct DigestService: Sendable {
     ) async -> Int {
         let store = EditionStore(database)
         do {
-            if let edition = try await store.open(schedule, now: now) {
+            // **Composed only while the page can still come out.** A row a
+            // later boundary abandoned, and one the model has read and declined
+            // in this language, are both finished with : composing either costs
+            // a read of the whole three days and, wherever the ten have
+            // shifted, ten row writes the window has to react to, for a page
+            // nobody will ever see.
+            if let edition = try await store.open(schedule, now: now),
+                edition.closedAt == nil,
+                edition.briefLocale != locale.identifier
+            {
                 try await store.compose(edition, now: now)
             }
             try await store.purge(now: now)
@@ -714,10 +821,11 @@ nonisolated struct DigestService: Sendable {
     func brief(
         until deadline: Date? = nil,
         now: Date = Date(),
-        periodStart: Date? = nil,
+        page: Range<Date>? = nil,
+        meteredFrom: Date? = nil,
         onProgress: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
     ) async -> Int {
-        await JobRunner(BriefStoriesJob(database, now: now, periodStart: periodStart))
+        await JobRunner(BriefStoriesJob(database, now: now, period: page, meteredFrom: meteredFrom))
             .run(until: deadline, onProgress: onProgress).done
     }
 
@@ -804,7 +912,24 @@ nonisolated struct DigestService: Sendable {
         // watcher follows, and the page went on moving under a reader for the
         // whole of its life. Once before and once after is the same ordering
         // said properly.
-        let coming = await openEdition(schedule, now: now)
+        //
+        // **Its own clock, and not the turn's.** A turn runs for two minutes in
+        // front of a reader and five behind them, and longer than that across a
+        // suspension, so a boundary can pass inside one. Handed the moment the
+        // turn began, both the opening and the naming worked for the period
+        // before the one the device was living in.
+        let coming = await openEdition(schedule)
+
+        // **Two things, and they were read as one.** The page being made is
+        // what the writing is ordered by ; the period running now is what holds
+        // a busy story to one re-ask inside it, and it goes on running for
+        // hours after the page has come out. Taking both from the row meant the
+        // meter came off the moment an edition was published and stayed off
+        // until the next boundary, which is all but the whole day : a story the
+        // press was busy with cost a call on every pass, and the headline the
+        // reader was looking at changed under them every few minutes.
+        let page = coming.map { $0.periodStart..<$0.periodEnd }
+        let metered = coming?.periodStart ?? schedule.current(at: Date())?.opened
 
         // A slice short of the end, and the last one belongs to the naming.
         let writing = Self.writingEnds(by: end)
@@ -813,12 +938,12 @@ nonisolated struct DigestService: Sendable {
             onPhase(.writing)
             let slice = min(Date().addingTimeInterval(Self.enrichmentSlice), writing)
             let written = await brief(
-                until: slice, now: now, periodStart: coming?.periodStart, onProgress: onWriting)
+                until: slice, now: now, page: page, meteredFrom: metered, onProgress: onWriting)
 
             onPhase(.filing)
             let next = min(Date().addingTimeInterval(Self.enrichmentSlice), writing)
             let filed = await nameTopics(
-                until: next, now: now, periodStart: coming?.periodStart, onProgress: onFiling)
+                until: next, now: now, runningFrom: metered, onProgress: onFiling)
 
             guard written > 0 || filed > 0 else { break }
         }
@@ -833,7 +958,6 @@ nonisolated struct DigestService: Sendable {
         onPhase(.naming)
         await makeTheEdition(
             schedule,
-            now: now,
             until: Self.namingEnds(by: end),
             onNaming: onNaming
         )
@@ -867,10 +991,10 @@ nonisolated struct DigestService: Sendable {
     func nameTopics(
         until deadline: Date? = nil,
         now: Date = Date(),
-        periodStart: Date? = nil,
+        runningFrom: Date? = nil,
         onProgress: @escaping @Sendable (Int, Int) -> Void = { _, _ in }
     ) async -> Int {
-        await JobRunner(FileStoriesJob(database, locale: locale, now: now, periodStart: periodStart))
+        await JobRunner(FileStoriesJob(database, locale: locale, now: now, runningFrom: runningFrom))
             .run(until: deadline, onProgress: onProgress).done
     }
 
@@ -887,7 +1011,6 @@ nonisolated struct DigestService: Sendable {
         try await DigestStore(database).digest(topic, now: now)
     }
 
-    /// The edition the front page shows, and every one the archive holds.
     /// What is worth suggesting to somebody searching, out of the headlines on
     /// the page.
     ///
@@ -915,12 +1038,20 @@ nonisolated struct DigestService: Sendable {
         try await EditionStore(database).archive(now: now)
     }
 
+    /// The hour of a page that is composed and still waiting to be written,
+    /// which is what a second background grant is worth asking for.
+    @concurrent
+    func editionInThePress(now: Date = Date()) async throws -> Date? {
+        try await EditionStore(database).inThePress(now: now)
+    }
+
     /// The figures of a named handful of stories, for a page that is frozen.
     @concurrent
     func figures(of ids: [UUID], now: Date = Date()) async throws -> [UUID: DigestStory] {
         try await DigestStore(database).stories(ids, now: now)
     }
 
+    /// The edition the front page shows, and every one the archive holds.
     @concurrent
     func editions(now: Date = Date()) async throws -> (current: PublishedEdition?, archive: [PublishedEdition]) {
         let store = EditionStore(database)

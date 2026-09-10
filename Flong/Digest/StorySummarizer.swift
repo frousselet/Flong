@@ -427,12 +427,19 @@ nonisolated struct StorySummarizer: Sendable {
         // The window holds the prompt and the answer together, and a prompt
         // that leaves no room for an answer is not sent : the cost of asking
         // anyway is a refusal, and the cost of a refusal is a story with no
-        // headline. Nothing to do with how it was asked, so the other voice is
-        // not tried and the story is left to be asked about again when its
-        // articles have moved on.
+        // headline.
+        //
+        // **A fact about the story, and it was filed as one about the model.**
+        // Answered `.unusable`, the story kept `brief_locale` null, which is
+        // what `never asked` looks like, so it came back at every pass for ever
+        // and at the head of the queue, since the unasked are taken first. It
+        // is a refusal : these articles are too long to put to this model, and
+        // they will still be too long next time. Said that way it also reaches
+        // the second voice, which condenses, and condensing is exactly the
+        // remedy for a prompt that does not fit.
         guard await conversation.hasRoom(for: prompt, keeping: Self.reservedTokens) else {
             Log.enrich.notice("A story was too long to summarize, and kept its article's own title")
-            return .unusable
+            return .declined
         }
 
         // The ask, with the patience and the reading of a failure already round

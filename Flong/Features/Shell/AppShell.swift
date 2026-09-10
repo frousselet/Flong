@@ -281,6 +281,7 @@ struct AppShell: View {
             // A window that opens in the background has no phase change to
             // learn from, and `onChange` only fires on a change.
             model.isReading = scenePhase == .active
+            model.isAwake = scenePhase != .background
 
             // Before the page is read : the subjects a story is filed under are
             // chosen from this vocabulary, and a filing pass that ran before it
@@ -305,6 +306,12 @@ struct AppShell: View {
             // What the reader is looking at decides whether Flong may
             // interrupt them about something on that very page.
             model.isReading = phase == .active
+            // **The window being there, which is not the window being key.** On
+            // the Mac an open window behind another application is `.inactive`,
+            // and the clock, gated on `.active`, did nothing at all : the
+            // machine most likely to sit open across a boundary was the one
+            // that never noticed one.
+            model.isAwake = phase != .background
 
             guard phase == .active else {
                 // Asked for on the way out, which is when iOS wants it : a task

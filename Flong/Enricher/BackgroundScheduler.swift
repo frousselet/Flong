@@ -293,7 +293,15 @@ nonisolated enum BackgroundScheduler {
         /// only arrived on a phone left charging overnight would be a morning
         /// paper most readers never saw.
         static func scheduleEdition(at moment: Date?) {
-            guard let moment else { return }
+            // **Nothing to wake for is a request to withdraw.** The scheduler
+            // keeps a submitted request until it runs or is cancelled, so a
+            // reader who switches every edition off left the last one standing
+            // and the system woke Flong for a page it had been told nobody
+            // wanted.
+            guard let moment else {
+                BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: editionIdentifier)
+                return
+            }
             let request = BGProcessingTaskRequest(identifier: editionIdentifier)
             request.requiresExternalPower = false
             request.requiresNetworkConnectivity = true

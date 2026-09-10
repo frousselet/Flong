@@ -264,12 +264,12 @@ nonisolated struct DigestStore: Sendable {
         during period: Range<Date>? = nil
     ) async throws -> Digest {
         let since = now.addingTimeInterval(-Self.window)
-        let preferences = TopicPreferences(database)
-        let scores = try await preferences.scores()
-        let own = try await preferences.ownNames()
-        let symbols = try await preferences.symbols()
 
-        let (stories, topics, members) = try await database.writer.read { db in
+        // **One transaction, and it was four.** The three reads of the reader's
+        // own hand on the vocabulary each opened their own, two of them over
+        // the same fifty-two rows, and the page was then assembled out of four
+        // different snapshots of a store the model is writing to.
+        let (stories, topics, members, scores, own, symbols) = try await database.writer.read { db in
             // **The period narrows the stories and nothing else.** What follows
             // reads every member of the three days on purpose : the counts, the
             // marks, the sparkline, the picture and its credit are facts about
@@ -309,37 +309,73 @@ nonisolated struct DigestStore: Sendable {
             // twice showed `SPORT · EUROPEAN UNION` and then the other way
             // about. The rowid is the order the model gave them in, which is
             // the most exact subject first.
-            let topics = try StoryTopic.order(Column.rowID).fetchAll(db)
-                .reduce(into: [UUID: [String]]()) { topics, row in
-                    topics[row.storyID, default: []].append(row.name)
+            //
+            // **Keyed on the stories this read answers about**, both of them.
+            // Neither carried a `story_id` term, so a page of sixty stories
+            // read the whole filing table and every member row of the window,
+            // decoded them all, folded them into two dictionaries of thousands
+            // of entries, and then looked sixty keys up in them. The sibling
+            // read below (``figures(of:)``) has always been keyed, and it
+            // answers the same question in a hundredth of the time.
+            let ids = stories.map(\.id)
+
+            let topics =
+                ids.isEmpty
+                ? [:]
+                : try StoryTopic.filter(ids.contains(Column("story_id")))
+                    .order(Column.rowID)
+                    .fetchAll(db)
+                    .reduce(into: [UUID: [String]]()) { topics, row in
+                        topics[row.storyID, default: []].append(row.name)
+                    }
+
+            let members =
+                ids.isEmpty
+                ? []
+                : try Row.fetchAll(
+                    db,
+                    sql: """
+                        SELECT m.story_id AS story_id, f.title AS feed_title,
+                               f.site_url AS site_url, f.url AS feed_url,
+                               e.image_url AS image_url,
+                               COALESCE(e.published_at, e.received_at) AS date
+                        FROM story_member m
+                        JOIN entry e ON e.id = m.entry_id
+                        JOIN feed f ON f.id = e.feed_id
+                        WHERE m.story_id IN (\(databaseQuestionMarks(count: ids.count)))
+                          AND e.duplicate_of IS NULL
+                          AND COALESCE(e.published_at, e.received_at) >= ?
+                        """,
+                    arguments: StatementArguments(ids) + [since]
+                )
+                .map { row in
+                    StoryArticle(
+                        storyID: row["story_id"],
+                        feedTitle: row["feed_title"],
+                        feedSiteURL: (row["site_url"] as String?).flatMap(URL.init(string:)),
+                        feedURL: (row["feed_url"] as String?).flatMap(URL.init(string:)),
+                        date: row["date"],
+                        imageURL: (row["image_url"] as String?).flatMap(URL.init(string:))
+                    )
                 }
 
-            let members = try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT m.story_id AS story_id, f.title AS feed_title,
-                           f.site_url AS site_url, f.url AS feed_url,
-                           e.image_url AS image_url,
-                           COALESCE(e.published_at, e.received_at) AS date
-                    FROM story_member m
-                    JOIN entry e ON e.id = m.entry_id
-                    JOIN feed f ON f.id = e.feed_id
-                    WHERE e.duplicate_of IS NULL AND COALESCE(e.published_at, e.received_at) >= ?
-                    """,
-                arguments: [since]
-            )
-            .map { row in
-                StoryArticle(
-                    storyID: row["story_id"],
-                    feedTitle: row["feed_title"],
-                    feedSiteURL: (row["site_url"] as String?).flatMap(URL.init(string:)),
-                    feedURL: (row["feed_url"] as String?).flatMap(URL.init(string:)),
-                    date: row["date"],
-                    imageURL: (row["image_url"] as String?).flatMap(URL.init(string:))
-                )
+            // The reader's own hand on the vocabulary : what they pushed up or
+            // down, which names are theirs, and the mark each one wears. The
+            // subjects are one read rather than two, in the order a name was
+            // written in, which is the order ``TopicPreferences/ownNames()``
+            // promises.
+            let scores = try Row.fetchAll(db, sql: "SELECT name, score FROM topic_preference WHERE score <> 0")
+                .reduce(into: [String: Int]()) { found, row in found[row["name"] as String] = row["score"] as Int }
+
+            var own: [String] = []
+            var symbols: [String: String] = [:]
+            for row in try Row.fetchAll(db, sql: "SELECT name, is_own, symbol FROM topic ORDER BY created_at") {
+                let name: String = row["name"]
+                if row["is_own"] as Bool { own.append(name) }
+                symbols[name] = (row["symbol"] as String?) ?? Topic.defaultSymbol
             }
 
-            return (stories, topics, members)
+            return (stories, topics, members, scores, own, symbols)
         }
 
         let grouped = Dictionary(grouping: members, by: \.storyID)

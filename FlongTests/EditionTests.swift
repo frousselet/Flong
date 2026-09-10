@@ -574,6 +574,93 @@ struct EditionStoreTests {
         #expect(try await editions.current(now: now) == nil)
     }
 
+    /// The row as the store holds it now.
+    private func row(_ id: UUID) async throws -> Edition? {
+        try await database.writer.read { db in try Edition.fetchOne(db, key: id) }
+    }
+
+    /// **A page the reader cancelled is a page nobody may write.** The work set
+    /// is `closed_at IS NULL AND published_at IS NULL`, so a row left open by a
+    /// slot that no longer exists is indistinguishable from the page being
+    /// made : a model call was spent on it, it came out, and it announced
+    /// itself under an hour the reader had just abolished.
+    @Test("A slot the reader switches off takes the page in flight with it")
+    func aCancelledSlotIsAbandoned() async throws {
+        try await story("Une", endingHoursBeforeNoon: 3)
+        try await story("Deux", endingHoursBeforeNoon: 4)
+        let edition = try await make()
+        #expect(edition.slot == .noon)
+
+        var schedule = EditionSchedule.standard
+        schedule.hours[.noon] = nil
+        try await editions.open(schedule, now: now, calendar: calendar)
+
+        let standing = try #require(await row(edition.id))
+        #expect(standing.closedAt != nil)
+        #expect(standing.publishedAt == nil)
+    }
+
+    /// With no boundary at all the old code returned before it closed anything,
+    /// so the last page open went on being written and announced itself after
+    /// the reader had switched every edition off.
+    @Test("With every edition switched off, the page being made is abandoned")
+    func everySlotOffAbandonsThePage() async throws {
+        try await story("Une", endingHoursBeforeNoon: 3)
+        try await story("Deux", endingHoursBeforeNoon: 4)
+        let edition = try await make()
+
+        #expect(try await editions.open(EditionSchedule(hours: [:]), now: now, calendar: calendar) == nil)
+
+        let standing = try #require(await row(edition.id))
+        #expect(standing.closedAt != nil)
+        #expect(standing.publishedAt == nil)
+    }
+
+    /// The work set tests `closed_at IS NULL`, but it tests it before the model
+    /// call. A boundary that goes to press inside that call would otherwise put
+    /// two pages of one period in the archive.
+    @Test("A page whose successor has gone to press is not published")
+    func aClosedPageIsNotPublished() async throws {
+        try await story("Une", endingHoursBeforeNoon: 3)
+        try await story("Deux", endingHoursBeforeNoon: 4)
+        let edition = try await make()
+        let asked = try await rows(of: edition.id).map(\.storyID)
+
+        try await database.writer.write { db in
+            try db.execute(
+                sql: "UPDATE edition SET closed_at = ? WHERE id = ?", arguments: [self.now, edition.id])
+        }
+
+        let written = try await editions.publish(
+            edition.id,
+            points: ["Une chose.", "Une autre."],
+            topics: ["", ""],
+            in: Locale(identifier: "fr_FR"),
+            composedOf: asked
+        )
+        #expect(written == false)
+        #expect(try await editions.current(now: now) == nil)
+    }
+
+    /// **What a second background grant is worth asking for.** A phone gets one
+    /// wake per boundary, and one that lands inside the wait for a page's own
+    /// stories finds nothing ready ; re-arming for the next boundary threw the
+    /// hour away entirely.
+    @Test("A page composed and still unwritten is what a second grant is for")
+    func aPageInThePress() async throws {
+        #expect(try await editions.inThePress(now: now) == nil)
+
+        try await story("Une", endingHoursBeforeNoon: 3)
+        try await story("Deux", endingHoursBeforeNoon: 4)
+        let edition = try await make()
+        #expect(try await editions.inThePress(now: now) == edition.openedAt)
+
+        // Read and declined is a durable answer, so there is nothing to wake
+        // for : the same question would get the same refusal.
+        try await editions.stamp(edition.id, refusedIn: Locale(identifier: "fr_FR"), now: now)
+        #expect(try await editions.inThePress(now: now) == nil)
+    }
+
     private func publish(_ id: UUID, at moment: Date? = nil) async throws {
         try await database.writer.write { db in
             guard var edition = try Edition.fetchOne(db, key: id) else { return }
@@ -621,6 +708,130 @@ struct EditionBriefWorkTests {
     func nothingToDoWithoutAModel() async throws {
         guard !LocalProvider().isAvailable else { return }
         #expect(try await BriefEditionsJob(database, now: now).remaining() == 0)
+    }
+}
+
+/// Whether a page's own period has been written, which decides when it goes to
+/// press.
+///
+/// **The readiness test and the writer have to be asking one question.** They
+/// were asking two. The writer is metered : a story it has already been asked
+/// about inside this period is one it will not touch again, however many
+/// articles have since joined it. The readiness test read the *unmetered*
+/// predicate, so every one of those counted as a story the page was still
+/// waiting on, the count could never reach nought, and no edition was ever
+/// ready before its twenty minutes of grace had run out. Four times a day, the
+/// paper came out twenty minutes after its own hour.
+@Suite("Whether a page's own period has been written")
+struct EditionReadinessTests {
+    private let database: AppDatabase
+    private let french = Locale(identifier: "fr_FR")
+
+    /// The hour the page closes at, and a moment ten minutes past it : inside
+    /// the grace, so readiness is really asked rather than short-circuited.
+    private let boundary = Date(timeIntervalSince1970: 1_788_000_000)
+    private var now: Date { boundary.addingTimeInterval(10 * 60) }
+    private var opened: Date { boundary.addingTimeInterval(-8 * 3600) }
+
+    init() throws {
+        database = try AppDatabase.inMemory()
+    }
+
+    private func page() async throws -> Edition {
+        let edition = Edition(slot: .morning, openedAt: boundary, coversFrom: opened, updatedAt: now)
+        try await database.writer.write { [edition] db in try edition.insert(db) }
+        return edition
+    }
+
+    /// A story inside the period, of two articles, and whatever the model has
+    /// been told about it.
+    ///
+    /// `brief_members` is deliberately never written, which is what says the
+    /// articles have moved since the model last saw them.
+    private func story(askedAt: Date?) async throws {
+        let middle = boundary.addingTimeInterval(-4 * 3600)
+        var story = Story(
+            id: .v7(at: middle), title: "Le tunnel", firstAt: middle, lastAt: middle, updatedAt: middle)
+        story.isGenerated = askedAt != nil
+        story.briefLocale = askedAt == nil ? nil : french.identifier
+        story.briefAskedAt = askedAt
+
+        try await database.writer.write { [story] db in
+            try story.insert(db)
+            var feed = Feed(url: URL(string: "https://readiness.example.com/f.xml")!, title: "Readiness")
+            try feed.insert(db)
+            for index in 0..<2 {
+                let date = middle.addingTimeInterval(-Double(index) * 60)
+                var entry = Entry(
+                    feedID: feed.id, guid: "urn:readiness:\(index)", title: "Le tunnel",
+                    publishedAt: date, receivedAt: date)
+                entry.hasMedia = false
+                try entry.insert(db)
+                try StoryMember(storyID: story.id, entryID: entry.id, similarity: 1).insert(db)
+            }
+        }
+    }
+
+    private func isReady(_ edition: Edition) async throws -> Bool {
+        try await database.writer.read { db in
+            try BriefEditionsJob.isReady(edition, in: db, locale: self.french, now: self.now)
+        }
+    }
+
+    @Test("A story already asked about inside the period does not hold the page")
+    func aMeteredStoryDoesNotHold() async throws {
+        let edition = try await page()
+        try await story(askedAt: boundary.addingTimeInterval(-2 * 3600))
+
+        #expect(try await isReady(edition))
+    }
+
+    @Test("A story nobody has asked about holds the page until the grace runs out")
+    func anUnwrittenStoryHolds() async throws {
+        let edition = try await page()
+        try await story(askedAt: nil)
+
+        #expect(try await isReady(edition) == false)
+    }
+}
+
+/// The hours the reader is in the middle of choosing.
+///
+/// **A choice being made is not a choice the store knows about yet.** Moving a
+/// wheel from seven to nine passes through a hundred and twenty minutes, and
+/// each of them wrote the preference, pushed it to iCloud, grouped the whole
+/// three-day window and read the page back. So the writing waits half a second
+/// for the reader to stop. What that opens is a window in which the held value
+/// and the stored one disagree, and ``AppModel/load()`` reads the stored one
+/// back over the held one : it is the tail of every refresh, every pull and
+/// every mark-all-read, so a pass landing inside the settle would undo the hour
+/// the reader had just chosen, and the pending write would then make the undoing
+/// permanent.
+@Suite("A schedule the reader is still choosing", .serialized)
+@MainActor
+struct EditionScheduleSettleTests {
+    private let model: AppModel
+
+    init() throws {
+        model = AppModel(
+            database: try AppDatabase.inMemory(),
+            preferences: Preferences(cloud: nil, local: UserDefaults(suiteName: "flong.settle.\(UUID())") ?? .standard)
+        )
+    }
+
+    @Test("A refresh landing inside the settle does not undo the hour just chosen")
+    func aChoiceSurvivesARefresh() async throws {
+        var wanted = EditionSchedule.standard
+        wanted.hours[.morning] = 6 * 60
+
+        model.editionSchedule = wanted
+        #expect(model.editionSchedule == wanted)
+
+        // What every refresh ends with, while the preference still holds the
+        // reader's previous hours.
+        await model.load()
+
+        #expect(model.editionSchedule == wanted)
     }
 }
 

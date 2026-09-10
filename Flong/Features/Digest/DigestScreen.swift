@@ -168,7 +168,7 @@ struct DigestScreen: View {
             // telling the reader there is none would be untrue for the minute
             // it takes. That case draws the shape of the page instead, above.
             if model.digestTopic == .frontPage, model.edition == nil, !isWaitingForAnEdition {
-                NoEdition(hasSchedule: !model.editionSchedule.slots.isEmpty, absence: model.absence(of: .editions)) {
+                NoEdition(hasSchedule: !model.editionSchedule.slots.isEmpty, absence: model.editionsAbsence) {
                     open(.view(.unread))
                 }
             } else if model.digest.isEmpty, model.currentWork == nil {
