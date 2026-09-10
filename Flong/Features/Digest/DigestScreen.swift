@@ -375,7 +375,9 @@ struct DigestScreen: View {
 
             if model.backNumbersAreOpen {
                 ForEach(model.editionArchive) { published in
-                    BackNumber(published: published) { open(.story($0)) }
+                    BackNumber(published: published, marks: model.digest.symbols, zoom: zoom) {
+                        open(.story($0))
+                    }
                 }
 
                 // **Reached rather than pressed.** The row is realized a little

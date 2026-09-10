@@ -204,111 +204,90 @@ nonisolated struct PullArrow: Shape {
 
 /// One back number, as it was.
 ///
+/// **Set exactly as today's paper is set.** The dateline over the head, the
+/// head on its own pane of glass, the lead running its picture across the
+/// column and the rest keeping theirs to a square at the side : an archive set
+/// in plainer type than the page above it would read as a summary of itself
+/// rather than as the paper it was. What it does not do is sink, which is the
+/// one thing on the front page that is about being at the top of a scroll : see
+/// ``EditionSinking``.
+///
 /// The rows are the edition's own frozen heads rather than a read of the story
 /// table : a purge that took an article shrinks a story and can tidy it away
 /// altogether, and a page from last Tuesday that lost a row would be an archive
 /// nobody could trust. What the world has since done to a story is not drawn
-/// here at all, so nothing on a back number moves again.
+/// here at all, so nothing on a back number moves again, and ``StoryRow`` draws
+/// no figures where there are none to give.
 struct BackNumber: View {
     let published: PublishedEdition
+    /// The mark each subject wears, which a rubric is printed from. Handed down
+    /// so the rows here are set exactly as the rows above them.
+    let marks: [String: String]
+    let zoom: Namespace.ID
     let open: (UUID) -> Void
 
     @Environment(\.theme) private var theme
 
-    /// What an edition says, and never more than the bound : a page published
-    /// before the bound came down carries five points. See ``EditionHead``.
-    private var points: [String] {
-        Array(published.edition.points.prefix(EditionSummarizer.mostPoints))
-    }
-
-    /// The mark one point wears, or the tag where nothing was matched.
-    private func mark(at index: Int) -> String {
-        guard index < published.marks.count else { return Topic.defaultSymbol }
-        return published.marks[index]
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             dateline
-            if !points.isEmpty { said }
-            ForEach(published.stories, id: \.position) { story in
-                headline(story)
-                Divider()
+
+            if !published.edition.points.isEmpty {
+                EditionHead(published: published)
+            }
+
+            ForEach(Array(published.stories.enumerated()), id: \.element.position) { position, story in
+                StoryRow(
+                    story: story.printed(over: nil, on: published.edition.openedAt),
+                    isLead: position == 0,
+                    isFirst: position == 0,
+                    marks: marks,
+                    zoom: zoom
+                ) {
+                    open(story.storyID)
+                }
+                .accessibilityIdentifier("back-number-headline")
             }
         }
         .padding(.bottom, Editorial.rhythm)
     }
 
-    /// Which paper this is, in the words the masthead of the day used.
+    /// Which paper this is, set the way the front page sets its own.
+    ///
+    /// The day over the edition and its hour, which is the navigation title and
+    /// the subtitle under it said inline : a back number has no bar of its own
+    /// to put them in, and they are the two things that say which paper this
+    /// is.
     ///
     /// The hour and not the moment it was written : a page that arrived at ten
-    /// past eleven is still the eleven o'clock edition, and the dateline is what
-    /// says so.
+    /// past eleven is still the eleven o'clock edition, and the dateline is
+    /// what says so.
     private var dateline: some View {
-        HStack(spacing: 6) {
-            Text(published.edition.slot.title)
-            Text(verbatim: "·")
-            Text(published.edition.openedAt, format: .dateTime.weekday(.wide).day().month())
+        VStack(alignment: .leading, spacing: 1) {
+            Text(verbatim: Self.day(published.edition.openedAt))
+                .font(theme.headline(.title2))
+                .foregroundStyle(.primary)
+
+            HStack(spacing: 5) {
+                Text(published.edition.slot.title)
+                Text(verbatim: "·")
+                Text(published.edition.openedAt, format: .dateTime.hour().minute())
+            }
+            .font(theme.metadata)
+            .foregroundStyle(.secondary)
         }
-        .font(theme.metadata)
-        .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, Editorial.tightRhythm)
+        .padding(.top, Editorial.rhythm)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
     }
 
-    /// The few points the model wrote over the whole of that page.
-    private var said: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ForEach(Array(points.enumerated()), id: \.offset) { index, point in
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Image(systemName: mark(at: index))
-                        .font(.system(.footnote, weight: .medium))
-                        .foregroundStyle(.primary)
-                        .frame(width: EditionHead.markWidth)
-                        .accessibilityHidden(true)
-                    // Never cut, here as at the head of the page : the bound is
-                    // on what the model writes. See ``EditionHead``.
-                    Text(verbatim: point)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-        .font(.callout)
-        .foregroundStyle(.primary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, Editorial.rhythm)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text("Written by the model : \(points.joined(separator: ". "))"))
-    }
-
-    private func headline(_ story: EditionStory) -> some View {
-        Button {
-            open(story.storyID)
-        } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(verbatim: story.title)
-                    .font(theme.headline(.headline))
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if let summary = story.summary, !summary.isEmpty {
-                    StorySummary(
-                        summary: summary,
-                        isGenerated: story.isGenerated,
-                        isTranslated: story.isTranslated,
-                        style: .subheadline
-                    )
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 14)
-            .contentShape(.rect)
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("back-number-headline")
+    /// The day spelled as the front page spells it in its own title.
+    private static func day(_ date: Date) -> String {
+        let spelled = date.formatted(.dateTime.weekday(.wide).day().month(.wide))
+        // Only the first letter : French writes `samedi 29 août`, and
+        // capitalizing every word would give `Samedi 29 Août`.
+        return spelled.prefix(1).localizedUppercase + spelled.dropFirst()
     }
 }
 
