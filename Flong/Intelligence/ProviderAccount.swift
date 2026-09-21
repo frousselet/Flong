@@ -21,6 +21,9 @@ import Foundation
 nonisolated enum ProviderKind: String, Codable, Hashable, Sendable, CaseIterable {
     /// The model on this device, which is the only one Flong ships with.
     case appleIntelligence
+    /// Apple's own larger model, which is not on this device and which the
+    /// reader configures nothing about.
+    case privateCloudCompute
     case openAICompatible
     case anthropic
 
@@ -31,7 +34,7 @@ nonisolated enum ProviderKind: String, Codable, Hashable, Sendable, CaseIterable
     /// make one keystroke rather than twenty.
     var address: String? {
         switch self {
-        case .appleIntelligence: nil
+        case .appleIntelligence, .privateCloudCompute: nil
         case .openAICompatible: "https://api.openai.com/v1"
         case .anthropic: "https://api.anthropic.com/v1"
         }
@@ -148,6 +151,16 @@ nonisolated struct ProviderAccount: Identifiable, Hashable, Sendable, Codable {
 /// rather have no headline than a written one.
 nonisolated enum ModelChoice: Hashable, Sendable, Codable {
     case onDevice
+    /// Apple's own larger model, which is what a task nobody has pointed
+    /// anywhere falls to once the reader has agreed and the device can reach
+    /// it.
+    ///
+    /// **Never written down.** ``ProviderSettings/pointing(_:at:)`` turns it
+    /// into the absence of an entry, and the absence of an entry is what every
+    /// build, older and newer, already knows how to read. So preferring it
+    /// stores nothing new, and a device that has never heard of it cannot be
+    /// handed a word it does not know.
+    case privateCloud
     case provider(UUID)
     case nothing
 
@@ -213,8 +226,29 @@ nonisolated enum ModelChoice: Hashable, Sendable, Codable {
         case .provider(let id):
             var nested = container.nestedContainer(keyedBy: ProviderKeys.self, forKey: .provider)
             try nested.encode(id, forKey: .value)
+        case .privateCloud:
+            // Unreachable by construction : `pointing(_:at:)` removes the entry
+            // rather than writing this. Were it ever written, it would have to
+            // be a word older builds already read, and the device is the one
+            // they fall to anyway.
+            _ = container.nestedContainer(keyedBy: ProviderKeys.self, forKey: .onDevice)
         }
     }
+}
+
+/// Whether the reader has agreed that Apple's own larger model may be asked.
+///
+/// **Its own consent, and not the one that covers a service they configured.**
+/// The two say different things : one names a host the reader chose and a key
+/// they typed, the other names Apple and has neither. One yes must not buy the
+/// other, and withdrawing either must not withdraw both.
+///
+/// A string on the wire, so an older build reading it sees a scalar it can
+/// ignore rather than a shape it cannot parse.
+nonisolated enum PrivateCloudConsent: String, Hashable, Sendable, Codable {
+    case unasked
+    case agreed
+    case declined
 }
 
 /// What the reader has chosen about models.
@@ -244,6 +278,13 @@ nonisolated struct ProviderSettings: Hashable, Sendable, Codable {
     /// it is not made.
     var sendsToProviders = false
 
+    /// Whether Apple's own larger model may be asked.
+    ///
+    /// A decision about the reader rather than about a device, so it travels
+    /// with their other decisions. Whether any given device can act on it is a
+    /// fact about that device and is never stored.
+    var privateCloud: PrivateCloudConsent = .unasked
+
     init() {}
 
     /// Written out rather than left to be synthesized, since the reading below
@@ -252,6 +293,7 @@ nonisolated struct ProviderSettings: Hashable, Sendable, Codable {
         case accounts
         case assignment
         case sendsToProviders
+        case privateCloud
     }
 
     // MARK: - Reading a blob written before this version
@@ -273,6 +315,7 @@ nonisolated struct ProviderSettings: Hashable, Sendable, Codable {
         accounts = try container.decodeIfPresent([ProviderAccount].self, forKey: .accounts) ?? []
         assignment = Self.readAssignment(in: container)
         sendsToProviders = try container.decodeIfPresent(Bool.self, forKey: .sendsToProviders) ?? false
+        privateCloud = try container.decodeIfPresent(PrivateCloudConsent.self, forKey: .privateCloud) ?? .unasked
     }
 
     /// The assignment read pair by pair, because one pair this build cannot
@@ -315,6 +358,24 @@ nonisolated struct ProviderSettings: Hashable, Sendable, Codable {
         assignment[task] ?? .onDevice
     }
 
+    /// The same question, asked by a device that knows whether it can reach
+    /// Apple's own larger model.
+    ///
+    /// **Preferring it lives in this one line, and it moves only what was never
+    /// decided.** A task carrying an entry is obeyed exactly as before, so a
+    /// reader who put their headlines on this device keeps them there after
+    /// they agree. A task carrying none falls to Apple's model where the reader
+    /// has agreed and this device is eligible, and to this device otherwise.
+    ///
+    /// The argument is eligibility and not readiness. A quota that runs out at
+    /// three in the morning must not rewrite on screen the answer the reader
+    /// gave, and what is actually writing at this moment is said in a line
+    /// underneath rather than by changing the answer above it.
+    func choice(for task: ModelTask, withPrivateCloud eligible: Bool) -> ModelChoice {
+        if let said = assignment[task] { return said }
+        return eligible && privateCloud == .agreed ? .privateCloud : .onDevice
+    }
+
     /// The account answering one task, or nothing where the device answers it.
     func account(for task: ModelTask) -> ProviderAccount? {
         guard sendsToProviders else { return nil }
@@ -324,7 +385,14 @@ nonisolated struct ProviderSettings: Hashable, Sendable, Codable {
     /// The same settings with one task pointed somewhere else.
     func pointing(_ task: ModelTask, at choice: ModelChoice) -> ProviderSettings {
         var settings = self
-        settings.assignment[task] = choice
+        // Apple's model is what a task nobody has pointed anywhere falls to, so
+        // pointing a task at it is unpointing the task. Nothing is written, and
+        // there is nothing for an older build to fail to read.
+        if case .privateCloud = choice {
+            settings.assignment.removeValue(forKey: task)
+        } else {
+            settings.assignment[task] = choice
+        }
         return settings
     }
 
@@ -350,6 +418,12 @@ nonisolated struct ProviderSettings: Hashable, Sendable, Codable {
         var settings = self
         settings.assignment = settings.assignment.filter { $0.value == .nothing }
         settings.sendsToProviders = false
+        // **Both consents, or this sends more than it stops.** Emptying the
+        // assignment is what puts every task back, and a task with no entry is
+        // exactly the one Apple's model answers. Left agreed, a reader asking
+        // for nothing to leave would have moved every task from a service they
+        // chose to one they did not.
+        settings.privateCloud = settings.privateCloud == .agreed ? .declined : settings.privateCloud
         return settings
     }
 

@@ -36,6 +36,16 @@ nonisolated protocol ModelProvider: Sendable {
 
     var isAvailable: Bool { get }
 
+    /// Whether what is asked is about to leave this device.
+    ///
+    /// **Read rather than declared, because for one provider it changes.**
+    /// ``host`` was the whole answer while every model was either on the device
+    /// or at an address the reader typed. Apple's own larger model is neither :
+    /// it leaves, and there is no address to name. A provider that falls back
+    /// to the device mid-pass stops leaving, too, and a consent or a log that
+    /// said otherwise would be saying something untrue about the one thing they
+    /// exist to record.
+
     /// Why it cannot be used, in a sentence for the reader, or nothing when it
     /// can.
     var absence: LocalizedStringResource? { get }
@@ -91,6 +101,12 @@ nonisolated protocol ModelConversation: AnyObject {
 
     /// Asks, and remembers the turn.
     func answer(to question: String, shaped: ResponseShape, keeping budget: Int) async throws(ModelFault) -> Answer
+}
+
+nonisolated extension ModelProvider {
+    /// Nothing leaves where nothing is spoken to, which is true of every
+    /// provider that names a host or names none.
+    var leavesTheDevice: Bool { host != nil }
 }
 
 nonisolated extension ModelConversation {

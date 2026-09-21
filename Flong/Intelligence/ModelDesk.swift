@@ -30,6 +30,9 @@ nonisolated final class ModelDesk: Sendable {
     static let shared = ModelDesk()
 
     private let local: LocalProvider
+    /// Where Apple's own larger model stands, taken once and held rather than
+    /// asked per story.
+    let privateCloud: PrivateCloudStanding
     private let preferences: Preferences
     private let secrets: ProviderSecretStoring
     private let transport: CloudTransport
@@ -43,11 +46,13 @@ nonisolated final class ModelDesk: Sendable {
 
     init(
         local: LocalProvider = LocalProvider(),
+        privateCloud: PrivateCloudStanding = PrivateCloudStanding(),
         preferences: Preferences = Preferences(),
         secrets: ProviderSecretStoring = KeychainProviderSecrets(),
         transport: CloudTransport = CloudTransport()
     ) {
         self.local = local
+        self.privateCloud = privateCloud
         self.preferences = preferences
         self.secrets = secrets
         self.transport = transport
@@ -68,9 +73,30 @@ nonisolated final class ModelDesk: Sendable {
     /// expired in the night must be visible rather than silently costing the
     /// reader the better half of their front page.
     func hand(for task: ModelTask) -> ModelHand {
-        guard preferences.providers.choice(for: task) != .nothing else {
+        let settings = preferences.providers
+        let choice = settings.choice(for: task, withPrivateCloud: privateCloud.reading.isEligible)
+
+        guard choice != .nothing else {
             return ModelHand(task: task, provider: NoModel(), patience: patience(with: NoModel()))
         }
+
+        // Apple's own larger model, where the reader agreed and this device can
+        // reach it. It carries the device behind it rather than beside it, so
+        // a quota that runs out mid-pass costs a round trip and not the night.
+        if case .privateCloud = choice {
+            let provider = PrivateCloudProvider(
+                task: task,
+                local: local,
+                standing: privateCloud,
+                log: log.withLock { $0 }
+            )
+            let patience = patience(with: provider)
+            guard !patience.hasGivenUp() else {
+                return ModelHand(task: task, provider: local, patience: self.patience(with: local))
+            }
+            return ModelHand(task: task, provider: provider, patience: patience)
+        }
+
         guard let cloud = configured(for: task) else {
             return ModelHand(task: task, provider: local, patience: patience(with: local))
         }
@@ -84,7 +110,13 @@ nonisolated final class ModelDesk: Sendable {
 
     /// Why one task will not be done, or nothing where it will.
     func absence(of task: ModelTask) -> LocalizedStringResource? {
-        guard preferences.providers.choice(for: task) != .nothing else { return NoModel().absence }
+        let settings = preferences.providers
+        let choice = settings.choice(for: task, withPrivateCloud: privateCloud.reading.isEligible)
+
+        guard choice != .nothing else { return NoModel().absence }
+        // Apple's model answers or the device does, so what is missing is
+        // whatever the device is missing.
+        if case .privateCloud = choice { return local.absence }
         guard let cloud = configured(for: task) else { return local.absence }
         // A model of the reader's own that is failing is not an absence : the
         // device is writing instead, and the settings row is where that is
@@ -103,6 +135,7 @@ nonisolated final class ModelDesk: Sendable {
     /// the full pass. Both are moments when what made a model fail an hour ago
     /// may well have changed, and neither costs anything if it has not.
     func reconsiderEverything() {
+        privateCloud.reconsider()
         patiences.withLock { patiences in
             for patience in patiences.values { patience.reconsider() }
         }
@@ -136,7 +169,9 @@ nonisolated final class ModelDesk: Sendable {
     /// Which format a kind of service speaks.
     static func wire(of kind: ProviderKind) -> (any CloudWire)? {
         switch kind {
-        case .appleIntelligence: nil
+        // Neither speaks a wire format : one is on the device and the other is
+        // spoken to through the framework rather than over HTTP.
+        case .appleIntelligence, .privateCloudCompute: nil
         case .openAICompatible: OpenAICompatible()
         case .anthropic: AnthropicMessages()
         }

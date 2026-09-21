@@ -49,11 +49,15 @@ struct ModelSettings: View {
         case editor(ProviderDraft)
         /// A choice waiting on the reader's answer to one question.
         case consent(task: ModelTask, choice: ModelChoice, host: String)
+        /// The same question about Apple's own larger model, which names no
+        /// host because there is none to name.
+        case privateCloudConsent(task: ModelTask)
 
         var id: String {
             switch self {
             case .editor(let draft): "editor-\(draft.id)"
             case .consent(let task, _, _): "consent-\(task.rawValue)"
+            case .privateCloudConsent(let task): "private-cloud-\(task.rawValue)"
             }
         }
     }
@@ -89,6 +93,14 @@ struct ModelSettings: View {
                     model.point(task, at: choice)
                 }
                 .themed()
+            case .privateCloudConsent(let task):
+                PrivateCloudAgreement { agreed in
+                    self.presenting = nil
+                    guard agreed else { return }
+                    model.answerPrivateCloud(.agreed)
+                    model.point(task, at: .privateCloud)
+                }
+                .themed()
             }
         }
         .alert("Stop sending anything?", isPresented: $isStopping) {
@@ -115,6 +127,12 @@ struct ModelSettings: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Picker(selection: choice(for: task)) {
                         Text("On this device").tag(ModelChoice.onDevice)
+                        // Only where this device can reach it. A choice that
+                        // cannot be acted on is a setting that looks set and
+                        // does nothing.
+                        if model.hasPrivateCloud {
+                            Text("Private Cloud Compute").tag(ModelChoice.privateCloud)
+                        }
                         // The reader's own name for their own account, so it is
                         // never translated.
                         ForEach(model.providers) { provider in
@@ -130,6 +148,13 @@ struct ModelSettings: View {
                             .font(theme.metadata)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                    } else if model.choice(of: task) == .privateCloud, let standing = model.privateCloudStanding {
+                        // What is actually writing, said under the row rather
+                        // than by changing the answer in it.
+                        Text(Self.saying(standing))
+                            .font(theme.metadata)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .accessibilityIdentifier("model-task-\(task.rawValue)")
@@ -137,7 +162,30 @@ struct ModelSettings: View {
         } header: {
             Text("What the model does")
         } footer: {
-            Text("Each of these uses Apple Intelligence, one of your providers, or nothing at all.")
+            Text(
+                model.hasPrivateCloud
+                    ? "Each of these uses this device, Private Cloud Compute, one of your providers, or nothing at all."
+                    : "Each of these uses Apple Intelligence, one of your providers, or nothing at all."
+            )
+        }
+    }
+
+    /// What is writing, where it is not what the row says.
+    ///
+    /// Plain and short : the reader wants to know their page is still being
+    /// written, not why Apple's servers are busy.
+    private static func saying(_ standing: PrivateCloudReading) -> LocalizedStringResource {
+        switch standing.reason {
+        case .limitReached:
+            guard let comesBack = standing.resetDate else {
+                return "The Private Cloud Compute limit is reached. This device is writing."
+            }
+            let when = comesBack.formatted(date: .abbreviated, time: .shortened)
+            return "The Private Cloud Compute limit is reached. This device is writing until \(when)."
+        case .systemNotReady:
+            return "Private Cloud Compute is not ready. This device is writing."
+        default:
+            return "Private Cloud Compute could not be reached. This device is writing."
         }
     }
 
@@ -150,6 +198,12 @@ struct ModelSettings: View {
         Binding(
             get: { model.choice(of: task) },
             set: { wanted in
+                // Apple's own model has a consent of its own, which says
+                // different things and is asked in its own words.
+                if case .privateCloud = wanted, model.privateCloudConsent != .agreed {
+                    presenting = .privateCloudConsent(task: task)
+                    return
+                }
                 guard case .provider(let id) = wanted, !model.sendsToProviders else {
                     model.point(task, at: wanted)
                     return

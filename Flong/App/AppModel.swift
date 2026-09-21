@@ -1827,9 +1827,32 @@ final class AppModel {
     private(set) var providerCalls: [ProviderCall] = []
     private(set) var providerCallCount = 0
 
+    /// Whether they have agreed that Apple's own larger model may be asked.
+    private(set) var privateCloudConsent: PrivateCloudConsent = .unasked
+
+    /// Whether this device could reach it at all, which is a fact about the
+    /// device and never travels with the reader's decisions.
+    private(set) var hasPrivateCloud = false
+
+    /// What is writing at this moment where that is not what the picker says,
+    /// or nothing where the two agree.
+    private(set) var privateCloudStanding: PrivateCloudReading?
+
     /// Where one task is pointed.
     func choice(of task: ModelTask) -> ModelChoice {
-        preferences.providers.choice(for: task)
+        preferences.providers.choice(for: task, withPrivateCloud: hasPrivateCloud)
+    }
+
+    /// Records that they have been asked about Apple's own larger model.
+    ///
+    /// Its own consent and not the one that covers a service they configured :
+    /// the two say different things, and one yes must not buy the other.
+    func answerPrivateCloud(_ answer: PrivateCloudConsent) {
+        var settings = preferences.providers
+        settings.privateCloud = answer
+        preferences.providers = settings
+        loadProviders()
+        Task { await rebuildDigest() }
     }
 
     /// What went wrong last with one of their models, where anything did.
@@ -1850,6 +1873,14 @@ final class AppModel {
         let settings = preferences.providers
         providers = settings.accounts
         sendsToProviders = settings.sendsToProviders
+        privateCloudConsent = settings.privateCloud
+
+        let reading = models.privateCloud.reading
+        hasPrivateCloud = reading.isEligible
+        // Said only where it differs from the answer above it, so a picker
+        // never changes under the reader because a quota ran out in the night.
+        privateCloudStanding = reading.isEligible && !reading.isReady ? reading : nil
+
         holdWhoWritesEditions()
     }
 

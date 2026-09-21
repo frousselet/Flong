@@ -2391,6 +2391,17 @@
         }
       }
     },
+    "Each of these uses this device, Private Cloud Compute, one of your providers, or nothing at all.": {
+      "comment": "Footer under the four things a model does, where this device can reach Apple's larger model.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chacun utilise cet appareil, Private Cloud Compute, un de vos fournisseurs, ou rien du tout."
+          }
+        }
+      }
+    },
     "Earlier editions": {
       "extractionState": "manual",
       "localizations": {
@@ -4491,6 +4502,39 @@
         }
       }
     },
+    "Private Cloud Compute": {
+      "comment": "One choice in the picker for a thing a model does : Apple's larger model, which is not on this device. The name is Apple's and is not translated.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Private Cloud Compute"
+          }
+        }
+      }
+    },
+    "Private Cloud Compute could not be reached. This device is writing.": {
+      "comment": "Under a task pointed at Apple's larger model, when it cannot be reached at all.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Private Cloud Compute n'a pas pu être joint. C'est cet appareil qui écrit."
+          }
+        }
+      }
+    },
+    "Private Cloud Compute is not ready. This device is writing.": {
+      "comment": "Under a task pointed at Apple's larger model, when the system is not ready for it.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Private Cloud Compute n'est pas prêt. C'est cet appareil qui écrit."
+          }
+        }
+      }
+    },
     "Profile": {
       "localizations": {
         "fr": {
@@ -5673,6 +5717,28 @@
         }
       }
     },
+    "The Private Cloud Compute limit is reached. This device is writing until %@.": {
+      "comment": "Under a task pointed at Apple's larger model, when the quota is spent. The placeholder is the date it comes back.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La limite de Private Cloud Compute est atteinte. C'est cet appareil qui écrit jusqu'au %@."
+          }
+        }
+      }
+    },
+    "The Private Cloud Compute limit is reached. This device is writing.": {
+      "comment": "Under a task pointed at Apple's larger model, when the quota is spent and the system named no date.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La limite de Private Cloud Compute est atteinte. C'est cet appareil qui écrit."
+          }
+        }
+      }
+    },
     "The account is yours. Flong has none, and pays for nothing.": {
       "comment": "Consent sheet : whose account it is.",
       "localizations": {
@@ -6000,6 +6066,17 @@
         }
       }
     },
+    "There is no account and nothing to pay. The limit is your device's, shared with everything else that uses it.": {
+      "comment": "Consent sheet for Apple's larger model : that there is no account, and that the quota is the system's.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il n'y a pas de compte et rien à payer. La limite est celle de votre appareil, partagée avec tout ce qui s'en sert."
+          }
+        }
+      }
+    },
     "There is no such model.": {
       "comment": "What a reader is told when a model service has no model of the name they typed.",
       "localizations": {
@@ -6018,6 +6095,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ils vont à %@."
+          }
+        }
+      }
+    },
+    "They go to Private Cloud Compute, which is Apple's. Apple does not keep them.": {
+      "comment": "Consent sheet for Apple's larger model : where what leaves goes.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ils vont à Private Cloud Compute, qui appartient à Apple. Apple ne les conserve pas."
           }
         }
       }
@@ -6182,6 +6270,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cette semaine"
+          }
+        }
+      }
+    },
+    "This writes what you have not pointed somewhere else. Anything you chose yourself stays where you put it.": {
+      "comment": "Consent sheet for Apple's larger model : that agreeing moves only what was never decided.",
+      "localizations": {
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il écrit ce que vous n'avez pointé nulle part ailleurs. Ce que vous avez choisi vous-même reste où vous l'avez mis."
           }
         }
       }
