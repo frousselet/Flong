@@ -6292,7 +6292,7 @@ final class AppModel {
 
         let report: ServiceImportReport
         do {
-            report = try await service.run(job, using: client) { progress in
+            report = try await service.run(job, using: client) { [weak self] progress in
                 BackgroundScheduler.report(done: progress.done, of: progress.total)
                 Task { @MainActor [weak self] in self?.serviceProgress = progress }
             }
