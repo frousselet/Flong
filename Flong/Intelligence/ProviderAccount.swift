@@ -113,6 +113,31 @@ nonisolated struct ProviderAccount: Identifiable, Hashable, Sendable, Codable {
 
     /// The host, which is what the consent names and the log records.
     var host: String { origin?.host() ?? "" }
+
+    // MARK: - Reading a blob written before a field was added
+
+    /// The same reading ``ProviderSettings`` does, and for the same reason.
+    ///
+    /// An account is inside that blob, so a field added here fails the whole
+    /// of it : Swift's synthesized reading demands every key rather than
+    /// falling back on a property's default, and one missing key throws a
+    /// failure that empties the accounts, the assignments and the consent
+    /// together. Every field is read as optional against what it means when
+    /// nobody has said anything, except the three an account cannot be without.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        kind = try container.decode(ProviderKind.self, forKey: .kind)
+        name = try container.decode(String.self, forKey: .name)
+        origin = try container.decodeIfPresent(URL.self, forKey: .origin)
+        path = try container.decodeIfPresent(String.self, forKey: .path) ?? ""
+        isEndpointSecret = try container.decodeIfPresent(Bool.self, forKey: .isEndpointSecret) ?? false
+        model = try container.decodeIfPresent(String.self, forKey: .model) ?? ""
+        headerNames = try container.decodeIfPresent([String].self, forKey: .headerNames) ?? []
+        dialect = try container.decodeIfPresent(ProviderDialect.self, forKey: .dialect) ?? .strictSchema
+        lastWorkedAt = try container.decodeIfPresent(Date.self, forKey: .lastWorkedAt)
+        addedAt = try container.decodeIfPresent(Date.self, forKey: .addedAt) ?? Date()
+    }
 }
 
 /// Where one of the four things a model does is pointed.
@@ -129,6 +154,66 @@ nonisolated enum ModelChoice: Hashable, Sendable, Codable {
     var account: UUID? {
         guard case .provider(let id) = self else { return nil }
         return id
+    }
+
+    // MARK: - Surviving a case this build has never heard of
+
+    /// **A case written by a newer device used to cost the reader everything.**
+    /// These travel through the key-value store, so a device one version ahead
+    /// writes what a device one version behind has to read. The synthesized
+    /// reading threw on a case it did not know, and the throw did not stop at
+    /// the one task : ``Preferences/providers`` reads the whole settings blob
+    /// through a `try?`, so one unknown word emptied the accounts, the
+    /// assignments and the consent together, and the next write pushed that
+    /// emptiness back to iCloud for every other device to receive. A reader
+    /// would have lost the model they configured, on all of their devices, and
+    /// nothing would have said why.
+    ///
+    /// So a case that is not recognized reads as the device, which is what a
+    /// task nobody has spoken about already means, and everything around it
+    /// survives. The writing is untouched and byte for byte what it has always
+    /// been, `{"onDevice":{}}` and `{"provider":{"_0":"..."}}`, since the other
+    /// device has to go on reading what this one writes.
+    private enum CodingKeys: String, CodingKey {
+        case onDevice
+        case provider
+        case nothing
+    }
+
+    /// The synthesized name for a single unlabelled associated value.
+    private enum ProviderKeys: String, CodingKey {
+        case value = "_0"
+    }
+
+    init(from decoder: Decoder) throws {
+        guard let container = try? decoder.container(keyedBy: CodingKeys.self) else {
+            self = .onDevice
+            return
+        }
+
+        if container.contains(.provider),
+            let nested = try? container.nestedContainer(keyedBy: ProviderKeys.self, forKey: .provider),
+            let id = try? nested.decode(UUID.self, forKey: .value)
+        {
+            self = .provider(id)
+        } else if container.contains(.nothing) {
+            self = .nothing
+        } else {
+            self = .onDevice
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .onDevice:
+            _ = container.nestedContainer(keyedBy: ProviderKeys.self, forKey: .onDevice)
+        case .nothing:
+            _ = container.nestedContainer(keyedBy: ProviderKeys.self, forKey: .nothing)
+        case .provider(let id):
+            var nested = container.nestedContainer(keyedBy: ProviderKeys.self, forKey: .provider)
+            try nested.encode(id, forKey: .value)
+        }
     }
 }
 
@@ -160,6 +245,64 @@ nonisolated struct ProviderSettings: Hashable, Sendable, Codable {
     var sendsToProviders = false
 
     init() {}
+
+    /// Written out rather than left to be synthesized, since the reading below
+    /// names it.
+    private enum CodingKeys: String, CodingKey {
+        case accounts
+        case assignment
+        case sendsToProviders
+    }
+
+    // MARK: - Reading a blob written before this version
+
+    /// **A field added here used to cost the reader everything, too.** Swift's
+    /// synthesized reading does not fall back on a property's default : it
+    /// demands the key, so the first version to add a field would have failed
+    /// to read every blob written before it, and ``Preferences/providers``
+    /// reads through a `try?` that turns a failure into empty settings and
+    /// then writes them back to iCloud. The day a field was added, every
+    /// reader would have lost their accounts and their consent on every
+    /// device. Measured, not feared : `keyNotFound` on today's own blob.
+    ///
+    /// Every field is read as optional and falls back on what it means when
+    /// nobody has said anything, so a blob from any version reads, and so does
+    /// a blob from a version that adds another field after this one.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        accounts = try container.decodeIfPresent([ProviderAccount].self, forKey: .accounts) ?? []
+        assignment = Self.readAssignment(in: container)
+        sendsToProviders = try container.decodeIfPresent(Bool.self, forKey: .sendsToProviders) ?? false
+    }
+
+    /// The assignment read pair by pair, because one pair this build cannot
+    /// read must not cost the others.
+    ///
+    /// **A dictionary keyed by anything but a string or a number is written as
+    /// a flat list**, the task and then its choice, over and over :
+    /// `["headlines", {...}, "search", {...}]`. Read as a dictionary in one go,
+    /// a task named by a newer version fails the whole list, and the failure
+    /// does not stop there : it fails the settings, which empties the accounts
+    /// and the consent and writes that emptiness back to iCloud.
+    ///
+    /// So the key is read as the string it is written as, and a name this build
+    /// has never heard of drops that one pair. Both reads are written so they
+    /// always move forward : a pair that could not be read still advances the
+    /// list, and nothing here can turn into a loop that does not end.
+    private static func readAssignment(in container: KeyedDecodingContainer<CodingKeys>) -> [ModelTask: ModelChoice] {
+        guard var list = try? container.nestedUnkeyedContainer(forKey: .assignment) else { return [:] }
+
+        var read: [ModelTask: ModelChoice] = [:]
+        while !list.isAtEnd {
+            // A key that is not a string is a shape nothing here wrote, and
+            // there is no telling where the next pair begins, so it stops.
+            guard let name = try? list.decode(String.self) else { break }
+            guard let choice = try? list.decode(ModelChoice.self) else { break }
+            guard let task = ModelTask(rawValue: name) else { continue }
+            read[task] = choice
+        }
+        return read
+    }
 
     func account(_ id: UUID?) -> ProviderAccount? {
         guard let id else { return nil }

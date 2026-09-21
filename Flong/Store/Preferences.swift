@@ -431,10 +431,21 @@ nonisolated final class Preferences: @unchecked Sendable {
     /// under the same identifiers, and travel by iCloud Keychain instead.
     var providers: ProviderSettings {
         get {
-            guard let data = cloud?.data(forKey: Key.providers) ?? local.data(forKey: Key.providers),
-                let stored = try? JSONDecoder().decode(ProviderSettings.self, from: data)
-            else { return ProviderSettings() }
-            return stored
+            guard let data = cloud?.data(forKey: Key.providers) ?? local.data(forKey: Key.providers) else {
+                return ProviderSettings()
+            }
+            do {
+                return try JSONDecoder().decode(ProviderSettings.self, from: data)
+            } catch {
+                // Said out loud because of what silence used to cost. What is
+                // handed back is empty, and the next write pushes that
+                // emptiness to iCloud and to every other device : the reader
+                // loses the model they configured and their consent with it.
+                // Both readings are tolerant now, so this should never happen ;
+                // if it ever does, it must not happen quietly.
+                Log.store.error("The model settings would not be read, so the reader's own were not seen.")
+                return ProviderSettings()
+            }
         }
         set {
             guard let data = try? JSONEncoder().encode(newValue) else { return }
