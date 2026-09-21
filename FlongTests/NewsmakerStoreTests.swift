@@ -12,9 +12,25 @@
 import CloudKit
 import Foundation
 import GRDB
+import NaturalLanguage
 import Testing
 
 @testable import Flong
+
+/// Whether this system can name a person at all.
+///
+/// **A simulator carries no named-entity models.** Asked what it can do with a
+/// French word, `NLTagger` answers `Language`, `Script` and `TokenType` there
+/// and nothing else, where the same question on a Mac answers seven schemes
+/// with `NameType` among them. So every word of every article comes back
+/// `.other`, ``Newsmaker/people(inTitle:text:language:)`` finds nobody, and
+/// every test resting on the tagger having named somebody fails over an asset
+/// that is not in this project and cannot be installed from it.
+///
+/// Skipped rather than red, and they run on a device. What is written on top of
+/// the tagger is tested apart from it, on the spans it hands back rather than
+/// on prose, and those need none of this.
+let systemNamesPeople = NLTagger.availableTagSchemes(for: .word, language: .french).contains(.nameType)
 
 @Suite("The people the articles are about")
 struct NewsmakerStoreTests {
@@ -92,7 +108,7 @@ struct NewsmakerStoreTests {
 
     // MARK: - Reading a person out of an article
 
-    @Test("A headline names the people it is about, in the order it names them")
+    @Test("A headline names the people it is about, in the order it names them", .enabled(if: systemNamesPeople))
     func headline() {
         let found = Newsmaker.people(inTitle: "Emmanuel Macron reçoit Donald Trump à Paris", language: "fr")
 
@@ -102,7 +118,9 @@ struct NewsmakerStoreTests {
         #expect(!found.contains { $0.name == "Paris" })
     }
 
-    @Test("A paper names somebody in full once and by their surname after, and that is one person")
+    @Test(
+        "A paper names somebody in full once and by their surname after, and that is one person",
+        .enabled(if: systemNamesPeople))
     func surnames() {
         let found = Newsmaker.people(
             inTitle: "Trump donne dix jours à l'Iran",
@@ -126,7 +144,7 @@ struct NewsmakerStoreTests {
         #expect(found.first { $0.name == "Donald Trump" }.map { $0.times > 1 } == true)
     }
 
-    @Test("A surname two people in one article share folds into neither of them")
+    @Test("A surname two people in one article share folds into neither of them", .enabled(if: systemNamesPeople))
     func ambiguity() {
         let found = Newsmaker.people(
             inTitle: "Le procès",
@@ -144,7 +162,7 @@ struct NewsmakerStoreTests {
         #expect(found.first?.times == 2)
     }
 
-    @Test("Whoever signed the piece is not somebody it is about")
+    @Test("Whoever signed the piece is not somebody it is about", .enabled(if: systemNamesPeople))
     func bylines() {
         let found = Newsmaker.people(
             inTitle: "Un entretien",
@@ -205,7 +223,9 @@ struct NewsmakerStoreTests {
         #expect(Newsmaker.people(inTitle: "", language: "fr").isEmpty)
     }
 
-    @Test("The language is believed where the feed stated one, and guessed where it did not")
+    @Test(
+        "The language is believed where the feed stated one, and guessed where it did not",
+        .enabled(if: systemNamesPeople))
     func languages() {
         let stated = Newsmaker.people(
             inTitle: "Une rencontre",
@@ -238,7 +258,9 @@ struct NewsmakerStoreTests {
 
     // MARK: - What the job leaves behind
 
-    @Test("An article is read once, and one that named nobody is never asked about again")
+    @Test(
+        "An article is read once, and one that named nobody is never asked about again", .enabled(if: systemNamesPeople)
+    )
     func queue() async throws {
         try await articles(Newsmaker.leastArticles, saying: "Donald Trump a parlé mardi soir.")
         try await article("Le budget en cinq graphiques", saying: "Les recettes reculent de trois points.")
@@ -264,7 +286,7 @@ struct NewsmakerStoreTests {
         #expect(try await newsmakers.unread(limit: 1).map(\.title) == ["Neuf"])
     }
 
-    @Test("Reading an article twice says it once")
+    @Test("Reading an article twice says it once", .enabled(if: systemNamesPeople))
     func idempotent() async throws {
         let entry = try await article("Une rencontre", saying: "Donald Trump a parlé mardi soir.")
         try await readEverything()
@@ -277,7 +299,7 @@ struct NewsmakerStoreTests {
         #expect(try await newsmakers.newsmaker(named: "Donald Trump")?.count == 1)
     }
 
-    @Test("An article a publisher rewrote keeps nobody it no longer names")
+    @Test("An article a publisher rewrote keeps nobody it no longer names", .enabled(if: systemNamesPeople))
     func rewritten() async throws {
         let entry = try await article("Une rencontre", saying: "Donald Trump a parlé mardi soir.")
         try await readEverything()
@@ -296,7 +318,7 @@ struct NewsmakerStoreTests {
         #expect(try await newsmakers.newsmaker(named: "Emmanuel Macron")?.count == 1)
     }
 
-    @Test("A duplicate and a hidden article are not read : neither is shown anywhere")
+    @Test("A duplicate and a hidden article are not read : neither is shown anywhere", .enabled(if: systemNamesPeople))
     func unshown() async throws {
         let first = try await article("Une rencontre", saying: "Donald Trump a parlé mardi soir.")
         let second = try await article("La même", saying: "Emmanuel Macron a parlé mercredi.")
@@ -313,7 +335,7 @@ struct NewsmakerStoreTests {
 
     // MARK: - Who there is
 
-    @Test("Two articles about one person are one row and a count of two")
+    @Test("Two articles about one person are one row and a count of two", .enabled(if: systemNamesPeople))
     func counting() async throws {
         try await article("Une rencontre", saying: "Donald Trump a parlé mardi soir.")
         try await article("Une autre", saying: "Donald Trump est attendu jeudi.")
@@ -322,7 +344,7 @@ struct NewsmakerStoreTests {
         #expect(try await newsmakers.newsmaker(named: "Donald Trump")?.count == 2)
     }
 
-    @Test("A row names the publishers writing about them, the ones writing most first")
+    @Test("A row names the publishers writing about them, the ones writing most first", .enabled(if: systemNamesPeople))
     func publishers() async throws {
         try await article(
             "Une rencontre", saying: "Donald Trump a parlé mardi soir.",
@@ -364,7 +386,7 @@ struct NewsmakerStoreTests {
         #expect(try await newsmakers.newsmaker(named: "Personne") == nil)
     }
 
-    @Test("One person's page holds what is written about them")
+    @Test("One person's page holds what is written about them", .enabled(if: systemNamesPeople))
     func page() async throws {
         try await article("Une rencontre", saying: "Donald Trump a parlé mardi soir.")
         try await article("Sans personne", saying: "Les recettes reculent de trois points.")
@@ -402,7 +424,9 @@ struct NewsmakerStoreTests {
         #expect(try await newsmakers.newsmaker(named: "Emmanuel Macron")?.isFavourite == true)
     }
 
-    @Test("Taking the favourite back leaves the person in the list and nothing else behind")
+    @Test(
+        "Taking the favourite back leaves the person in the list and nothing else behind",
+        .enabled(if: systemNamesPeople))
     func unfavourite() async throws {
         try await article("Une rencontre", saying: "Donald Trump a parlé mardi soir.")
         try await readEverything()
@@ -432,7 +456,9 @@ struct NewsmakerStoreTests {
         #expect(try await newsmakers.notified().isEmpty)
     }
 
-    @Test("An article naming somebody the reader asked about is announced under their name")
+    @Test(
+        "An article naming somebody the reader asked about is announced under their name",
+        .enabled(if: systemNamesPeople))
     func announced() async throws {
         try await article("Une rencontre", saying: "Donald Trump a parlé mardi soir.")
         try await readEverything()
@@ -448,7 +474,9 @@ struct NewsmakerStoreTests {
 
     // MARK: - What the directory leaves out
 
-    @Test("Somebody too few articles name is not in the directory, and their rows are there all the same")
+    @Test(
+        "Somebody too few articles name is not in the directory, and their rows are there all the same",
+        .enabled(if: systemNamesPeople))
     func threshold() async throws {
         try await articles(Newsmaker.leastArticles - 1, saying: "Emmanuel Macron a parlé mercredi matin.")
         try await readEverything()

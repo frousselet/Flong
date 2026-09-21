@@ -52,12 +52,42 @@ struct TopicNamerLiveTests {
     /// which is the right behaviour and not something to assert against. What
     /// these tests are for is what a working model writes, so they say so and
     /// stop rather than reporting the machine's mood as a fault in the code.
-    private func modelIsStillThere(_ what: String) -> Bool {
+    private func modelIsStillThere(_ what: String) async -> Bool {
         guard LocalProvider().isAvailable else {
             print("=== the model went away while checking \(what), so nothing was judged")
             return false
         }
+        guard await Self.modelAnswers() else {
+            print("=== the model here says it is there and answers nothing, so \(what) was not judged")
+            return false
+        }
         return true
+    }
+
+    /// Whether the model answers, which is not what `availability` says.
+    ///
+    /// **A machine can hold a model that says `available` and fails every
+    /// call.** The models are a downloaded asset set, and an operating system
+    /// upgrade can leave the catalogue empty behind an availability that never
+    /// stopped saying `available` : every request then comes back
+    /// `ModelManagerError`, three of them leave the model alone for a while,
+    /// and a suite gated on availability alone runs to the end and reports the
+    /// state of the machine as a fault in the code. That is the one thing the
+    /// note above says this suite exists not to do.
+    ///
+    /// One question of a few tokens tells the two apart, and only `unusable`
+    /// counts : a model that read the question and declined it, or that was
+    /// busy, is a model that is here.
+    private static func modelAnswers() async -> Bool {
+        do {
+            _ = try await LocalProvider()
+                .conversation(saying: "Answer in one word.")
+                .answer(to: "Name a colour.", shaped: .words, keeping: 16)
+            return true
+        } catch {
+            guard case .unusable = error else { return true }
+            return false
+        }
     }
 
     private let headlines = [
@@ -81,7 +111,7 @@ struct TopicNamerLiveTests {
     func briefOfEnglishArticles() async throws {
         let articles = english.map { (title: $0, excerpt: Optional($0)) }
         let brief = await StorySummarizer(locale: Locale(identifier: "fr_FR")).brief(forArticles: articles)
-        guard modelIsStillThere("a brief") else { return }
+        guard await modelIsStillThere("a brief") else { return }
 
         let summary = try #require(brief.summary)
         #expect(brief.isGenerated)
@@ -115,7 +145,7 @@ struct TopicNamerLiveTests {
 
         for (headline, subject) in expected {
             guard case .wrote(let filed) = await namer.file(headline, summary: nil, into: vocabulary) else {
-                if modelIsStillThere("a filing") { Issue.record("The model would not file \(headline)") }
+                if await modelIsStillThere("a filing") { Issue.record("The model would not file \(headline)") }
                 continue
             }
             print("=== \(headline) -> \(filed)")
@@ -147,7 +177,7 @@ struct TopicNamerLiveTests {
                 into: ["Jardinage", "Cuisine"]
             )
         else {
-            if modelIsStillThere("a filing with nothing that fits") {
+            if await modelIsStillThere("a filing with nothing that fits") {
                 Issue.record("The model would not file the headline")
             }
             return
@@ -202,7 +232,7 @@ struct TopicNamerLiveTests {
 
         let page = try await service.digest(now: now)
         let stories = try await database.writer.read { db in try Story.fetchAll(db) }
-        guard modelIsStillThere("a whole page") else { return }
+        guard await modelIsStillThere("a whole page") else { return }
 
         // What a reader opening the window sees : stories, written briefs, and
         // pills to narrow them by.
