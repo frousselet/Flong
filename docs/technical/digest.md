@@ -454,6 +454,10 @@ A model that will not write about one story is not a model that has stopped work
 
 Only the second kind counts towards the three failures that leave the model alone for the rest of the run. Counting the first meant three awkward headlines in a row silenced it, and every story after them kept whatever it already said, in whatever language it already said it : a page of security advisories half in French and half in English.
 
+**Those names are iOS 26's, and iOS 27 uses others.** The one enumeration they all belonged to was split across four types there, `LanguageModelError`, `SystemLanguageModel.Error`, `LanguageModelSession.Error` and `GeneratedContent.ParsingError`, and deprecated. Nothing says so at build time : a deprecation dated 27 is silent against a deployment target of 26, and the old reading goes on compiling while it stops catching anything. What it stops catching falls to the default, which reads the model as unreachable, so the paragraph above arrives again by the other door : the same page of security advisories, the same three refusals, the same silence. `LocalProvider.fault(of:)` reads the newer set first and falls back to the older one, and it does so until the deployment target moves rather than under a flag.
+
+The split is worth something beyond compatibility on one count. `LanguageModelError.rateLimited` carries a `resetDate`, where the old `rateLimited` carried a string. The device passes it on as the `retryAfter` a service's own rate limit already fills, which it could not do before for want of anything to pass. A timeout has no counterpart in the old set and is the one case decided rather than translated : it reads as the model being unreachable and not as the model being busy, since busy counts towards nothing and is the model asking for a moment, which a rate limit does in so many words and a silence does not.
+
 ## More of this, less of this
 
 A long press on a subject moves it up or down, by one, between three and minus three. Nought is the absence of an opinion and is never stored, so the table holds one row per subject the reader has actually spoken about.

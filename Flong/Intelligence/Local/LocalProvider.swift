@@ -144,7 +144,7 @@ nonisolated struct LocalProvider: ModelProvider {
     /// cut off in the middle comes back as a `decodingFailure`, which is a
     /// worse outcome than a long one.
     static func options(maximumTokens: Int) -> GenerationOptions {
-        GenerationOptions(sampling: .greedy, maximumResponseTokens: maximumTokens)
+        GenerationOptions(samplingMode: .greedy, maximumResponseTokens: maximumTokens)
     }
 
     // MARK: - What a failure means
@@ -157,7 +157,24 @@ nonisolated struct LocalProvider: ModelProvider {
     /// run, and every story after them kept whatever it already said, in
     /// whatever language it already said it. That is the mixture of French and
     /// English a reader of the security press was looking at.
+    ///
+    /// **There are two sets of failures to read, and the newer one is read
+    /// first.** One enumeration carried all of this until iOS 27, which split
+    /// it across four types and deprecated the old one. Nothing warns about
+    /// that : the deprecation is dated 27 and the deployment target is 26, so
+    /// the compiler stays quiet and the old reading goes on compiling. What it
+    /// does not go on doing is working. Anything that is not the old
+    /// enumeration falls through to the last line here and is read as the
+    /// model being unreachable, so one guardrail refusal over one awkward
+    /// story would become the model being broken, and three in a row would
+    /// silence it for ten minutes : precisely the page of security advisories
+    /// the paragraph above is about, arriving again through the other door.
+    /// Both sets are read until the deployment target moves.
     static func fault(of error: Error) -> ModelFault {
+        if #available(iOS 27.0, macOS 27.0, *), let fault = recentFault(of: error) {
+            return fault
+        }
+
         guard let error = error as? LanguageModelSession.GenerationError else {
             guard error is CancellationError else { return .unusable(.unreachable) }
             return .unusable(.cancelled)
@@ -178,6 +195,65 @@ nonisolated struct LocalProvider: ModelProvider {
             return .unusable(.misconfigured)
         @unknown default:
             return .unusable(.unreachable)
+        }
+    }
+
+    /// The same reading, against the failures iOS 27 throws in place of the
+    /// single enumeration, or nothing where the error is none of them.
+    ///
+    /// **Four types where there was one**, and the split is not a tidying :
+    /// each of them carries what the old one only wrote into a string. The one
+    /// worth taking here is the rate limit, which now says when it lifts. The
+    /// device passed nothing there before, not by choice but because the old
+    /// enumeration had nothing to pass.
+    ///
+    /// **A timeout is the one judgement call, and it reads as unreachable
+    /// rather than busy.** Busy is the model asking for a moment and counts
+    /// towards nothing, which is right for a rate limit, since a rate limit
+    /// says in so many words to come back. A timeout says nothing at all, and
+    /// a night's pass that asks a silent model once per story spends the night
+    /// asking. Three in a row leaves it alone for ten minutes, which is what
+    /// that count exists for.
+    @available(iOS 27.0, macOS 27.0, *)
+    private static func recentFault(of error: Error) -> ModelFault? {
+        switch error {
+        case let error as LanguageModelError:
+            switch error {
+            case .guardrailViolation, .refusal:
+                return .declined
+            case .unsupportedGenerationGuide:
+                return .unreadable
+            case .contextSizeExceeded:
+                return .tooLong
+            case .rateLimited(let limit):
+                return .busy(retryAfter: limit.resetDate.map { max(0, $0.timeIntervalSinceNow) })
+            case .unsupportedCapability, .unsupportedLanguageOrLocale, .unsupportedTranscriptContent:
+                return .unusable(.misconfigured)
+            case .timeout:
+                return .unusable(.unreachable)
+            @unknown default:
+                return .unusable(.unreachable)
+            }
+        case is GeneratedContent.ParsingError:
+            return .unreadable
+        case let error as SystemLanguageModel.Error:
+            switch error {
+            case .assetsUnavailable:
+                return .unusable(.absent)
+            @unknown default:
+                return .unusable(.unreachable)
+            }
+        case let error as LanguageModelSession.Error:
+            switch error {
+            case .concurrentRequests:
+                return .busy(retryAfter: nil)
+            case .transcriptMutationWhileResponding:
+                return .unusable(.misconfigured)
+            @unknown default:
+                return .unusable(.unreachable)
+            }
+        default:
+            return nil
         }
     }
 

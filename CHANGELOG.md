@@ -57,6 +57,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- What went wrong with the model is read on iOS 27 as well : the system split its one set of failures across four types and deprecated the old one without a word from the compiler, so a story the model declined to write about would have counted as a model that had stopped working, and three of them would have silenced it for ten minutes.
 - An edition comes out at its hour : the naming was left whatever the headlines and the subjects had not used, which on a morning was nothing ; the readiness test counted stories the writer had already decided never to re-ask, so no page was ever ready before its twenty minutes of grace ran out ; the writer worked through the day's news before the night's, so the page could not fill ; and a phone's one background wake per hour was re-armed for the next hour whatever had come of it. A reader who opened Flong at ten still had last night's paper.
 - An edition the reader cancels is cancelled : switching a slot off, moving it back, or switching every edition off left the page in flight open, so it was written, published and announced under an hour that no longer existed. A page whose successor has gone to press is no longer published either, and the pending background wake is withdrawn.
 - The notice for a new edition is no longer lost by the pass on the mains, which published the page and said nothing ; and the first edition after the notices are switched on is no longer swallowed by a watermark seeded with a wall clock.

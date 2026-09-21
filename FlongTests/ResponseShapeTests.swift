@@ -187,6 +187,61 @@ struct ModelFaultTests {
         #expect(LocalProvider.fault(of: CancellationError()).isBusy)
     }
 
+    /// iOS 27 split the one enumeration into four types, and nothing warns
+    /// that the old reading no longer catches them : a deprecation dated 27
+    /// against a deployment target of 26 is a silent one. Unread, every one of
+    /// these would come back as the model being unreachable, and a page of
+    /// awkward stories would silence it. These are the same four questions as
+    /// above, asked of the newer door.
+    @available(iOS 27.0, macOS 27.0, *)
+    @Test("A story the newer failures will not write about is still about the story")
+    func aRecentRefusalIsAboutTheStory() {
+        let errors: [any Error] = [
+            LanguageModelError.guardrailViolation(.init(debugDescription: "")),
+            LanguageModelError.refusal(.init(explanation: "", debugDescription: "")),
+            LanguageModelError.unsupportedGenerationGuide(.init(schemaName: nil, debugDescription: "")),
+            LanguageModelError.contextSizeExceeded(.init(contextSize: 4096, tokenCount: 8192, debugDescription: "")),
+            GeneratedContent.ParsingError(rawContent: "", debugDescription: ""),
+        ]
+
+        for error in errors {
+            #expect(!LocalProvider.fault(of: error).isTheModelItself)
+        }
+    }
+
+    /// The rate limit is the one of the four that gained something the old
+    /// enumeration could not carry, so the device now says when it lifts where
+    /// it used to pass nothing.
+    @available(iOS 27.0, macOS 27.0, *)
+    @Test("A newer rate limit is busy and says when it lifts")
+    func aRecentRateLimitSaysWhenItLifts() {
+        let lifts = Date().addingTimeInterval(30)
+        let limit = LanguageModelError.rateLimited(.init(resetDate: lifts, debugDescription: ""))
+        let fault = LocalProvider.fault(of: limit)
+
+        guard case .busy(let retryAfter) = fault else {
+            Issue.record("A rate limit is the model asking for a moment")
+            return
+        }
+        #expect(fault.isBusy)
+        #expect(retryAfter.map { $0 > 0 && $0 <= 30 } == true)
+
+        #expect(LocalProvider.fault(of: LanguageModelSession.Error.concurrentRequests).isBusy)
+    }
+
+    /// A timeout is the judgement call : it says nothing at all, where a rate
+    /// limit says to come back, so it counts and a rate limit does not.
+    @available(iOS 27.0, macOS 27.0, *)
+    @Test("Assets that are not there, and a silence, are the model itself")
+    func recentModelTroubleIsTheModel() {
+        let absent = LocalProvider.fault(of: SystemLanguageModel.Error.assetsUnavailable(.init(debugDescription: "")))
+        #expect(absent == .unusable(.absent))
+
+        let silent = LocalProvider.fault(of: LanguageModelError.timeout(.init(debugDescription: "")))
+        #expect(silent.isTheModelItself)
+        #expect(!silent.isBusy)
+    }
+
     @Test("The three answers are drawn from the fault in one place")
     func theThreeAnswersAreDrawnOnce() {
         #expect(Answered<String>(failing: .declined).written == nil)
