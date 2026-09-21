@@ -124,6 +124,51 @@ struct TopicNamerLiveTests {
         #expect(Self.language(of: summary) == .french)
     }
 
+    /// Our own instructions, put to the model over articles with nothing in
+    /// them to object to.
+    ///
+    /// **This is the test that tells the two failures apart.** One story
+    /// refused is ordinary, is what the second voice exists for, and costs a
+    /// headline. Every story refused, a village library included, is our own
+    /// prompt being refused, and it costs the whole page : nothing is
+    /// generated, so no story is eligible and no edition comes out. From the
+    /// reader's side the two look the same, a paper wearing its publishers'
+    /// own headlines, which is precisely the outcome section 14 was rewritten
+    /// to stop happening silently.
+    ///
+    /// iOS 27 decides this refusal after the answer has been written, over a
+    /// transcript that holds the instructions, so a word chosen to illustrate
+    /// a rule is enough to stop the digest outright. One did, in both voices
+    /// at once, which is why the second could not rescue the first.
+    /// `docs/technical/digest.md` carries the measurement.
+    @Test("Our own instructions are not what the model refuses")
+    func ourOwnVoiceIsAnswerable() async throws {
+        let harmless: [(title: String, excerpt: String?)] = [
+            (
+                "La bibliothèque municipale ouvrira le dimanche",
+                "Le conseil a voté l'ouverture dominicale à partir de septembre."
+            ),
+            ("Horaires élargis pour la bibliothèque", "Les lecteurs pourront emprunter sept jours sur sept."),
+            (
+                "La médiathèque recrute deux bibliothécaires",
+                "Deux postes sont ouverts pour tenir les nouveaux horaires."
+            ),
+        ]
+
+        let brief = await StorySummarizer(locale: Locale(identifier: "fr_FR")).brief(forArticles: harmless)
+        guard await modelIsStillThere("our own instructions") else { return }
+
+        #expect(
+            brief.isGenerated,
+            """
+            Both voices refused a story about library opening hours, so what is being refused is our \
+            own prompt rather than the news. Look for a word in the instructions of StorySummarizer \
+            before looking at the articles.
+            """
+        )
+        #expect(brief.summary != nil)
+    }
+
     private static func language(of text: String) -> NLLanguage? {
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(text)

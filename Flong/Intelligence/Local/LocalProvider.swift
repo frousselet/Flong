@@ -103,9 +103,18 @@ nonisolated struct LocalProvider: ModelProvider {
     /// reader already chose to receive, which is the case Apple provides
     /// ``SystemLanguageModel/Guardrails/permissiveContentTransformations`` for.
     /// The default set refuses a great deal of ordinary news : a court report,
-    /// a war, a drug seizure, an epidemic. Every one of those refusals arrived
-    /// as a `guardrailViolation`, and every one left a story wearing its own
+    /// a war, a drug seizure, an epidemic. Those refusals arrived as a
+    /// `guardrailViolation`, and every one left a story wearing its own
     /// article's headline for no reason the reader could see.
+    ///
+    /// **Not every refusal is one of those, and iOS 27 made that matter.** A
+    /// second kind arrives as a `refusal` carrying `May contain sensitive
+    /// content`, it is decided after the answer has been written rather than
+    /// before, and this setting does not touch it : measured over the same
+    /// call, the permissive set and the default set refuse it alike. Nothing
+    /// keys on the difference, ``fault(of:)`` folding both into `.declined`,
+    /// which is why the behaviour was right while this paragraph was not.
+    /// `docs/technical/digest.md` carries the measurement.
     ///
     /// It is not a way round anything. What is asked of the model is a headline
     /// and one line about articles a publisher has already published and a

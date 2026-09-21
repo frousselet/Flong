@@ -294,8 +294,8 @@ nonisolated struct StorySummarizer: Sendable {
         Never promise more than the articles say, and never exaggerate.
 
         Write it as a sentence of the reader's language, with its articles and its verb, and end it \
-        without a full stop : `L'Argentine restitue un tableau volé par les nazis`, never `Argentine \
-        restitue tableau volé par nazis`, never `Pierre Gasly pole position`.
+        without a full stop : `L'Argentine restitue un tableau volé à un musée`, never `Argentine \
+        restitue tableau volé à musée`, never `Pierre Gasly pole position`.
 
         The standfirst is one or two sentences and no more.
         It states the angle : what this story is about, of everything it could have been about.
@@ -342,8 +342,8 @@ nonisolated struct StorySummarizer: Sendable {
         Never a pun, never a play on words, never a tease, never a question.
 
         Write it as a sentence of the reader's language, with its articles and its verb, and end it \
-        without a full stop : `L'Argentine restitue un tableau volé par les nazis`, never `Argentine \
-        restitue tableau volé par nazis`, never `Pierre Gasly pole position`.
+        without a full stop : `L'Argentine restitue un tableau volé à un musée`, never `Argentine \
+        restitue tableau volé à musée`, never `Pierre Gasly pole position`.
 
         The standfirst is one or two sentences and no more.
         It answers what the headline left out : who, what, where, and why.
