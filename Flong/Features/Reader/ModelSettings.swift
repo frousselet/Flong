@@ -284,7 +284,7 @@ struct ModelSettings: View {
 
     @ViewBuilder
     private var calls: some View {
-        if !model.providers.isEmpty {
+        if model.sendsAnything || !model.providers.isEmpty {
             Section {
                 NavigationLink(value: ReaderPage.providerCalls) {
                     HStack {
@@ -311,7 +311,7 @@ struct ModelSettings: View {
     /// material.
     @ViewBuilder
     private var stopping: some View {
-        if model.sendsToProviders {
+        if model.sendsAnything {
             Section {
                 Button(role: .destructive) {
                     isStopping = true

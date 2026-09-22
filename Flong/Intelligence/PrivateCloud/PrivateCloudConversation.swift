@@ -113,7 +113,7 @@ nonisolated final class PrivateCloudConversation: ModelConversation {
             return Answer(response.content)
         } catch {
             let fault = PrivateCloudProvider.fault(of: error)
-            await record(Self.outcome(of: fault), from: started, prompt: nil, answer: nil)
+            await record(.failed(fault), from: started, prompt: nil, answer: nil)
             standing.failed(fault)
 
             // The reader left. Nothing stands in for that.
@@ -134,15 +134,6 @@ nonisolated final class PrivateCloudConversation: ModelConversation {
         let opened = local.conversation(saying: instructions)
         device = opened
         return opened
-    }
-
-    /// What a failure is called in the record the reader can read.
-    private static func outcome(of fault: ModelFault) -> ProviderCallOutcome {
-        switch fault {
-        case .declined, .unreadable, .tooLong: .declined
-        case .busy: .busy
-        case .unusable: .failed
-        }
     }
 
     /// One row per request that actually left, and only for that rung : a

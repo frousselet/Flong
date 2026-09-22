@@ -56,6 +56,17 @@ nonisolated enum ProviderDialect: String, Codable, Hashable, Sendable {
     case jsonObject
     /// Neither, and the answer read out of whatever came back.
     case plainText
+
+    /// A word a newer version learnt is read as the one nothing has learnt yet.
+    ///
+    /// Safe, because this is a hint rather than a setting : a dialect read
+    /// wrong costs one call that comes back in the wrong shape and is then
+    /// learnt again. Read strictly it would throw, and a throw here fails the
+    /// whole settings blob, which costs the reader every account they have.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = Self(rawValue: raw) ?? .strictSchema
+    }
 }
 
 /// One model a reader has configured, and everything about it that is not a
@@ -249,6 +260,16 @@ nonisolated enum PrivateCloudConsent: String, Hashable, Sendable, Codable {
     case unasked
     case agreed
     case declined
+
+    /// **Anything this build does not understand is not a yes.** A word a newer
+    /// version writes is read as never having been asked, which sends nothing
+    /// and leaves the reader able to agree. Read strictly it would throw, and a
+    /// throw fails the whole settings blob : the accounts, the assignment and
+    /// this very consent, on every device.
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = Self(rawValue: raw) ?? .unasked
+    }
 }
 
 /// What the reader has chosen about models.
@@ -312,10 +333,50 @@ nonisolated struct ProviderSettings: Hashable, Sendable, Codable {
     /// a blob from a version that adds another field after this one.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        accounts = try container.decodeIfPresent([ProviderAccount].self, forKey: .accounts) ?? []
+        accounts = Self.readAccounts(in: container)
         assignment = Self.readAssignment(in: container)
         sendsToProviders = try container.decodeIfPresent(Bool.self, forKey: .sendsToProviders) ?? false
         privateCloud = try container.decodeIfPresent(PrivateCloudConsent.self, forKey: .privateCloud) ?? .unasked
+    }
+
+    /// The accounts read one at a time, because one this build cannot read must
+    /// not cost the others.
+    ///
+    /// **An account of a kind a newer version added is the case this exists
+    /// for.** A kind is not a hint and must not be guessed at : pointed at the
+    /// wrong wire format, an account would send a reader's articles to their
+    /// service in a shape it does not speak. So the account this build cannot
+    /// understand is left out rather than approximated, and the ones beside it,
+    /// the assignment and the consent all survive, where reading the array
+    /// whole lost every one of them.
+    ///
+    /// **What it still costs, said rather than discovered.** This build then
+    /// writes the settings back without that account, so it is lost on the
+    /// newer device too. That is the price of one shared blob that carries no
+    /// version, and it is a great deal smaller than the price of losing all of
+    /// them.
+    private static func readAccounts(in container: KeyedDecodingContainer<CodingKeys>) -> [ProviderAccount] {
+        guard var list = try? container.nestedUnkeyedContainer(forKey: .accounts) else { return [] }
+
+        var read: [ProviderAccount] = []
+        while !list.isAtEnd {
+            // Decoded into a value first so the cursor moves whatever happens :
+            // a failed `decode` is not promised to advance, and a loop that
+            // does not end is a launch that hangs rather than a test that
+            // fails.
+            guard let carried = try? list.decode(AnyAccount.self) else { break }
+            if let account = carried.account { read.append(account) }
+        }
+        return read
+    }
+
+    /// One element of the list, which is an account or is not.
+    private struct AnyAccount: Decodable {
+        let account: ProviderAccount?
+
+        init(from decoder: Decoder) throws {
+            account = try? ProviderAccount(from: decoder)
+        }
     }
 
     /// The assignment read pair by pair, because one pair this build cannot

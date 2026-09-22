@@ -149,4 +149,50 @@ struct ProviderSettingsCodingTests {
         #expect(read.sendsToProviders)
         #expect(read.choice(for: .search) == .onDevice)
     }
+
+    // MARK: - Words a newer version writes
+
+    /// An account of a kind this build has no name for is left out rather than
+    /// guessed at, and everything beside it survives. Guessed at, it would send
+    /// a reader's articles to their own service in a shape it does not speak.
+    @Test("An account of a kind this build cannot read costs that account alone")
+    func anUnknownKindCostsOneAccount() throws {
+        let mixed = #"""
+            {"accounts":[\
+            {"id":"0198F0A0-0000-7000-8000-000000000001","kind":"anthropic","name":"Chez moi"},\
+            {"id":"0198F0A0-0000-7000-8000-000000000002","kind":"aKindFromLater","name":"Ailleurs"}],\
+            "sendsToProviders":true,"privateCloud":"agreed"}
+            """#
+            .replacingOccurrences(of: "\\\n", with: "")
+
+        let read = try JSONDecoder().decode(ProviderSettings.self, from: Data(mixed.utf8))
+
+        #expect(read.accounts.map(\.name) == ["Chez moi"])
+        #expect(read.sendsToProviders)
+        #expect(read.privateCloud == .agreed)
+    }
+
+    /// A dialect is a hint that is learnt again, so it is forgotten rather than
+    /// thrown over.
+    @Test("A dialect this build cannot read is forgotten, not fatal")
+    func anUnknownDialectIsForgotten() throws {
+        let odd =
+            #"{"accounts":[{"id":"0198F0A0-0000-7000-8000-000000000001","kind":"anthropic","name":"Chez moi","dialect":"aDialectFromLater"}]}"#
+        let read = try JSONDecoder().decode(ProviderSettings.self, from: Data(odd.utf8))
+
+        #expect(read.accounts.map(\.name) == ["Chez moi"])
+        #expect(read.accounts.first?.dialect == .strictSchema)
+    }
+
+    /// Anything that is not a yes this build understands is not a yes.
+    @Test("A consent this build cannot read is never taken for agreement")
+    func anUnknownConsentIsNotAYes() throws {
+        let later = #"{"accounts":[],"sendsToProviders":false,"privateCloud":"agreedForSomethingElse"}"#
+        let read = try JSONDecoder().decode(ProviderSettings.self, from: Data(later.utf8))
+
+        #expect(read.privateCloud == .unasked)
+        for task in ModelTask.allCases {
+            #expect(read.choice(for: task, withPrivateCloud: true) == .onDevice)
+        }
+    }
 }

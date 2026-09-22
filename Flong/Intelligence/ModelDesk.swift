@@ -114,9 +114,15 @@ nonisolated final class ModelDesk: Sendable {
         let choice = settings.choice(for: task, withPrivateCloud: privateCloud.reading.isEligible)
 
         guard choice != .nothing else { return NoModel().absence }
-        // Apple's model answers or the device does, so what is missing is
-        // whatever the device is missing.
-        if case .privateCloud = choice { return local.absence }
+        // **Asked of the provider rather than answered here.** Apple's model
+        // answers or the device does, and the two have different absences : a
+        // page that said no edition would be written while that model was
+        // writing it is the front page's one unforgivable sentence, and
+        // repeating the reasoning here rather than asking is how the two
+        // drifted apart in the first place.
+        if case .privateCloud = choice {
+            return PrivateCloudProvider(task: task, local: local, standing: privateCloud, log: nil).absence
+        }
         guard let cloud = configured(for: task) else { return local.absence }
         // A model of the reader's own that is failing is not an absence : the
         // device is writing instead, and the settings row is where that is

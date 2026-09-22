@@ -1843,6 +1843,16 @@ final class AppModel {
         preferences.providers.choice(for: task, withPrivateCloud: hasPrivateCloud)
     }
 
+    /// Whether anything at all may leave this device.
+    ///
+    /// **The way back out is gated on this and not on having an account.** A
+    /// reader whose only consent is Apple's own model has no account, so a
+    /// section shown only to account holders hid both the stop and the record
+    /// of what had left, from exactly the reader they were written for. The
+    /// sheet promises `you can stop at any time` and `every call is written
+    /// down on this device`, and neither was reachable.
+    var sendsAnything: Bool { sendsToProviders || privateCloudConsent == .agreed }
+
     /// Records that they have been asked about Apple's own larger model.
     ///
     /// Its own consent and not the one that covers a service they configured :

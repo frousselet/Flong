@@ -159,8 +159,32 @@ nonisolated final class PrivateCloudStanding: Sendable {
     /// So the same failure lays a rest here, until the system's own date or for
     /// a quarter of an hour where it named none.
     func failed(_ fault: ModelFault, now: Date = Date()) {
-        guard case .busy(let retryAfter) = fault else { return }
-        let until = now.addingTimeInterval(retryAfter ?? Self.blindRest)
+        switch fault {
+        case .busy(let retryAfter):
+            // A date already past is no date at all : floored to zero it would
+            // defeat the fallback below and lay a rest the next read lifts.
+            let waiting = retryAfter.flatMap { $0 > 0 ? $0 : nil } ?? Self.blindRest
+            rest(until: now.addingTimeInterval(waiting))
+        case .unusable(.cancelled):
+            // The reader left. That says nothing about anything.
+            return
+        case .unusable:
+            // **A network that is not there needs a rest as much as a spent
+            // quota does, and used to get none.** The conversation answers from
+            // the device and returns normally, so the call counts as a success
+            // and ``ModelPatience`` never sees the failure ; nothing else
+            // watches. A pass over five hundred stories then paid five hundred
+            // timeouts before the device wrote, every one of them a row in the
+            // reader's own log. Both brakes were unreachable and this is the
+            // one that can reach.
+            rest(until: now.addingTimeInterval(Self.blindRest))
+        case .declined, .unreadable, .tooLong:
+            // About the story it was shown, which says nothing about the model.
+            return
+        }
+    }
+
+    private func rest(until: Date) {
         held.withLock { $0.restsUntil = until }
         Log.enrich.notice("Private Cloud Compute is resting, and this device is writing meanwhile")
     }

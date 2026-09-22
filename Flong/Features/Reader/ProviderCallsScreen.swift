@@ -71,9 +71,14 @@ struct ProviderCallsScreen: View {
         VStack(alignment: .leading, spacing: 3) {
             Text(call.task.title)
 
-            // Verbatim : a host and a model identifier are spelled the same in
-            // every language.
-            Text(verbatim: "\(call.host) · \(call.model)")
+            // Verbatim : a host, a model identifier and the name of Apple's
+            // own model are spelled the same in every language.
+            //
+            // **A call that names neither a host nor a model is not a mistake.**
+            // Apple's larger model has no address a reader could check and the
+            // framework names no model, so the row says what it was rather than
+            // a lone separator between two empty strings.
+            Text(verbatim: Self.where(call))
                 .font(theme.metadata)
                 .foregroundStyle(.secondary)
 
@@ -87,6 +92,12 @@ struct ProviderCallsScreen: View {
             .font(theme.metadata)
             .foregroundStyle(call.outcome == .answered ? AnyShapeStyle(.secondary) : AnyShapeStyle(Color.orange))
         }
+    }
+
+    /// Where a call went, in the terms that call has.
+    private static func `where`(_ call: ProviderCall) -> String {
+        let said = [call.host, call.model].filter { !$0.isEmpty }
+        return said.isEmpty ? call.providerName : said.joined(separator: " · ")
     }
 
     private func ended(_ call: ProviderCall) -> Text {
