@@ -129,3 +129,32 @@ There is no export of stories to carry the field into yet ; the column is where 
 ## What is never in an error
 
 **Nothing from the wire.** A service is free to put anything in the body of its own error and several put the prompt there ; one of them puts the key back. So the failures are a small closed set of five, the body is neither shown nor logged, and what a reader is told is one of five sentences written here. That is what makes `a key never reaches a message` a property a test can prove rather than a habit that decays.
+
+## Apple's own larger model
+
+It is a fourth answer to *who writes this* and it is not one of the accounts above : no key, no address and no bill, so almost nothing on this page applies to it. What does apply is the log, which records it like any other call that left, and the rule that nothing goes before the reader has agreed.
+
+**Preferring it is the absence of a choice.** A task carrying an entry is obeyed exactly as before ; a task carrying none falls to it, once the reader has agreed and once the device is eligible. `ModelChoice.privateCloud` is therefore never written down : `pointing(_:at:)` removes the entry rather than storing a word older versions cannot read. Consent moves what was never decided and never overrides a decision.
+
+**Eligibility and readiness are different questions on purpose.** Eligibility is a fact about the device, and it decides what the picker offers. Readiness is a matter of the hour, the quota included, and it decides only the line underneath the row. A quota spent at three in the morning must not rewrite on screen the answer the reader gave, and a picker that flickered between two answers overnight would be worse than one that is occasionally optimistic.
+
+**A spent quota rests the model rather than counting against it.** `ModelPatience` counts a busy model towards nothing, which is right and must stay right, a background pass being rate-limited hard enough that three of those once silenced the model for a whole night. But nothing would then stop the asking, and a pass over five hundred stories would put five hundred round trips to a limit already reached. So the same failure lays a rest on `PrivateCloudStanding`, until the system's own date or a quarter of an hour where it named none, and the device writes meanwhile. It costs a round trip and not the night.
+
+### Turning it on
+
+**It is held shut, and the reason is that there is nothing to probe.** Apple gates the model behind a managed entitlement, `com.apple.developer.private-cloud-compute`, granted on request. Without it the framework does not throw : it stops the process on the first request. Measured on iOS 27.0, `availability` answers `available` all the same, `contextSize` answers `32768`, and the quota reads normally, so nothing the framework says tells you whether asking is safe. `SecTaskCreateFromSelf` does not exist on iOS, so the running binary cannot read its own entitlements either. A build-time condition is the only honest gate.
+
+Two deliberate steps, once Apple has granted the request :
+
+1. add `com.apple.developer.private-cloud-compute` to `Config/Flong.entitlements` ;
+2. add `FLONG_PRIVATE_CLOUD` to `SWIFT_ACTIVE_COMPILATION_CONDITIONS`.
+
+Until both are done every reading answers `notEntitled`, nothing is ever eligible, and no request is ever made. The entitlement is deliberately absent from the file rather than present and unused : a managed entitlement that has not been granted fails provisioning, so adding it early breaks the build for everybody.
+
+The second step has been walked with the first left out, by building the whole suite with `SWIFT_ACTIVE_COMPILATION_CONDITIONS` carrying the flag : everything compiles and every test passes with it set, so the day the entitlement arrives is not the day this is first tried. **They go together and neither alone is safe.** The flag without the entitlement is the one combination that stops the process, since it lets a reading call itself eligible and a request follow. The gate is the flag rather than the entitlement because the entitlement cannot be read from inside the running application on iOS, which is the whole reason this is a build-time question.
+
+### What has not been measured
+
+**Its refusal rate.** That model offers `init()` and nothing else : no guardrails, no use case, no knob of any kind. `LocalProvider` sets the permissive content-transformation guardrails precisely because the default set refuses about a third of ordinary news, and there is no equivalent here. If its defaults behave like the default set on the device, the visible result of preferring it is a *worse* front page : better prose on what it writes, and a third of the page back to raw headlines. Nothing in the system would report it, a refusal being about the story rather than the model. The second voice is switched off while it answers, too, which removes the one mechanism that recovers four refusals in ten.
+
+**So it should be measured before the preference is switched on for anybody**, on the pattern of `TopicNamerLiveTests` : thirty real stories to both models, refusals counted. It could not be measured while writing this, the model being gated behind the entitlement above.
